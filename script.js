@@ -108,26 +108,33 @@ function startLoadingSequence() {
 
     // Chamar o backend de forma definitiva
     fetchAllData().then((success) => {
-        if (success === false) return; // Se deu 401, o fetchAllData já recarregou a página
-
-        // Quando a API responde com sucesso, completamos a barra
-        clearInterval(interval);
-        clearInterval(insightInterval);
+        // Garantir que a barra chegue a 100%
         bar.style.width = "100%";
+        
+        if (success === false) {
+            console.log("Sessão expirada, redirecionando...");
+            return;
+        }
+
         loadingText.innerText = "Dados Sincronizados!";
         generateRealInsights();
         
+        // FORÇAR a retirada do overlay após os dados chegarem
         setTimeout(() => {
             overlay.classList.add("hidden");
             app.classList.remove("hidden");
             setupEventListeners();
-        }, 1200);
+            console.log("Dashboard liberado com sucesso.");
+        }, 800);
     }).catch(err => {
         console.error("Erro fatal no carregamento:", err);
-        loadingText.innerText = "Falha na conexão. Reiniciando...";
-        clearInterval(interval);
-        clearInterval(insightInterval);
-        setTimeout(() => window.location.reload(), 3000);
+        loadingText.innerText = "Falha na conexão. Tentando recuperar...";
+        
+        // Mesmo em erro, se já tivermos dados antigos, podemos tentar mostrar
+        setTimeout(() => {
+            overlay.classList.add("hidden");
+            app.classList.remove("hidden");
+        }, 3000);
     });
 }
 
