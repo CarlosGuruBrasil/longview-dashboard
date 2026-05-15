@@ -107,8 +107,10 @@ function startLoadingSequence() {
     loadingText.innerText = "Sincronizando com o Portal de Inteligência...";
 
     // Chamar o backend de forma definitiva
-    fetchAllData().then(() => {
-        // Quando a API responde, completamos a barra
+    fetchAllData().then((success) => {
+        if (success === false) return; // Se deu 401, o fetchAllData já recarregou a página
+
+        // Quando a API responde com sucesso, completamos a barra
         clearInterval(interval);
         clearInterval(insightInterval);
         bar.style.width = "100%";
@@ -280,8 +282,9 @@ async function fetchAllData(force = false) {
         
         if (!response.ok) {
             if (response.status === 401) {
-                window.location.reload(); // Redireciona para login se o token expirar
-                return;
+                sessionStorage.removeItem("longview_auth");
+                window.location.reload(); 
+                return false;
             }
             throw new Error('Falha na sincronização');
         }
@@ -299,6 +302,7 @@ async function fetchAllData(force = false) {
         }
 
         applyGlobalFilters();
+        return true; // Sucesso final
     } catch (error) {
         console.error("Erro na sincronização:", error);
         alert("Erro ao sincronizar dados. Tente novamente mais tarde.");
