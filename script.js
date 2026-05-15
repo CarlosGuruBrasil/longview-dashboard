@@ -315,6 +315,13 @@ async function fetchAllData(force = false) {
         }
 
         applyGlobalFilters();
+
+        // REMOVER o spinner interno e mostrar o conteúdo
+        const innerLoader = document.getElementById("loader");
+        const contentArea = document.getElementById("content-area");
+        if (innerLoader) innerLoader.classList.add("hidden");
+        if (contentArea) contentArea.classList.remove("hidden");
+
         return true; // Sucesso final
     } catch (error) {
         console.error("Erro na sincronização:", error);
