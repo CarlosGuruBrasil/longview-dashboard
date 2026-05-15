@@ -657,6 +657,8 @@ function renderStatusPieChart(statuses) {
         }
     }));
 
+    const totalLeads = rawValues.reduce((a, b) => a + b, 0);
+
     const option = {
         backgroundColor: 'transparent',
         tooltip: {
@@ -670,13 +672,52 @@ function renderStatusPieChart(statuses) {
             {
                 name: 'Leads por Status',
                 type: 'funnel',
-                left: '10%',
-                right: '10%',
-                top: 10,
-                bottom: 10,
-                width: '80%',
+                left: '5%',
+                right: '40%', // Espaço generoso para os nomes na direita
+                top: 20,
+                bottom: 20,
+                width: '55%',
                 min: 0,
-                minSize: '8%',
+                minSize: '5%',
+                maxSize: '100%',
+                sort: 'descending',
+                gap: 2,
+                label: {
+                    show: true,
+                    position: 'right',
+                    color: '#e5e7eb',
+                    fontSize: 11,
+                    fontWeight: 500,
+                    formatter: '{b}' // Nome fora
+                },
+                labelLine: {
+                    show: true,
+                    length: 20,
+                    lineStyle: {
+                        color: 'rgba(255,255,255,0.2)'
+                    }
+                },
+                itemStyle: {
+                    borderColor: 'rgba(255,255,255,0.05)',
+                    borderWidth: 1,
+                    shadowBlur: 10,
+                    shadowColor: 'rgba(0,0,0,0.5)'
+                },
+                emphasis: {
+                    label: { fontWeight: 'bold', color: '#fff' }
+                },
+                data: chartData
+            },
+            {
+                // Camada para porcentagem interna
+                type: 'funnel',
+                left: '5%',
+                right: '40%',
+                top: 20,
+                bottom: 20,
+                width: '55%',
+                min: 0,
+                minSize: '5%',
                 maxSize: '100%',
                 sort: 'descending',
                 gap: 2,
@@ -686,24 +727,13 @@ function renderStatusPieChart(statuses) {
                     color: '#fff',
                     fontSize: 12,
                     fontWeight: 'bold',
-                    formatter: '{b}: {c}'
-                },
-                itemStyle: {
-                    borderColor: 'rgba(255,255,255,0.05)',
-                    borderWidth: 1,
-                    shadowBlur: 15,
-                    shadowColor: 'rgba(0,0,0,0.5)'
-                },
-                emphasis: {
-                    label: {
-                        fontSize: 15,
-                        fontWeight: '900'
-                    },
-                    itemStyle: {
-                        shadowBlur: 30,
-                        shadowColor: 'rgba(255,255,255,0.3)'
+                    formatter: (params) => {
+                        const perc = totalLeads > 0 ? ((params.value / totalLeads) * 100).toFixed(1) : 0;
+                        return perc > 3 ? perc + '%' : ''; // Só mostra se tiver espaço
                     }
                 },
+                itemStyle: { opacity: 0 },
+                silent: true,
                 data: chartData
             }
         ]
