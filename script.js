@@ -1505,6 +1505,21 @@ function updateMetaDashboard(insights) {
     }
 }
 
+function filterAdsTable() {
+    const searchTerm = document.getElementById("ads-search-campaign").value.toLowerCase();
+    // No momento usamos apenas o busca por termo, o filtro por produto pode ser expandido depois
+    
+    const rows = document.querySelectorAll("#table-campaigns-body tr");
+    rows.forEach(row => {
+        const campaignName = row.cells[0].textContent.toLowerCase();
+        if (campaignName.includes(searchTerm)) {
+            row.style.display = "";
+        } else {
+            row.style.display = "none";
+        }
+    });
+}
+
 function switchView(viewName) {
     currentView = viewName;
     
@@ -1532,9 +1547,10 @@ function switchView(viewName) {
     const titleMap = {
         "dashboard": "Dashboard Geral",
         "leads": "Gestão de Leads",
-        "vendas": "Relatório de Vendas"
+        "vendas": "Relatório de Vendas",
+        "marketing": "Marketing ADS"
     };
-    document.getElementById("page-title").textContent = titleMap[viewName];
+    document.getElementById("page-title").textContent = titleMap[viewName] || "Dashboard";
 }
 
 function showLoader() {
