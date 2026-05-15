@@ -9,8 +9,8 @@ module.exports = async (req, res) => {
   const { username, password } = req.body;
 
   // Em produção, esses valores virão das Environment Variables da Vercel
-  const ADMIN_USER = process.env.ADMIN_USER || 'admin';
-  const ADMIN_PASS = process.env.ADMIN_PASS || 'longview2024';
+  const ADMIN_USER = process.env.ADMIN_USER || 'Longview';
+  const ADMIN_PASS = process.env.ADMIN_PASS || 'Guru$2026';
   const JWT_SECRET = process.env.JWT_SECRET || 'secret-longview-key';
 
   if (username === ADMIN_USER && password === ADMIN_PASS) {
