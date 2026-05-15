@@ -652,7 +652,7 @@ function renderStatusPieChart(statuses) {
     if (statusPieChartInstance) statusPieChartInstance.destroy();
     
     statusPieChartInstance = new Chart(ctx.getContext('2d'), {
-        type: 'doughnut',
+        type: 'pie',
         plugins: [ChartDataLabels],
         data: {
             labels: labels,
