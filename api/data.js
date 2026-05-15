@@ -33,10 +33,35 @@ module.exports = async (req, res) => {
   try {
     console.log("Buscando dados frescos dos APIs...");
 
-    // 1. CRM Leads
-    const crmPromise = axios.get("https://longviewempreendimentos.cvcrm.com.br/api/v1/comercial/leads?limit=500", {
-      headers: { "email": CV_CRM_EMAIL, "token": CV_CRM_TOKEN, "Accept": "application/json" }
-    });
+    // 1. CRM Leads - Função para buscar TUDO com paginação
+    const fetchAllCRMLeads = async () => {
+      let allLeads = [];
+      let page = 1;
+      let hasMore = true;
+      const limit = 500;
+
+      console.log("Iniciando varredura completa de leads...");
+
+      while (hasMore) {
+        const response = await axios.get(`https://longviewempreendimentos.cvcrm.com.br/api/v1/comercial/leads`, {
+          params: { limit, offset: (page - 1) * limit },
+          headers: { "email": CV_CRM_EMAIL, "token": CV_CRM_TOKEN, "Accept": "application/json" }
+        });
+
+        const leads = response.data.leads || [];
+        allLeads = allLeads.concat(leads);
+
+        // Se trouxer menos que o limite, significa que chegamos ao fim
+        if (leads.length < limit || allLeads.length >= 5000) { // Limitador de segurança em 5k para evitar timeout extremo
+          hasMore = false;
+        } else {
+          page++;
+        }
+      }
+      return { leads: allLeads, total: allLeads.length };
+    };
+
+    const crmPromise = fetchAllCRMLeads();
 
     // 2. Meta Ads - Campanhas
     const metaCampPromise = axios.get(`https://graph.facebook.com/v18.0/${META_ACT_ID}/insights`, {
@@ -85,18 +110,19 @@ module.exports = async (req, res) => {
       crmPromise, metaCampPromise, metaDemoPromise, metaRegionPromise, metaGlobalPromise
     ]);
 
-    const crmRes = results[0].status === 'fulfilled' ? results[0].value : { data: { leads: [] } };
+    // crmPromise agora retorna o objeto de dados diretamente, não o objeto Axios
+    const crmData = results[0].status === 'fulfilled' ? results[0].value : { leads: [] };
     const metaCampRes = results[1].status === 'fulfilled' ? results[1].value : { data: { data: [] } };
     const metaDemoRes = results[2].status === 'fulfilled' ? results[2].value : { data: { data: [] } };
     const metaRegionRes = results[3].status === 'fulfilled' ? results[3].value : { data: { data: [] } };
     const metaGlobalRes = results[4].status === 'fulfilled' ? results[4].value : { data: { data: [] } };
 
     if (results.some(r => r.status === 'rejected')) {
-        console.warn("Algumas APIs falharam, mas seguindo com o que temos:", results.filter(r => r.status === 'rejected').map(r => r.reason.message));
+        console.warn("Algumas APIs falharam:", results.filter(r => r.status === 'rejected').map(r => r.reason.message));
     }
 
     const fullData = {
-      leads: crmRes.data,
+      leads: crmData,
       meta: {
         campaigns: metaCampRes.data.data || [],
         demographics: metaDemoRes.data.data || [],
