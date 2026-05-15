@@ -95,8 +95,8 @@ module.exports = async (req, res) => {
     // 2.1 Meta Ads - Detalhes da Campanha (Para datas reais de início/fim)
     const metaCampDetailsPromise = axios.get(`https://graph.facebook.com/v18.0/${META_ACT_ID}/campaigns`, {
       params: {
-        fields: 'id,name,start_time,stop_time,created_time,status',
-        limit: 100,
+        fields: 'id,name,created_time,start_time,stop_time,status',
+        limit: 150,
         access_token: META_TOKEN
       }
     });

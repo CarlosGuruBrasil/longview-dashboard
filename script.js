@@ -46,7 +46,6 @@ function startLoadingSequence(isRefresh = false) {
     overlay.classList.remove("hidden");
     login.classList.add("hidden");
     
-    // Insights Iniciais (Genéricos)
     const initialInsights = [
         "A LongView está processando suas métricas de desempenho...",
         "Conectando aos servidores do CV CRM para dados atualizados...",
@@ -1406,12 +1405,9 @@ function renderCampaignsTable(campaigns) {
         
         // Datas REAIS vs Datas do Período
         const details = detailsMap[camp.campaign_id];
-        let startStr = "-";
-        let stopStr = "-";
-        let durationStr = "-";
-
         if (details) {
-            const start = new Date(details.start_time || details.created_time);
+            // Prioridade absoluta para created_time (Data de Nascimento da Campanha no Meta)
+            const start = new Date(details.created_time || details.start_time);
             const stop = details.stop_time ? new Date(details.stop_time) : null;
             
             startStr = start.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'2-digit'});
