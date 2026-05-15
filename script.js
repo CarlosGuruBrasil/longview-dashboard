@@ -638,45 +638,91 @@ function renderStatusPieChart(statuses) {
     const ctx = document.getElementById('statusPieChart');
     if(!ctx) return;
     
-    const sorted = Object.entries(statuses).sort((a, b) => b[1] - a[1]);
-    const data = sorted.map(item => item[1]);
-    const total = data.reduce((acc, val) => acc + val, 0);
+    // Definir ordem lógica do funil
+    const hierarchy = ["novo", "entrada", "atendimento", "proposta", "reserva", "venda", "ganho"];
     
-    const labels = sorted.map((item, i) => {
-        const perc = total > 0 ? ((data[i] / total) * 100).toFixed(1) : 0;
-        return `${item[0]} (${perc}%)`;
+    const sorted = Object.entries(statuses).sort((a, b) => {
+        const getIdx = (name) => {
+            const lower = name.toLowerCase();
+            const idx = hierarchy.findIndex(h => lower.includes(h));
+            return idx === -1 ? 99 : idx;
+        };
+        return getIdx(a[0]) - getIdx(b[0]);
     });
-    
+
+    const labels = sorted.map(item => item[0]);
+    const dataValues = sorted.map(item => item[1]);
     const colors = sorted.map(item => getStatusColor(item[0]).bg);
     
+    // Para criar o efeito de pirâmide, precisamos de um dataset invisível que empurra as barras para o centro
+    const maxVal = Math.max(...dataValues) * 1.1;
+    const offsets = dataValues.map(val => (maxVal - val) / 2);
+
     if (statusPieChartInstance) statusPieChartInstance.destroy();
     
     statusPieChartInstance = new Chart(ctx.getContext('2d'), {
-        type: 'pie',
+        type: 'bar',
         plugins: [ChartDataLabels],
         data: {
             labels: labels,
-            datasets: [{
-                data: data,
-                backgroundColor: colors,
-                borderWidth: 0
-            }]
+            datasets: [
+                {
+                    // Dataset invisível para centralização
+                    data: offsets,
+                    backgroundColor: 'transparent',
+                    borderWidth: 0,
+                    hoverBackgroundColor: 'transparent'
+                },
+                {
+                    // O dado real
+                    data: dataValues,
+                    backgroundColor: colors,
+                    borderRadius: 5,
+                    borderWidth: 0,
+                    barThickness: 35
+                }
+            ]
         },
         options: {
+            indexAxis: 'y',
             responsive: true,
             maintainAspectRatio: false,
+            scales: {
+                x: { 
+                    stacked: true, 
+                    display: false,
+                    grid: { display: false }
+                },
+                y: { 
+                    stacked: true,
+                    grid: { display: false },
+                    ticks: {
+                        color: '#e5e5e5',
+                        font: { size: 12, weight: '600' }
+                    }
+                }
+            },
             plugins: {
+                legend: { display: false },
                 datalabels: {
-                    color: '#ffffff',
-                    font: { weight: 'bold', size: 11 },
+                    anchor: 'center',
+                    align: 'center',
+                    color: '#fff',
+                    font: { weight: 'bold', size: 12 },
                     formatter: (value, context) => {
-                        const sum = context.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
-                        const perc = (value / sum * 100).toFixed(1);
-                        return perc >= 4 ? perc + '%' : '';
+                        if (context.datasetIndex === 0) return null;
+                        return value;
                     }
                 },
-                legend: { position: 'right', labels: { color: '#e5e5e5', boxWidth: 12, font: { size: 11 } } },
-                tooltip: { callbacks: { label: function(context) { return ' ' + context.label + ': ' + context.raw + ' leads'; } } }
+                tooltip: {
+                    enabled: true,
+                    callbacks: {
+                        label: (context) => {
+                            if (context.datasetIndex === 0) return null;
+                            return ` ${context.label}: ${context.raw} leads`;
+                        }
+                    }
+                }
             }
         }
     });
