@@ -635,89 +635,77 @@ function renderOriginPieChart(origins) {
 }
 
 function renderStatusPieChart(statuses) {
-    const ctx = document.getElementById('statusPieChart');
-    if(!ctx) return;
+    const container = document.getElementById('status-funnel-container');
+    if(!container) return;
     
-    // Definir ordem lógica do funil
+    // Limpar container
+    container.innerHTML = "";
+
     // Ordenar por volume para manter a forma de pirâmide
     const sorted = Object.entries(statuses).sort((a, b) => b[1] - a[1]);
+    if (sorted.length === 0) return;
 
-    const labels = sorted.map(item => item[0]);
     const rawValues = sorted.map(item => item[1]);
-    const colors = sorted.map(item => getStatusColor(item[0]).bg);
     
-    // Usar raiz quadrada para a largura visual (suaviza a pirâmide mantendo a proporção)
-    const visualValues = rawValues.map(v => Math.sqrt(v));
-    const maxVisual = Math.max(...visualValues);
-    const offsets = visualValues.map(v => (maxVisual - v) / 2);
+    // Normalização visual: Usar raiz quadrada para as larguras (proporcionalidade visual)
+    const visualWidths = rawValues.map(v => Math.max(Math.sqrt(v), 2)); // Mínimo de 2 para visibilidade
+    const maxWidth = Math.max(...visualWidths);
+    
+    const widthBase = 90; // Porcentagem da largura total
+    const heightPerSection = 100 / sorted.length;
+    
+    let svgHtml = `<svg viewBox="0 0 400 350" preserveAspectRatio="none" style="width:100%; height:100%; overflow: visible;">`;
+    
+    // Definição de Gradientes e Filtros (opcional para estética premium)
+    svgHtml += `<defs>
+        <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur in="SourceAlpha" stdDeviation="2" />
+            <feOffset dx="0" dy="1" result="offsetblur" />
+            <feComponentTransfer><feFuncA type="linear" slope="0.3"/></feComponentTransfer>
+            <feMerge><feMergeNode /><feMergeNode in="SourceGraphic" /></feMerge>
+        </filter>
+    </defs>`;
 
-    if (statusPieChartInstance) statusPieChartInstance.destroy();
-    
-    statusPieChartInstance = new Chart(ctx.getContext('2d'), {
-        type: 'bar',
-        plugins: [ChartDataLabels],
-        data: {
-            labels: labels,
-            datasets: [
-                {
-                    data: offsets,
-                    backgroundColor: 'transparent',
-                    borderWidth: 0
-                },
-                {
-                    data: visualValues,
-                    backgroundColor: colors,
-                    borderWidth: 0,
-                    barPercentage: 1.0, // Remove espaço entre barras
-                    categoryPercentage: 1.0, // Remove espaço entre categorias
-                    realData: rawValues // Guardar valor real para o label
-                }
-            ]
-        },
-        options: {
-            indexAxis: 'y',
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                x: { stacked: true, display: false },
-                y: { 
-                    stacked: true, 
-                    display: true,
-                    grid: { display: false },
-                    ticks: {
-                        color: '#fff',
-                        font: { size: 12, weight: '600' },
-                        mirror: true, // Texto dentro da pirâmide se possível
-                        padding: -10,
-                        z: 10
-                    }
-                }
-            },
-            plugins: {
-                legend: { display: false },
-                datalabels: {
-                    anchor: 'center',
-                    align: 'center',
-                    color: '#fff',
-                    font: { weight: 'bold', size: 13 },
-                    formatter: (value, context) => {
-                        if (context.datasetIndex === 0) return null;
-                        const real = context.dataset.realData[context.dataIndex];
-                        return real;
-                    }
-                },
-                tooltip: {
-                    callbacks: {
-                        label: (context) => {
-                            if (context.datasetIndex === 0) return null;
-                            const real = context.dataset.realData[context.dataIndex];
-                            return ` ${context.label}: ${real} leads`;
-                        }
-                    }
-                }
-            }
-        }
+    let currentY = 0;
+    const h = 350 / sorted.length;
+
+    sorted.forEach((item, i) => {
+        const name = item[0];
+        const val = item[1];
+        const color = getStatusColor(name).bg;
+        
+        // Calcular largura do topo e da base deste trapézio
+        const wTop = (visualWidths[i] / maxWidth) * 380;
+        const wBottom = (i === sorted.length - 1) ? 20 : (visualWidths[i+1] / maxWidth) * 380;
+        
+        const xTopL = (400 - wTop) / 2;
+        const xTopR = xTopL + wTop;
+        const xBotL = (400 - wBottom) / 2;
+        const xBotR = xBotL + wBottom;
+        
+        const yTop = currentY;
+        const yBot = currentY + h;
+
+        // Desenhar Polígono (Trapézio)
+        const points = `${xTopL},${yTop} ${xTopR},${yTop} ${xBotR},${yBot} ${xBotL},${yBot}`;
+        
+        svgHtml += `
+            <g class="funnel-step" style="cursor: pointer;">
+                <polygon points="${points}" fill="${color}" filter="url(#shadow)">
+                    <title>${name}: ${val} leads</title>
+                </polygon>
+                <!-- Label de Nome -->
+                <text x="${xTopL - 5}" y="${yTop + h/2 + 5}" text-anchor="end" fill="#94a3b8" style="font-size: 11px; font-weight: 600;">${name.substring(0,15)}${name.length > 15 ? '...' : ''}</text>
+                <!-- Valor -->
+                <text x="200" y="${yTop + h/2 + 6}" text-anchor="middle" fill="#fff" style="font-size: 13px; font-weight: 800; pointer-events: none;">${val}</text>
+            </g>
+        `;
+        
+        currentY += h;
     });
+
+    svgHtml += `</svg>`;
+    container.innerHTML = svgHtml;
 }
 
 function renderSalesOriginPieChart(leads) {
