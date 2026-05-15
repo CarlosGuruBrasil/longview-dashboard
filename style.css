@@ -532,14 +532,15 @@ body::after {
         letter-spacing: 1px;
     }
     .data-table td strong, .data-table td span {
-        text-align: left;
-        width: 100%;
-        word-break: break-all; /* Força quebra em ADS e Nomes */
-        white-space: normal;
-        color: #fff;
-        font-size: 15px;
-        max-width: 100%;
-        display: block;
+        text-align: left !important;
+        width: 100% !important;
+        word-break: break-word !important; /* Mais suave que break-all mas efetivo */
+        white-space: normal !important; /* ESSENCIAL PARA NÃO VAZAR */
+        color: #fff !important;
+        font-size: 15px !important;
+        max-width: 100% !important;
+        display: block !important;
+        overflow: hidden !important;
     }
     
     /* Proteção específica para a barra de status */
@@ -568,13 +569,20 @@ body::after {
         width: 100% !important;
         max-width: 100% !important;
         box-sizing: border-box !important;
-        margin: 0;
+        margin: 0 !important;
         height: 48px !important;
+        padding: 0 15px !important;
     }
     .sidebar-item {
-        width: 100%;
-        margin-bottom: 25px;
-        box-sizing: border-box;
+        width: 100% !important;
+        margin-bottom: 25px !important;
+        box-sizing: border-box !important;
+        padding: 0 !important; /* Remove qualquer padding que encolha o botão mas não o input */
+    }
+    .btn-primary, .btn-secondary {
+        width: 100% !important;
+        margin: 10px 0 0 0 !important;
+        box-sizing: border-box !important;
     }
     
     .m-footer-actions {
