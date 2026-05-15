@@ -661,45 +661,84 @@ function renderStatusPieChart(statuses) {
         backgroundColor: 'transparent',
         tooltip: {
             trigger: 'item',
-            formatter: '{b}: {c} leads ({d}%)'
+            formatter: '{b}: <b>{c} leads</b>',
+            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+            borderColor: 'rgba(255,255,255,0.1)',
+            textStyle: { color: '#fff' }
         },
         series: [
             {
                 name: 'Leads por Status',
                 type: 'funnel',
-                left: '15%',
-                top: 20,
-                bottom: 20,
-                width: '70%',
+                left: '25%', // Dá espaço para os nomes na esquerda
+                top: 10,
+                bottom: 10,
+                width: '60%',
                 min: 0,
+                minSize: '10%', // Garante que fatias pequenas sejam visíveis
                 maxSize: '100%',
                 sort: 'descending',
-                gap: 2,
+                gap: 3,
                 label: {
                     show: true,
-                    position: 'right',
+                    position: 'left',
                     color: '#94a3b8',
                     fontSize: 12,
+                    fontWeight: 500,
                     formatter: '{b}'
                 },
                 labelLine: {
-                    length: 10,
+                    show: true,
+                    length: 20,
                     lineStyle: {
                         width: 1,
-                        type: 'solid'
+                        type: 'solid',
+                        color: 'rgba(255,255,255,0.2)'
                     }
                 },
                 itemStyle: {
-                    borderColor: 'rgba(255,255,255,0.1)',
-                    borderWidth: 1
+                    borderColor: 'rgba(255,255,255,0.05)',
+                    borderWidth: 1,
+                    shadowBlur: 10,
+                    shadowColor: 'rgba(0,0,0,0.5)'
                 },
                 emphasis: {
                     label: {
                         fontSize: 14,
                         color: '#fff',
                         fontWeight: 'bold'
+                    },
+                    itemStyle: {
+                        shadowBlur: 20,
+                        shadowColor: 'rgba(255,255,255,0.2)'
                     }
                 },
+                data: chartData
+            },
+            {
+                // Segunda camada apenas para os números internos
+                type: 'funnel',
+                left: '25%',
+                top: 10,
+                bottom: 10,
+                width: '60%',
+                min: 0,
+                minSize: '10%',
+                maxSize: '100%',
+                sort: 'descending',
+                gap: 3,
+                label: {
+                    show: true,
+                    position: 'inside',
+                    color: '#fff',
+                    fontSize: 14,
+                    fontWeight: 'bold',
+                    formatter: '{c}'
+                },
+                itemStyle: {
+                    opacity: 0 // Invisível, só queremos o label
+                },
+                silent: true, // Não interfere no tooltip
                 data: chartData
             }
         ]
