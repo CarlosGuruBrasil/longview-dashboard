@@ -195,62 +195,70 @@ function showApp() {
 function setupEventListeners() {
     // Configurar eventos do Dashboard
     const refreshBtn = document.getElementById("refresh-btn");
-    if (refreshBtn.getAttribute('data-events-set')) return; // Evitar duplicar
-    refreshBtn.setAttribute('data-events-set', 'true');
+    if (refreshBtn && !refreshBtn.getAttribute('data-events-set')) {
+        refreshBtn.setAttribute('data-events-set', 'true');
+        refreshBtn.addEventListener("click", () => startLoadingSequence(true));
+    }
 
-    refreshBtn.addEventListener("click", () => {
-        // Mostrar a tela de carregamento para o refresh manual
-        const overlay = document.getElementById("loading-overlay");
-        if (overlay) {
-            overlay.classList.remove("hidden");
-            const loadingText = document.getElementById("loading-text");
-            if (loadingText) loadingText.innerText = "Iniciando atualização completa...";
-            
-            // Re-iniciar o fluxo de carregamento que já lida com o fetchAllData(true)
-            startLoadingSequence(true); 
-        }
-    });
-    document.getElementById("filter-btn").addEventListener("click", applyGlobalFilters);
-    document.getElementById("clear-date-btn").addEventListener("click", () => {
-        document.getElementById("start-date").value = "";
-        document.getElementById("end-date").value = "";
-        applyGlobalFilters();
-    });
-    
-    document.getElementById("growth-period").addEventListener("change", renderGrowthChart);
-    document.getElementById("sales-growth-period").addEventListener("change", renderSalesGrowthChart);
+    const filterBtn = document.getElementById("filter-btn");
+    if (filterBtn) filterBtn.addEventListener("click", applyGlobalFilters);
 
     // Navegação Lateral (Desktop)
-    const navItems = document.querySelectorAll(".nav-item");
-    navItems.forEach(item => {
+    document.querySelectorAll(".nav-item").forEach(item => {
         item.addEventListener("click", (e) => {
             e.preventDefault();
-            const viewName = item.getAttribute("data-view");
-            switchView(viewName);
+            switchView(item.getAttribute("data-view"));
         });
     });
 
     // Navegação Inferior (Mobile)
-    const mobileNavItems = document.querySelectorAll(".mobile-nav-item");
-    mobileNavItems.forEach(item => {
+    document.querySelectorAll(".mobile-nav-item").forEach(item => {
         item.addEventListener("click", (e) => {
             e.preventDefault();
-            const viewName = item.getAttribute("data-view");
-            switchView(viewName);
-            // Scroll to top when switching views on mobile
+            switchView(item.getAttribute("data-view"));
             window.scrollTo({ top: 0, behavior: 'smooth' });
         });
     });
 
-    // Filtros de Coluna (Leads)
-    document.querySelectorAll(".col-filter").forEach(input => {
-        input.addEventListener("input", applyTableFilters);
-    });
+    // --- Menu Mobile ---
+    const openFiltersBtn = document.getElementById("open-filters-btn");
+    const closeFiltersBtn = document.getElementById("close-filters-btn");
+    const mobileSidebar = document.getElementById("mobile-filter-sidebar");
 
-    // Filtros de Coluna (Vendas)
-    document.querySelectorAll(".col-filter-sales").forEach(input => {
-        input.addEventListener("input", applySalesTableFilters);
-    });
+    if (openFiltersBtn) {
+        openFiltersBtn.addEventListener("click", () => mobileSidebar.classList.remove("hidden"));
+    }
+    if (closeFiltersBtn) {
+        closeFiltersBtn.addEventListener("click", () => mobileSidebar.classList.add("hidden"));
+    }
+
+    // Filtros Mobile
+    const mFilterBtn = document.getElementById("m-filter-btn");
+    if (mFilterBtn) {
+        mFilterBtn.addEventListener("click", () => {
+            const start = document.getElementById("m-start-date").value;
+            const end = document.getElementById("m-end-date").value;
+            if (start) document.getElementById("start-date").value = start;
+            if (end) document.getElementById("end-date").value = end;
+            applyGlobalFilters();
+            mobileSidebar.classList.add("hidden");
+        });
+    }
+
+    const mRefreshBtn = document.getElementById("m-refresh-btn");
+    if (mRefreshBtn) {
+        mRefreshBtn.addEventListener("click", () => {
+            mobileSidebar.classList.add("hidden");
+            startLoadingSequence(true);
+        });
+    }
+
+    // --- Filtros de ADS ---
+    const adsSearch = document.getElementById("ads-search-campaign");
+    const adsProduct = document.getElementById("ads-filter-product");
+
+    if (adsSearch) adsSearch.addEventListener("input", filterAdsTable);
+    if (adsProduct) adsProduct.addEventListener("change", filterAdsTable);
 }
 
 // Helpers
@@ -1386,33 +1394,20 @@ function renderMetaDemographics(demoData, regionData) {
 }
 
 function updateMetaDashboard(insights) {
-    if (!insights) {
-        document.getElementById("meta-spend").innerText = "R$ 0,00";
-        document.getElementById("meta-impressions").innerText = "0";
-        document.getElementById("meta-clicks").innerText = "0";
-        document.getElementById("meta-cpc").innerText = "R$ 0,00";
-        document.getElementById("meta-cpm").innerText = "R$ 0,00";
-        document.getElementById("meta-ctr").innerText = "0%";
-        document.getElementById("meta-leads-api").innerText = "0";
-        document.getElementById("meta-leads-top").innerText = "0";
-        document.getElementById("meta-cpl").innerText = "R$ 0,00";
-        return;
-    }
+    if (!insights) return;
 
     const spend = parseFloat(insights.spend || 0);
     const impressions = parseInt(insights.impressions || 0);
     const clicks = parseInt(insights.clicks || 0);
-    const cpc = parseFloat(insights.cpc || 0);
-    const cpm = parseFloat(insights.cpm || 0);
-    const ctr = parseFloat(insights.ctr || 0);
 
-    // Detecção abrangente de leads da API do Meta
+    // Detecção ULTRA Robusta de Leads (Meta API)
     let metaLeads = 0;
     if (insights.actions) {
         const leadActions = insights.actions.filter(a => 
             a.action_type === 'lead' || 
             a.action_type === 'offsite_conversion.fb_pixel_lead' ||
-            a.action_type.includes('leadgen')
+            a.action_type.includes('leadgen') ||
+            a.action_type.includes('onsite_conversion.lead')
         );
         metaLeads = leadActions.reduce((acc, a) => acc + parseInt(a.value || 0), 0);
     }
@@ -1420,28 +1415,60 @@ function updateMetaDashboard(insights) {
     document.getElementById("meta-spend").innerText = formatCurrency(spend);
     document.getElementById("meta-impressions").innerText = impressions.toLocaleString('pt-BR');
     document.getElementById("meta-clicks").innerText = clicks.toLocaleString('pt-BR');
-    document.getElementById("meta-cpc").innerText = formatCurrency(cpc);
-    document.getElementById("meta-cpm").innerText = formatCurrency(cpm);
-    document.getElementById("meta-ctr").innerText = ctr.toFixed(2) + "%";
     document.getElementById("meta-leads-api").innerText = metaLeads.toLocaleString('pt-BR');
     document.getElementById("meta-leads-top").innerText = metaLeads.toLocaleString('pt-BR');
 
-    // Contar Leads do Facebook/Instagram que chegaram no CRM
+    // Leads do Meta que chegaram no CRM (Baseado na Origem)
     let crmFbLeads = 0;
-    filteredLeads.forEach(l => {
+    allLeads.forEach(l => {
         const o = getOrigin(l).toLowerCase();
         if (o.includes("facebook") || o.includes("instagram") || o.includes("fb") || o.includes("ig") || o.includes("meta") || o.includes("social")) {
             crmFbLeads++;
         }
     });
 
-    const totalLeadsCrm = crmFbLeads > 0 ? crmFbLeads : (metaLeads > 0 ? metaLeads : 0);
-    
-    if (totalLeadsCrm > 0 && spend > 0) {
-        document.getElementById("meta-cpl").innerText = formatCurrency(spend / totalLeadsCrm);
-    } else {
-        document.getElementById("meta-cpl").innerText = "R$ 0,00";
+    const totalLeadsCrm = crmFbLeads;
+    const cplCRM = totalLeadsCrm > 0 ? spend / totalLeadsCrm : 0;
+    document.getElementById("meta-cpl").innerText = formatCurrency(cplCRM);
+
+    document.getElementById("meta-cpc").innerText = formatCurrency(parseFloat(insights.cpc || 0));
+    document.getElementById("meta-cpm").innerText = formatCurrency(parseFloat(insights.cpm || 0));
+    document.getElementById("meta-ctr").innerText = (parseFloat(insights.ctr || 0)).toFixed(2) + "%";
+
+    // Chart Pie: Meta vs Resto
+    const ctx = document.getElementById("marketingPieChart");
+    if (ctx) {
+        const nonFbLeads = allLeads.length - crmFbLeads;
+        if (marketingPieChartInstance) marketingPieChartInstance.destroy();
+        marketingPieChartInstance = new Chart(ctx.getContext('2d'), {
+            type: 'doughnut',
+            plugins: [ChartDataLabels],
+            data: {
+                labels: [`Meta Ads (${crmFbLeads})`, `Outros (${nonFbLeads})`],
+                datasets: [{
+                    data: [crmFbLeads, nonFbLeads],
+                    backgroundColor: ['#0ea5e9', '#6366F1'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    datalabels: {
+                        color: '#fff',
+                        font: { weight: 'bold', size: 12 },
+                        formatter: (val, ctx) => {
+                            const sum = ctx.chart.data.datasets[0].data.reduce((a,b) => a+b, 0);
+                            return sum > 0 ? ((val/sum)*100).toFixed(1) + "%" : "";
+                        }
+                    },
+                    legend: { position: 'bottom', labels: { color: '#e5e5e5' } }
+                }
+            }
+        });
     }
+}
 
     // Chart
     const ctx = document.getElementById("marketingPieChart");

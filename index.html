@@ -117,11 +117,17 @@
         <!-- Main Content -->
         <main class="main-content">
             <header class="top-header">
-                <div class="header-title">
+                <div class="mobile-top-bar">
+                    <img src="https://longview.com.br/wp-content/uploads/2023/07/logo-long-view-branca.png" alt="Logo" class="mobile-logo">
+                    <button id="open-filters-btn" class="menu-trigger">
+                        <i class="ph ph-funnel"></i>
+                    </button>
+                </div>
+                <div class="header-title desktop-only">
                     <h1 id="page-title">Dashboard</h1>
                     <p>Análise de clientes e negociações</p>
                 </div>
-                <div class="header-actions">
+                <div class="header-actions desktop-only">
                     <div class="date-filters">
                         <div class="date-input-group">
                             <label for="start-date">De:</label>
@@ -132,7 +138,6 @@
                             <input type="date" id="end-date" class="date-input">
                         </div>
                         <button id="filter-btn" class="btn-secondary">Filtrar</button>
-                        <button id="clear-date-btn" class="btn-secondary" style="background: rgba(255, 82, 82, 0.1); color: #FF5252; border-color: rgba(255, 82, 82, 0.3);" title="Limpar Datas">Limpar</button>
                     </div>
                     <button id="refresh-btn" class="btn-primary">
                         <i class="ph ph-arrows-clockwise"></i>
@@ -140,6 +145,30 @@
                     </button>
                 </div>
             </header>
+
+            <!-- Sidebar de Filtros Mobile -->
+            <div id="mobile-filter-sidebar" class="mobile-sidebar-overlay hidden">
+                <div class="mobile-sidebar-content">
+                    <div class="sidebar-header">
+                        <h3>Filtros e Ações</h3>
+                        <button id="close-filters-btn"><i class="ph ph-x"></i></button>
+                    </div>
+                    <div class="sidebar-body">
+                        <div class="sidebar-item">
+                            <label>Data Inicial</label>
+                            <input type="date" id="m-start-date" class="date-input">
+                        </div>
+                        <div class="sidebar-item">
+                            <label>Data Final</label>
+                            <input type="date" id="m-end-date" class="date-input">
+                        </div>
+                        <button id="m-filter-btn" class="btn-primary" style="width:100%; margin-top: 10px;">Aplicar Filtros</button>
+                        <button id="m-refresh-btn" class="btn-secondary" style="width:100%; margin-top: 10px; background: rgba(255,255,255,0.05);">
+                            <i class="ph ph-arrows-clockwise"></i> Forçar Atualização
+                        </button>
+                    </div>
+                </div>
+            </div>
 
             <div id="loader" class="loader-container">
                 <div class="spinner"></div>
