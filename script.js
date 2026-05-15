@@ -142,7 +142,15 @@ function generateRealInsights() {
     if (!allLeads || allLeads.length === 0) return;
 
     const sales = allLeads.filter(l => isSale(l));
-    const totalValue = sales.reduce((acc, l) => acc + (parseFloat(l.valor_negocio) || 0), 0);
+    const totalValue = sales.reduce((acc, l) => {
+        let val = 0;
+        if (l.valor_negocio) {
+            // Remove pontos de milhar e troca vírgula por ponto
+            const cleanVal = l.valor_negocio.toString().replace(/\./g, '').replace(',', '.');
+            val = parseFloat(cleanVal) || 0;
+        }
+        return acc + val;
+    }, 0);
     
     // Encontrar empreendimento campeão
     const empCount = {};
@@ -948,7 +956,14 @@ function renderSalesSummary(salesArray) {
     const container = document.getElementById("sales-summary-container");
     if (!container) return;
 
-    const totalVGV = salesArray.reduce((acc, lead) => acc + (parseFloat(lead.valor_negocio) || 0), 0);
+    const totalVGV = salesArray.reduce((acc, lead) => {
+        let val = 0;
+        if (lead.valor_negocio) {
+            const cleanVal = lead.valor_negocio.toString().replace(/\./g, '').replace(',', '.');
+            val = parseFloat(cleanVal) || 0;
+        }
+        return acc + val;
+    }, 0);
 
     container.innerHTML = `
         <div class="summary-box total-box">
