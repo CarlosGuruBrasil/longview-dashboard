@@ -193,6 +193,42 @@ function showApp() {
 }
 
 function setupEventListeners() {
+    // --- LOGIN ---
+    const loginForm = document.getElementById("login-form");
+    if (loginForm) {
+        loginForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const user = document.getElementById("user").value;
+            const pass = document.getElementById("pass").value;
+            const loginBtn = loginForm.querySelector("button");
+            
+            loginBtn.innerText = "Verificando...";
+            loginBtn.disabled = true;
+
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user, pass })
+                });
+
+                if (res.ok) {
+                    sessionStorage.setItem("longview_auth", "true");
+                    startLoadingSequence();
+                } else {
+                    alert("Usuário ou senha incorretos.");
+                    loginBtn.innerText = "Entrar no Painel";
+                    loginBtn.disabled = false;
+                }
+            } catch (err) {
+                console.error("Erro no login:", err);
+                alert("Erro ao conectar com o servidor.");
+                loginBtn.innerText = "Entrar no Painel";
+                loginBtn.disabled = false;
+            }
+        });
+    }
+
     // Configurar eventos do Dashboard
     const refreshBtn = document.getElementById("refresh-btn");
     if (refreshBtn && !refreshBtn.getAttribute('data-events-set')) {
