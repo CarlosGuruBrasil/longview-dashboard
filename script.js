@@ -258,7 +258,18 @@ function setupEventListeners() {
         });
     }
 
-    // --- Filtros de ADS ---
+    const clearBtn = document.getElementById("clear-filters-btn");
+    if (clearBtn) {
+        clearBtn.addEventListener("click", () => {
+            document.getElementById("start-date").value = "";
+            document.getElementById("end-date").value = "";
+            if (document.getElementById("m-start-date")) document.getElementById("m-start-date").value = "";
+            if (document.getElementById("m-end-date")) document.getElementById("m-end-date").value = "";
+            applyGlobalFilters();
+        });
+    }
+
+    // Filtros de ADS ---
     const adsSearch = document.getElementById("ads-search-campaign");
     const adsProduct = document.getElementById("ads-filter-product");
 
@@ -368,26 +379,33 @@ function applyGlobalFilters() {
     const startDate = document.getElementById("start-date").value;
     const endDate = document.getElementById("end-date").value;
     
-    filteredLeads = allLeads;
-    
-    if (startDate || endDate) {
+    console.log(`Aplicando filtros: de ${startDate || 'sempre'} até ${endDate || 'hoje'}`);
+
+    if (!startDate && !endDate) {
+        filteredLeads = allLeads;
+    } else {
         filteredLeads = allLeads.filter(lead => {
-            if (!lead.data_cad) return false;
-            const leadDateStr = lead.data_cad.split(' ')[0];
-            const leadDate = new Date(leadDateStr);
-            let isAfterStart = true, isBeforeEnd = true;
-            if (startDate) isAfterStart = leadDate >= new Date(startDate);
-            if (endDate) isBeforeEnd = leadDate <= new Date(endDate);
-            return isAfterStart && isBeforeEnd;
+            const leadDateStr = (lead.data_cadastramento || lead.data_cad || "").split(' ')[0];
+            if (!leadDateStr) return false;
+            
+            if (startDate && leadDateStr < startDate) return false;
+            if (endDate && leadDateStr > endDate) return false;
+            return true;
         });
     }
     
-    updateDashboard(filteredLeads);
-    populateDropdowns(filteredLeads);
-    applyTableFilters(); // Atualiza tabela de leads respeitando filtros das colunas
-    applySalesTableFilters(); // Atualiza tabela de vendas
+    console.log(`Filtro finalizado: ${filteredLeads.length} leads encontrados.`);
 
-    // Meta Ads (O dashboard será atualizado com os dados do cache global)
+    // Atualizar tudo
+    updateDashboard(filteredLeads);
+    renderLeadsTable(filteredLeads);
+    renderSalesTable(filteredLeads.filter(isSale));
+    
+    // Se estivermos na view de marketing, forçar atualização do gráfico de pizza
+    if (currentView === 'marketing') {
+        const metaGlobal = window.lastMetaInsights || null;
+        if (metaGlobal) updateMetaDashboard(metaGlobal);
+    }
 }
 
 function populateDropdowns(leadsArray) {
