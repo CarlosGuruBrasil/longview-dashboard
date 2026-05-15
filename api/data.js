@@ -87,7 +87,7 @@ module.exports = async (req, res) => {
         level: 'campaign',
         fields: 'campaign_id,campaign_name,spend,impressions,clicks,actions,date_start,date_stop',
         ...timeParams,
-        limit: 100,
+        limit: 500,
         access_token: META_TOKEN
       }
     });
@@ -96,7 +96,7 @@ module.exports = async (req, res) => {
     const metaCampDetailsPromise = axios.get(`https://graph.facebook.com/v18.0/${META_ACT_ID}/campaigns`, {
       params: {
         fields: 'id,name,created_time,start_time,stop_time,status',
-        limit: 150,
+        limit: 500,
         access_token: META_TOKEN
       }
     });
@@ -118,6 +118,16 @@ module.exports = async (req, res) => {
         level: 'account',
         fields: 'clicks,impressions,spend',
         breakdowns: 'region',
+        ...timeParams,
+        access_token: META_TOKEN
+      }
+    });
+
+    // 5. Meta Ads - Totais Globais
+    const metaGlobalPromise = axios.get(`https://graph.facebook.com/v18.0/${META_ACT_ID}/insights`, {
+      params: {
+        level: 'account',
+        fields: 'clicks,impressions,spend,actions',
         ...timeParams,
         access_token: META_TOKEN
       }

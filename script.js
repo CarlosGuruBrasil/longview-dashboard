@@ -1375,8 +1375,11 @@ function renderCampaignsTable(campaigns) {
     
     // Pegar detalhes extras (datas reais) vindos do backend
     const detailsMap = {};
-    if (window.lastMetaData && window.lastMetaData.meta && window.lastMetaData.meta.campaignDetails) {
-        window.lastMetaData.meta.campaignDetails.forEach(d => {
+    const details = window.lastMetaData && window.lastMetaData.meta ? window.lastMetaData.meta.campaignDetails : [];
+    console.log(`[DEBUG] Populando detalhes para ${campaigns.length} campanhas. Detalhes disponíveis: ${details ? details.length : 0}`);
+    
+    if (details && details.length > 0) {
+        details.forEach(d => {
             detailsMap[d.id] = d;
         });
     }
@@ -1385,8 +1388,8 @@ function renderCampaignsTable(campaigns) {
     const sortedCampaigns = [...campaigns].sort((a, b) => {
         const detailsA = detailsMap[a.campaign_id];
         const detailsB = detailsMap[b.campaign_id];
-        const dateA = detailsA ? new Date(detailsA.start_time || detailsA.created_time) : new Date(a.date_start);
-        const dateB = detailsB ? new Date(detailsB.start_time || detailsB.created_time) : new Date(b.date_start);
+        const dateA = detailsA ? new Date(detailsA.created_time || detailsA.start_time) : new Date(a.date_start);
+        const dateB = detailsB ? new Date(detailsB.created_time || detailsB.start_time) : new Date(b.date_start);
         return dateB - dateA;
     });
 
