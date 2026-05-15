@@ -53,7 +53,7 @@ module.exports = async (req, res) => {
     const metaDemoPromise = axios.get(`https://graph.facebook.com/v18.0/${META_ACT_ID}/insights`, {
       params: {
         level: 'account',
-        fields: 'gender,age,clicks,impressions,spend',
+        fields: 'clicks,impressions,spend',
         breakdowns: 'gender,age',
         date_preset: 'maximum',
         access_token: META_TOKEN
@@ -64,7 +64,7 @@ module.exports = async (req, res) => {
     const metaRegionPromise = axios.get(`https://graph.facebook.com/v18.0/${META_ACT_ID}/insights`, {
       params: {
         level: 'account',
-        fields: 'region,clicks,impressions,spend',
+        fields: 'clicks,impressions,spend',
         breakdowns: 'region',
         date_preset: 'maximum',
         access_token: META_TOKEN
