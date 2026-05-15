@@ -188,16 +188,25 @@ function setupEventListeners() {
     document.getElementById("growth-period").addEventListener("change", renderGrowthChart);
     document.getElementById("sales-growth-period").addEventListener("change", renderSalesGrowthChart);
 
-    // Navegação Lateral
+    // Navegação Lateral (Desktop)
     const navItems = document.querySelectorAll(".nav-item");
     navItems.forEach(item => {
         item.addEventListener("click", (e) => {
             e.preventDefault();
-            navItems.forEach(n => n.classList.remove("active"));
-            item.classList.add("active");
-            
             const viewName = item.getAttribute("data-view");
             switchView(viewName);
+        });
+    });
+
+    // Navegação Inferior (Mobile)
+    const mobileNavItems = document.querySelectorAll(".mobile-nav-item");
+    mobileNavItems.forEach(item => {
+        item.addEventListener("click", (e) => {
+            e.preventDefault();
+            const viewName = item.getAttribute("data-view");
+            switchView(viewName);
+            // Scroll to top when switching views on mobile
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         });
     });
 
@@ -1411,6 +1420,20 @@ function updateMetaDashboard(insights) {
 }
 
 function switchView(viewName) {
+    currentView = viewName;
+    
+    // Atualizar classes ativa (Desktop)
+    document.querySelectorAll(".nav-item").forEach(n => {
+        n.classList.remove("active");
+        if (n.getAttribute("data-view") === viewName) n.classList.add("active");
+    });
+
+    // Atualizar classes ativa (Mobile)
+    document.querySelectorAll(".mobile-nav-item").forEach(n => {
+        n.classList.remove("active");
+        if (n.getAttribute("data-view") === viewName) n.classList.add("active");
+    });
+
     document.querySelectorAll(".view-section").forEach(sec => sec.classList.remove("active-view", "hidden"));
     document.querySelectorAll(".view-section").forEach(sec => sec.classList.add("hidden"));
     
