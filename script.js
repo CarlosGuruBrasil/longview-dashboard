@@ -1095,29 +1095,29 @@ function renderTable(leadsArray, tbodyId, limit = null) {
         
         if (tbodyId === "table-sales-body") {
             tr.innerHTML = `
-                <td><strong>${name}</strong></td>
-                <td>${dataCad}</td>
-                <td><span class="status-badge" style="background-color: ${colors.bg}; color: ${colors.text}; border: 1px solid rgba(255,255,255,0.1);">${statusName}</span></td>
-                <td>${source}</td>
-                <td>${corretor}</td>
-                <td>${imobiliaria}</td>
-                <td>${gestor}</td>
-                <td>${emp}</td>
-                <td><strong>${unidade}</strong></td>
-                <td><span style="color:var(--text-secondary);font-size:13px;">${tipologia}</span></td>
-                <td><strong style="color: #10B981;">${valFormatted}</strong></td>
+                <td data-label="Cliente"><strong>${name}</strong></td>
+                <td data-label="Data">${dataCad}</td>
+                <td data-label="Status"><span class="status-badge" style="background-color: ${colors.bg}; color: ${colors.text}; border: 1px solid rgba(255,255,255,0.1);">${statusName}</span></td>
+                <td data-label="Origem">${source}</td>
+                <td data-label="Corretor">${corretor}</td>
+                <td data-label="Imobiliária">${imobiliaria}</td>
+                <td data-label="Gestor">${gestor}</td>
+                <td data-label="Empreendimento">${emp}</td>
+                <td data-label="Unidade"><strong>${unidade}</strong></td>
+                <td data-label="Tipologia"><span style="color:var(--text-secondary);font-size:13px;">${tipologia}</span></td>
+                <td data-label="Valor"><strong style="color: #10B981;">${valFormatted}</strong></td>
             `;
         } else {
             tr.innerHTML = `
-                <td><strong>${name}</strong></td>
-                <td>${dataCad}</td>
-                <td><span class="status-badge" style="background-color: ${colors.bg}; color: ${colors.text}; border: 1px solid rgba(255,255,255,0.1);">${statusName}</span></td>
-                <td>${source}</td>
-                <td>${corretor}</td>
-                <td>${imobiliaria}</td>
-                <td>${gestor}</td>
-                <td>${emp}</td>
-                <td>${valFormatted}</td>
+                <td data-label="Cliente"><strong>${name}</strong></td>
+                <td data-label="Data">${dataCad}</td>
+                <td data-label="Status"><span class="status-badge" style="background-color: ${colors.bg}; color: ${colors.text}; border: 1px solid rgba(255,255,255,0.1);">${statusName}</span></td>
+                <td data-label="Origem">${source}</td>
+                <td data-label="Corretor">${corretor}</td>
+                <td data-label="Imobiliária">${imobiliaria}</td>
+                <td data-label="Gestor">${gestor}</td>
+                <td data-label="Empreendimento">${emp}</td>
+                <td data-label="Valor">${valFormatted}</td>
             `;
         }
         
@@ -1212,15 +1212,15 @@ function renderCampaignsTable(campaigns) {
         
         const tr = document.createElement("tr");
         tr.innerHTML = `
-            <td><strong>${name}</strong></td>
-            <td style="font-size: 12px; color: var(--text-secondary);">${periodStr}</td>
-            <td style="font-size: 12px;">${durationStr}</td>
-            <td><strong style="color: #F43F5E;">${formatCurrency(spend)}</strong></td>
-            <td>${impressions.toLocaleString('pt-BR')} / ${clicks.toLocaleString('pt-BR')}</td>
-            <td>${metaLeads}</td>
-            <td><strong>${cplStr}</strong></td>
-            <td><strong style="color: #0ea5e9; font-size: 1.1em;">${crmLeadsCount}</strong></td>
-            <td style="max-width: 320px; line-height: 1.6;">${badgesHtml}</td>
+            <td data-label="Campanha"><strong>${name}</strong></td>
+            <td data-label="Período" style="font-size: 12px; color: var(--text-secondary);">${periodStr}</td>
+            <td data-label="Duração" style="font-size: 12px;">${durationStr}</td>
+            <td data-label="Gasto"><strong style="color: #F43F5E;">${formatCurrency(spend)}</strong></td>
+            <td data-label="Imp/Cliques">${impressions.toLocaleString('pt-BR')} / ${clicks.toLocaleString('pt-BR')}</td>
+            <td data-label="Meta Leads">${metaLeads}</td>
+            <td data-label="CPL"><strong>${cplStr}</strong></td>
+            <td data-label="CRM Leads"><strong style="color: #0ea5e9; font-size: 1.1em;">${crmLeadsCount}</strong></td>
+            <td data-label="Status Funil" style="max-width: 320px; line-height: 1.6;">${badgesHtml}</td>
         `;
         tbody.appendChild(tr);
     });
