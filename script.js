@@ -639,23 +639,15 @@ function renderStatusPieChart(statuses) {
     if(!ctx) return;
     
     // Definir ordem lógica do funil
-    const hierarchy = ["novo", "entrada", "atendimento", "proposta", "reserva", "venda", "ganho"];
-    
-    const sorted = Object.entries(statuses).sort((a, b) => {
-        const getIdx = (name) => {
-            const lower = name.toLowerCase();
-            const idx = hierarchy.findIndex(h => lower.includes(h));
-            return idx === -1 ? 99 : idx;
-        };
-        return getIdx(a[0]) - getIdx(b[0]);
-    });
+    // Ordenar estritamente por valor (Maior -> Menor) para garantir o formato de Pirâmide Inversa
+    const sorted = Object.entries(statuses).sort((a, b) => b[1] - a[1]);
 
     const labels = sorted.map(item => item[0]);
     const dataValues = sorted.map(item => item[1]);
     const colors = sorted.map(item => getStatusColor(item[0]).bg);
     
-    // Para criar o efeito de pirâmide, precisamos de um dataset invisível que empurra as barras para o centro
-    const maxVal = Math.max(...dataValues) * 1.1;
+    // Calcular offsets para centralização real (Pirâmide)
+    const maxVal = Math.max(...dataValues);
     const offsets = dataValues.map(val => (maxVal - val) / 2);
 
     if (statusPieChartInstance) statusPieChartInstance.destroy();
@@ -667,19 +659,18 @@ function renderStatusPieChart(statuses) {
             labels: labels,
             datasets: [
                 {
-                    // Dataset invisível para centralização
                     data: offsets,
                     backgroundColor: 'transparent',
                     borderWidth: 0,
                     hoverBackgroundColor: 'transparent'
                 },
                 {
-                    // O dado real
                     data: dataValues,
                     backgroundColor: colors,
-                    borderRadius: 5,
+                    borderRadius: 4,
                     borderWidth: 0,
-                    barThickness: 35
+                    barThickness: 28,
+                    minBarLength: 10 // Garante que valores pequenos (como 2 ou 4) sejam visíveis
                 }
             ]
         },
@@ -698,31 +689,39 @@ function renderStatusPieChart(statuses) {
                     grid: { display: false },
                     ticks: {
                         color: '#e5e5e5',
-                        font: { size: 12, weight: '600' }
+                        font: { size: 11, weight: '500' },
+                        padding: 10
                     }
                 }
             },
             plugins: {
                 legend: { display: false },
                 datalabels: {
-                    anchor: 'center',
-                    align: 'center',
+                    anchor: 'end',
+                    align: 'right',
                     color: '#fff',
-                    font: { weight: 'bold', size: 12 },
+                    offset: 8,
+                    font: { weight: 'bold', size: 11 },
                     formatter: (value, context) => {
                         if (context.datasetIndex === 0) return null;
                         return value;
                     }
                 },
                 tooltip: {
-                    enabled: true,
+                    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                    titleFont: { size: 13 },
+                    bodyFont: { size: 12 },
+                    padding: 12,
                     callbacks: {
                         label: (context) => {
                             if (context.datasetIndex === 0) return null;
-                            return ` ${context.label}: ${context.raw} leads`;
+                            return ` ${context.raw} leads`;
                         }
                     }
                 }
+            },
+            layout: {
+                padding: { right: 50 } // Espaço para os números à direita
             }
         }
     });
