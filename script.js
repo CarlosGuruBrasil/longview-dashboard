@@ -1377,14 +1377,14 @@ function renderCampaignsTable(campaigns) {
     const detailsMap = {};
     if (window.lastMetaData && window.lastMetaData.meta && window.lastMetaData.meta.campaignDetails) {
         window.lastMetaData.meta.campaignDetails.forEach(d => {
-            detailsMap[d.name] = d;
+            detailsMap[d.id] = d;
         });
     }
 
     // Ordenar pelas mais recentes baseando-se na data de INÍCIO REAL ou criação
     const sortedCampaigns = [...campaigns].sort((a, b) => {
-        const detailsA = detailsMap[a.campaign_name];
-        const detailsB = detailsMap[b.campaign_name];
+        const detailsA = detailsMap[a.campaign_id];
+        const detailsB = detailsMap[b.campaign_id];
         const dateA = detailsA ? new Date(detailsA.start_time || detailsA.created_time) : new Date(a.date_start);
         const dateB = detailsB ? new Date(detailsB.start_time || detailsB.created_time) : new Date(b.date_start);
         return dateB - dateA;
@@ -1404,7 +1404,7 @@ function renderCampaignsTable(campaigns) {
         const clicks = parseInt(camp.clicks || 0);
         
         // Datas REAIS vs Datas do Período
-        const details = detailsMap[name];
+        const details = detailsMap[camp.campaign_id];
         let periodStr = "-";
         let durationStr = "-";
 
