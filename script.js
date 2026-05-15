@@ -634,117 +634,76 @@ function renderOriginPieChart(origins) {
     });
 }
 
-let statusFunnelChart = null;
-
 function renderStatusPieChart(statuses) {
-    const chartDom = document.getElementById('status-funnel-echarts');
-    if(!chartDom) return;
+    const container = document.getElementById('status-pyramid-container');
+    if(!container) return;
     
-    // Inicializar ECharts se necessário
-    if (!statusFunnelChart) {
-        statusFunnelChart = echarts.init(chartDom, 'dark');
+    // Ordenar por volume
+    const sorted = Object.entries(statuses).sort((a, b) => b[1] - a[1]);
+    if (sorted.length === 0) {
+        container.innerHTML = "<p style='color:#94a3b8;'>Sem dados</p>";
+        return;
     }
 
-    // Ordenar por volume para o funil
-    const sorted = Object.entries(statuses).sort((a, b) => b[1] - a[1]);
-    if (sorted.length === 0) return;
-
-    const chartData = sorted.map(item => ({
-        name: item[0],
-        value: item[1],
-        itemStyle: {
-            color: getStatusColor(item[0]).bg
-        }
-    }));
-
-    const totalLeads = rawValues.reduce((a, b) => a + b, 0);
-
-    const option = {
-        backgroundColor: 'transparent',
-        tooltip: {
-            trigger: 'item',
-            formatter: '{b}: <b>{c} leads</b>',
-            backgroundColor: 'rgba(15, 23, 42, 0.9)',
-            borderColor: 'rgba(255,255,255,0.1)',
-            textStyle: { color: '#fff', fontSize: 13 }
-        },
-        series: [
-            {
-                name: 'Leads por Status',
-                type: 'funnel',
-                left: '5%',
-                right: '40%', // Espaço generoso para os nomes na direita
-                top: 20,
-                bottom: 20,
-                width: '55%',
-                min: 0,
-                minSize: '5%',
-                maxSize: '100%',
-                sort: 'descending',
-                gap: 2,
-                label: {
-                    show: true,
-                    position: 'right',
-                    color: '#e5e7eb',
-                    fontSize: 11,
-                    fontWeight: 500,
-                    formatter: '{b}' // Nome fora
-                },
-                labelLine: {
-                    show: true,
-                    length: 20,
-                    lineStyle: {
-                        color: 'rgba(255,255,255,0.2)'
-                    }
-                },
-                itemStyle: {
-                    borderColor: 'rgba(255,255,255,0.05)',
-                    borderWidth: 1,
-                    shadowBlur: 10,
-                    shadowColor: 'rgba(0,0,0,0.5)'
-                },
-                emphasis: {
-                    label: { fontWeight: 'bold', color: '#fff' }
-                },
-                data: chartData
-            },
-            {
-                // Camada para porcentagem interna
-                type: 'funnel',
-                left: '5%',
-                right: '40%',
-                top: 20,
-                bottom: 20,
-                width: '55%',
-                min: 0,
-                minSize: '5%',
-                maxSize: '100%',
-                sort: 'descending',
-                gap: 2,
-                label: {
-                    show: true,
-                    position: 'inside',
-                    color: '#fff',
-                    fontSize: 12,
-                    fontWeight: 'bold',
-                    formatter: (params) => {
-                        const perc = totalLeads > 0 ? ((params.value / totalLeads) * 100).toFixed(1) : 0;
-                        return perc > 3 ? perc + '%' : ''; // Só mostra se tiver espaço
-                    }
-                },
-                itemStyle: { opacity: 0 },
-                silent: true,
-                data: chartData
-            }
-        ]
-    };
-
-    statusFunnelChart.setOption(option);
+    const totalLeads = sorted.reduce((acc, curr) => acc + curr[1], 0);
+    const n = sorted.length;
     
-    // Responsividade
-    window.addEventListener('resize', () => {
-        statusFunnelChart.resize();
+    // Configurações do Desenho
+    const svgW = 400;
+    const svgH = 380;
+    const pyramidTopW = 300; // Largura do topo da pirâmide
+    const pyramidBotW = 20;  // Largura da base (ponta)
+    const centerX = 160;     // Deslocado para a esquerda para dar espaço aos textos na direita
+    const sectionH = svgH / n;
+    
+    let svgHtml = `<svg viewBox="0 0 ${svgW} ${svgH}" style="width:100%; height:100%; overflow: visible;">`;
+    
+    // Filtro de Sombra Suave
+    svgHtml += `<defs><filter id="pyramidShadow"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.3"/></filter></defs>`;
+
+    sorted.forEach((item, i) => {
+        const name = item[0];
+        const val = item[1];
+        const perc = totalLeads > 0 ? ((val / totalLeads) * 100).toFixed(1) : 0;
+        const color = getStatusColor(name).bg;
+        
+        // Cálculo das coordenadas do trapézio para formar o triângulo perfeito
+        const yTop = i * sectionH;
+        const yBot = (i + 1) * sectionH;
+        
+        // Interpolação linear da largura
+        const wTop = pyramidTopW - (i * (pyramidTopW - pyramidBotW) / n);
+        const wBot = pyramidTopW - ((i + 1) * (pyramidTopW - pyramidBotW) / n);
+        
+        const x1 = centerX - wTop/2;
+        const x2 = centerX + wTop/2;
+        const x3 = centerX + wBot/2;
+        const x4 = centerX - wBot/2;
+        
+        const points = `${x1},${yTop} ${x2},${yTop} ${x3},${yBot} ${x4},${yBot}`;
+        
+        svgHtml += `
+            <g class="pyramid-slice" style="cursor:pointer;">
+                <polygon points="${points}" fill="${color}" filter="url(#pyramidShadow)">
+                    <title>${name}: ${val} leads</title>
+                </polygon>
+                
+                <!-- Porcentagem Interna -->
+                <text x="${centerX}" y="${yTop + sectionH/2 + 5}" text-anchor="middle" fill="#fff" style="font-size: 13px; font-weight: 800; pointer-events:none;">${perc}%</text>
+                
+                <!-- Linha Guia -->
+                <line x1="${x2 + 5}" y1="${yTop + sectionH/2}" x2="${x2 + 25}" y2="${yTop + sectionH/2}" stroke="rgba(255,255,255,0.2)" stroke-width="1" />
+                
+                <!-- Rótulo Externo (Nome e Valor) -->
+                <text x="${x2 + 30}" y="${yTop + sectionH/2 + 4}" fill="#e2e8f0" style="font-size: 11px; font-weight: 500;">
+                    ${name.substring(0,18)}${name.length > 18 ? '..' : ''} <tspan fill="#94a3b8" font-weight="400">(${val})</tspan>
+                </text>
+            </g>
+        `;
     });
+
+    svgHtml += `</svg>`;
+    container.innerHTML = svgHtml;
 }
 
 function renderSalesOriginPieChart(leads) {
