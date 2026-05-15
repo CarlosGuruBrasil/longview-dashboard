@@ -114,18 +114,19 @@ module.exports = async (req, res) => {
       }
     });
 
-    // 5. Meta Ads - Global Insights (Account Level)
-    const metaGlobalPromise = axios.get(`https://graph.facebook.com/v18.0/${META_ACT_ID}/insights`, {
+    // 6. Meta Ads - Plataforma (Facebook vs Instagram)
+    const metaPlatformPromise = axios.get(`https://graph.facebook.com/v18.0/${META_ACT_ID}/insights`, {
       params: {
         level: 'account',
-        fields: 'spend,impressions,clicks,cpc,cpm,ctr,actions',
+        fields: 'clicks,impressions,spend',
+        breakdowns: 'publisher_platform',
         ...timeParams,
         access_token: META_TOKEN
       }
     });
 
     const results = await Promise.allSettled([
-      crmPromise, metaCampPromise, metaDemoPromise, metaRegionPromise, metaGlobalPromise
+      crmPromise, metaCampPromise, metaDemoPromise, metaRegionPromise, metaGlobalPromise, metaPlatformPromise
     ]);
 
     const crmData = results[0].status === 'fulfilled' ? results[0].value : { leads: [] };
@@ -144,6 +145,7 @@ module.exports = async (req, res) => {
         campaigns: metaCampRes.data.data || [],
         demographics: metaDemoRes.data.data || [],
         regions: metaRegionRes.data.data || [],
+        platforms: results[5].status === 'fulfilled' ? results[5].value.data.data : [],
         global: metaGlobalRes.data.data ? metaGlobalRes.data.data[0] : null
       },
       updatedAt: new Date().toISOString()

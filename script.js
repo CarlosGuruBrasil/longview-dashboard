@@ -13,6 +13,7 @@ let marketingPieChartInstance = null;
 let metaGenderChartInstance = null;
 let metaAgeChartInstance = null;
 let metaRegionChartInstance = null;
+let metaPlatformChartInstance = null;
 let currentView = 'dashboard';
 
 // Meta Ads Config (Agora no Backend)
@@ -401,6 +402,7 @@ async function fetchAllData(force = false) {
             window.lastMetaGlobal = data.meta.global;
             
             renderMetaDemographics(window.lastMetaDemographics, window.lastMetaRegions);
+            renderMetaPlatforms(data.meta.platforms || []);
             renderCampaignsTable(window.lastMetaCampaigns);
             updateMetaDashboard(window.lastMetaGlobal);
         }
@@ -1686,4 +1688,48 @@ function hideLoader() {
 
 function formatCurrency(value) {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 }).format(value);
+}
+
+function renderMetaPlatforms(platformData) {
+    const platforms = { "facebook": 0, "instagram": 0, "others": 0 };
+    
+    platformData.forEach(d => {
+        const p = d.publisher_platform ? d.publisher_platform.toLowerCase() : "others";
+        const val = parseInt(d.clicks || 0);
+        if (p.includes("facebook")) platforms.facebook += val;
+        else if (p.includes("instagram")) platforms.instagram += val;
+        else platforms.others += val;
+    });
+
+    const ctx = document.getElementById("metaPlatformChart");
+    if (ctx) {
+        if (metaPlatformChartInstance) metaPlatformChartInstance.destroy();
+        metaPlatformChartInstance = new Chart(ctx.getContext('2d'), {
+            type: 'doughnut',
+            plugins: [ChartDataLabels],
+            data: {
+                labels: ['Facebook', 'Instagram', 'Outros'],
+                datasets: [{
+                    data: [platforms.facebook, platforms.instagram, platforms.others],
+                    backgroundColor: ['#1877F2', '#E1306C', '#64748b'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom', labels: { color: '#e2e8f0' } },
+                    datalabels: {
+                        color: '#fff',
+                        font: { weight: 'bold' },
+                        formatter: (val, ctx) => {
+                            const sum = ctx.chart.data.datasets[0].data.reduce((a,b) => a+b, 0);
+                            return sum > 0 ? ((val/sum)*100).toFixed(1) + "%" : "";
+                        }
+                    }
+                }
+            }
+        });
+    }
 }
