@@ -96,7 +96,7 @@ module.exports = async (req, res) => {
     // Aumentamos o limite para 1000 para garantir que pegamos TUDO do histórico
     const metaCampDetailsPromise = axios.get(`https://graph.facebook.com/v18.0/${META_ACT_ID}/campaigns`, {
       params: {
-        fields: 'id,name,created_time,start_time,stop_time,status',
+        fields: 'id,name,created_time,start_time,stop_time,status,objective',
         limit: 1000,
         access_token: META_TOKEN
       }

@@ -1385,6 +1385,21 @@ function renderCampaignsTable(campaigns) {
         });
     }
 
+    const translateObjective = (obj) => {
+        const map = {
+            'OUTREACH': 'Reconhecimento',
+            'OUTCOMES': 'Conversão/Vendas',
+            'TRAFFIC': 'Tráfego',
+            'ENGAGEMENT': 'Engajamento',
+            'LEAD_GENERATION': 'Cadastros (Leads)',
+            'APP_PROMOTION': 'App',
+            'SALES': 'Vendas',
+            'CONVERSIONS': 'Conversões',
+            'AWARENESS': 'Reconhecimento'
+        };
+        return map[obj] || obj || "Contínuo";
+    };
+
     // Função auxiliar para tentar extrair data do nome (ex: 09/09/2024)
     const extractDateFromName = (name) => {
         const regex = /(\d{2})\/(\d{2})\/(\d{4})/;
@@ -1429,6 +1444,7 @@ function renderCampaignsTable(campaigns) {
         const id = camp.campaign_id ? camp.campaign_id.toString() : "";
         const det = detailsMapById[id] || detailsMapByName[name.toLowerCase().trim()];
         
+        let objStr = det ? translateObjective(det.objective) : "Marketing";
         let start = det ? new Date(det.created_time || det.start_time) : (extractDateFromName(name) || new Date(camp.date_start));
         let stop = det && det.stop_time ? new Date(det.stop_time) : null;
         
@@ -1473,6 +1489,7 @@ function renderCampaignsTable(campaigns) {
         const tr = document.createElement("tr");
         tr.innerHTML = `
             <td data-label="Campanha"><strong>${name}</strong></td>
+            <td data-label="Objetivo"><span style="font-size: 11px; padding: 2px 6px; border-radius: 4px; background: rgba(255,255,255,0.05); color: #fff; border: 1px solid rgba(255,255,255,0.1);">${objStr}</span></td>
             <td data-label="Início" style="font-size: 12px; color: #10B981; font-weight: 600;">${startStr}</td>
             <td data-label="Término" style="font-size: 12px; color: var(--text-secondary);">${stopStr}</td>
             <td data-label="Duração" style="font-size: 12px;">${durationStr}</td>
