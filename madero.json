@@ -1,0 +1,78 @@
+{
+  "idlead": 3628,
+  "gestor": {
+    "id": 63,
+    "nome": "Marianne Maier",
+    "email": "marianne@hauz.digital"
+  },
+  "imobiliaria": {
+    "id": 2,
+    "nome": "Hauzimob Negócios Imobiliários"
+  },
+  "corretor": {
+    "id": 17,
+    "nome": "Pedro Torino",
+    "email": "pedrotorino.longview@gmail.com"
+  },
+  "situacao": {
+    "id": 4,
+    "nome": "Em Atendimento"
+  },
+  "nome": "Jose Luis Madero",
+  "email": "joseluislehmann@gmail.com",
+  "telefone": "+542216056204",
+  "score": 100,
+  "data_cad": "2026-05-08 14:32:42",
+  "midia_principal": "Facebook Ads",
+  "documento_tipo": "cpf",
+  "documento": null,
+  "sexo": null,
+  "renda_familiar": null,
+  "valor_negocio": "0,00",
+  "cep": null,
+  "endereco": null,
+  "numero": null,
+  "bairro": null,
+  "complemento": null,
+  "estado": null,
+  "cidade": null,
+  "profissao": null,
+  "origem": "Busca Compartilhada",
+  "data_reativacao": null,
+  "data_vencimento": "2026-11-08 14:41:59",
+  "ultima_data_conversao": "2026-05-08 14:32:42",
+  "codigointerno": null,
+  "possibilidade_venda": null,
+  "empreendimento": [
+    {
+      "id": 4,
+      "nome": "Nautic"
+    }
+  ],
+  "midias": [
+    "Facebook Ads"
+  ],
+  "tags": [
+    "Nautic"
+  ],
+  "campos_adicionais": [
+    {
+      "slug": "SIM",
+      "valor": "sim"
+    },
+    {
+      "slug": "INVESTIMENTO",
+      "valor": "investimento"
+    }
+  ],
+  "autor_ultima_alteracao": "marianne@hauz.digital",
+  "qtde_simulacoes_associadas": 0,
+  "qtde_reservas_associadas": 0,
+  "link_interacoes": "https://longviewempreendimentos.cvcrm.com.br/gestor/relatorios/interacoes/html?q[1|l.idlead]=3628",
+  "link_simulacoes": "https://longviewempreendimentos.cvcrm.com.br/gestor/relatorios/simulacao/html?q[1|l.idlead]=3628",
+  "link_reservas": "https://longviewempreendimentos.cvcrm.com.br/gestor/relatorios/reservas/html?q[1|l.idlead]=3628",
+  "link_interesses": "https://longviewempreendimentos.cvcrm.com.br/gestor/comercial/leads/3628/administrar",
+  "idrd_station": "286b8c69-caed-4274-8963-f082b7f5cdf8",
+  "link_rdstation": "https://app.rdstation.com.br/leads/public/286b8c69-caed-4274-8963-f082b7f5cdf8",
+  "empreendimentosId": "4"
+}
