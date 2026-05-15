@@ -27,40 +27,11 @@ document.addEventListener("DOMContentLoaded", () => {
     if (sessionStorage.getItem("longview_auth") === "true") {
         showApp();
     } else {
-        // Eventos de Login via Formulário (permite salvar senha no navegador)
-        const loginForm = document.getElementById("login-form");
-        loginForm.addEventListener("submit", (e) => {
-            e.preventDefault();
-            handleLogin();
-        });
+        setupEventListeners();
     }
 });
 
-async function handleLogin() {
-    const user = document.getElementById("login-user").value;
-    const pass = document.getElementById("login-pass").value;
-    const errorMsg = document.getElementById("login-error");
-
-    try {
-        const response = await fetch('/api/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: user, password: pass })
-        });
-
-        if (response.ok) {
-            sessionStorage.setItem("longview_auth", "true");
-            startLoadingSequence();
-        } else {
-            throw new Error('Falha no login');
-        }
-    } catch (err) {
-        errorMsg.classList.remove("hidden");
-        const card = document.querySelector(".login-card");
-        card.style.animation = "none";
-        setTimeout(() => { card.style.animation = "shake 0.4s"; }, 10);
-    }
-}
+// handleLogin removida para usar setupEventListeners
 
 function startLoadingSequence(isRefresh = false) {
     const overlay = document.getElementById("loading-overlay");
@@ -194,13 +165,11 @@ function showApp() {
 
 function setupEventListeners() {
     // --- LOGIN ---
-    const loginForm = document.getElementById("login-form");
-    if (loginForm) {
-        loginForm.addEventListener("submit", async (e) => {
-            e.preventDefault();
+    const loginBtn = document.getElementById("btn-login");
+    if (loginBtn) {
+        loginBtn.addEventListener("click", async () => {
             const user = document.getElementById("login-user").value;
             const pass = document.getElementById("login-pass").value;
-            const loginBtn = document.getElementById("btn-login");
             
             loginBtn.innerText = "Verificando...";
             loginBtn.disabled = true;
