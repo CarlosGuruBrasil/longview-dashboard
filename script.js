@@ -232,12 +232,15 @@ function setupEventListeners() {
 
     if (openFiltersBtn) {
         openFiltersBtn.addEventListener("click", () => {
-            updateMobileSidebarFilters();
+            moveFiltersToSidebar();
             mobileSidebar.classList.remove("hidden");
         });
     }
     if (closeFiltersBtn) {
-        closeFiltersBtn.addEventListener("click", () => mobileSidebar.classList.add("hidden"));
+        closeFiltersBtn.addEventListener("click", () => {
+            restoreFiltersFromSidebar();
+            mobileSidebar.classList.add("hidden");
+        });
     }
 
     // Filtros Mobile
@@ -1619,54 +1622,45 @@ function switchView(viewName) {
     }
 }
 
-function updateMobileSidebarFilters() {
-    const container = document.getElementById("dynamic-filters-mobile");
-    if (!container) return;
+function moveFiltersToSidebar() {
+    const sidebarContainer = document.getElementById("dynamic-filters-mobile");
+    if (!sidebarContainer) return;
     
-    container.innerHTML = ""; // Limpar conteúdo anterior
+    sidebarContainer.innerHTML = ""; // Limpar anterior
     
-    // Pegar a view ativa no momento
     const activeView = document.querySelector(".view-section:not(.hidden)");
     if (!activeView) return;
     
-    // Procurar por uma linha de filtros dentro da view ativa
     const filtersRow = activeView.querySelector(".table-filters-row");
     if (filtersRow) {
-        // Clonar o container de filtros
-        const clone = filtersRow.cloneNode(true);
+        // Criar um marcador no local original para sabermos onde devolver
+        if (!filtersRow.id) filtersRow.id = "original-filters-" + Math.random().toString(36).substr(2, 9);
+        window.lastFiltersMoved = filtersRow;
+        window.lastFiltersParent = filtersRow.parentNode;
+        window.lastFiltersNextSibling = filtersRow.nextSibling;
         
-        // Estilizar o clone para ficar bem na sidebar
-        clone.classList.add("sidebar-dynamic-filter-container");
+        // Mover o elemento inteiro para a sidebar
+        sidebarContainer.appendChild(filtersRow);
         
-        container.appendChild(clone);
-        
-        // Sincronizar os valores dos inputs/selects originais com os novos clones
-        // e adicionar listeners para que o clone atualize o original
-        const originals = filtersRow.querySelectorAll("input, select");
-        const clones = clone.querySelectorAll("input, select");
-        
-        clones.forEach((c, idx) => {
-            const original = originals[idx];
-            if (!original) return;
-            
-            // Sincronizar valor inicial
-            c.value = original.value;
-            
-            // Ao mudar o clone, atualiza o original
-            c.addEventListener("change", () => {
-                original.value = c.value;
-                // Disparar o evento de mudança no original para que os scripts de filtro percebam
-                original.dispatchEvent(new Event('change'));
-                original.dispatchEvent(new Event('input'));
-            });
-
-            c.addEventListener("input", () => {
-                original.value = c.value;
-                original.dispatchEvent(new Event('input'));
-            });
-        });
+        // Garantir que os botões dentro dele (como Limpar Filtros) fiquem visíveis no mobile dentro da sidebar
+        const clearBtn = filtersRow.querySelector(".btn-clear-filters");
+        if (clearBtn) clearBtn.style.display = "block";
     }
 }
+
+function restoreFiltersFromSidebar() {
+    if (window.lastFiltersMoved && window.lastFiltersParent) {
+        window.lastFiltersParent.insertBefore(window.lastFiltersMoved, window.lastFiltersNextSibling);
+        window.lastFiltersMoved = null;
+    }
+}
+
+// Atualizar switchView para lidar com a restauração se mudar de aba com menu aberto
+const originalSwitchView = switchView;
+window.switchView = function(viewName) {
+    restoreFiltersFromSidebar();
+    originalSwitchView(viewName);
+};
 
 function showLoader() {
     document.getElementById("loader").classList.remove("hidden");

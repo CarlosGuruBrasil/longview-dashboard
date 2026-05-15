@@ -493,44 +493,86 @@ body::after {
 
     /* Transform Tables into Mobile Cards */
     .data-table thead { display: none; }
+    /* --- CARDS DE DADOS (DESIGN STACKED PARA MOBILE) --- */
     .data-table tr { 
         display: block; 
-        background: linear-gradient(145deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%);
+        background: rgba(255, 255, 255, 0.03);
         margin-bottom: 20px; 
-        border-radius: 20px; 
-        padding: 24px;
+        border-radius: 18px; 
+        padding: 20px;
         border: 1px solid var(--card-border);
-        box-shadow: 0 8px 32px rgba(0,0,0,0.3);
     }
     .data-table td { 
-        display: grid; 
-        grid-template-columns: 110px 1fr; /* Largura fixa para o rótulo */
-        gap: 15px;
+        display: flex; 
+        flex-direction: column; /* Empilha: Rótulo em cima, Valor embaixo */
+        gap: 6px;
         padding: 12px 0; 
         font-size: 14px;
         border-bottom: 1px solid rgba(255, 255, 255, 0.05);
         align-items: flex-start;
+        text-align: left;
     }
     .data-table td:last-child { border-bottom: none; }
     .data-table td::before {
         content: attr(data-label);
-        font-weight: 800;
+        font-weight: 700;
         color: var(--text-secondary);
-        font-size: 10px;
+        font-size: 11px;
         text-transform: uppercase;
         letter-spacing: 1px;
-        opacity: 0.7;
     }
     .data-table td strong, .data-table td span {
-        text-align: right;
-        word-break: break-word; /* ESSENCIAL */
-        display: block;
+        text-align: left;
+        width: 100%;
+        word-break: break-word;
         color: #fff;
+        font-size: 15px;
     }
 
-    /* Esconde os filtros fixos da tela no mobile, pois agora estarão na sidebar */
+    /* --- SIDEBAR E FILTROS --- */
+    .mobile-sidebar-content {
+        padding: 24px;
+        width: 85%; /* Um pouco mais estreita para parecer um menu lateral */
+        box-sizing: border-box;
+    }
+    .date-input {
+        width: 100% !important;
+        box-sizing: border-box !important; /* Essencial para não estourar */
+        margin: 0;
+    }
+    .sidebar-item {
+        width: 100%;
+        margin-bottom: 20px;
+    }
+    
+    /* Esconde filtros da tela mas mantém na sidebar */
     .table-filters-row {
         display: none !important;
+    }
+    
+    .sidebar-dynamic-filter-container {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 15px !important;
+        margin-bottom: 25px;
+    }
+    
+    /* Estilo para selects e inputs dentro da sidebar */
+    .sidebar-dynamic-filter-container select,
+    .sidebar-dynamic-filter-container input {
+        width: 100% !important;
+        height: 44px !important;
+        background: rgba(255,255,255,0.05) !important;
+        border: 1px solid var(--card-border) !important;
+        border-radius: 10px !important;
+        color: white !important;
+        padding: 0 12px !important;
+    }
+
+    .btn-clear-filters {
+        width: 100% !important;
+        margin-top: 10px;
+        display: block !important;
     }
 
     /* Date Filters as App Modal/Section */
