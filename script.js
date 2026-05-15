@@ -177,7 +177,7 @@ function setupEventListeners() {
     if (refreshBtn.getAttribute('data-events-set')) return; // Evitar duplicar
     refreshBtn.setAttribute('data-events-set', 'true');
 
-    refreshBtn.addEventListener("click", fetchCRMData);
+    refreshBtn.addEventListener("click", () => fetchAllData(true));
     document.getElementById("filter-btn").addEventListener("click", applyGlobalFilters);
     document.getElementById("clear-date-btn").addEventListener("click", () => {
         document.getElementById("start-date").value = "";
@@ -315,7 +315,7 @@ function applyGlobalFilters() {
     applyTableFilters(); // Atualiza tabela de leads respeitando filtros das colunas
     applySalesTableFilters(); // Atualiza tabela de vendas
 
-    fetchMetaAdsData(document.getElementById("start-date").value, document.getElementById("end-date").value);
+    // Meta Ads (O dashboard será atualizado com os dados do cache global)
 }
 
 function populateDropdowns(leadsArray) {
