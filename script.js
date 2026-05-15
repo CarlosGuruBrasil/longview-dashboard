@@ -1471,7 +1471,12 @@ function updateMetaDashboard(insights) {
 
     // Contar Leads do Facebook/Instagram que chegaram no CRM (A métrica mais real)
     let crmFbLeads = 0;
-    allLeads.forEach(l => {
+    // Usa 'filteredLeads' se houver algum filtro ativo, caso contrário 'allLeads'
+    const startVal = document.getElementById("start-date") ? document.getElementById("start-date").value : "";
+    const endVal = document.getElementById("end-date") ? document.getElementById("end-date").value : "";
+    const leadsBase = (startVal || endVal) ? filteredLeads : allLeads;
+    
+    leadsBase.forEach(l => {
         const o = getOrigin(l).toLowerCase();
         if (o.includes("facebook") || o.includes("instagram") || o.includes("fb") || o.includes("ig") || o.includes("meta") || o.includes("social")) {
             crmFbLeads++;
@@ -1511,7 +1516,7 @@ function updateMetaDashboard(insights) {
     // Chart Pie: Meta vs Resto
     const ctx = document.getElementById("marketingPieChart");
     if (ctx) {
-        const nonFbLeads = allLeads.length - crmFbLeads;
+        const nonFbLeads = leadsBase.length - crmFbLeads;
         if (marketingPieChartInstance) marketingPieChartInstance.destroy();
         marketingPieChartInstance = new Chart(ctx.getContext('2d'), {
             type: 'doughnut',
