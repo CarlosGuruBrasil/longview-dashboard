@@ -291,8 +291,14 @@ async function fetchAllData(force = false) {
         
         const data = await response.json();
         
-        // 1. Leads do CRM
-        allLeads = data.leads.leads || [];
+        // 1. Leads do CRM (Garantir leitura flexível do Cache ou API)
+        if (data.leads && data.leads.leads) {
+            allLeads = data.leads.leads;
+        } else if (Array.isArray(data.leads)) {
+            allLeads = data.leads;
+        } else {
+            allLeads = [];
+        }
         
         // 2. Dados do Meta
         if (data.meta) {
