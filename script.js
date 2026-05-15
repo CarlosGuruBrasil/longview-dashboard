@@ -42,12 +42,14 @@ function startLoadingSequence(isRefresh = false) {
     const bar = document.getElementById("progress-bar");
     const loadingText = document.getElementById("loading-text");
     const insightText = document.getElementById("insight-text");
+    const startTime = Date.now();
 
     overlay.classList.remove("hidden");
     login.classList.add("hidden");
     
     const initialInsights = [
         "A LongView está processando suas métricas de desempenho...",
+        "Orgulhosamente criado por Carlos Guru",
         "Conectando aos servidores do CV CRM para dados atualizados...",
         "Preparando análise de ROI e performance de mídia..."
     ];
@@ -65,39 +67,40 @@ function startLoadingSequence(isRefresh = false) {
         }, 500);
     }, 3500);
 
-    // Simular progresso visual enquanto espera a API
+    // Simular progresso visual sincronizado com 15 segundos (15000ms)
     let width = 0;
+    const duration = 15000; // 15 segundos
+    const stepTime = 100; // Atualiza a cada 100ms
+    const totalSteps = duration / stepTime;
+    const increment = 100 / totalSteps;
+
     const interval = setInterval(() => {
-        if (width >= 90) {
+        if (width >= 99) {
             clearInterval(interval);
         } else {
-            width += Math.random() * 5;
-            bar.style.width = Math.min(width, 90) + "%";
+            width += increment;
+            bar.style.width = Math.min(width, 99) + "%";
         }
-    }, 200);
+    }, stepTime);
 
     loadingText.innerText = isRefresh ? "Forçando sincronização total com APIs..." : "Conectando ao Portal de Inteligência...";
 
     // Chamar o backend de forma definitiva
     fetchAllData(isRefresh).then((success) => {
-        // Garantir que a barra chegue a 100%
-        bar.style.width = "100%";
+        // FORÇAR a retirada do overlay após os dados chegarem E o tempo de 15s expirar
+        const remainingTime = Math.max(0, 15000 - (Date.now() - startTime));
         
-        if (success === false) {
-            console.log("Sessão expirada, redirecionando...");
-            return;
-        }
-
-        loadingText.innerText = "Dados Sincronizados!";
-        generateRealInsights();
-        
-        // FORÇAR a retirada do overlay após os dados chegarem
         setTimeout(() => {
-            overlay.classList.add("hidden");
-            app.classList.remove("hidden");
-            setupEventListeners();
-            console.log("Dashboard liberado com sucesso.");
-        }, 800);
+            bar.style.width = "100%";
+            loadingText.innerText = "Dashboard Pronto!";
+            
+            setTimeout(() => {
+                overlay.classList.add("hidden");
+                app.classList.remove("hidden");
+                setupEventListeners();
+                console.log("Dashboard liberado após 15 segundos.");
+            }, 500);
+        }, remainingTime);
     }).catch(err => {
         console.error("Erro fatal no carregamento:", err);
         loadingText.innerText = "Falha na conexão. Tentando recuperar...";
