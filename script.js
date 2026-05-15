@@ -198,9 +198,9 @@ function setupEventListeners() {
     if (loginForm) {
         loginForm.addEventListener("submit", async (e) => {
             e.preventDefault();
-            const user = document.getElementById("user").value;
-            const pass = document.getElementById("pass").value;
-            const loginBtn = loginForm.querySelector("button");
+            const user = document.getElementById("login-user").value;
+            const pass = document.getElementById("login-pass").value;
+            const loginBtn = document.getElementById("btn-login");
             
             loginBtn.innerText = "Verificando...";
             loginBtn.disabled = true;
@@ -296,6 +296,9 @@ function setupEventListeners() {
     if (adsSearch) adsSearch.addEventListener("input", filterAdsTable);
     if (adsProduct) adsProduct.addEventListener("change", filterAdsTable);
 }
+
+// Iniciar eventos imediatamente
+setupEventListeners();
 
 // Helpers
 function isSale(lead) {
