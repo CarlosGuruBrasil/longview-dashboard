@@ -151,7 +151,7 @@ module.exports = async (req, res) => {
 
     // Só salvar no cache se NÃO for um request filtrado ou exclusivo do meta
     if (!isMetaOnly && !startDate && !endDate) {
-      await kv.set('dashboard_data', fullData, { ex: 3600 });
+      await kv.set('dashboard_data', fullData);
     }
 
     res.status(200).json(fullData);
