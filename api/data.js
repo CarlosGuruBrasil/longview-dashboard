@@ -81,12 +81,21 @@ module.exports = async (req, res) => {
       timeParams = { time_range: JSON.stringify({ since: '2020-01-01', until: endDate }) };
     }
 
-    // 2. Meta Ads - Campanhas
+    // 2. Meta Ads - Campanhas (Insights)
     const metaCampPromise = axios.get(`https://graph.facebook.com/v18.0/${META_ACT_ID}/insights`, {
       params: {
         level: 'campaign',
-        fields: 'campaign_name,spend,impressions,clicks,actions,date_start,date_stop',
+        fields: 'campaign_id,campaign_name,spend,impressions,clicks,actions,date_start,date_stop',
         ...timeParams,
+        limit: 100,
+        access_token: META_TOKEN
+      }
+    });
+
+    // 2.1 Meta Ads - Detalhes da Campanha (Para datas reais de início/fim)
+    const metaCampDetailsPromise = axios.get(`https://graph.facebook.com/v18.0/${META_ACT_ID}/campaigns`, {
+      params: {
+        fields: 'name,start_time,stop_time,created_time,status',
         limit: 100,
         access_token: META_TOKEN
       }
@@ -126,7 +135,7 @@ module.exports = async (req, res) => {
     });
 
     const results = await Promise.allSettled([
-      crmPromise, metaCampPromise, metaDemoPromise, metaRegionPromise, metaGlobalPromise, metaPlatformPromise
+      crmPromise, metaCampPromise, metaDemoPromise, metaRegionPromise, metaGlobalPromise, metaPlatformPromise, metaCampDetailsPromise
     ]);
 
     const crmData = results[0].status === 'fulfilled' ? results[0].value : { leads: [] };
@@ -143,6 +152,7 @@ module.exports = async (req, res) => {
       leads: crmData,
       meta: {
         campaigns: metaCampRes.data.data || [],
+        campaignDetails: results[6].status === 'fulfilled' ? results[6].value.data.data : [],
         demographics: metaDemoRes.data.data || [],
         regions: metaRegionRes.data.data || [],
         platforms: results[5].status === 'fulfilled' ? results[5].value.data.data : [],

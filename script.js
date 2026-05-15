@@ -395,6 +395,7 @@ async function fetchAllData(force = false) {
         }
         
         const data = await response.json();
+        window.lastMetaData = data; // Guardar tudo para acesso posterior
         
         // 1. Leads do CRM (Garantir leitura flexível do Cache ou API)
         if (data.leads && data.leads.leads) {
@@ -1372,13 +1373,21 @@ function renderCampaignsTable(campaigns) {
     if (!tbody) return;
     tbody.innerHTML = "";
     
-    // Ordenar pelas mais recentes (date_stop desc, date_start desc)
-    // Garantir que nulos/vazios fiquem no topo (campanhas em curso)
+    // Pegar detalhes extras (datas reais) vindos do backend
+    const detailsMap = {};
+    if (window.lastMetaData && window.lastMetaData.meta && window.lastMetaData.meta.campaignDetails) {
+        window.lastMetaData.meta.campaignDetails.forEach(d => {
+            detailsMap[d.name] = d;
+        });
+    }
+
+    // Ordenar pelas mais recentes baseando-se na data de INÍCIO REAL ou criação
     const sortedCampaigns = [...campaigns].sort((a, b) => {
-        const dateB = b.date_stop ? new Date(b.date_stop) : new Date();
-        const dateA = a.date_stop ? new Date(a.date_stop) : new Date();
-        if (dateB - dateA !== 0) return dateB - dateA;
-        return new Date(b.date_start) - new Date(a.date_start);
+        const detailsA = detailsMap[a.campaign_name];
+        const detailsB = detailsMap[b.campaign_name];
+        const dateA = detailsA ? new Date(detailsA.start_time || detailsA.created_time) : new Date(a.date_start);
+        const dateB = detailsB ? new Date(detailsB.start_time || detailsB.created_time) : new Date(b.date_start);
+        return dateB - dateA;
     });
 
     const filterInput = document.querySelector('.col-filter[data-col="campanha"]');
@@ -1394,17 +1403,30 @@ function renderCampaignsTable(campaigns) {
         const impressions = parseInt(camp.impressions || 0);
         const clicks = parseInt(camp.clicks || 0);
         
-        // Datas e Duração
+        // Datas REAIS vs Datas do Período
+        const details = detailsMap[name];
         let periodStr = "-";
         let durationStr = "-";
-        if (camp.date_start && camp.date_stop) {
+
+        if (details) {
+            const start = new Date(details.start_time || details.created_time);
+            const stop = details.stop_time ? new Date(details.stop_time) : null;
+            
+            const startStr = start.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'2-digit'});
+            const stopStr = stop ? stop.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'2-digit'}) : "Ativa";
+            
+            periodStr = `${startStr} à ${stopStr}`;
+            
+            const endCalc = stop || new Date();
+            const diffTime = Math.abs(endCalc - start);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            durationStr = `${diffDays} dias`;
+        } else if (camp.date_start && camp.date_stop) {
+            // Fallback para as datas do insight se não achar o detalhe
             const start = new Date(camp.date_start);
             const stop = new Date(camp.date_stop);
             periodStr = `${start.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'})} à ${stop.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'})}`;
-            
-            const diffTime = Math.abs(stop - start);
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-            durationStr = `${diffDays} dias`;
+            durationStr = "Período Filtro";
         }
 
         let metaLeads = 0;
