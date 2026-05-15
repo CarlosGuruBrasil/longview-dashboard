@@ -130,7 +130,17 @@ body::after {
 
 @media (min-width: 1200px) {
     .stats-grid { grid-template-columns: repeat(4, 1fr); }
+    .meta-stats-grid { grid-template-columns: repeat(5, 1fr) !important; }
 }
+
+.meta-stats-grid .stat-card {
+    padding: 16px; /* Menor padding para 5 colunas */
+}
+
+.meta-stats-grid .stat-card h3 {
+    font-size: 1.1rem; /* Ajuste para evitar quebra de texto */
+}
+
 
 .stat-card { 
     display: flex; 
