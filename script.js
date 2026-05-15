@@ -1,10 +1,4 @@
-const API_URL = "https://longviewempreendimentos.cvcrm.com.br/api/v1/comercial/leads?limit=500";
-const HEADERS = {
-    "email": "macabongo@gmail.com",
-    "token": "47224c041e3ac2dd5c4c8a0f5eabd16e70a0ef23",
-    "Content-Type": "application/json"
-};
-
+// Configurações removidas por segurança (Agora estão no Backend)
 let allLeads = [];
 let filteredLeads = [];
 let growthChartInstance = null;
@@ -21,8 +15,7 @@ let metaAgeChartInstance = null;
 let metaRegionChartInstance = null;
 let currentView = 'dashboard';
 
-const META_ACT_ID = "act_913791682330789";
-const META_TOKEN = "EAANZCfDAn7TsBRQpxdZB7VJU4lmBB0Vta9UtrWJv9gdrowZBa6XjR9KZAQPddgdk2aIyhKMo12JAMrsPk1QG9ZCaoUkb0rzqqrMk51rDV3UhvDtRYZCCohpaWxaCEHMHpZAMlJaeFbWGr3DX3m3ZBRmFFipVKZBFaz04B0OcweoTsGpmAZBiZCz3MB6ZB5bZCelCZApZB2bfQZDZD";
+// Meta Ads Config (Agora no Backend)
 
 Chart.defaults.color = '#A3A3A3';
 Chart.defaults.font.family = "'Outfit', sans-serif";
@@ -43,17 +36,26 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 });
 
-function handleLogin() {
+async function handleLogin() {
     const user = document.getElementById("login-user").value;
     const pass = document.getElementById("login-pass").value;
     const errorMsg = document.getElementById("login-error");
 
-    if (user === "Longview" && pass === "Guru$2026") {
-        sessionStorage.setItem("longview_auth", "true");
-        startLoadingSequence();
-    } else {
+    try {
+        const response = await fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: user, password: pass })
+        });
+
+        if (response.ok) {
+            sessionStorage.setItem("longview_auth", "true");
+            startLoadingSequence();
+        } else {
+            throw new Error('Falha no login');
+        }
+    } catch (err) {
         errorMsg.classList.remove("hidden");
-        // Efeito de shake simples no card
         const card = document.querySelector(".login-card");
         card.style.animation = "none";
         setTimeout(() => { card.style.animation = "shake 0.4s"; }, 10);
@@ -101,14 +103,11 @@ function startLoadingSequence() {
         }
     }, 200);
 
-    loadingText.innerText = "Conectando ao CV CRM...";
+    loadingText.innerText = "Sincronizando com Banco de Dados...";
 
-    fetchCRMData().then(() => {
-        // Gerar Insights Reais após o primeiro fetch
+    fetchAllData().then(() => {
         generateRealInsights();
-        loadingText.innerText = `Analisando ${allLeads.length} leads e calculando métricas...`;
-        return fetchMetaAdsData();
-    }).then(() => {
+        loadingText.innerText = `Analisando dados e calculando métricas...`;
         clearInterval(interval);
         clearInterval(insightInterval);
         bar.style.width = "100%";
@@ -257,84 +256,39 @@ function getStatusColor(input) {
     return { bg: "rgba(255, 255, 255, 0.1)", text: "#A3A3A3" };
 }
 
-async function fetchCRMData() {
-    const loaderText = document.querySelector('#loader p');
-    const loaderContainer = document.getElementById("loader");
+async function fetchAllData(force = false) {
+    const loaderText = document.querySelector('#loading-text');
     
-    // 1. Tenta carregar do Cache primeiro para acesso instantâneo
-    const cached = localStorage.getItem("cvcrm_leads_cache");
-    if (cached) {
-        try {
-            allLeads = JSON.parse(cached);
-            applyGlobalFilters();
-            hideLoader(); // Mostra o painel instantaneamente
-            
-            // Ativa o mini-loader no canto da tela
-            if (loaderText) loaderText.textContent = "Atualizando dados em segundo plano...";
-            loaderContainer.classList.add("background-sync");
-            loaderContainer.classList.remove("hidden");
-        } catch(e) {
-            console.error("Erro ao ler cache", e);
-            showLoader();
-        }
-    } else {
-        showLoader();
-        if (loaderText) loaderText.textContent = "Buscando dados no CV CRM...";
-    }
-    
-    // 2. Busca dados frescos da API
     try {
-        let tempLeads = [];
-        let limit = 500;
-        let currentOffset = 0;
-        let totalLeads = 0;
-        let keepFetching = true;
-
-        while(keepFetching) {
-            const response = await fetch(`${API_URL}&offset=${currentOffset}`, { method: "GET", headers: HEADERS });
-            if (!response.ok) throw new Error(`Erro na requisição: ${response.status}`);
-            
-            const data = await response.json();
-            
-            if (totalLeads === 0 && data.total) {
-                totalLeads = data.total;
+        if (loaderText) loaderText.textContent = "Sincronizando com o Backend...";
+        
+        const url = force ? '/api/data?refresh=true' : '/api/data';
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+            if (response.status === 401) {
+                window.location.reload(); // Redireciona para login se o token expirar
+                return;
             }
-
-            if (data.leads && data.leads.length > 0) {
-                tempLeads = tempLeads.concat(data.leads);
-                currentOffset += limit;
-                
-                // Só atualiza o texto se não estiver no background sync
-                if (loaderText && totalLeads > 0 && !cached) {
-                    loaderText.textContent = `Sincronizando banco de dados... (${tempLeads.length} de ${totalLeads} leads)`;
-                }
-                
-                if (tempLeads.length >= totalLeads || data.leads.length < limit) {
-                    keepFetching = false;
-                }
-            } else {
-                keepFetching = false;
-            }
+            throw new Error('Falha na sincronização');
         }
         
-        // 3. Substitui os dados antigos pelos novos e salva no cache
-        allLeads = tempLeads;
-        try {
-            localStorage.setItem("cvcrm_leads_cache", JSON.stringify(allLeads));
-        } catch(e) {
-            console.warn("Limite de armazenamento atingido, não foi possível fazer cache de tudo.");
-        }
+        const data = await response.json();
         
+        // 1. Leads do CRM
+        allLeads = data.leads.leads || [];
+        
+        // 2. Dados do Meta
+        if (data.meta) {
+            renderMetaDemographics(data.meta.demographics || [], data.meta.regions || []);
+            renderCampaignsTable(data.meta.campaigns || []);
+            updateMetaDashboard(data.meta.global);
+        }
+
         applyGlobalFilters();
     } catch (error) {
         console.error("Erro na sincronização:", error);
-        if (!cached) {
-            alert("Erro ao buscar dados do CV CRM.");
-        }
-    } finally {
-        if (loaderText) loaderText.textContent = "Buscando dados no CV CRM..."; 
-        loaderContainer.classList.remove("background-sync");
-        hideLoader();
+        alert("Erro ao sincronizar dados. Tente novamente mais tarde.");
     }
 }
 
@@ -1161,79 +1115,7 @@ function renderTable(leadsArray, tbodyId, limit = null) {
 // ==========================================
 // META ADS INTEGRATION
 // ==========================================
-async function fetchMetaAdsData(startDateStr, endDateStr) {
-    try {
-        let datePart = "";
-        if (startDateStr || endDateStr) {
-            let since = startDateStr || '2010-01-01';
-            let until = endDateStr || new Date().toISOString().split('T')[0];
-            const timeRangeObj = { since: since, until: until };
-            datePart = `time_range=${encodeURIComponent(JSON.stringify(timeRangeObj))}`;
-        } else {
-            datePart = "date_preset=maximum";
-        }
-
-        const urlGlobal = `https://graph.facebook.com/v19.0/${META_ACT_ID}/insights?fields=spend,impressions,clicks,cpc,cpm,ctr,actions&${datePart}&access_token=${META_TOKEN}`;
-        const urlCampaigns = `https://graph.facebook.com/v19.0/${META_ACT_ID}/insights?level=campaign&fields=campaign_name,spend,impressions,clicks,cpc,cpm,ctr,actions,date_start,date_stop&${datePart}&access_token=${META_TOKEN}`;
-        const urlDemo = `https://graph.facebook.com/v19.0/${META_ACT_ID}/insights?fields=clicks,impressions&breakdowns=gender,age&${datePart}&access_token=${META_TOKEN}`;
-        const urlRegion = `https://graph.facebook.com/v19.0/${META_ACT_ID}/insights?fields=clicks,impressions&breakdowns=region&${datePart}&access_token=${META_TOKEN}`;
-
-        const [resGlobal, resCampaigns, resDemo, resRegion] = await Promise.all([
-            fetch(urlGlobal),
-            fetch(urlCampaigns),
-            fetch(urlDemo),
-            fetch(urlRegion)
-        ]);
-        
-        const dataGlobal = await resGlobal.json();
-        const dataCampaigns = await resCampaigns.json();
-        const dataDemo = await resDemo.json();
-        const dataRegion = await resRegion.json();
-
-        // Render Demographics
-        renderMetaDemographics(dataDemo.data || [], dataRegion.data || []);
-
-        // Calcular total de leads a partir das campanhas (mais confiável para períodos longos/maximum)
-        let totalLeadsFromCampaigns = 0;
-        if (dataCampaigns.data) {
-            dataCampaigns.data.forEach(camp => {
-                if (camp.actions) {
-                    const l = camp.actions.find(a => a.action_type === 'lead' || a.action_type === 'offsite_conversion.fb_pixel_lead');
-                    if (l) totalLeadsFromCampaigns += parseInt(l.value);
-                }
-            });
-        }
-
-        if (dataGlobal.data && dataGlobal.data.length > 0) {
-            const insights = dataGlobal.data[0];
-            
-            // Garantir que o objeto de ações existe
-            if (!insights.actions) insights.actions = [];
-            
-            // Se o global não trouxe a ação 'lead', ou se a soma das campanhas for maior (mais precisa)
-            const globalLeadAction = insights.actions.find(a => a.action_type === 'lead');
-            if (!globalLeadAction || totalLeadsFromCampaigns > parseInt(globalLeadAction.value)) {
-                if (globalLeadAction) {
-                    globalLeadAction.value = totalLeadsFromCampaigns.toString();
-                } else {
-                    insights.actions.push({ action_type: 'lead', value: totalLeadsFromCampaigns.toString() });
-                }
-            }
-
-            updateMetaDashboard(insights);
-        } else {
-            updateMetaDashboard(null);
-        }
-
-        if (dataCampaigns.data) {
-            renderCampaignsTable(dataCampaigns.data);
-        } else {
-            renderCampaignsTable([]);
-        }
-    } catch (e) {
-        console.error("Meta Ads Error:", e);
-    }
-}
+// Função fetchMetaAdsData removida (integrada no fetchAllData)
 
 function findCRMLeadsForCampaign(campaignName) {
     const cmpNormal = campaignName.toLowerCase();
