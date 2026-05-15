@@ -15,9 +15,13 @@ module.exports = async (req, res) => {
   }
 
   try {
-    // Verificar se existe cache no Redis (Vercel KV)
+    const isMetaOnly = req.query.type === 'meta';
+    const startDate = req.query.start;
+    const endDate = req.query.end;
+
+    // Verificar se existe cache no Redis (Vercel KV) Apenas para o dashboard global
     const forceRefresh = req.query.refresh === 'true';
-    if (!forceRefresh) {
+    if (!forceRefresh && !isMetaOnly && !startDate && !endDate) {
       const cachedData = await kv.get('dashboard_data');
       if (cachedData) {
         console.log("Servindo dados do Cache (Redis)");
@@ -31,10 +35,12 @@ module.exports = async (req, res) => {
     const META_TOKEN = process.env.META_TOKEN;
     const META_ACT_ID = process.env.META_ACT_ID;
 
-    console.log("Buscando dados frescos das APIs...");
+    console.log(`Buscando dados frescos das APIs... (MetaOnly: ${isMetaOnly}, Filtros: ${startDate} - ${endDate})`);
 
-    // 1. CRM Leads - Função para buscar TUDO com paginação
+    // 1. CRM Leads - Função para buscar TUDO com paginação (Pula se for só Meta)
     const fetchAllCRMLeads = async () => {
+      if (isMetaOnly) return { leads: [], total: 0 };
+      
       let allLeads = [];
       let page = 1;
       let hasMore = true;
@@ -51,8 +57,7 @@ module.exports = async (req, res) => {
         const leads = response.data.leads || [];
         allLeads = allLeads.concat(leads);
 
-        // Se trouxer menos que o limite, significa que chegamos ao fim
-        if (leads.length < limit || allLeads.length >= 5000) { // Limitador de segurança em 5k para evitar timeout extremo
+        if (leads.length < limit || allLeads.length >= 5000) { 
           hasMore = false;
         } else {
           page++;
@@ -63,12 +68,25 @@ module.exports = async (req, res) => {
 
     const crmPromise = fetchAllCRMLeads();
 
+    // Lógica de tempo para o Meta Ads
+    let timeParams = { date_preset: 'maximum' };
+    if (startDate && endDate) {
+      timeParams = { time_range: JSON.stringify({ since: startDate, until: endDate }) };
+    } else if (startDate) {
+      // Se tiver só start, bota until como hoje
+      const today = new Date().toISOString().split('T')[0];
+      timeParams = { time_range: JSON.stringify({ since: startDate, until: today }) };
+    } else if (endDate) {
+      // Se tiver só end, bota start bem pra trás
+      timeParams = { time_range: JSON.stringify({ since: '2020-01-01', until: endDate }) };
+    }
+
     // 2. Meta Ads - Campanhas
     const metaCampPromise = axios.get(`https://graph.facebook.com/v18.0/${META_ACT_ID}/insights`, {
       params: {
         level: 'campaign',
         fields: 'campaign_name,spend,impressions,clicks,actions,date_start,date_stop',
-        date_preset: 'maximum',
+        ...timeParams,
         limit: 100,
         access_token: META_TOKEN
       }
@@ -80,7 +98,7 @@ module.exports = async (req, res) => {
         level: 'account',
         fields: 'clicks,impressions,spend',
         breakdowns: 'gender,age',
-        date_preset: 'maximum',
+        ...timeParams,
         access_token: META_TOKEN
       }
     });
@@ -91,7 +109,7 @@ module.exports = async (req, res) => {
         level: 'account',
         fields: 'clicks,impressions,spend',
         breakdowns: 'region',
-        date_preset: 'maximum',
+        ...timeParams,
         access_token: META_TOKEN
       }
     });
@@ -101,7 +119,7 @@ module.exports = async (req, res) => {
       params: {
         level: 'account',
         fields: 'spend,impressions,clicks,cpc,cpm,ctr,actions',
-        date_preset: 'maximum',
+        ...timeParams,
         access_token: META_TOKEN
       }
     });
@@ -110,7 +128,6 @@ module.exports = async (req, res) => {
       crmPromise, metaCampPromise, metaDemoPromise, metaRegionPromise, metaGlobalPromise
     ]);
 
-    // crmPromise agora retorna o objeto de dados diretamente, não o objeto Axios
     const crmData = results[0].status === 'fulfilled' ? results[0].value : { leads: [] };
     const metaCampRes = results[1].status === 'fulfilled' ? results[1].value : { data: { data: [] } };
     const metaDemoRes = results[2].status === 'fulfilled' ? results[2].value : { data: { data: [] } };
@@ -118,7 +135,7 @@ module.exports = async (req, res) => {
     const metaGlobalRes = results[4].status === 'fulfilled' ? results[4].value : { data: { data: [] } };
 
     if (results.some(r => r.status === 'rejected')) {
-        console.warn("Algumas APIs falharam:", results.filter(r => r.status === 'rejected').map(r => r.reason.message));
+        console.warn("Algumas APIs falharam:", results.filter(r => r.status === 'rejected').map(r => r.reason ? r.reason.message : 'Unknown'));
     }
 
     const fullData = {
@@ -132,8 +149,10 @@ module.exports = async (req, res) => {
       updatedAt: new Date().toISOString()
     };
 
-    // Salvar no Banco de Dados (Redis) por 1 hora (3600 segundos)
-    await kv.set('dashboard_data', fullData, { ex: 3600 });
+    // Só salvar no cache se NÃO for um request filtrado ou exclusivo do meta
+    if (!isMetaOnly && !startDate && !endDate) {
+      await kv.set('dashboard_data', fullData, { ex: 3600 });
+    }
 
     res.status(200).json(fullData);
   } catch (error) {
@@ -141,3 +160,4 @@ module.exports = async (req, res) => {
     res.status(500).json({ error: "Erro na sincronização", details: error.message });
   }
 };
+

@@ -360,9 +360,14 @@ async function fetchAllData(force = false) {
         
         // 2. Dados do Meta
         if (data.meta) {
-            renderMetaDemographics(data.meta.demographics || [], data.meta.regions || []);
-            renderCampaignsTable(data.meta.campaigns || []);
-            updateMetaDashboard(data.meta.global);
+            window.lastMetaDemographics = data.meta.demographics || [];
+            window.lastMetaRegions = data.meta.regions || [];
+            window.lastMetaCampaigns = data.meta.campaigns || [];
+            window.lastMetaGlobal = data.meta.global;
+            
+            renderMetaDemographics(window.lastMetaDemographics, window.lastMetaRegions);
+            renderCampaignsTable(window.lastMetaCampaigns);
+            updateMetaDashboard(window.lastMetaGlobal);
         }
 
         applyGlobalFilters();
@@ -408,10 +413,41 @@ function applyGlobalFilters() {
     applyTableFilters(); // Atualiza tabela de leads respeitando filtros das colunas
     applySalesTableFilters(); // Atualiza tabela de vendas
     
-    // Se estivermos na view de marketing, forçar atualização do gráfico de pizza
-    if (currentView === 'marketing') {
-        const metaGlobal = window.lastMetaInsights || null;
-        if (metaGlobal) updateMetaDashboard(metaGlobal);
+    // Atualizar Meta Ads buscando os dados reais filtrados no servidor
+    fetchFilteredMetaData(startDate, endDate);
+}
+
+async function fetchFilteredMetaData(start, end) {
+    // Se não tiver datas, volta ao original (Tudo)
+    if (!start && !end) {
+        if (window.lastMetaGlobal) {
+            renderMetaDemographics(window.lastMetaDemographics, window.lastMetaRegions);
+            renderCampaignsTable(window.lastMetaCampaigns);
+            updateMetaDashboard(window.lastMetaGlobal);
+        }
+        return;
+    }
+
+    try {
+        const btn = document.getElementById("filter-btn");
+        if(btn) btn.innerText = "Filtrando...";
+
+        const response = await fetch(`/api/data?type=meta&start=${start || ''}&end=${end || ''}`);
+        if (!response.ok) throw new Error('Falha na busca de ads');
+        
+        const data = await response.json();
+        
+        if (data.meta) {
+            renderMetaDemographics(data.meta.demographics || [], data.meta.regions || []);
+            renderCampaignsTable(data.meta.campaigns || []);
+            updateMetaDashboard(data.meta.global);
+        }
+        
+        if(btn) btn.innerText = "Filtrar";
+    } catch (err) {
+        console.error("Erro ao buscar filtros do Meta:", err);
+        const btn = document.getElementById("filter-btn");
+        if(btn) btn.innerText = "Filtrar";
     }
 }
 
