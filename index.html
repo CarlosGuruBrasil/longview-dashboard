@@ -59,7 +59,7 @@
         <!-- Sidebar -->
         <aside class="sidebar">
             <div class="logo-container">
-                <img src="logolongview.png" alt="LongView" class="logo-img" style="max-width: 100%; height: auto; max-height: 50px;">
+                <img src="logolongview.png" alt="LongView" class="logo-img" style="max-width: 100%; height: auto; max-height: 70px;">
             </div>
 
             <nav class="nav-menu">
@@ -118,7 +118,7 @@
         <main class="main-content">
             <header class="top-header">
                 <div class="mobile-top-bar">
-                    <img src="logolongview.png" alt="Logo" class="mobile-logo">
+                    <img src="logolongview.png" alt="Logo" class="mobile-logo" style="max-height: 45px;">
                     <button id="open-filters-btn" class="menu-trigger">
                         <i class="ph ph-funnel"></i>
                     </button>
@@ -155,6 +155,7 @@
                         <button id="close-filters-btn"><i class="ph ph-x"></i></button>
                     </div>
                     <div class="sidebar-body">
+                        <!-- Filtros Globais de Data -->
                         <div class="sidebar-item">
                             <label>Data Inicial</label>
                             <input type="date" id="m-start-date" class="date-input">
@@ -163,6 +164,12 @@
                             <label>Data Final</label>
                             <input type="date" id="m-end-date" class="date-input">
                         </div>
+
+                        <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.1); margin: 20px 0;">
+
+                        <!-- Container para Filtros Dinâmicos (Movidos via JS) -->
+                        <div id="dynamic-filters-mobile"></div>
+
                         <button id="m-filter-btn" class="btn-primary" style="width:100%; margin-top: 10px;">Aplicar Filtros</button>
                         <button id="m-refresh-btn" class="btn-secondary" style="width:100%; margin-top: 10px; background: rgba(255,255,255,0.05);">
                             <i class="ph ph-arrows-clockwise"></i> Forçar Atualização

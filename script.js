@@ -231,7 +231,10 @@ function setupEventListeners() {
     const mobileSidebar = document.getElementById("mobile-filter-sidebar");
 
     if (openFiltersBtn) {
-        openFiltersBtn.addEventListener("click", () => mobileSidebar.classList.remove("hidden"));
+        openFiltersBtn.addEventListener("click", () => {
+            updateMobileSidebarFilters();
+            mobileSidebar.classList.remove("hidden");
+        });
     }
     if (closeFiltersBtn) {
         closeFiltersBtn.addEventListener("click", () => mobileSidebar.classList.add("hidden"));
@@ -1609,6 +1612,60 @@ function switchView(viewName) {
         "marketing": "Marketing ADS"
     };
     document.getElementById("page-title").textContent = titleMap[viewName] || "Dashboard";
+
+    // No mobile, se o menu de filtros estiver aberto ou for ser aberto, precisamos atualizar os filtros
+    if (window.innerWidth <= 1024) {
+        updateMobileSidebarFilters();
+    }
+}
+
+function updateMobileSidebarFilters() {
+    const container = document.getElementById("dynamic-filters-mobile");
+    if (!container) return;
+    
+    container.innerHTML = ""; // Limpar conteúdo anterior
+    
+    // Pegar a view ativa no momento
+    const activeView = document.querySelector(".view-section:not(.hidden)");
+    if (!activeView) return;
+    
+    // Procurar por uma linha de filtros dentro da view ativa
+    const filtersRow = activeView.querySelector(".table-filters-row");
+    if (filtersRow) {
+        // Clonar o container de filtros
+        const clone = filtersRow.cloneNode(true);
+        
+        // Estilizar o clone para ficar bem na sidebar
+        clone.classList.add("sidebar-dynamic-filter-container");
+        
+        container.appendChild(clone);
+        
+        // Sincronizar os valores dos inputs/selects originais com os novos clones
+        // e adicionar listeners para que o clone atualize o original
+        const originals = filtersRow.querySelectorAll("input, select");
+        const clones = clone.querySelectorAll("input, select");
+        
+        clones.forEach((c, idx) => {
+            const original = originals[idx];
+            if (!original) return;
+            
+            // Sincronizar valor inicial
+            c.value = original.value;
+            
+            // Ao mudar o clone, atualiza o original
+            c.addEventListener("change", () => {
+                original.value = c.value;
+                // Disparar o evento de mudança no original para que os scripts de filtro percebam
+                original.dispatchEvent(new Event('change'));
+                original.dispatchEvent(new Event('input'));
+            });
+
+            c.addEventListener("input", () => {
+                original.value = c.value;
+                original.dispatchEvent(new Event('input'));
+            });
+        });
+    }
 }
 
 function showLoader() {
