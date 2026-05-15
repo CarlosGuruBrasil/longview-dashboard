@@ -134,7 +134,7 @@ function generateRealInsights() {
     // Encontrar melhor origem
     const originCount = {};
     allLeads.forEach(l => {
-        const name = l.origem ? l.origem.nome : 'N/A';
+        const name = getOrigin(l);
         originCount[name] = (originCount[name] || 0) + 1;
     });
     const topOrigin = Object.entries(originCount).sort((a,b) => b[1]-a[1])[0];
@@ -289,7 +289,12 @@ function isSale(lead) {
 
 function getOrigin(lead) {
     // Priorizando a mídia de visita conforme solicitado, depois fallback
-    return lead.midia_visita || lead.midia_principal || lead.origem || "Desconhecido";
+    if (lead.midia_visita) return String(lead.midia_visita);
+    if (lead.midia_principal) return String(lead.midia_principal);
+    if (lead.origem) {
+        return typeof lead.origem === 'object' && lead.origem.nome ? String(lead.origem.nome) : String(lead.origem);
+    }
+    return "Desconhecido";
 }
 
 function getStatusColor(input) {
@@ -372,6 +377,7 @@ async function fetchAllData(force = false) {
     } catch (error) {
         console.error("Erro na sincronização:", error);
         alert("Erro ao sincronizar dados. Tente novamente mais tarde.");
+        return false;
     }
 }
 

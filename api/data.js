@@ -14,24 +14,24 @@ module.exports = async (req, res) => {
     return res.status(401).json({ error: 'Não autorizado' });
   }
 
-  // Verificar se existe cache no Redis (Vercel KV)
-  const forceRefresh = req.query.refresh === 'true';
-  if (!forceRefresh) {
-    const cachedData = await kv.get('dashboard_data');
-    if (cachedData) {
-      console.log("Servindo dados do Cache (Redis)");
-      return res.status(200).json(cachedData);
-    }
-  }
-
-  // Tokens (Devem estar configurados no Vercel Dashboard)
-  const CV_CRM_TOKEN = process.env.CV_CRM_TOKEN;
-  const CV_CRM_EMAIL = process.env.CV_CRM_EMAIL;
-  const META_TOKEN = process.env.META_TOKEN;
-  const META_ACT_ID = process.env.META_ACT_ID;
-
   try {
-    console.log("Buscando dados frescos dos APIs...");
+    // Verificar se existe cache no Redis (Vercel KV)
+    const forceRefresh = req.query.refresh === 'true';
+    if (!forceRefresh) {
+      const cachedData = await kv.get('dashboard_data');
+      if (cachedData) {
+        console.log("Servindo dados do Cache (Redis)");
+        return res.status(200).json(cachedData);
+      }
+    }
+
+    // Tokens (Devem estar configurados no Vercel Dashboard)
+    const CV_CRM_TOKEN = process.env.CV_CRM_TOKEN;
+    const CV_CRM_EMAIL = process.env.CV_CRM_EMAIL;
+    const META_TOKEN = process.env.META_TOKEN;
+    const META_ACT_ID = process.env.META_ACT_ID;
+
+    console.log("Buscando dados frescos das APIs...");
 
     // 1. CRM Leads - Função para buscar TUDO com paginação
     const fetchAllCRMLeads = async () => {

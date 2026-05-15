@@ -7,6 +7,12 @@ module.exports = async (req, res) => {
 
   try {
     const incomingLead = req.body;
+    
+    if (!incomingLead || Object.keys(incomingLead).length === 0 || (!incomingLead.id && !incomingLead.id_lead)) {
+        console.warn("Webhook recebido sem dados de lead válidos (ID ausente).");
+        return res.status(400).json({ error: 'Payload inválido ou sem ID do lead' });
+    }
+    
     console.log("Recebido Webhook do CRM para o Lead:", incomingLead.id || incomingLead.id_lead);
 
     // 1. Buscar os dados atuais do cache
