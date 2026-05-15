@@ -664,81 +664,46 @@ function renderStatusPieChart(statuses) {
             formatter: '{b}: <b>{c} leads</b>',
             backgroundColor: 'rgba(15, 23, 42, 0.9)',
             borderColor: 'rgba(255,255,255,0.1)',
-            textStyle: { color: '#fff' }
+            textStyle: { color: '#fff', fontSize: 13 }
         },
         series: [
             {
                 name: 'Leads por Status',
                 type: 'funnel',
-                left: '25%', // Dá espaço para os nomes na esquerda
+                left: '10%',
+                right: '10%',
                 top: 10,
                 bottom: 10,
-                width: '60%',
+                width: '80%',
                 min: 0,
-                minSize: '10%', // Garante que fatias pequenas sejam visíveis
+                minSize: '8%',
                 maxSize: '100%',
                 sort: 'descending',
-                gap: 3,
-                label: {
-                    show: true,
-                    position: 'left',
-                    color: '#94a3b8',
-                    fontSize: 12,
-                    fontWeight: 500,
-                    formatter: '{b}'
-                },
-                labelLine: {
-                    show: true,
-                    length: 20,
-                    lineStyle: {
-                        width: 1,
-                        type: 'solid',
-                        color: 'rgba(255,255,255,0.2)'
-                    }
-                },
-                itemStyle: {
-                    borderColor: 'rgba(255,255,255,0.05)',
-                    borderWidth: 1,
-                    shadowBlur: 10,
-                    shadowColor: 'rgba(0,0,0,0.5)'
-                },
-                emphasis: {
-                    label: {
-                        fontSize: 14,
-                        color: '#fff',
-                        fontWeight: 'bold'
-                    },
-                    itemStyle: {
-                        shadowBlur: 20,
-                        shadowColor: 'rgba(255,255,255,0.2)'
-                    }
-                },
-                data: chartData
-            },
-            {
-                // Segunda camada apenas para os números internos
-                type: 'funnel',
-                left: '25%',
-                top: 10,
-                bottom: 10,
-                width: '60%',
-                min: 0,
-                minSize: '10%',
-                maxSize: '100%',
-                sort: 'descending',
-                gap: 3,
+                gap: 2,
                 label: {
                     show: true,
                     position: 'inside',
                     color: '#fff',
-                    fontSize: 14,
+                    fontSize: 12,
                     fontWeight: 'bold',
-                    formatter: '{c}'
+                    formatter: '{b}: {c}'
                 },
                 itemStyle: {
-                    opacity: 0 // Invisível, só queremos o label
+                    borderColor: 'rgba(255,255,255,0.05)',
+                    borderWidth: 1,
+                    shadowBlur: 15,
+                    shadowColor: 'rgba(0,0,0,0.5)'
                 },
-                silent: true, // Não interfere no tooltip
+                emphasis: {
+                    label: {
+                        fontSize: 15,
+                        fontWeight: '900'
+                    },
+                    itemStyle: {
+                        shadowBlur: 30,
+                        shadowColor: 'rgba(255,255,255,0.3)'
+                    }
+                },
                 data: chartData
             }
         ]
