@@ -162,10 +162,11 @@ body::after {
 .stat-card { 
     display: flex; 
     align-items: center; 
-    gap: 16px; 
-    padding: 24px;
+    gap: clamp(12px, 1.5vw, 16px); 
+    padding: clamp(16px, 2vw, 24px);
     height: 100%;
     transition: all 0.3s ease; 
+    overflow: hidden; /* Garante que nada saia do card */
 }
 .stat-card:hover { transform: translateY(-4px); }
 
@@ -195,11 +196,12 @@ body::after {
     letter-spacing: 0.5px;
 }
 .stat-value { 
-    font-size: 26px; 
+    font-size: clamp(18px, 2.2vw, 26px); 
     font-weight: 700; 
     color: #FFFFFF; 
     line-height: 1.1;
     white-space: nowrap;
+    letter-spacing: -0.5px;
 }
 
 /* Charts */
@@ -676,9 +678,9 @@ body::after {
         margin-right: 0 !important;
         box-sizing: border-box !important;
     }
-    .stat-icon { width: 40px; height: 40px; font-size: 20px; }
-    .stat-value { font-size: 18px; }
-    .stat-details h3 { font-size: 10px; }
+    .stat-icon { width: 36px; height: 36px; font-size: 18px; border-radius: 10px; }
+    .stat-value { font-size: clamp(15px, 4.5vw, 19px); letter-spacing: -0.8px; }
+    .stat-details h3 { font-size: 9px; margin-bottom: 2px; }
 
     /* Buttons */
     .btn-primary { 
