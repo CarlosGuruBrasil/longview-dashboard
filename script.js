@@ -404,8 +404,9 @@ function applyGlobalFilters() {
 
     // Atualizar tudo
     updateDashboard(filteredLeads);
-    renderLeadsTable(filteredLeads);
-    renderSalesTable(filteredLeads.filter(isSale));
+    populateDropdowns(filteredLeads);
+    applyTableFilters(); // Atualiza tabela de leads respeitando filtros das colunas
+    applySalesTableFilters(); // Atualiza tabela de vendas
     
     // Se estivermos na view de marketing, forçar atualização do gráfico de pizza
     if (currentView === 'marketing') {
