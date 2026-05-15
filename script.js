@@ -278,9 +278,31 @@ function setupEventListeners() {
             document.getElementById("end-date").value = "";
             if (document.getElementById("m-start-date")) document.getElementById("m-start-date").value = "";
             if (document.getElementById("m-end-date")) document.getElementById("m-end-date").value = "";
+            
+            // Limpar também filtros de coluna das tabelas
+            document.querySelectorAll(".col-filter, .col-filter-sales").forEach(input => {
+                input.value = "";
+            });
+            
             applyGlobalFilters();
         });
     }
+
+    // Botões de Limpar Filtros das Tabelas (Individuais)
+    document.querySelectorAll(".btn-clear-table-filters").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const container = btn.closest(".table-filters-row");
+            if (container) {
+                container.querySelectorAll(".col-filter, .col-filter-sales").forEach(input => {
+                    input.value = "";
+                });
+                // Re-filtrar a tabela específica ou todas
+                filterLeadsTable();
+                filterSalesTable();
+                if (typeof filterAdsTable === 'function') filterAdsTable();
+            }
+        });
+    });
 
     // Filtros de ADS ---
     const adsSearch = document.getElementById("ads-search-campaign");

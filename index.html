@@ -138,7 +138,7 @@
                             <input type="date" id="end-date" class="date-input">
                         </div>
                         <button id="filter-btn" class="btn-secondary">Filtrar</button>
-                        <button id="clear-filters-btn" class="btn-secondary" style="background: rgba(255,255,255,0.05); color: #94a3b8;">Limpar</button>
+                        <button id="clear-filters-btn" class="btn-secondary" style="border-color: rgba(255,255,255,0.2);"><i class="ph ph-trash"></i> Limpar</button>
                     </div>
                     <button id="refresh-btn" class="btn-primary">
                         <i class="ph ph-arrows-clockwise"></i>
@@ -330,6 +330,11 @@
                                     <span class="filter-label">Status (Etapa)</span>
                                     <select class="col-filter" data-col="status"><option value="">Todos</option></select>
                                 </div>
+                                <div class="filter-group" style="align-items: flex-end;">
+                                    <button class="btn-clear-table-filters" title="Limpar todos os filtros da tabela" style="background: transparent; border: 1px solid rgba(255,255,255,0.1); color: var(--text-secondary); padding: 8px; border-radius: 8px; cursor: pointer; height: 38px; display: flex; align-items: center; gap: 5px;">
+                                        <i class="ph ph-trash"></i> Limpar
+                                    </button>
+                                </div>
                             </div>
                         </div>
                         <div class="table-responsive">
@@ -442,6 +447,11 @@
                                 <div class="filter-group">
                                     <span class="filter-label">Empreendimento</span>
                                     <select class="col-filter-sales" data-col="empreendimento"><option value="">Todos</option></select>
+                                </div>
+                                <div class="filter-group" style="align-items: flex-end;">
+                                    <button class="btn-clear-table-filters" title="Limpar todos os filtros da tabela" style="background: transparent; border: 1px solid rgba(255,255,255,0.1); color: var(--text-secondary); padding: 8px; border-radius: 8px; cursor: pointer; height: 38px; display: flex; align-items: center; gap: 5px;">
+                                        <i class="ph ph-trash"></i> Limpar
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -565,6 +575,17 @@
                     <div class="table-card glass-card" style="margin-top: 24px;">
                         <div class="table-header">
                             <h3>Desempenho por Campanha (Integração Meta + CV CRM)</h3>
+                            <div class="table-filters-row">
+                                <div class="filter-group">
+                                    <span class="filter-label">Filtrar Campanha</span>
+                                    <input type="text" class="col-filter" data-col="campanha" placeholder="Buscar campanha...">
+                                </div>
+                                <div class="filter-group" style="align-items: flex-end;">
+                                    <button class="btn-clear-table-filters" title="Limpar todos os filtros da tabela" style="background: transparent; border: 1px solid rgba(255,255,255,0.1); color: var(--text-secondary); padding: 8px; border-radius: 8px; cursor: pointer; height: 38px; display: flex; align-items: center; gap: 5px;">
+                                        <i class="ph ph-trash"></i> Limpar
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                         <div class="table-container">
                             <table class="data-table">
