@@ -507,6 +507,10 @@ body::after {
         border-radius: 18px; 
         padding: 20px;
         border: 1px solid var(--card-border);
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+        overflow: hidden;
     }
     .data-table td { 
         display: flex; 
@@ -530,36 +534,42 @@ body::after {
     .data-table td strong, .data-table td span {
         text-align: left;
         width: 100%;
-        word-break: break-word;
+        word-break: break-all; /* Força quebra em ADS e Nomes */
+        white-space: normal;
         color: #fff;
         font-size: 15px;
-        max-width: 100%; /* Blindagem contra overflow */
-        overflow: hidden;
+        max-width: 100%;
+        display: block;
     }
     
     /* Proteção específica para a barra de status */
     .status-badge {
         max-width: 100% !important;
-        white-space: nowrap;
+        white-space: normal !important;
         overflow: hidden;
-        text-overflow: ellipsis;
         display: inline-block;
-        padding: 4px 12px;
+        padding: 6px 14px;
         box-sizing: border-box;
+        text-align: center;
     }
 
     /* --- SIDEBAR E FILTROS --- */
     .mobile-sidebar-content {
-        padding: 40px 25px; /* Aumentado para garantir respiro nas bordas */
+        padding: 30px 20px 100px 20px;
         width: 85%;
         box-sizing: border-box;
         overflow-x: hidden;
+        position: relative;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
     }
     .date-input {
         width: 100% !important;
         max-width: 100% !important;
         box-sizing: border-box !important;
         margin: 0;
+        height: 48px !important;
     }
     .sidebar-item {
         width: 100%;
@@ -567,6 +577,15 @@ body::after {
         box-sizing: border-box;
     }
     
+    .m-footer-actions {
+        position: absolute;
+        bottom: 30px;
+        left: 20px;
+        right: 20px;
+        padding-top: 0;
+        margin-top: 0;
+    }
+ 
     /* Esconde filtros da tela mas mantém na sidebar */
     .table-filters-row {
         display: none !important;

@@ -251,11 +251,23 @@ function setupEventListeners() {
         });
     }
 
+    const mClearBtn = document.getElementById("m-clear-btn");
+    if (mClearBtn) {
+        mClearBtn.addEventListener("click", () => {
+            document.getElementById("m-start-date").value = "";
+            document.getElementById("m-end-date").value = "";
+            document.getElementById("start-date").value = "";
+            document.getElementById("end-date").value = "";
+            applyGlobalFilters();
+            mobileSidebar.classList.add("hidden");
+        });
+    }
+
     const mRefreshBtn = document.getElementById("m-refresh-btn");
     if (mRefreshBtn) {
         mRefreshBtn.addEventListener("click", () => {
-            mobileSidebar.classList.add("hidden");
             startLoadingSequence(true);
+            mobileSidebar.classList.add("hidden");
         });
     }
 
