@@ -1478,41 +1478,6 @@ function updateMetaDashboard(insights) {
     }
 }
 
-    // Chart
-    const ctx = document.getElementById("marketingPieChart");
-    if (ctx) {
-        const nonFbLeads = filteredLeads.length - crmFbLeads;
-        if (marketingPieChartInstance) marketingPieChartInstance.destroy();
-        marketingPieChartInstance = new Chart(ctx.getContext('2d'), {
-            type: 'doughnut',
-            plugins: [ChartDataLabels],
-            data: {
-                labels: [`Meta Ads (${crmFbLeads})`, `Outros (${nonFbLeads})`],
-                datasets: [{
-                    data: [crmFbLeads, nonFbLeads],
-                    backgroundColor: ['#0ea5e9', '#6366F1'],
-                    borderWidth: 0
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    datalabels: {
-                        color: '#fff',
-                        font: { weight: 'bold', size: 12 },
-                        formatter: (val, ctx) => {
-                            const sum = ctx.chart.data.datasets[0].data.reduce((a,b) => a+b, 0);
-                            return sum > 0 ? ((val/sum)*100).toFixed(1) + "%" : "";
-                        }
-                    },
-                    legend: { position: 'bottom', labels: { color: '#e5e5e5' } }
-                }
-            }
-        });
-    }
-}
-
 function filterAdsTable() {
     const searchTerm = document.getElementById("ads-search-campaign").value.toLowerCase();
     // No momento usamos apenas o busca por termo, o filtro por produto pode ser expandido depois
