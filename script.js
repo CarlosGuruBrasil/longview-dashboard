@@ -210,6 +210,17 @@ function setupEventListeners() {
     const filterBtn = document.getElementById("filter-btn");
     if (filterBtn) filterBtn.addEventListener("click", applyGlobalFilters);
 
+    // Filtros de Coluna (Leads e Campanhas)
+    document.querySelectorAll(".col-filter").forEach(input => {
+        input.addEventListener("input", () => {
+            if (input.getAttribute("data-col") === "campanha") {
+                applyCampaignTableFilters();
+            } else {
+                applyTableFilters();
+            }
+        });
+    });
+
     // Navegação Lateral (Desktop)
     document.querySelectorAll(".nav-item").forEach(item => {
         item.addEventListener("click", (e) => {
@@ -448,6 +459,7 @@ function applyGlobalFilters() {
     updateDashboard(filteredLeads);
     populateDropdowns(filteredLeads);
     applyTableFilters(); // Atualiza tabela de leads respeitando filtros das colunas
+    applyCampaignTableFilters(); // Atualiza tabela de campanhas
     applySalesTableFilters(); // Atualiza tabela de vendas
     
     // Atualizar Meta Ads buscando os dados reais filtrados no servidor
@@ -1358,14 +1370,22 @@ function renderCampaignsTable(campaigns) {
     tbody.innerHTML = "";
     
     // Ordenar pelas mais recentes (date_stop desc, date_start desc)
-    const sortedCampaigns = campaigns.sort((a, b) => {
-        const dateB = new Date(b.date_stop);
-        const dateA = new Date(a.date_stop);
+    // Garantir que nulos/vazios fiquem no topo (campanhas em curso)
+    const sortedCampaigns = [...campaigns].sort((a, b) => {
+        const dateB = b.date_stop ? new Date(b.date_stop) : new Date();
+        const dateA = a.date_stop ? new Date(a.date_stop) : new Date();
         if (dateB - dateA !== 0) return dateB - dateA;
         return new Date(b.date_start) - new Date(a.date_start);
     });
 
-    sortedCampaigns.forEach(camp => {
+    const filterInput = document.querySelector('.col-filter[data-col="campanha"]');
+    const filterText = filterInput ? filterInput.value.toLowerCase().trim() : "";
+
+    const filtered = sortedCampaigns.filter(c => 
+        (c.campaign_name || "").toLowerCase().includes(filterText)
+    );
+
+    filtered.forEach(camp => {
         const name = camp.campaign_name || "Desconhecido";
         const spend = parseFloat(camp.spend || 0);
         const impressions = parseInt(camp.impressions || 0);
@@ -1688,6 +1708,12 @@ function hideLoader() {
 
 function formatCurrency(value) {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 }).format(value);
+}
+
+function applyCampaignTableFilters() {
+    if (window.lastMetaCampaigns) {
+        renderCampaignsTable(window.lastMetaCampaigns);
+    }
 }
 
 function renderMetaPlatforms(platformData) {
