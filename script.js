@@ -62,7 +62,7 @@ async function handleLogin() {
     }
 }
 
-function startLoadingSequence() {
+function startLoadingSequence(isRefresh = false) {
     const overlay = document.getElementById("loading-overlay");
     const login = document.getElementById("login-screen");
     const app = document.getElementById("main-app");
@@ -104,10 +104,10 @@ function startLoadingSequence() {
         }
     }, 200);
 
-    loadingText.innerText = "Sincronizando com o Portal de Inteligência...";
+    loadingText.innerText = isRefresh ? "Forçando sincronização total com APIs..." : "Conectando ao Portal de Inteligência...";
 
     // Chamar o backend de forma definitiva
-    fetchAllData().then((success) => {
+    fetchAllData(isRefresh).then((success) => {
         // Garantir que a barra chegue a 100%
         bar.style.width = "100%";
         
@@ -198,7 +198,18 @@ function setupEventListeners() {
     if (refreshBtn.getAttribute('data-events-set')) return; // Evitar duplicar
     refreshBtn.setAttribute('data-events-set', 'true');
 
-    refreshBtn.addEventListener("click", () => fetchAllData(true));
+    refreshBtn.addEventListener("click", () => {
+        // Mostrar a tela de carregamento para o refresh manual
+        const overlay = document.getElementById("loading-overlay");
+        if (overlay) {
+            overlay.classList.remove("hidden");
+            const loadingText = document.getElementById("loading-text");
+            if (loadingText) loadingText.innerText = "Iniciando atualização completa...";
+            
+            // Re-iniciar o fluxo de carregamento que já lida com o fetchAllData(true)
+            startLoadingSequence(true); 
+        }
+    });
     document.getElementById("filter-btn").addEventListener("click", applyGlobalFilters);
     document.getElementById("clear-date-btn").addEventListener("click", () => {
         document.getElementById("start-date").value = "";
