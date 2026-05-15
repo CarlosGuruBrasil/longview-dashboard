@@ -489,54 +489,69 @@ function populateDropdowns(leadsArray) {
 }
 
 function updateDashboard(leads) {
-    let totalVendasQtd = 0;
-    let totalVisitas = 0;
-    let valorTotalVendas = 0;
-    
-    const origins = {};
-    const statuses = {};
+    if (!leads) return;
 
-    leads.forEach(lead => {
-        const statusName = (lead.situacao && lead.situacao.nome) ? lead.situacao.nome : "Desconhecido";
-        const originName = getOrigin(lead);
-        
-        // Contadores
-        origins[originName] = (origins[originName] || 0) + 1;
-        statuses[statusName] = (statuses[statusName] || 0) + 1;
+    // Pequeno atraso para garantir que o navegador processou a memória antes de desenhar gráficos pesados
+    setTimeout(() => {
+        try {
+            let totalVendasQtd = 0;
+            let totalVisitas = 0;
+            let valorTotalVendas = 0;
+            
+            const origins = {};
+            const statuses = {};
 
-        // Regras KPI
-        if (isSale(lead)) {
-            totalVendasQtd++;
-            if (lead.valor_negocio) {
-                const numStr = lead.valor_negocio.replace(/\./g, '').replace(',', '.');
-                const num = parseFloat(numStr);
-                if (!isNaN(num)) valorTotalVendas += num;
-            }
+            leads.forEach(lead => {
+                const statusName = (lead.situacao && lead.situacao.nome) ? lead.situacao.nome : "Desconhecido";
+                const originName = getOrigin(lead);
+                
+                // Contadores
+                origins[originName] = (origins[originName] || 0) + 1;
+                statuses[statusName] = (statuses[statusName] || 0) + 1;
+
+                // Regras KPI
+                if (isSale(lead)) {
+                    totalVendasQtd++;
+                    if (lead.valor_negocio) {
+                        const numStr = lead.valor_negocio.replace(/\./g, '').replace(',', '.');
+                        const num = parseFloat(numStr);
+                        if (!isNaN(num)) valorTotalVendas += num;
+                    }
+                }
+                
+                if (statusName.toLowerCase().includes("visita")) {
+                    totalVisitas++;
+                }
+            });
+
+            // Atualiza HTML KPIs
+            const elLeads = document.getElementById("kpi-leads");
+            const elVendas = document.getElementById("kpi-vendas-qtd");
+            const elVisitas = document.getElementById("kpi-visitas");
+            const elValor = document.getElementById("kpi-valor-vendas");
+
+            if(elLeads) elLeads.textContent = leads.length;
+            if(elVendas) elVendas.textContent = totalVendasQtd;
+            if(elVisitas) elVisitas.textContent = totalVisitas;
+            if(elValor) elValor.textContent = formatCurrency(valorTotalVendas);
+
+            // Renderizar Gráficos de Pizza com proteção individual
+            try { renderOriginPieChart(origins); } catch(e) { console.error("Erro Origem:", e); }
+            try { renderStatusPieChart(statuses); } catch(e) { console.error("Erro Status:", e); }
+            try { renderSalesOriginPieChart(leads); } catch(e) { console.error("Erro Vendas Origem:", e); }
+
+            // Gráficos de Crescimento
+            try { renderGrowthChart(); } catch(e) { console.error("Erro Growth:", e); }
+            try { renderSalesGrowthChart(); } catch(e) { console.error("Erro Sales Growth:", e); }
+
+            // Resumos de Etapas
+            try { renderLeadsSummary(leads); } catch(e) { console.error("Erro Leads Summary:", e); }
+            try { renderSalesSummary(leads.filter(l => isSale(l))); } catch(e) { console.error("Erro Sales Summary:", e); }
+            
+        } catch (globalError) {
+            console.error("Erro global no Dashboard:", globalError);
         }
-        
-        if (statusName.toLowerCase().includes("visita")) {
-            totalVisitas++;
-        }
-    });
-
-    // Atualiza HTML KPIs
-    document.getElementById("kpi-leads").textContent = leads.length;
-    document.getElementById("kpi-vendas-qtd").textContent = totalVendasQtd;
-    document.getElementById("kpi-visitas").textContent = totalVisitas;
-    document.getElementById("kpi-valor-vendas").textContent = formatCurrency(valorTotalVendas);
-
-    // Renderizar Gráficos de Pizza
-    renderOriginPieChart(origins);
-    renderStatusPieChart(statuses);
-    renderSalesOriginPieChart(leads);
-
-    // Gráficos de Crescimento
-    renderGrowthChart();
-    renderSalesGrowthChart();
-
-    // Resumos de Etapas
-    renderLeadsSummary(leads);
-    renderSalesSummary(leads.filter(l => isSale(l)));
+    }, 50);
 }
 
 function renderOriginPieChart(origins) {
