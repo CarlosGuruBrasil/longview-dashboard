@@ -1406,10 +1406,15 @@ function updateMetaDashboard(insights) {
     const cpm = parseFloat(insights.cpm || 0);
     const ctr = parseFloat(insights.ctr || 0);
 
+    // Detecção abrangente de leads da API do Meta
     let metaLeads = 0;
     if (insights.actions) {
-        const leadAction = insights.actions.find(a => a.action_type === 'lead');
-        if (leadAction) metaLeads = parseInt(leadAction.value);
+        const leadActions = insights.actions.filter(a => 
+            a.action_type === 'lead' || 
+            a.action_type === 'offsite_conversion.fb_pixel_lead' ||
+            a.action_type.includes('leadgen')
+        );
+        metaLeads = leadActions.reduce((acc, a) => acc + parseInt(a.value || 0), 0);
     }
 
     document.getElementById("meta-spend").innerText = formatCurrency(spend);
@@ -1421,11 +1426,11 @@ function updateMetaDashboard(insights) {
     document.getElementById("meta-leads-api").innerText = metaLeads.toLocaleString('pt-BR');
     document.getElementById("meta-leads-top").innerText = metaLeads.toLocaleString('pt-BR');
 
-    // Calculate CRM Leads from FB/IG
+    // Contar Leads do Facebook/Instagram que chegaram no CRM
     let crmFbLeads = 0;
     filteredLeads.forEach(l => {
         const o = getOrigin(l).toLowerCase();
-        if (o.includes("facebook") || o.includes("instagram") || o.includes("fb") || o.includes("ig") || o.includes("meta")) {
+        if (o.includes("facebook") || o.includes("instagram") || o.includes("fb") || o.includes("ig") || o.includes("meta") || o.includes("social")) {
             crmFbLeads++;
         }
     });
