@@ -1374,22 +1374,32 @@ function renderCampaignsTable(campaigns) {
     tbody.innerHTML = "";
     
     // Pegar detalhes extras (datas reais) vindos do backend
-    const detailsMap = {};
+    const detailsMapById = {};
+    const detailsMapByName = {};
     const details = window.lastMetaData && window.lastMetaData.meta ? window.lastMetaData.meta.campaignDetails : [];
-    console.log(`[DEBUG] Populando detalhes para ${campaigns.length} campanhas. Detalhes disponíveis: ${details ? details.length : 0}`);
     
     if (details && details.length > 0) {
         details.forEach(d => {
-            detailsMap[d.id] = d;
+            if (d.id) detailsMapById[d.id.toString()] = d;
+            if (d.name) detailsMapByName[d.name.toLowerCase().trim()] = d;
         });
+        console.log(`[DEBUG] Mapeamento concluído: ${Object.keys(detailsMapById).length} por ID, ${Object.keys(detailsMapByName).length} por Nome.`);
+    } else {
+        console.warn("[DEBUG] Nenhum detalhe de campanha encontrado no window.lastMetaData");
     }
 
     // Ordenar pelas mais recentes baseando-se na data de INÍCIO REAL ou criação
     const sortedCampaigns = [...campaigns].sort((a, b) => {
-        const detailsA = detailsMap[a.campaign_id];
-        const detailsB = detailsMap[b.campaign_id];
-        const dateA = detailsA ? new Date(detailsA.created_time || detailsA.start_time) : new Date(a.date_start);
-        const dateB = detailsB ? new Date(detailsB.created_time || detailsB.start_time) : new Date(b.date_start);
+        const idA = a.campaign_id ? a.campaign_id.toString() : "";
+        const idB = b.campaign_id ? b.campaign_id.toString() : "";
+        const nameA = (a.campaign_name || "").toLowerCase().trim();
+        const nameB = (b.campaign_name || "").toLowerCase().trim();
+
+        const detA = detailsMapById[idA] || detailsMapByName[nameA];
+        const detB = detailsMapById[idB] || detailsMapByName[nameB];
+
+        const dateA = detA ? new Date(detA.created_time || detA.start_time) : new Date(a.date_start);
+        const dateB = detB ? new Date(detB.created_time || detB.start_time) : new Date(b.date_start);
         return dateB - dateA;
     });
 
@@ -1407,11 +1417,18 @@ function renderCampaignsTable(campaigns) {
         const clicks = parseInt(camp.clicks || 0);
         
         // Datas REAIS vs Datas do Período
-        const details = detailsMap[camp.campaign_id];
-        if (details) {
+        const campId = camp.campaign_id ? camp.campaign_id.toString() : "";
+        const campNameKey = (camp.campaign_name || "").toLowerCase().trim();
+        const det = detailsMapById[campId] || detailsMapByName[campNameKey];
+
+        let startStr = "-";
+        let stopStr = "-";
+        let durationStr = "-";
+
+        if (det) {
             // Prioridade absoluta para created_time (Data de Nascimento da Campanha no Meta)
-            const start = new Date(details.created_time || details.start_time);
-            const stop = details.stop_time ? new Date(details.stop_time) : null;
+            const start = new Date(det.created_time || det.start_time);
+            const stop = det.stop_time ? new Date(det.stop_time) : null;
             
             startStr = start.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'2-digit'});
             stopStr = stop ? stop.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'2-digit'}) : "Ativa";
