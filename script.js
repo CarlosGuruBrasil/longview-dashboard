@@ -410,6 +410,7 @@ async function fetchAllData(force = false) {
             window.lastMetaDemographics = data.meta.demographics || [];
             window.lastMetaRegions = data.meta.regions || [];
             window.lastMetaCampaigns = data.meta.campaigns || [];
+            window.lastMetaPlatforms = data.meta.platforms || [];
             window.lastMetaGlobal = data.meta.global;
             
             renderMetaDemographics(window.lastMetaDemographics, window.lastMetaRegions);
@@ -471,6 +472,7 @@ async function fetchFilteredMetaData(start, end) {
     if (!start && !end) {
         if (window.lastMetaGlobal) {
             renderMetaDemographics(window.lastMetaDemographics, window.lastMetaRegions);
+            renderMetaPlatforms(window.lastMetaPlatforms || []);
             renderCampaignsTable(window.lastMetaCampaigns);
             updateMetaDashboard(window.lastMetaGlobal);
         }
@@ -488,6 +490,7 @@ async function fetchFilteredMetaData(start, end) {
         
         if (data.meta) {
             renderMetaDemographics(data.meta.demographics || [], data.meta.regions || []);
+            renderMetaPlatforms(data.meta.platforms || []);
             renderCampaignsTable(data.meta.campaigns || []);
             updateMetaDashboard(data.meta.global);
         }
