@@ -1373,14 +1373,42 @@ function renderCampaignsTable(campaigns) {
     if (!tbody) return;
     tbody.innerHTML = "";
     
-    console.log(`[DEBUG] Renderizando ${campaigns.length} campanhas com metadados aninhados.`);
+    // Pegar detalhes extras (datas reais) vindos do backend
+    const detailsMapById = {};
+    const detailsMapByName = {};
+    const details = window.lastMetaData && window.lastMetaData.meta ? window.lastMetaData.meta.campaignDetails : [];
+    
+    if (details && details.length > 0) {
+        details.forEach(d => {
+            if (d.id) detailsMapById[d.id.toString()] = d;
+            if (d.name) detailsMapByName[d.name.toLowerCase().trim()] = d;
+        });
+    }
 
-    // Ordenar pelas mais recentes baseando-se na data de CRIAÇÃO REAL (que agora vem dentro de .campaign)
+    // Função auxiliar para tentar extrair data do nome (ex: 09/09/2024)
+    const extractDateFromName = (name) => {
+        const regex = /(\d{2})\/(\d{2})\/(\d{4})/;
+        const match = name.match(regex);
+        if (match) {
+            const [_, day, month, year] = match;
+            return new Date(`${year}-${month}-${day}T12:00:00`); // Meio dia para evitar timezone jump
+        }
+        return null;
+    };
+
+    // Ordenar pelas mais recentes baseando-se na data de CRIAÇÃO REAL
     const sortedCampaigns = [...campaigns].sort((a, b) => {
-        const metaA = a.campaign || {};
-        const metaB = b.campaign || {};
-        const dateA = new Date(metaA.created_time || a.date_start);
-        const dateB = new Date(metaB.created_time || b.date_start);
+        const idA = a.campaign_id ? a.campaign_id.toString() : "";
+        const idB = b.campaign_id ? b.campaign_id.toString() : "";
+        const nameA = a.campaign_name || "";
+        const nameB = b.campaign_name || "";
+
+        const detA = detailsMapById[idA] || detailsMapByName[nameA.toLowerCase().trim()];
+        const detB = detailsMapById[idB] || detailsMapByName[nameB.toLowerCase().trim()];
+
+        const dateA = detA ? new Date(detA.created_time || detA.start_time) : (extractDateFromName(nameA) || new Date(a.date_start));
+        const dateB = detB ? new Date(detB.created_time || detB.start_time) : (extractDateFromName(nameB) || new Date(b.date_start));
+        
         return dateB - dateA;
     });
 
@@ -1397,10 +1425,12 @@ function renderCampaignsTable(campaigns) {
         const impressions = parseInt(camp.impressions || 0);
         const clicks = parseInt(camp.clicks || 0);
         
-        // Metadados aninhados vindos do campo campaign{...}
-        const meta = camp.campaign || {};
-        const start = new Date(meta.created_time || camp.date_start);
-        const stop = meta.stop_time ? new Date(meta.stop_time) : null;
+        // Metadados
+        const id = camp.campaign_id ? camp.campaign_id.toString() : "";
+        const det = detailsMapById[id] || detailsMapByName[name.toLowerCase().trim()];
+        
+        let start = det ? new Date(det.created_time || det.start_time) : (extractDateFromName(name) || new Date(camp.date_start));
+        let stop = det && det.stop_time ? new Date(det.stop_time) : null;
         
         const startStr = start.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'2-digit'});
         const stopStr = stop ? stop.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'2-digit'}) : "Ativa";
@@ -1419,7 +1449,6 @@ function renderCampaignsTable(campaigns) {
         const crmLeadsMatched = findCRMLeadsForCampaign(name);
         const crmLeadsCount = crmLeadsMatched.length;
         
-        // Agrupar leads do CRM pelo Status do Funil
         const statusCounts = {};
         crmLeadsMatched.forEach(l => {
             const statusName = l.situacao && l.situacao.nome ? l.situacao.nome : "Novo";
