@@ -1408,25 +1408,7 @@ function updateMetaDashboard(insights) {
     const impressions = parseInt(insights.impressions || 0);
     const clicks = parseInt(insights.clicks || 0);
 
-    // Detecção ULTRA Robusta de Leads (Meta API)
-    let metaLeads = 0;
-    if (insights.actions) {
-        const leadActions = insights.actions.filter(a => 
-            a.action_type === 'lead' || 
-            a.action_type === 'offsite_conversion.fb_pixel_lead' ||
-            a.action_type.includes('leadgen') ||
-            a.action_type.includes('onsite_conversion.lead')
-        );
-        metaLeads = leadActions.reduce((acc, a) => acc + parseInt(a.value || 0), 0);
-    }
-
-    document.getElementById("meta-spend").innerText = formatCurrency(spend);
-    document.getElementById("meta-impressions").innerText = impressions.toLocaleString('pt-BR');
-    document.getElementById("meta-clicks").innerText = clicks.toLocaleString('pt-BR');
-    document.getElementById("meta-leads-api").innerText = metaLeads.toLocaleString('pt-BR');
-    document.getElementById("meta-leads-top").innerText = metaLeads.toLocaleString('pt-BR');
-
-    // Leads do Meta que chegaram no CRM (Baseado na Origem)
+    // Contar Leads do Facebook/Instagram que chegaram no CRM (A métrica mais real)
     let crmFbLeads = 0;
     allLeads.forEach(l => {
         const o = getOrigin(l).toLowerCase();
@@ -1434,6 +1416,28 @@ function updateMetaDashboard(insights) {
             crmFbLeads++;
         }
     });
+
+    // Detecção ULTRA Robusta de Leads (Meta API)
+    let metaLeadsFromApi = 0;
+    if (insights.actions) {
+        const leadActions = insights.actions.filter(a => 
+            a.action_type === 'lead' || 
+            a.action_type === 'offsite_conversion.fb_pixel_lead' ||
+            a.action_type.includes('leadgen') ||
+            a.action_type.includes('onsite_conversion.lead') ||
+            a.action_type.includes('lead_grouped')
+        );
+        metaLeadsFromApi = leadActions.reduce((acc, a) => acc + parseInt(a.value || 0), 0);
+    }
+
+    // Usamos o maior valor entre o CRM e a API para garantir que nunca fique zerado injustamente
+    const displayLeads = Math.max(crmFbLeads, metaLeadsFromApi);
+
+    document.getElementById("meta-spend").innerText = formatCurrency(spend);
+    document.getElementById("meta-impressions").innerText = impressions.toLocaleString('pt-BR');
+    document.getElementById("meta-clicks").innerText = clicks.toLocaleString('pt-BR');
+    document.getElementById("meta-leads-api").innerText = displayLeads.toLocaleString('pt-BR');
+    document.getElementById("meta-leads-top").innerText = displayLeads.toLocaleString('pt-BR');
 
     const totalLeadsCrm = crmFbLeads;
     const cplCRM = totalLeadsCrm > 0 ? spend / totalLeadsCrm : 0;
