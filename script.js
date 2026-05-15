@@ -634,78 +634,83 @@ function renderOriginPieChart(origins) {
     });
 }
 
-function renderStatusPieChart(statuses) {
-    const container = document.getElementById('status-funnel-container');
-    if(!container) return;
-    
-    // Limpar container
-    container.innerHTML = "";
+let statusFunnelChart = null;
 
-    // Ordenar por volume para manter a forma de pirâmide
+function renderStatusPieChart(statuses) {
+    const chartDom = document.getElementById('status-funnel-echarts');
+    if(!chartDom) return;
+    
+    // Inicializar ECharts se necessário
+    if (!statusFunnelChart) {
+        statusFunnelChart = echarts.init(chartDom, 'dark');
+    }
+
+    // Ordenar por volume para o funil
     const sorted = Object.entries(statuses).sort((a, b) => b[1] - a[1]);
     if (sorted.length === 0) return;
 
-    const rawValues = sorted.map(item => item[1]);
-    
-    // Normalização visual: Usar raiz quadrada para as larguras (proporcionalidade visual)
-    const visualWidths = rawValues.map(v => Math.max(Math.sqrt(v), 2)); // Mínimo de 2 para visibilidade
-    const maxWidth = Math.max(...visualWidths);
-    
-    const widthBase = 90; // Porcentagem da largura total
-    const heightPerSection = 100 / sorted.length;
-    
-    let svgHtml = `<svg viewBox="0 0 400 350" preserveAspectRatio="none" style="width:100%; height:100%; overflow: visible;">`;
-    
-    // Definição de Gradientes e Filtros (opcional para estética premium)
-    svgHtml += `<defs>
-        <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-            <feGaussianBlur in="SourceAlpha" stdDeviation="2" />
-            <feOffset dx="0" dy="1" result="offsetblur" />
-            <feComponentTransfer><feFuncA type="linear" slope="0.3"/></feComponentTransfer>
-            <feMerge><feMergeNode /><feMergeNode in="SourceGraphic" /></feMerge>
-        </filter>
-    </defs>`;
+    const chartData = sorted.map(item => ({
+        name: item[0],
+        value: item[1],
+        itemStyle: {
+            color: getStatusColor(item[0]).bg
+        }
+    }));
 
-    let currentY = 0;
-    const h = 350 / sorted.length;
+    const option = {
+        backgroundColor: 'transparent',
+        tooltip: {
+            trigger: 'item',
+            formatter: '{b}: {c} leads ({d}%)'
+        },
+        series: [
+            {
+                name: 'Leads por Status',
+                type: 'funnel',
+                left: '15%',
+                top: 20,
+                bottom: 20,
+                width: '70%',
+                min: 0,
+                maxSize: '100%',
+                sort: 'descending',
+                gap: 2,
+                label: {
+                    show: true,
+                    position: 'right',
+                    color: '#94a3b8',
+                    fontSize: 12,
+                    formatter: '{b}'
+                },
+                labelLine: {
+                    length: 10,
+                    lineStyle: {
+                        width: 1,
+                        type: 'solid'
+                    }
+                },
+                itemStyle: {
+                    borderColor: 'rgba(255,255,255,0.1)',
+                    borderWidth: 1
+                },
+                emphasis: {
+                    label: {
+                        fontSize: 14,
+                        color: '#fff',
+                        fontWeight: 'bold'
+                    }
+                },
+                data: chartData
+            }
+        ]
+    };
 
-    sorted.forEach((item, i) => {
-        const name = item[0];
-        const val = item[1];
-        const color = getStatusColor(name).bg;
-        
-        // Calcular largura do topo e da base deste trapézio
-        const wTop = (visualWidths[i] / maxWidth) * 380;
-        const wBottom = (i === sorted.length - 1) ? 20 : (visualWidths[i+1] / maxWidth) * 380;
-        
-        const xTopL = (400 - wTop) / 2;
-        const xTopR = xTopL + wTop;
-        const xBotL = (400 - wBottom) / 2;
-        const xBotR = xBotL + wBottom;
-        
-        const yTop = currentY;
-        const yBot = currentY + h;
-
-        // Desenhar Polígono (Trapézio)
-        const points = `${xTopL},${yTop} ${xTopR},${yTop} ${xBotR},${yBot} ${xBotL},${yBot}`;
-        
-        svgHtml += `
-            <g class="funnel-step" style="cursor: pointer;">
-                <polygon points="${points}" fill="${color}" filter="url(#shadow)">
-                    <title>${name}: ${val} leads</title>
-                </polygon>
-                <!-- Label de Nome -->
-                <text x="${xTopL - 5}" y="${yTop + h/2 + 5}" text-anchor="end" fill="#94a3b8" style="font-size: 11px; font-weight: 600;">${name.substring(0,15)}${name.length > 15 ? '...' : ''}</text>
-                <!-- Valor -->
-                <text x="200" y="${yTop + h/2 + 6}" text-anchor="middle" fill="#fff" style="font-size: 13px; font-weight: 800; pointer-events: none;">${val}</text>
-            </g>
-        `;
-        
-        currentY += h;
+    statusFunnelChart.setOption(option);
+    
+    // Responsividade
+    window.addEventListener('resize', () => {
+        statusFunnelChart.resize();
     });
-
-    svgHtml += `</svg>`;
-    container.innerHTML = svgHtml;
 }
 
 function renderSalesOriginPieChart(leads) {
