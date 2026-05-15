@@ -488,6 +488,7 @@ async function fetchFilteredMetaData(start, end) {
         if (!response.ok) throw new Error('Falha na busca de ads');
         
         const data = await response.json();
+        window.lastMetaData = data; // CRITICAL: Atualizar dados globais ao filtrar
         
         if (data.meta) {
             renderMetaDemographics(data.meta.demographics || [], data.meta.regions || []);
@@ -1405,28 +1406,25 @@ function renderCampaignsTable(campaigns) {
         
         // Datas REAIS vs Datas do Período
         const details = detailsMap[camp.campaign_id];
-        let periodStr = "-";
+        let startStr = "-";
+        let stopStr = "-";
         let durationStr = "-";
 
         if (details) {
             const start = new Date(details.start_time || details.created_time);
             const stop = details.stop_time ? new Date(details.stop_time) : null;
             
-            const startStr = start.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'2-digit'});
-            const stopStr = stop ? stop.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'2-digit'}) : "Ativa";
-            
-            periodStr = `${startStr} à ${stopStr}`;
+            startStr = start.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'2-digit'});
+            stopStr = stop ? stop.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'2-digit'}) : "Ativa";
             
             const endCalc = stop || new Date();
             const diffTime = Math.abs(endCalc - start);
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
             durationStr = `${diffDays} dias`;
         } else if (camp.date_start && camp.date_stop) {
-            // Fallback para as datas do insight se não achar o detalhe
-            const start = new Date(camp.date_start);
-            const stop = new Date(camp.date_stop);
-            periodStr = `${start.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'})} à ${stop.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'})}`;
-            durationStr = "Período Filtro";
+            startStr = new Date(camp.date_start).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'});
+            stopStr = new Date(camp.date_stop).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'});
+            durationStr = "Total";
         }
 
         let metaLeads = 0;
@@ -1463,9 +1461,10 @@ function renderCampaignsTable(campaigns) {
         const tr = document.createElement("tr");
         tr.innerHTML = `
             <td data-label="Campanha"><strong>${name}</strong></td>
-            <td data-label="Período" style="font-size: 12px; color: var(--text-secondary);">${periodStr}</td>
+            <td data-label="Início" style="font-size: 12px; color: #10B981; font-weight: 600;">${startStr}</td>
+            <td data-label="Término" style="font-size: 12px; color: var(--text-secondary);">${stopStr}</td>
             <td data-label="Duração" style="font-size: 12px;">${durationStr}</td>
-            <td data-label="Gasto"><strong style="color: #F43F5E;">${formatCurrency(spend)}</strong></td>
+            <td data-label="Investimento"><strong style="color: #F43F5E;">${formatCurrency(spend)}</strong></td>
             <td data-label="Imp/Cliques">${impressions.toLocaleString('pt-BR')} / ${clicks.toLocaleString('pt-BR')}</td>
             <td data-label="Meta Leads">${metaLeads}</td>
             <td data-label="CPL"><strong>${cplStr}</strong></td>
