@@ -533,6 +533,19 @@ body::after {
         word-break: break-word;
         color: #fff;
         font-size: 15px;
+        max-width: 100%; /* Blindagem contra overflow */
+        overflow: hidden;
+    }
+    
+    /* Proteção específica para a barra de status */
+    .status-badge {
+        max-width: 100% !important;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: inline-block;
+        padding: 4px 12px;
+        box-sizing: border-box;
     }
 
     /* --- SIDEBAR E FILTROS --- */

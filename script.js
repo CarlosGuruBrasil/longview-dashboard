@@ -231,16 +231,10 @@ function setupEventListeners() {
     const mobileSidebar = document.getElementById("mobile-filter-sidebar");
 
     if (openFiltersBtn) {
-        openFiltersBtn.addEventListener("click", () => {
-            moveFiltersToSidebar();
-            mobileSidebar.classList.remove("hidden");
-        });
+        openFiltersBtn.addEventListener("click", () => mobileSidebar.classList.remove("hidden"));
     }
     if (closeFiltersBtn) {
-        closeFiltersBtn.addEventListener("click", () => {
-            restoreFiltersFromSidebar();
-            mobileSidebar.classList.add("hidden");
-        });
+        closeFiltersBtn.addEventListener("click", () => mobileSidebar.classList.add("hidden"));
     }
 
     // Filtros Mobile
@@ -1599,8 +1593,10 @@ function switchView(viewName) {
         if (n.getAttribute("data-view") === viewName) n.classList.add("active");
     });
 
-    document.querySelectorAll(".view-section").forEach(sec => sec.classList.remove("active-view", "hidden"));
-    document.querySelectorAll(".view-section").forEach(sec => sec.classList.add("hidden"));
+    document.querySelectorAll(".view-section").forEach(sec => {
+        sec.classList.remove("active-view");
+        sec.classList.add("hidden");
+    });
     
     const target = document.getElementById(`view-${viewName}`);
     if(target) {
@@ -1615,52 +1611,7 @@ function switchView(viewName) {
         "marketing": "Marketing ADS"
     };
     document.getElementById("page-title").textContent = titleMap[viewName] || "Dashboard";
-
-    // No mobile, se o menu de filtros estiver aberto ou for ser aberto, precisamos atualizar os filtros
-    if (window.innerWidth <= 1024) {
-        updateMobileSidebarFilters();
-    }
 }
-
-function moveFiltersToSidebar() {
-    const sidebarContainer = document.getElementById("dynamic-filters-mobile");
-    if (!sidebarContainer) return;
-    
-    sidebarContainer.innerHTML = ""; // Limpar anterior
-    
-    const activeView = document.querySelector(".view-section:not(.hidden)");
-    if (!activeView) return;
-    
-    const filtersRow = activeView.querySelector(".table-filters-row");
-    if (filtersRow) {
-        // Criar um marcador no local original para sabermos onde devolver
-        if (!filtersRow.id) filtersRow.id = "original-filters-" + Math.random().toString(36).substr(2, 9);
-        window.lastFiltersMoved = filtersRow;
-        window.lastFiltersParent = filtersRow.parentNode;
-        window.lastFiltersNextSibling = filtersRow.nextSibling;
-        
-        // Mover o elemento inteiro para a sidebar
-        sidebarContainer.appendChild(filtersRow);
-        
-        // Garantir que os botões dentro dele (como Limpar Filtros) fiquem visíveis no mobile dentro da sidebar
-        const clearBtn = filtersRow.querySelector(".btn-clear-filters");
-        if (clearBtn) clearBtn.style.display = "block";
-    }
-}
-
-function restoreFiltersFromSidebar() {
-    if (window.lastFiltersMoved && window.lastFiltersParent) {
-        window.lastFiltersParent.insertBefore(window.lastFiltersMoved, window.lastFiltersNextSibling);
-        window.lastFiltersMoved = null;
-    }
-}
-
-// Atualizar switchView para lidar com a restauração se mudar de aba com menu aberto
-const originalSwitchView = switchView;
-window.switchView = function(viewName) {
-    restoreFiltersFromSidebar();
-    originalSwitchView(viewName);
-};
 
 function showLoader() {
     document.getElementById("loader").classList.remove("hidden");
