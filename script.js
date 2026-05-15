@@ -93,35 +93,39 @@ function startLoadingSequence() {
         }, 500);
     }, 3500);
 
-    // Simular progresso
+    // Simular progresso visual enquanto espera a API
     let width = 0;
     const interval = setInterval(() => {
-        if (width >= 90) clearInterval(interval);
-        else {
+        if (width >= 90) {
+            clearInterval(interval);
+        } else {
             width += Math.random() * 5;
             bar.style.width = Math.min(width, 90) + "%";
         }
     }, 200);
 
-    loadingText.innerText = "Sincronizando com Banco de Dados...";
+    loadingText.innerText = "Sincronizando com o Portal de Inteligência...";
 
+    // Chamar o backend de forma definitiva
     fetchAllData().then(() => {
-        generateRealInsights();
-        loadingText.innerText = `Analisando dados e calculando métricas...`;
+        // Quando a API responde, completamos a barra
         clearInterval(interval);
         clearInterval(insightInterval);
         bar.style.width = "100%";
-        loadingText.innerText = "Sincronização Completa!";
+        loadingText.innerText = "Dados Sincronizados!";
+        generateRealInsights();
         
         setTimeout(() => {
             overlay.classList.add("hidden");
             app.classList.remove("hidden");
             setupEventListeners();
-        }, 800);
+        }, 1200);
     }).catch(err => {
-        console.error("Erro:", err);
+        console.error("Erro fatal no carregamento:", err);
+        loadingText.innerText = "Falha na conexão. Reiniciando...";
+        clearInterval(interval);
         clearInterval(insightInterval);
-        loadingText.innerText = "Erro na conexão.";
+        setTimeout(() => window.location.reload(), 3000);
     });
 }
 
@@ -266,10 +270,10 @@ function getStatusColor(input) {
 }
 
 async function fetchAllData(force = false) {
-    const loaderText = document.querySelector('#loading-text');
+    const loadingText = document.getElementById("loading-text");
     
     try {
-        if (loaderText) loaderText.textContent = "Sincronizando com o Backend...";
+        if (loadingText) loadingText.textContent = "Buscando dados no servidor...";
         
         const url = force ? '/api/data?refresh=true' : '/api/data';
         const response = await fetch(url);
