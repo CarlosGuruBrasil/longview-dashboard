@@ -610,9 +610,76 @@ function updateDashboard(leads) {
     }, 50);
 }
 
+// --- SISTEMA DE VISUALIZAÇÃO MOBILE (PIRÂMIDES) ---
+function isMobile() { return window.innerWidth < 768; }
+
+function renderMobilePyramidSVG(canvasId, dataObj, unit = "leads") {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const parent = canvas.parentElement;
+    
+    // Garantir que temos um container para o SVG
+    let svgContainer = parent.querySelector('.mobile-pyramid-wrapper');
+    if (!svgContainer) {
+        svgContainer = document.createElement('div');
+        svgContainer.className = 'mobile-pyramid-wrapper';
+        parent.appendChild(svgContainer);
+    }
+
+    const sorted = Object.entries(dataObj).sort((a, b) => b[1] - a[1]).slice(0, 7);
+    if (sorted.length === 0) {
+        svgContainer.innerHTML = "<p style='color:#94a3b8; font-size:12px; padding:20px;'>Sem dados para exibir</p>";
+        return;
+    }
+
+    const total = sorted.reduce((acc, curr) => acc + curr[1], 0);
+    const n = sorted.length;
+    const svgW = 400;
+    const svgH = Math.max(280, n * 50);
+    const topW = 280;
+    const botW = 20;
+    const centerX = 150;
+    const sectionH = svgH / n;
+    const palette = ['#10B981', '#3B82F6', '#8B5CF6', '#EC4899', '#F59E0B', '#0ea5e9', '#6366F1'];
+
+    let html = `<svg viewBox="0 0 ${svgW} ${svgH}" style="width:100%; height:auto; overflow:visible;">`;
+    html += `<defs><filter id="pShadow"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-opacity="0.3"/></filter></defs>`;
+
+    sorted.forEach((item, i) => {
+        const [name, val] = item;
+        const perc = total > 0 ? ((val / total) * 100).toFixed(1) : 0;
+        const yT = i * sectionH;
+        const yB = (i + 1) * sectionH;
+        const wT = topW - (i * (topW - botW) / n);
+        const wB = topW - ((i + 1) * (topW - botW) / n);
+        const pts = `${centerX - wT/2},${yT} ${centerX + wT/2},${yT} ${centerX + wB/2},${yB} ${centerX - wB/2},${yB}`;
+        
+        html += `
+            <g>
+                <polygon points="${pts}" fill="${palette[i % palette.length]}" filter="url(#pShadow)" opacity="${1 - (i*0.05)}"/>
+                <text x="${centerX}" y="${yT + sectionH/2 + 5}" text-anchor="middle" fill="#fff" style="font-size:12px; font-weight:800;">${perc}%</text>
+                <text x="${centerX + wT/2 + 10}" y="${yT + sectionH/2 + 4}" fill="#e2e8f0" style="font-size:11px; font-weight:600;">
+                    ${name.length > 18 ? name.substring(0,16)+'..' : name} <tspan fill="#94a3b8" font-weight="400">(${val})</tspan>
+                </text>
+            </g>`;
+    });
+    html += `</svg>`;
+
+    canvas.style.display = 'none';
+    svgContainer.style.display = 'block';
+    svgContainer.innerHTML = html;
+}
+
 function renderOriginPieChart(origins) {
+    if (isMobile()) {
+        renderMobilePyramidSVG('originPieChart', origins);
+        return;
+    }
     const ctx = document.getElementById('originPieChart');
     if(!ctx) return;
+    ctx.style.display = 'block';
+    const wrapper = ctx.parentElement.querySelector('.mobile-pyramid-wrapper');
+    if(wrapper) wrapper.style.display = 'none';
     
     const sorted = Object.entries(origins).sort((a, b) => b[1] - a[1]);
     const data = sorted.map(item => item[1]);
@@ -656,30 +723,29 @@ function renderOriginPieChart(origins) {
 }
 
 function renderStatusPieChart(statuses) {
-    const container = document.getElementById('status-pyramid-container');
+    // No mobile ou desktop, este gráfico JÁ É pirâmide por design
+    const containerId = 'status-pyramid-container';
+    const container = document.getElementById(containerId);
     if(!container) return;
     
-    // Ordenar por volume
+    // Reaproveitar o motor de pirâmide para consistência
     const sorted = Object.entries(statuses).sort((a, b) => b[1] - a[1]);
     if (sorted.length === 0) {
         container.innerHTML = "<p style='color:#94a3b8;'>Sem dados</p>";
         return;
     }
-
+    
+    // No status, usamos cores específicas do CRM
     const totalLeads = sorted.reduce((acc, curr) => acc + curr[1], 0);
     const n = sorted.length;
-    
-    // Configurações do Desenho
     const svgW = 400;
     const svgH = 380;
-    const pyramidTopW = 300; // Largura do topo da pirâmide
-    const pyramidBotW = 20;  // Largura da base (ponta)
-    const centerX = 160;     // Deslocado para a esquerda para dar espaço aos textos na direita
+    const topW = 300;
+    const botW = 20;
+    const centerX = 160;
     const sectionH = svgH / n;
     
     let svgHtml = `<svg viewBox="0 0 ${svgW} ${svgH}" style="width:100%; height:100%; overflow: visible;">`;
-    
-    // Filtro de Sombra Suave
     svgHtml += `<defs><filter id="pyramidShadow"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.3"/></filter></defs>`;
 
     sorted.forEach((item, i) => {
@@ -687,44 +753,21 @@ function renderStatusPieChart(statuses) {
         const val = item[1];
         const perc = totalLeads > 0 ? ((val / totalLeads) * 100).toFixed(1) : 0;
         const colorData = getStatusColor(name);
-        const bgColor = colorData.bg;
-        const textColor = colorData.text; // Usar a cor de contraste definida (preto para branco, etc)
-        
-        // Cálculo das coordenadas do trapézio para formar o triângulo perfeito
-        const yTop = i * sectionH;
-        const yBot = (i + 1) * sectionH;
-        
-        // Interpolação linear da largura
-        const wTop = pyramidTopW - (i * (pyramidTopW - pyramidBotW) / n);
-        const wBot = pyramidTopW - ((i + 1) * (pyramidTopW - pyramidBotW) / n);
-        
-        const x1 = centerX - wTop/2;
-        const x2 = centerX + wTop/2;
-        const x3 = centerX + wBot/2;
-        const x4 = centerX - wBot/2;
-        
-        const points = `${x1},${yTop} ${x2},${yTop} ${x3},${yBot} ${x4},${yBot}`;
+        const yT = i * sectionH;
+        const yB = (i + 1) * sectionH;
+        const wT = topW - (i * (topW - botW) / n);
+        const wB = topW - ((i + 1) * (topW - botW) / n);
+        const pts = `${centerX - wT/2},${yT} ${centerX + wT/2},${yT} ${centerX + wB/2},${yB} ${centerX - wB/2},${yB}`;
         
         svgHtml += `
             <g class="pyramid-slice" style="cursor:pointer;">
-                <polygon points="${points}" fill="${bgColor}" filter="url(#pyramidShadow)">
-                    <title>${name}: ${val} leads</title>
-                </polygon>
-                
-                <!-- Porcentagem Interna (com cor de contraste inteligente) -->
-                <text x="${centerX}" y="${yTop + sectionH/2 + 5}" text-anchor="middle" fill="${textColor}" style="font-size: 13px; font-weight: 800; pointer-events:none;">${perc}%</text>
-                
-                <!-- Linha Guia -->
-                <line x1="${x2 + 5}" y1="${yTop + sectionH/2}" x2="${x2 + 25}" y2="${yTop + sectionH/2}" stroke="rgba(255,255,255,0.2)" stroke-width="1" />
-                
-                <!-- Rótulo Externo (Nome e Valor) - Sem truncar -->
-                <text x="${x2 + 30}" y="${yTop + sectionH/2 + 4}" fill="#e2e8f0" style="font-size: 11px; font-weight: 600;">
+                <polygon points="${pts}" fill="${colorData.bg}" filter="url(#pyramidShadow)"/>
+                <text x="${centerX}" y="${yT + sectionH/2 + 5}" text-anchor="middle" fill="${colorData.text}" style="font-size: 13px; font-weight: 800;">${perc}%</text>
+                <text x="${centerX + wT/2 + 15}" y="${yT + sectionH/2 + 4}" fill="#e2e8f0" style="font-size: 11px; font-weight: 600;">
                     ${name} <tspan fill="#94a3b8" font-weight="400">(${val})</tspan>
                 </text>
-            </g>
-        `;
+            </g>`;
     });
-
     svgHtml += `</svg>`;
     container.innerHTML = svgHtml;
 }
@@ -1060,8 +1103,15 @@ function getTopN(obj, n) {
 }
 
 function renderGenericPieChart(canvasId, dataObj, chartInstance, setInstanceCallback) {
+    if (isMobile()) {
+        renderMobilePyramidSVG(canvasId, dataObj);
+        return;
+    }
     const ctx = document.getElementById(canvasId);
     if (!ctx) return;
+    ctx.style.display = 'block';
+    const wrapper = ctx.parentElement.querySelector('.mobile-pyramid-wrapper');
+    if(wrapper) wrapper.style.display = 'none';
     
     const sorted = Object.entries(dataObj).sort((a, b) => b[1] - a[1]);
     if (sorted.length === 0) return;
