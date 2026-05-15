@@ -1385,10 +1385,18 @@ function renderCampaignsTable(campaigns) {
         });
     }
 
-    const translateObjective = (obj) => {
+    const translateObjective = (obj, name = "") => {
+        const n = name.toUpperCase();
+        
+        // Fallback por Nome (Muito comum se a API omitir o campo objective)
+        if (n.includes("RECONHECIMENTO")) return "Reconhecimento";
+        if (n.includes("ENG ") || n.includes("ENGAJAMENTO")) return "Engajamento";
+        if (n.includes("TRAFEGO") || n.includes("TRAFFIC")) return "Tráfego";
+        if (n.includes("CADASTRO") || n.includes("LEAD")) return "Cadastros (Leads)";
+
         const map = {
             'OUTREACH': 'Reconhecimento',
-            'OUTCOMES': 'Conversão/Vendas',
+            'OUTCOMES': 'Conversão/Leads',
             'TRAFFIC': 'Tráfego',
             'ENGAGEMENT': 'Engajamento',
             'LEAD_GENERATION': 'Cadastros (Leads)',
@@ -1397,7 +1405,11 @@ function renderCampaignsTable(campaigns) {
             'CONVERSIONS': 'Conversões',
             'AWARENESS': 'Reconhecimento'
         };
-        return map[obj] || obj || "Contínuo";
+        
+        if (map[obj]) return map[obj];
+        if (obj && obj !== "UNKNOWN") return obj;
+
+        return "Marketing";
     };
 
     // Função auxiliar para tentar extrair data do nome (ex: 09/09/2024)
@@ -1444,7 +1456,7 @@ function renderCampaignsTable(campaigns) {
         const id = camp.campaign_id ? camp.campaign_id.toString() : "";
         const det = detailsMapById[id] || detailsMapByName[name.toLowerCase().trim()];
         
-        let objStr = det ? translateObjective(det.objective) : "Marketing";
+        let objStr = translateObjective(det ? det.objective : "", name);
         let start = det ? new Date(det.created_time || det.start_time) : (extractDateFromName(name) || new Date(camp.date_start));
         let stop = det && det.stop_time ? new Date(det.stop_time) : null;
         
