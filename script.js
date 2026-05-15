@@ -665,7 +665,9 @@ function renderStatusPieChart(statuses) {
         const name = item[0];
         const val = item[1];
         const perc = totalLeads > 0 ? ((val / totalLeads) * 100).toFixed(1) : 0;
-        const color = getStatusColor(name).bg;
+        const colorData = getStatusColor(name);
+        const bgColor = colorData.bg;
+        const textColor = colorData.text; // Usar a cor de contraste definida (preto para branco, etc)
         
         // Cálculo das coordenadas do trapézio para formar o triângulo perfeito
         const yTop = i * sectionH;
@@ -684,19 +686,19 @@ function renderStatusPieChart(statuses) {
         
         svgHtml += `
             <g class="pyramid-slice" style="cursor:pointer;">
-                <polygon points="${points}" fill="${color}" filter="url(#pyramidShadow)">
+                <polygon points="${points}" fill="${bgColor}" filter="url(#pyramidShadow)">
                     <title>${name}: ${val} leads</title>
                 </polygon>
                 
-                <!-- Porcentagem Interna -->
-                <text x="${centerX}" y="${yTop + sectionH/2 + 5}" text-anchor="middle" fill="#fff" style="font-size: 13px; font-weight: 800; pointer-events:none;">${perc}%</text>
+                <!-- Porcentagem Interna (com cor de contraste inteligente) -->
+                <text x="${centerX}" y="${yTop + sectionH/2 + 5}" text-anchor="middle" fill="${textColor}" style="font-size: 13px; font-weight: 800; pointer-events:none;">${perc}%</text>
                 
                 <!-- Linha Guia -->
                 <line x1="${x2 + 5}" y1="${yTop + sectionH/2}" x2="${x2 + 25}" y2="${yTop + sectionH/2}" stroke="rgba(255,255,255,0.2)" stroke-width="1" />
                 
-                <!-- Rótulo Externo (Nome e Valor) -->
-                <text x="${x2 + 30}" y="${yTop + sectionH/2 + 4}" fill="#e2e8f0" style="font-size: 11px; font-weight: 500;">
-                    ${name.substring(0,18)}${name.length > 18 ? '..' : ''} <tspan fill="#94a3b8" font-weight="400">(${val})</tspan>
+                <!-- Rótulo Externo (Nome e Valor) - Sem truncar -->
+                <text x="${x2 + 30}" y="${yTop + sectionH/2 + 4}" fill="#e2e8f0" style="font-size: 11px; font-weight: 600;">
+                    ${name} <tspan fill="#94a3b8" font-weight="400">(${val})</tspan>
                 </text>
             </g>
         `;
