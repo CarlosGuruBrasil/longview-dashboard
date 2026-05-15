@@ -332,12 +332,16 @@ body::after {
 }
 
 @media (max-width: 480px) {
+    .login-overlay {
+        align-items: flex-start; /* Alinha no topo em vez do centro */
+        padding-top: 12vh; /* Empurra um pouco para baixo do topo para não ficar colado */
+    }
     .login-card {
-        padding: 32px 24px; /* Espaçamento interno mais justo no celular */
-        max-width: 340px; /* Caixa levemente menor no celular */
+        padding: 32px 24px;
+        max-width: 340px;
     }
     .login-logo {
-        max-height: 40px !important; /* Logo mais proporcional */
+        max-height: 40px !important;
     }
 }
 @keyframes slideUp {
