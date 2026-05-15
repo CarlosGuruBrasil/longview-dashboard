@@ -81,11 +81,13 @@ module.exports = async (req, res) => {
       timeParams = { time_range: JSON.stringify({ since: '2020-01-01', until: endDate }) };
     }
 
-    // 2. Meta Ads - Campanhas UNIFICADAS (Metadados + Insights juntos)
-    // Isso garante que a data de criação (Início real) venha grudada nas métricas
-    const metaCampPromise = axios.get(`https://graph.facebook.com/v18.0/${META_ACT_ID}/campaigns`, {
+    // 2. Meta Ads - Campanhas (Insights com Metadados aninhados)
+    // Pedimos os metadados (created_time) dentro do próprio relatório de insights
+    const metaCampPromise = axios.get(`https://graph.facebook.com/v18.0/${META_ACT_ID}/insights`, {
       params: {
-        fields: `id,name,created_time,start_time,stop_time,status,insights.limit(1).${timeParams.time_range ? 'time_range(' + timeParams.time_range + ')' : 'date_preset(maximum)'}{spend,impressions,clicks,actions,date_start,date_stop}`,
+        level: 'campaign',
+        fields: 'campaign_id,campaign_name,spend,impressions,clicks,actions,date_start,date_stop,campaign{created_time,start_time,stop_time,status}',
+        ...timeParams,
         limit: 500,
         access_token: META_TOKEN
       }

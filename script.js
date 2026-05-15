@@ -1373,16 +1373,14 @@ function renderCampaignsTable(campaigns) {
     if (!tbody) return;
     tbody.innerHTML = "";
     
-    // Agora os dados vêm UNIFICADOS do backend. Cada campanha já tem seu .insights
-    console.log(`[DEBUG] Renderizando ${campaigns.length} campanhas unificadas.`);
+    console.log(`[DEBUG] Renderizando ${campaigns.length} campanhas com metadados aninhados.`);
 
-    // Filtrar apenas campanhas que tenham tido algum gasto ou cliques ou impressões (opcional, para limpar a tabela)
-    const activeCampaigns = campaigns.filter(c => c.insights && c.insights.data && c.insights.data.length > 0);
-
-    // Ordenar pelas mais recentes baseando-se na data de CRIAÇÃO REAL
-    const sortedCampaigns = [...activeCampaigns].sort((a, b) => {
-        const dateA = new Date(a.created_time || a.start_time);
-        const dateB = new Date(b.created_time || b.start_time);
+    // Ordenar pelas mais recentes baseando-se na data de CRIAÇÃO REAL (que agora vem dentro de .campaign)
+    const sortedCampaigns = [...campaigns].sort((a, b) => {
+        const metaA = a.campaign || {};
+        const metaB = b.campaign || {};
+        const dateA = new Date(metaA.created_time || a.date_start);
+        const dateB = new Date(metaB.created_time || b.date_start);
         return dateB - dateA;
     });
 
@@ -1390,20 +1388,19 @@ function renderCampaignsTable(campaigns) {
     const filterText = filterInput ? filterInput.value.toLowerCase().trim() : "";
 
     const filtered = sortedCampaigns.filter(c => 
-        (c.name || "").toLowerCase().includes(filterText)
+        (c.campaign_name || "").toLowerCase().includes(filterText)
     );
 
     filtered.forEach(camp => {
-        const insight = camp.insights.data[0]; // Pegamos o primeiro (e único) item de insight
+        const name = camp.campaign_name || "Desconhecido";
+        const spend = parseFloat(camp.spend || 0);
+        const impressions = parseInt(camp.impressions || 0);
+        const clicks = parseInt(camp.clicks || 0);
         
-        const name = camp.name || "Desconhecido";
-        const spend = parseFloat(insight.spend || 0);
-        const impressions = parseInt(insight.impressions || 0);
-        const clicks = parseInt(insight.clicks || 0);
-        
-        // Datas REAIS (Metadados do Objeto)
-        const start = new Date(camp.created_time || camp.start_time);
-        const stop = camp.stop_time ? new Date(camp.stop_time) : null;
+        // Metadados aninhados vindos do campo campaign{...}
+        const meta = camp.campaign || {};
+        const start = new Date(meta.created_time || camp.date_start);
+        const stop = meta.stop_time ? new Date(meta.stop_time) : null;
         
         const startStr = start.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'2-digit'});
         const stopStr = stop ? stop.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'2-digit'}) : "Ativa";
@@ -1414,8 +1411,8 @@ function renderCampaignsTable(campaigns) {
         const durationStr = `${diffDays} dias`;
 
         let metaLeads = 0;
-        if (insight.actions) {
-            const leadAction = insight.actions.find(a => a.action_type === 'lead' || a.action_type === 'offsite_conversion.fb_pixel_lead');
+        if (camp.actions) {
+            const leadAction = camp.actions.find(a => a.action_type === 'lead' || a.action_type === 'offsite_conversion.fb_pixel_lead');
             if (leadAction) metaLeads = parseInt(leadAction.value);
         }
 
