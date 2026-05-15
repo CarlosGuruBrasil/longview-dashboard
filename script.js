@@ -21,6 +21,7 @@ Chart.defaults.color = '#A3A3A3';
 Chart.defaults.font.family = "'Outfit', sans-serif";
 Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(20, 20, 20, 0.9)';
 Chart.defaults.plugins.tooltip.titleColor = '#fff';
+Chart.defaults.animation = window.innerWidth > 1024; // Desativa animações no mobile para evitar travamentos
 
 document.addEventListener("DOMContentLoaded", () => {
     // Verificar sessão existente

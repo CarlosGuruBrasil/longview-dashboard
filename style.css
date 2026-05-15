@@ -628,14 +628,21 @@ body::after {
         font-weight: 500;
     }
 
-    /* Stats Grid */
-    .stats-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
-    .stat-card { 
-        padding: 16px; 
-        flex-direction: column; 
-        align-items: flex-start; 
-        gap: 8px; 
-        border-radius: 18px;
+    .sidebar-body {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        padding: 0;
+    }
+    .m-footer-actions {
+        margin-top: auto;
+        padding-top: 30px;
+    }
+    .btn-primary, .btn-secondary, .date-input {
+        width: 100% !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        box-sizing: border-box !important;
     }
     .stat-icon { width: 40px; height: 40px; font-size: 20px; }
     .stat-value { font-size: 18px; }
