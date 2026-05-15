@@ -1691,15 +1691,30 @@ function formatCurrency(value) {
 }
 
 function renderMetaPlatforms(platformData) {
+    console.log("Meta Platform Data:", platformData); // Log para conferência
+    
     const platforms = { "facebook": 0, "instagram": 0, "others": 0 };
+    let hasData = false;
     
     platformData.forEach(d => {
         const p = d.publisher_platform ? d.publisher_platform.toLowerCase() : "others";
-        const val = parseInt(d.clicks || 0);
-        if (p.includes("facebook")) platforms.facebook += val;
-        else if (p.includes("instagram")) platforms.instagram += val;
-        else platforms.others += val;
+        const val = parseInt(d.clicks || d.impressions || 0);
+        if (val > 0) {
+            hasData = true;
+            if (p.includes("facebook")) platforms.facebook += val;
+            else if (p.includes("instagram")) platforms.instagram += val;
+            else platforms.others += val;
+        }
     });
+
+    const chartCard = document.getElementById("metaPlatformChart") ? document.getElementById("metaPlatformChart").closest('.chart-card') : null;
+    
+    if (!hasData) {
+        if (chartCard) chartCard.classList.add("hidden");
+        return;
+    } else {
+        if (chartCard) chartCard.classList.remove("hidden");
+    }
 
     const ctx = document.getElementById("metaPlatformChart");
     if (ctx) {
