@@ -1,3 +1,9 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { 
+    overflow-x: hidden; 
+    width: 100%;
+    position: relative;
+}
 :root {
     /* Colors - Dark Premium with Teal Accent */
     --bg-main: #0F1115;
@@ -531,18 +537,21 @@ body::after {
 
     /* --- SIDEBAR E FILTROS --- */
     .mobile-sidebar-content {
-        padding: 24px;
-        width: 85%; /* Um pouco mais estreita para parecer um menu lateral */
+        padding: 40px 25px; /* Aumentado para garantir respiro nas bordas */
+        width: 85%;
         box-sizing: border-box;
+        overflow-x: hidden;
     }
     .date-input {
         width: 100% !important;
-        box-sizing: border-box !important; /* Essencial para não estourar */
+        max-width: 100% !important;
+        box-sizing: border-box !important;
         margin: 0;
     }
     .sidebar-item {
         width: 100%;
-        margin-bottom: 20px;
+        margin-bottom: 25px;
+        box-sizing: border-box;
     }
     
     /* Esconde filtros da tela mas mantém na sidebar */
@@ -647,7 +656,7 @@ body::after {
 }
 
 .mobile-logo {
-    max-height: 55px !important; /* Logo muito maior */
+    max-height: 40px !important; /* Ajuste para não ocupar a tela toda */
     object-fit: contain;
     filter: drop-shadow(0 0 10px rgba(255,255,255,0.1));
 }
