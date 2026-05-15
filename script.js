@@ -1373,33 +1373,16 @@ function renderCampaignsTable(campaigns) {
     if (!tbody) return;
     tbody.innerHTML = "";
     
-    // Pegar detalhes extras (datas reais) vindos do backend
-    const detailsMapById = {};
-    const detailsMapByName = {};
-    const details = window.lastMetaData && window.lastMetaData.meta ? window.lastMetaData.meta.campaignDetails : [];
-    
-    if (details && details.length > 0) {
-        details.forEach(d => {
-            if (d.id) detailsMapById[d.id.toString()] = d;
-            if (d.name) detailsMapByName[d.name.toLowerCase().trim()] = d;
-        });
-        console.log(`[DEBUG] Mapeamento concluído: ${Object.keys(detailsMapById).length} por ID, ${Object.keys(detailsMapByName).length} por Nome.`);
-    } else {
-        console.warn("[DEBUG] Nenhum detalhe de campanha encontrado no window.lastMetaData");
-    }
+    // Agora os dados vêm UNIFICADOS do backend. Cada campanha já tem seu .insights
+    console.log(`[DEBUG] Renderizando ${campaigns.length} campanhas unificadas.`);
 
-    // Ordenar pelas mais recentes baseando-se na data de INÍCIO REAL ou criação
-    const sortedCampaigns = [...campaigns].sort((a, b) => {
-        const idA = a.campaign_id ? a.campaign_id.toString() : "";
-        const idB = b.campaign_id ? b.campaign_id.toString() : "";
-        const nameA = (a.campaign_name || "").toLowerCase().trim();
-        const nameB = (b.campaign_name || "").toLowerCase().trim();
+    // Filtrar apenas campanhas que tenham tido algum gasto ou cliques ou impressões (opcional, para limpar a tabela)
+    const activeCampaigns = campaigns.filter(c => c.insights && c.insights.data && c.insights.data.length > 0);
 
-        const detA = detailsMapById[idA] || detailsMapByName[nameA];
-        const detB = detailsMapById[idB] || detailsMapByName[nameB];
-
-        const dateA = detA ? new Date(detA.created_time || detA.start_time) : new Date(a.date_start);
-        const dateB = detB ? new Date(detB.created_time || detB.start_time) : new Date(b.date_start);
+    // Ordenar pelas mais recentes baseando-se na data de CRIAÇÃO REAL
+    const sortedCampaigns = [...activeCampaigns].sort((a, b) => {
+        const dateA = new Date(a.created_time || a.start_time);
+        const dateB = new Date(b.created_time || b.start_time);
         return dateB - dateA;
     });
 
@@ -1407,45 +1390,32 @@ function renderCampaignsTable(campaigns) {
     const filterText = filterInput ? filterInput.value.toLowerCase().trim() : "";
 
     const filtered = sortedCampaigns.filter(c => 
-        (c.campaign_name || "").toLowerCase().includes(filterText)
+        (c.name || "").toLowerCase().includes(filterText)
     );
 
     filtered.forEach(camp => {
-        const name = camp.campaign_name || "Desconhecido";
-        const spend = parseFloat(camp.spend || 0);
-        const impressions = parseInt(camp.impressions || 0);
-        const clicks = parseInt(camp.clicks || 0);
+        const insight = camp.insights.data[0]; // Pegamos o primeiro (e único) item de insight
         
-        // Datas REAIS vs Datas do Período
-        const campId = camp.campaign_id ? camp.campaign_id.toString() : "";
-        const campNameKey = (camp.campaign_name || "").toLowerCase().trim();
-        const det = detailsMapById[campId] || detailsMapByName[campNameKey];
-
-        let startStr = "-";
-        let stopStr = "-";
-        let durationStr = "-";
-
-        if (det) {
-            // Prioridade absoluta para created_time (Data de Nascimento da Campanha no Meta)
-            const start = new Date(det.created_time || det.start_time);
-            const stop = det.stop_time ? new Date(det.stop_time) : null;
-            
-            startStr = start.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'2-digit'});
-            stopStr = stop ? stop.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'2-digit'}) : "Ativa";
-            
-            const endCalc = stop || new Date();
-            const diffTime = Math.abs(endCalc - start);
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            durationStr = `${diffDays} dias`;
-        } else if (camp.date_start && camp.date_stop) {
-            startStr = new Date(camp.date_start).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'});
-            stopStr = new Date(camp.date_stop).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'});
-            durationStr = "Total";
-        }
+        const name = camp.name || "Desconhecido";
+        const spend = parseFloat(insight.spend || 0);
+        const impressions = parseInt(insight.impressions || 0);
+        const clicks = parseInt(insight.clicks || 0);
+        
+        // Datas REAIS (Metadados do Objeto)
+        const start = new Date(camp.created_time || camp.start_time);
+        const stop = camp.stop_time ? new Date(camp.stop_time) : null;
+        
+        const startStr = start.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'2-digit'});
+        const stopStr = stop ? stop.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'2-digit'}) : "Ativa";
+        
+        const endCalc = stop || new Date();
+        const diffTime = Math.abs(endCalc - start);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        const durationStr = `${diffDays} dias`;
 
         let metaLeads = 0;
-        if (camp.actions) {
-            const leadAction = camp.actions.find(a => a.action_type === 'lead' || a.action_type === 'offsite_conversion.fb_pixel_lead');
+        if (insight.actions) {
+            const leadAction = insight.actions.find(a => a.action_type === 'lead' || a.action_type === 'offsite_conversion.fb_pixel_lead');
             if (leadAction) metaLeads = parseInt(leadAction.value);
         }
 

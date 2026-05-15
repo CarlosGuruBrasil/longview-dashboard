@@ -81,21 +81,11 @@ module.exports = async (req, res) => {
       timeParams = { time_range: JSON.stringify({ since: '2020-01-01', until: endDate }) };
     }
 
-    // 2. Meta Ads - Campanhas (Insights)
-    const metaCampPromise = axios.get(`https://graph.facebook.com/v18.0/${META_ACT_ID}/insights`, {
+    // 2. Meta Ads - Campanhas UNIFICADAS (Metadados + Insights juntos)
+    // Isso garante que a data de criação (Início real) venha grudada nas métricas
+    const metaCampPromise = axios.get(`https://graph.facebook.com/v18.0/${META_ACT_ID}/campaigns`, {
       params: {
-        level: 'campaign',
-        fields: 'campaign_id,campaign_name,spend,impressions,clicks,actions,date_start,date_stop',
-        ...timeParams,
-        limit: 500,
-        access_token: META_TOKEN
-      }
-    });
-
-    // 2.1 Meta Ads - Detalhes da Campanha (Para datas reais de início/fim)
-    const metaCampDetailsPromise = axios.get(`https://graph.facebook.com/v18.0/${META_ACT_ID}/campaigns`, {
-      params: {
-        fields: 'id,name,created_time,start_time,stop_time,status',
+        fields: `id,name,created_time,start_time,stop_time,status,insights.limit(1).${timeParams.time_range ? 'time_range(' + timeParams.time_range + ')' : 'date_preset(maximum)'}{spend,impressions,clicks,actions,date_start,date_stop}`,
         limit: 500,
         access_token: META_TOKEN
       }
@@ -145,7 +135,7 @@ module.exports = async (req, res) => {
     });
 
     const results = await Promise.allSettled([
-      crmPromise, metaCampPromise, metaDemoPromise, metaRegionPromise, metaGlobalPromise, metaPlatformPromise, metaCampDetailsPromise
+      crmPromise, metaCampPromise, metaDemoPromise, metaRegionPromise, metaGlobalPromise, metaPlatformPromise
     ]);
 
     const crmData = results[0].status === 'fulfilled' ? results[0].value : { leads: [] };
@@ -162,7 +152,6 @@ module.exports = async (req, res) => {
       leads: crmData,
       meta: {
         campaigns: metaCampRes.data.data || [],
-        campaignDetails: results[6].status === 'fulfilled' ? results[6].value.data.data : [],
         demographics: metaDemoRes.data.data || [],
         regions: metaRegionRes.data.data || [],
         platforms: results[5].status === 'fulfilled' ? results[5].value.data.data : [],
