@@ -413,19 +413,24 @@ function getStatusColor(input) {
     }
 
     const s = name.toLowerCase();
-    
-    // Cores Oficiais CV CRM (conforme fotos enviadas)
-    if (s === "aguardando atendimento") return { bg: "#FF0F47", text: "#FFFFFF" };
-    if (s.includes("sdr")) return { bg: "#00E676", text: "#000000" };
-    if (s.includes("aguardando atendimento corretor")) return { bg: "#FFEA00", text: "#000000" }; 
-    if (s === "em atendimento") return { bg: "#FF8A00", text: "#FFFFFF" };
-    if (s.includes("visita agendada")) return { bg: "#00B0FF", text: "#FFFFFF" };
-    if (s.includes("visita realizada")) return { bg: "#00897B", text: "#FFFFFF" };
-    if (s.includes("simula")) return { bg: "#FF5252", text: "#FFFFFF" };
-    if (s.includes("reserva")) return { bg: "#2979FF", text: "#FFFFFF" };
+
+    // Cores Oficiais CV CRM
+    if (s.includes("aguardando atendimento corretor")) return { bg: "#FFEA00", text: "#000000" };
+    if (s === "aguardando atendimento")               return { bg: "#FF0F47", text: "#FFFFFF" };
+    if (s.includes("sdr"))                            return { bg: "#00E676", text: "#000000" };
+    if (s === "em atendimento")                       return { bg: "#FF8A00", text: "#FFFFFF" };
+    if (s.includes("visita agendada"))                return { bg: "#00B0FF", text: "#FFFFFF" };
+    if (s.includes("visita realizada"))               return { bg: "#00897B", text: "#FFFFFF" };
+    if (s.includes("simula"))                         return { bg: "#FF5252", text: "#FFFFFF" };
+    if (s.includes("reserva"))                        return { bg: "#2979FF", text: "#FFFFFF" };
     if (s === "venda realizada" || s.includes("vendid") || s.includes("ganho")) return { bg: "#FFFFFF", text: "#000000" };
-    
-    return { bg: "rgba(255, 255, 255, 0.1)", text: "#A3A3A3" };
+    if (s.includes("perdid") || s === "perdido")      return { bg: "#6B7280", text: "#FFFFFF" };
+    if (s.includes("lançamento") || s.includes("lancamento")) return { bg: "#8B5CF6", text: "#FFFFFF" };
+    if (s.includes("qualificad"))                     return { bg: "#F59E0B", text: "#000000" };
+    if (s.includes("proposta"))                       return { bg: "#EC4899", text: "#FFFFFF" };
+    if (s.includes("negociacao") || s.includes("negociação")) return { bg: "#F97316", text: "#FFFFFF" };
+
+    return { bg: "#4B5563", text: "#E5E7EB" };
 }
 
 const MV_CACHE_KEY = 'mv_data_cache';
@@ -1296,13 +1301,21 @@ function renderLeadsSummary(leadsArray) {
 
     const priorityStatuses = ["Visita Agendada", "Com Reserva"];
 
+    const makeBox = (name, count, colors) => {
+        const hex = colors.bg.startsWith('#') ? colors.bg : colors.bg;
+        const isLight = colors.text === "#000000";
+        const countColor = isLight ? colors.bg : '#ffffff';
+        return `<div class="summary-box" style="border-bottom-color:${hex}; background:${hex}18;">
+            <span class="title" style="color:${hex}">${name}</span>
+            <span class="count" style="color:${countColor}">${count}</span>
+        </div>`;
+    };
+
     let html = `<div class="summary-box total-box"><span class="title">Total de Leads</span><span class="count">${leadsArray.length}</span></div>`;
 
     // Etapas prioritárias sempre em primeiro
     priorityStatuses.forEach(name => {
-        const count = statuses[name] || 0;
-        const colors = getStatusColor(name);
-        html += `<div class="summary-box" style="border-bottom: 3px solid ${colors.bg}"><span class="title" style="color: ${colors.bg}">${name}</span><span class="count">${count}</span></div>`;
+        html += makeBox(name, statuses[name] || 0, getStatusColor(name));
     });
 
     // Todas as demais etapas (sem limite), ordenadas por quantidade
@@ -1311,13 +1324,9 @@ function renderLeadsSummary(leadsArray) {
         .filter(([name]) => !exclude.has(name) && statuses[name] > 0)
         .sort((a, b) => b[1] - a[1])
         .forEach(([name, count]) => {
-            // Buscar cor do lead para ter acesso à cor da API do CRM
-            const sampleLead = leadsArray.find(l => {
-                const s = l.situacao && l.situacao.nome ? l.situacao.nome : "Desconhecido";
-                return s === name;
-            });
+            const sampleLead = leadsArray.find(l => (l.situacao?.nome || "Desconhecido") === name);
             const colors = sampleLead ? getStatusColor(sampleLead) : getStatusColor(name);
-            html += `<div class="summary-box" style="border-bottom: 3px solid ${colors.bg}"><span class="title" style="color: ${colors.bg}">${name}</span><span class="count">${count}</span></div>`;
+            html += makeBox(name, count, colors);
         });
 
     container.innerHTML = html;
