@@ -1295,20 +1295,30 @@ function renderLeadsSummary(leadsArray) {
     });
 
     const priorityStatuses = ["Visita Agendada", "Com Reserva"];
-    
+
     let html = `<div class="summary-box total-box"><span class="title">Total de Leads</span><span class="count">${leadsArray.length}</span></div>`;
 
+    // Etapas prioritárias sempre em primeiro
     priorityStatuses.forEach(name => {
         const count = statuses[name] || 0;
         const colors = getStatusColor(name);
         html += `<div class="summary-box" style="border-bottom: 3px solid ${colors.bg}"><span class="title" style="color: ${colors.bg}">${name}</span><span class="count">${count}</span></div>`;
     });
 
-    const exclude = ["Aguardando Atendimento Corretor", "Em Atendimento SDR", ...priorityStatuses];
-    Object.entries(statuses).filter(([name]) => !exclude.includes(name)).sort((a,b) => b[1]-a[1]).slice(0, 5).forEach(([name, count]) => {
-        const colors = getStatusColor(name);
-        html += `<div class="summary-box" style="border-bottom: 3px solid ${colors.bg}"><span class="title" style="color: ${colors.bg}">${name}</span><span class="count">${count}</span></div>`;
-    });
+    // Todas as demais etapas (sem limite), ordenadas por quantidade
+    const exclude = new Set(["Aguardando Atendimento Corretor", "Em Atendimento SDR", "Desconhecido", ...priorityStatuses]);
+    Object.entries(statuses)
+        .filter(([name]) => !exclude.has(name) && statuses[name] > 0)
+        .sort((a, b) => b[1] - a[1])
+        .forEach(([name, count]) => {
+            // Buscar cor do lead para ter acesso à cor da API do CRM
+            const sampleLead = leadsArray.find(l => {
+                const s = l.situacao && l.situacao.nome ? l.situacao.nome : "Desconhecido";
+                return s === name;
+            });
+            const colors = sampleLead ? getStatusColor(sampleLead) : getStatusColor(name);
+            html += `<div class="summary-box" style="border-bottom: 3px solid ${colors.bg}"><span class="title" style="color: ${colors.bg}">${name}</span><span class="count">${count}</span></div>`;
+        });
 
     container.innerHTML = html;
 }
