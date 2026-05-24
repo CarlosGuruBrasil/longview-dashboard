@@ -15,13 +15,16 @@ import {
   BarChart3,
   ArrowRightLeft,
   Grid3X3,
-  LogOut
+  LogOut,
+  Settings
 } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 
 export default function Sidebar() {
   const pathname = usePathname();
   const { currentUser } = useUser();
+
+  const isAdmin = currentUser?.role === 'Desenvolvedor' || currentUser?.permissions?.isAdmin === true;
 
   const menuItems = [
     { name: 'Dashboard', href: '/project-vision', icon: LayoutDashboard },
@@ -34,12 +37,17 @@ export default function Sidebar() {
     { name: 'Relatórios', href: '/project-vision/reports', icon: BarChart3 },
   ];
 
+  if (isAdmin) {
+    menuItems.push({ name: 'Gerenciar Usuários', href: '/admin/users', icon: Settings });
+  }
+
   const getRoleColor = (role: string) => {
     switch (role) {
       case 'Desenvolvedor': return 'bg-purple-500/10 text-purple-400 border border-purple-500/30';
       case 'Diretoria': return 'bg-red-500/10 text-red-400 border border-red-500/30';
       case 'Gestor': return 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30';
       case 'Parceiro': return 'bg-amber-500/10 text-amber-400 border border-amber-500/30';
+      case 'Corretor': return 'bg-blue-500/10 text-blue-400 border border-blue-500/30';
       default: return 'bg-zinc-500/10 text-zinc-400 border border-zinc-500/30';
     }
   };

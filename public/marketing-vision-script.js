@@ -241,17 +241,23 @@ function setupEventListeners() {
     // Navegação Lateral (Desktop)
     document.querySelectorAll(".nav-item").forEach(item => {
         item.addEventListener("click", (e) => {
-            e.preventDefault();
-            switchView(item.getAttribute("data-view"));
+            const view = item.getAttribute("data-view");
+            if (view) {
+                e.preventDefault();
+                switchView(view);
+            }
         });
     });
 
     // Navegação Inferior (Mobile)
     document.querySelectorAll(".mobile-nav-item").forEach(item => {
         item.addEventListener("click", (e) => {
-            e.preventDefault();
-            switchView(item.getAttribute("data-view"));
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            const view = item.getAttribute("data-view");
+            if (view) {
+                e.preventDefault();
+                switchView(view);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
         });
     });
 

@@ -112,7 +112,7 @@ export default function KanbanPage() {
     const isResponsible = draggedTask.responsible.toLowerCase().includes(currentUser.name.toLowerCase()) ||
                           draggedTask.secondaryResponsibles?.some(r => r.toLowerCase().includes(currentUser.name.toLowerCase()));
     
-    const canMove = currentUser.role === 'Diretoria' || currentUser.role === 'Equipe Interna' || (currentUser.role === 'Parceiro' && isResponsible);
+    const canMove = currentUser.role === 'Desenvolvedor' || currentUser.role === 'Diretoria' || currentUser.role === 'Gestor' || (currentUser.role === 'Parceiro' && isResponsible);
     
     if (!canMove) {
       alert('Você não tem permissão para alterar o status desta tarefa.');

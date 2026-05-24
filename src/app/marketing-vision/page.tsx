@@ -2,9 +2,12 @@
 
 import React, { useEffect } from 'react';
 import Script from 'next/script';
+import { useUser } from '@/context/UserContext';
 import './style.css';
 
 export default function MarketingVisionPage() {
+  const { currentUser } = useUser();
+  const isAdmin = currentUser?.role === 'Desenvolvedor' || currentUser?.permissions?.isAdmin === true;
   
   useEffect(() => {
     // Forçar autenticação no sessionStorage para pular o login estático
@@ -95,6 +98,13 @@ export default function MarketingVisionPage() {
             {/* Alternância de Ambientes e Sair */}
             <hr style={{ border: '0', borderTop: '1px solid rgba(255,255,255,0.08)', margin: '15px 0' }} />
             
+            {isAdmin && (
+              <a href="/admin/users" className="nav-item" style={{ color: '#c084fc' }}>
+                <i className="ph ph-gear"></i>
+                <span>Gerenciar Usuários</span>
+              </a>
+            )}
+
             <a href="/select-app" className="nav-item" style={{ color: 'var(--text-secondary)' }}>
               <i className="ph ph-grid-nine"></i>
               <span>Painel de Apps</span>
@@ -113,12 +123,12 @@ export default function MarketingVisionPage() {
 
           <div className="sidebar-footer">
             <div className="user-profile">
-              <div className="avatar" style={{ backgroundColor: '#000000' }}>
-                <img src="/logohauzi.png" alt="Hauzi" style={{ width: '100%', height: '100%', objectFit: 'contain', backgroundColor: '#000000' }} />
+              <div className="avatar" style={{ backgroundColor: '#18181b', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '12px', fontWeight: 'bold' }}>
+                {currentUser?.name?.charAt(0) || 'U'}
               </div>
               <div className="user-info">
-                <span className="user-name">Administrado</span>
-                <span className="user-role">por Bruna Bazzo</span>
+                <span className="user-name" style={{ display: 'block', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{currentUser?.name || 'Carregando...'}</span>
+                <span className="user-role" style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)' }}>{currentUser?.role || 'Acesso'}</span>
               </div>
             </div>
           </div>
