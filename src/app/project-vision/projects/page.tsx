@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { 
-  Building2, 
-  TrendingUp, 
-  FolderOpen, 
+import {
+  Building2,
+  TrendingUp,
+  FolderOpen,
   ArrowRight,
   Clock,
   CheckCircle2,
@@ -12,7 +12,9 @@ import {
   RefreshCw,
   Plus,
   X,
-  Upload
+  Upload,
+  Camera,
+  Loader2
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -30,6 +32,9 @@ export default function ProjectsPage() {
   const [newName, setNewName] = useState('');
   const [newDesc, setNewDesc] = useState('');
   const [newBanner, setNewBanner] = useState<string | null>(null);
+
+  // Upload de banner em projeto existente
+  const [uploadingBanner, setUploadingBanner] = useState<string | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -70,6 +75,28 @@ export default function ProjectsPage() {
       case 'em andamento': return 'bg-amber-500/10 text-amber-400 border border-amber-500/20';
       case 'não iniciado': return 'bg-zinc-500/10 text-zinc-400 border border-zinc-500/20';
       default: return 'bg-blue-500/10 text-blue-400 border border-blue-500/20';
+    }
+  };
+
+  const handleProjectBannerUpdate = async (projId: string, file: File) => {
+    setUploadingBanner(projId);
+    try {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64 = reader.result as string;
+        const res = await fetch('/api/projects', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: projId, banner: base64 })
+        });
+        if (res.ok) {
+          setProjects(prev => prev.map(p => p.id === projId ? { ...p, banner: base64 } : p));
+        }
+        setUploadingBanner(null);
+      };
+      reader.readAsDataURL(file);
+    } catch {
+      setUploadingBanner(null);
     }
   };
 
@@ -164,10 +191,11 @@ export default function ProjectsPage() {
         <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {projects.map((proj) => {
             const stats = getProjectStats(proj.name);
-            const projectUrl = `/projects/${proj.name.toLowerCase().replace(/ /g, '-')}`;
+            const projectUrl = `/project-vision/projects/${proj.id}`;
+            const canEdit = currentUser.role === 'Diretoria' || currentUser.role === 'Desenvolvedor';
 
             return (
-              <div 
+              <div
                 key={proj.id}
                 className="bg-[#121214]/60 border border-[#1E1E22] rounded-xl overflow-hidden hover:border-zinc-700 transition-all duration-300 group flex flex-col justify-between shadow-xl"
               >
@@ -176,7 +204,7 @@ export default function ProjectsPage() {
                   {!proj.banner ? (
                     <div className="absolute inset-0 bg-[#09090B] flex items-center justify-center p-6 border-b border-[#1C1C1E]">
                       <div className="relative w-32 h-12">
-                        <Image 
+                        <Image
                           src="/logo longview.png"
                           alt="LongView Fallback Logo"
                           fill
@@ -185,7 +213,7 @@ export default function ProjectsPage() {
                       </div>
                     </div>
                   ) : (
-                    <Image 
+                    <Image
                       src={proj.banner}
                       alt={proj.name}
                       fill
@@ -194,6 +222,31 @@ export default function ProjectsPage() {
                     />
                   )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent" />
+
+                  {/* Botão de alterar imagem */}
+                  {canEdit && (
+                    <label
+                      htmlFor={`banner-${proj.id}`}
+                      className="absolute top-2 right-2 z-20 p-2 bg-black/60 hover:bg-black/85 text-white rounded-lg cursor-pointer opacity-0 group-hover:opacity-100 transition-all duration-200 border border-white/10"
+                      title="Alterar imagem do empreendimento"
+                      onClick={e => e.stopPropagation()}
+                    >
+                      {uploadingBanner === proj.id
+                        ? <Loader2 size={14} className="animate-spin" />
+                        : <Camera size={14} />}
+                      <input
+                        id={`banner-${proj.id}`}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={e => {
+                          const file = e.target.files?.[0];
+                          if (file) handleProjectBannerUpdate(proj.id, file);
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                  )}
                   
                   {/* Nome e Status */}
                   <div className="absolute bottom-4 left-4 right-4 flex items-end justify-between z-10">

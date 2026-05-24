@@ -11,6 +11,27 @@ export async function GET(request: NextRequest) {
   }
 }
 
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { id, banner } = body;
+
+    if (!id) return NextResponse.json({ error: 'ID obrigatório' }, { status: 400 });
+
+    const db = await readProjectData();
+    const idx = db.projects.findIndex(p => p.id === id);
+    if (idx === -1) return NextResponse.json({ error: 'Empreendimento não encontrado' }, { status: 404 });
+
+    if (banner !== undefined) db.projects[idx].banner = banner;
+
+    await writeProjectData(db);
+    return NextResponse.json({ project: db.projects[idx] });
+  } catch (error) {
+    console.error('Erro ao atualizar empreendimento:', error);
+    return NextResponse.json({ error: 'Erro ao atualizar' }, { status: 500 });
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
