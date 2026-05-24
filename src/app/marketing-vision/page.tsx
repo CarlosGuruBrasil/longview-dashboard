@@ -5,6 +5,17 @@ import Script from 'next/script';
 import { useUser } from '@/context/UserContext';
 import './style.css';
 
+function getRoleStyle(role: string): React.CSSProperties {
+  switch (role) {
+    case 'Desenvolvedor': return { background: 'rgba(168,85,247,0.1)', color: '#c084fc', border: '1px solid rgba(168,85,247,0.3)' };
+    case 'Diretoria':     return { background: 'rgba(239,68,68,0.1)',   color: '#f87171', border: '1px solid rgba(239,68,68,0.3)' };
+    case 'Gestor':        return { background: 'rgba(16,185,129,0.1)',  color: '#34d399', border: '1px solid rgba(16,185,129,0.3)' };
+    case 'Parceiro':      return { background: 'rgba(245,158,11,0.1)',  color: '#fbbf24', border: '1px solid rgba(245,158,11,0.3)' };
+    case 'Corretor':      return { background: 'rgba(59,130,246,0.1)',  color: '#60a5fa', border: '1px solid rgba(59,130,246,0.3)' };
+    default:              return { background: 'rgba(113,113,122,0.1)', color: '#a1a1aa', border: '1px solid rgba(113,113,122,0.3)' };
+  }
+}
+
 export default function MarketingVisionPage() {
   const { currentUser } = useUser();
   const isAdmin = currentUser?.role === 'Desenvolvedor' || currentUser?.permissions?.isAdmin === true;
@@ -62,74 +73,88 @@ export default function MarketingVisionPage() {
       <div className="app-container hidden" id="main-app">
         {/* Sidebar */}
         <aside className="sidebar">
-          <div className="logo-container flex flex-col items-center">
-            <img src="/logolongview.png" alt="LongView" className="logo-img" style={{ maxWidth: '100%', height: 'auto', maxHeight: '70px' }} />
-            <span className="text-[9px] uppercase font-bold tracking-widest text-[#0ea5e9] mt-1.5">
+          <div className="logo-container flex flex-col items-center" style={{ paddingTop: '32px', paddingBottom: '24px', borderBottom: '1px solid rgba(28,28,30,0.5)' }}>
+            <div style={{ position: 'relative', width: '176px', height: '56px' }}>
+              <img src="/logo longview.png" alt="LongView" style={{ width: '176px', height: '56px', objectFit: 'contain' }} />
+            </div>
+            <span className="text-[9px] uppercase font-bold tracking-widest text-[#0ea5e9] mt-1">
               Marketing Vision
             </span>
           </div>
 
-          <nav className="nav-menu">
-            <a href="#" className="nav-item active" data-view="dashboard">
-              <i className="ph ph-squares-four"></i>
-              <span>Dashboard</span>
-            </a>
-            <a href="#" className="nav-item" data-view="leads">
-              <i className="ph ph-users"></i>
-              <span>Leads</span>
-            </a>
-            <a href="#" className="nav-item" data-view="oportunidades-perdas">
-              <i className="ph ph-trend-up"></i>
-              <span>Oportunidades</span>
-            </a>
-            <a href="#" className="nav-item" data-view="empreendimentos">
-              <i className="ph ph-buildings"></i>
-              <span>Empreendimentos</span>
-            </a>
-            <a href="#" className="nav-item" data-view="vendas">
-              <i className="ph ph-currency-dollar"></i>
-              <span>Vendas</span>
-            </a>
-            <a href="#" className="nav-item" data-view="marketing">
-              <i className="ph ph-megaphone"></i>
-              <span>Marketing ADS</span>
-            </a>
-
-            {/* Alternância de Ambientes e Sair */}
-            <hr style={{ border: '0', borderTop: '1px solid rgba(255,255,255,0.08)', margin: '15px 0' }} />
-            
-            {isAdmin && (
-              <a href="/admin/users" className="nav-item" style={{ color: '#c084fc' }}>
-                <i className="ph ph-gear"></i>
-                <span>Gerenciar Usuários</span>
+          <div className="nav-menu-wrapper">
+            <nav className="nav-menu">
+              <a href="#" className="nav-item active" data-view="dashboard">
+                <i className="ph ph-squares-four"></i>
+                <span>Dashboard</span>
               </a>
-            )}
+              <a href="#" className="nav-item" data-view="leads">
+                <i className="ph ph-users"></i>
+                <span>Leads</span>
+              </a>
+              <a href="#" className="nav-item" data-view="oportunidades-perdas">
+                <i className="ph ph-trend-up"></i>
+                <span>Oportunidades</span>
+              </a>
+              <a href="#" className="nav-item" data-view="empreendimentos">
+                <i className="ph ph-buildings"></i>
+                <span>Empreendimentos</span>
+              </a>
+              <a href="#" className="nav-item" data-view="vendas">
+                <i className="ph ph-currency-dollar"></i>
+                <span>Vendas</span>
+              </a>
+              <a href="#" className="nav-item" data-view="marketing">
+                <i className="ph ph-megaphone"></i>
+                <span>Marketing ADS</span>
+              </a>
 
-            <a href="/select-app" className="nav-item" style={{ color: 'var(--text-secondary)' }}>
-              <i className="ph ph-grid-nine"></i>
-              <span>Painel de Apps</span>
-            </a>
+              {isAdmin && (
+                <a href="/admin/users" className="nav-item" style={{ color: '#c084fc' }}>
+                  <i className="ph ph-gear"></i>
+                  <span>Gerenciar Usuários</span>
+                </a>
+              )}
+            </nav>
+          </div>
 
-            <a href="/project-vision" className="nav-item" style={{ color: '#F59E0B' }}>
-              <i className="ph ph-layout"></i>
-              <span>Project Vision</span>
-            </a>
+          <div style={{ padding: '16px', borderTop: '1px solid #1C1C1E', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {/* Bottom Quick Access Buttons */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <a
+                href="/select-app"
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '8px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#d4d4d8', textDecoration: 'none', transition: 'all 0.2s' }}
+              >
+                <i className="ph ph-grid-nine" style={{ fontSize: '14px' }}></i>
+                <span>Painel de Aplicativos</span>
+              </a>
+              <a
+                href="/project-vision"
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '8px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', color: '#f59e0b', textDecoration: 'none', transition: 'all 0.2s' }}
+              >
+                <i className="ph ph-layout" style={{ fontSize: '14px' }}></i>
+                <span>Ir para Project Vision</span>
+              </a>
+            </div>
 
-            <a href="/api/auth/logout" className="nav-item" style={{ color: '#F43F5E' }}>
-              <i className="ph ph-sign-out"></i>
-              <span>Sair</span>
-            </a>
-          </nav>
-
-          <div className="sidebar-footer">
-            <div className="user-profile">
-              <div className="avatar" style={{ backgroundColor: '#18181b', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '12px', fontWeight: 'bold' }}>
-                {currentUser?.name?.charAt(0) || 'U'}
+            {/* User Profile Row */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px', borderRadius: '8px', background: '#121214', border: '1px solid #1E1E22' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
+                <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#27272a', border: '1px solid #3f3f46', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '12px', fontWeight: '600', flexShrink: 0 }}>
+                  {currentUser?.name?.charAt(0) || 'U'}
+                </div>
+                <div style={{ overflow: 'hidden' }}>
+                  <span style={{ display: 'block', fontSize: '12px', color: '#fff', fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '120px' }}>{currentUser?.name || 'Carregando...'}</span>
+                  <span style={{ display: 'inline-block', marginTop: '2px', fontSize: '9px', padding: '2px 6px', borderRadius: '9999px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', ...getRoleStyle(currentUser?.role || '') }}>{currentUser?.role || 'Acesso'}</span>
+                </div>
               </div>
-              <div className="user-info">
-                <span className="user-name" style={{ display: 'block', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{currentUser?.name || 'Carregando...'}</span>
-                <span className="user-role" style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)' }}>{currentUser?.role || 'Acesso'}</span>
-              </div>
+              <a
+                href="/api/auth/logout"
+                title="Fazer Logout"
+                style={{ padding: '6px', color: '#71717a', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', textDecoration: 'none', flexShrink: 0 }}
+              >
+                <i className="ph ph-sign-out" style={{ fontSize: '14px' }}></i>
+              </a>
             </div>
           </div>
         </aside>

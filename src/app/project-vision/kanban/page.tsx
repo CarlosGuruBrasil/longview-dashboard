@@ -1,16 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { 
-  Building2, 
-  Clock, 
-  CheckSquare, 
-  MessageSquare, 
+import {
+  CheckSquare,
+  MessageSquare,
   SlidersHorizontal,
-  RefreshCw,
-  AlertOctagon,
-  User,
-  Plus
+  RefreshCw
 } from 'lucide-react';
 import { Task, Project } from '@/lib/db';
 import { useUser } from '@/context/UserContext';
@@ -306,16 +301,28 @@ export default function KanbanPage() {
                           ${task.urgencia === 'Emergencial' ? 'glow-white-sm border-red-500/20' : ''}
                         `}
                       >
-                        {/* ID e Empreendimento */}
-                        <div className="flex justify-between items-center">
-                          <span className="text-[9px] font-mono text-zinc-400">{task.id}</span>
-                          <span className="text-[9px] font-semibold text-zinc-300 bg-white/5 border border-white/5 px-1.5 py-0.2 rounded">
+                        {/* ID */}
+                        <div className="flex items-center justify-between">
+                          <span className="text-[9px] font-mono text-zinc-500">{task.id}</span>
+                          {task.urgencia !== 'Baixa' && (
+                            <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded border ${
+                              task.urgencia === 'Emergencial' ? 'text-red-300 bg-red-500/10 border-red-500/20' :
+                              task.urgencia === 'Crítica' ? 'text-orange-400 bg-orange-500/10 border-orange-500/20' :
+                              task.urgencia === 'Alta' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' :
+                              'text-blue-400 bg-blue-500/10 border-blue-500/20'
+                            }`}>{task.urgencia}</span>
+                          )}
+                        </div>
+
+                        {/* Empreendimento — destaque */}
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-bold text-white bg-white/10 border border-white/15 px-2 py-0.5 rounded-md tracking-wide">
                             {task.project}
                           </span>
                         </div>
 
                         {/* Título / Assunto */}
-                        <p className="text-xs text-white font-medium line-clamp-2 leading-relaxed">
+                        <p className="text-xs text-zinc-100 font-semibold line-clamp-2 leading-relaxed">
                           {task.subject}
                         </p>
 
@@ -326,22 +333,29 @@ export default function KanbanPage() {
                             <span className="font-mono text-zinc-200">{task.progress}%</span>
                           </div>
                           <div className="w-full bg-zinc-800 h-1 rounded-full overflow-hidden">
-                            <div className="bg-zinc-400 h-1 rounded-full" style={{ width: `${task.progress}%` }} />
+                            <div className={`h-1 rounded-full transition-all ${
+                              task.progress === 100 ? 'bg-emerald-500' :
+                              task.progress >= 60 ? 'bg-lime-500' :
+                              task.progress >= 30 ? 'bg-amber-500' :
+                              'bg-zinc-500'
+                            }`} style={{ width: `${task.progress}%` }} />
                           </div>
                         </div>
 
                         {/* Metadados: Responsável, Comentários, Subtarefas */}
-                        <div className="flex items-center justify-between border-t border-[#1C1C1E] pt-2.5 text-zinc-350">
-                          {/* Responsável */}
-                          <div 
+                        <div className="flex items-center justify-between border-t border-[#1C1C1E] pt-2.5">
+                          {/* Responsável — destaque */}
+                          <div
                             onClick={(e) => {
                               e.stopPropagation();
                               setSelectedRespName(task.responsible);
                             }}
-                            className="flex items-center gap-1 overflow-hidden max-w-[120px] cursor-pointer group/resp hover:text-white"
+                            className="flex items-center gap-1 overflow-hidden max-w-[140px] cursor-pointer group/resp"
                           >
-                            <User size={10} className="shrink-0 text-zinc-400" />
-                            <span className="text-[9px] truncate text-zinc-300 group-hover/resp:underline font-semibold">{task.responsible}</span>
+                            <div className="w-5 h-5 rounded-full bg-zinc-700 border border-zinc-600 flex items-center justify-center text-[8px] font-bold text-white shrink-0">
+                              {task.responsible !== 'Não atribuído' ? task.responsible.charAt(0).toUpperCase() : '?'}
+                            </div>
+                            <span className="text-[10px] truncate text-zinc-200 group-hover/resp:text-white group-hover/resp:underline font-semibold">{task.responsible}</span>
                           </div>
 
                           {/* Urgência e Ícones */}

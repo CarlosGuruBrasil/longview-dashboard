@@ -226,15 +226,27 @@ export default function ProjectsPage() {
                     </div>
                   </div>
 
-                  {/* Progresso com barra premium */}
+                  {/* Progresso com barra de temperatura */}
                   <div className="space-y-2">
                     <div className="flex justify-between text-[10px] font-bold text-zinc-400 tracking-wider">
                       <span>Progresso Conclusão</span>
-                      <span className="font-mono text-white font-bold">{proj.progress}%</span>
+                      <span className={`font-mono font-bold ${
+                        proj.progress >= 80 ? 'text-emerald-400' :
+                        proj.progress >= 60 ? 'text-lime-400' :
+                        proj.progress >= 35 ? 'text-amber-400' :
+                        proj.progress >= 15 ? 'text-orange-400' :
+                        'text-red-400'
+                      }`}>{proj.progress}%</span>
                     </div>
-                    <div className="w-full bg-zinc-800 h-1.5 rounded-full overflow-hidden">
-                      <div 
-                        className="bg-white h-1.5 rounded-full transition-all duration-500" 
+                    <div className="w-full bg-zinc-800 h-2 rounded-full overflow-hidden">
+                      <div
+                        className={`h-2 rounded-full transition-all duration-700 ${
+                          proj.progress >= 80 ? 'bg-emerald-500' :
+                          proj.progress >= 60 ? 'bg-lime-500' :
+                          proj.progress >= 35 ? 'bg-amber-500' :
+                          proj.progress >= 15 ? 'bg-orange-500' :
+                          'bg-red-500'
+                        }`}
                         style={{ width: `${proj.progress}%` }}
                       />
                     </div>

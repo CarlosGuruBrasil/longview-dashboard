@@ -1,14 +1,13 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { 
-  Building2, 
-  CalendarRange, 
+import {
   SlidersHorizontal,
   RefreshCw,
-  Clock,
-  ArrowRight,
-  HelpCircle
+  HelpCircle,
+  ChevronLeft,
+  ChevronRight,
+  Calendar
 } from 'lucide-react';
 import { Task, Project } from '@/lib/db';
 import { useUser } from '@/context/UserContext';
@@ -23,17 +22,19 @@ export default function TimelinePage() {
   const [selectedProject, setSelectedProject] = useState('Todos');
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [selectedRespName, setSelectedRespName] = useState<string | null>(null);
+  // Navegação de meses (0 = mês atual)
+  const [monthOffset, setMonthOffset] = useState(0);
 
-  // Janela dinâmica: mês atual + próximo mês
+  // Janela dinâmica: 2 meses a partir do offset
   const _today = new Date();
-  const START_DATE = new Date(_today.getFullYear(), _today.getMonth(), 1);
-  const END_DATE = new Date(_today.getFullYear(), _today.getMonth() + 2, 0);
+  const START_DATE = new Date(_today.getFullYear(), _today.getMonth() + monthOffset, 1);
+  const END_DATE = new Date(_today.getFullYear(), _today.getMonth() + monthOffset + 2, 0);
   const TOTAL_DAYS = Math.round((END_DATE.getTime() - START_DATE.getTime()) / (24 * 60 * 60 * 1000)) + 1;
 
   // Labels dinâmicos para a régua
-  const _month1 = new Date(_today.getFullYear(), _today.getMonth(), 1);
-  const _month2 = new Date(_today.getFullYear(), _today.getMonth() + 1, 1);
-  const _daysInMonth1 = new Date(_today.getFullYear(), _today.getMonth() + 1, 0).getDate();
+  const _month1 = new Date(_today.getFullYear(), _today.getMonth() + monthOffset, 1);
+  const _month2 = new Date(_today.getFullYear(), _today.getMonth() + monthOffset + 1, 1);
+  const _daysInMonth1 = new Date(_today.getFullYear(), _today.getMonth() + monthOffset + 1, 0).getDate();
   const _widthPct1 = Math.round((_daysInMonth1 / TOTAL_DAYS) * 100);
   const _labelMonth1 = _month1.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
   const _labelMonth2 = _month2.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
@@ -183,45 +184,94 @@ export default function TimelinePage() {
         </div>
       </header>
 
-      {/* Filtros */}
-      <section className="bg-[#121214]/60 border border-[#1E1E22] rounded-xl p-4 flex flex-wrap items-center gap-4 shrink-0">
-        <div className="flex items-center gap-2 text-xs font-semibold text-zinc-400">
-          <SlidersHorizontal size={14} />
-          <span>Filtro de Cronograma:</span>
+      {/* Filtros + Navegação */}
+      <section className="bg-[#121214]/60 border border-[#1E1E22] rounded-xl p-4 space-y-3 shrink-0">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 text-xs font-semibold text-zinc-400">
+            <SlidersHorizontal size={14} />
+            <span>Filtro:</span>
+          </div>
+
+          <div className="w-56">
+            <select
+              value={selectedProject}
+              onChange={(e) => setSelectedProject(e.target.value)}
+              className="w-full bg-[#0A0A0B] border border-[#1E1E22] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none"
+            >
+              <option value="Todos">Todos os Empreendimentos</option>
+              {projects.map(p => (
+                <option key={p.id} value={p.name}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Navegação de meses */}
+          <div className="flex items-center gap-2 ml-2">
+            <button
+              onClick={() => setMonthOffset(o => o - 1)}
+              className="p-1.5 bg-[#0A0A0B] border border-[#1E1E22] rounded-lg text-zinc-400 hover:text-white hover:border-zinc-600 transition-colors"
+              title="Mês anterior"
+            >
+              <ChevronLeft size={14} />
+            </button>
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0A0A0B] border border-[#1E1E22] rounded-lg text-xs text-white font-semibold min-w-48 justify-center">
+              <Calendar size={12} className="text-zinc-400" />
+              <span>{_labelMonth1} → {_labelMonth2}</span>
+            </div>
+            <button
+              onClick={() => setMonthOffset(o => o + 1)}
+              className="p-1.5 bg-[#0A0A0B] border border-[#1E1E22] rounded-lg text-zinc-400 hover:text-white hover:border-zinc-600 transition-colors"
+              title="Próximo mês"
+            >
+              <ChevronRight size={14} />
+            </button>
+            {monthOffset !== 0 && (
+              <button
+                onClick={() => setMonthOffset(0)}
+                className="text-[10px] text-zinc-500 hover:text-white transition-colors px-2 py-1 border border-[#1E1E22] rounded-lg bg-[#0A0A0B]"
+              >
+                Hoje
+              </button>
+            )}
+          </div>
+
+          {/* Legenda de cores */}
+          <div className="flex flex-wrap items-center gap-3 text-[10px] uppercase font-bold text-zinc-400 tracking-wider ml-auto">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded bg-emerald-500" />
+              <span>Finalizado</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded bg-amber-500" />
+              <span>Em Andamento</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded bg-red-500" />
+              <span>Atrasado</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded bg-zinc-600" />
+              <span>Não Iniciado</span>
+            </div>
+          </div>
         </div>
 
-        <div className="w-64">
-          <select
-            value={selectedProject}
-            onChange={(e) => setSelectedProject(e.target.value)}
-            className="w-full bg-[#0A0A0B] border border-[#1E1E22] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none"
-          >
-            <option value="Todos">Todos os Empreendimentos</option>
-            {projects.map(p => (
-              <option key={p.id} value={p.name}>{p.name}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Legenda de cores */}
-        <div className="flex flex-wrap items-center gap-4 text-[10px] uppercase font-bold text-zinc-400 tracking-wider ml-auto">
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded bg-emerald-500" />
-            <span>Finalizado</span>
+        {/* Stats bar */}
+        {!loading && (
+          <div className="flex items-center gap-4 text-[10px] text-zinc-500 border-t border-[#1C1C1E] pt-3">
+            <span className="font-bold text-zinc-400">{filteredTasks.length} tarefas com cronograma planejado</span>
+            <span>·</span>
+            <span className="text-emerald-400 font-semibold">{filteredTasks.filter(t => t.statusAndamento === 'Finalizado').length} finalizadas</span>
+            <span className="text-amber-400 font-semibold">{filteredTasks.filter(t => t.statusAndamento === 'Em andamento').length} em andamento</span>
+            <span className="text-red-400 font-semibold">{filteredTasks.filter(t => {
+              if (t.statusAndamento === 'Finalizado' || !t.previsaoEntrega) return false;
+              const p = t.previsaoEntrega.split('/');
+              if (p.length !== 3) return false;
+              let y = parseInt(p[2]); if (y < 100) y += 2000;
+              return new Date(y, parseInt(p[1]) - 1, parseInt(p[0])) < new Date();
+            }).length} atrasadas</span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded bg-amber-500" />
-            <span>Em Andamento</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded bg-red-500" />
-            <span>Atrasado</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded bg-zinc-600" />
-            <span>Não Iniciado</span>
-          </div>
-        </div>
+        )}
       </section>
 
       {/* Gantt Container */}

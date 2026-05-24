@@ -53,20 +53,19 @@ function startLoadingSequence(isRefresh = false) {
 
     overlay.classList.remove("hidden");
     login.classList.add("hidden");
-    
+
     const initialInsights = [
         "A LongView está processando suas métricas de desempenho...",
         "Orgulhosamente criado por Carlos Guru",
         "Conectando aos servidores do CV CRM para dados atualizados...",
         "Preparando análise de ROI e performance de mídia..."
     ];
-    
+
     let insightIdx = 0;
     const insightInterval = setInterval(() => {
         if (!insightText) return;
         const currentList = window.realInsights && window.realInsights.length > 0 ? window.realInsights : initialInsights;
         insightIdx = (insightIdx + 1) % currentList.length;
-        
         insightText.style.opacity = 0;
         setTimeout(() => {
             insightText.innerText = currentList[insightIdx];
@@ -74,11 +73,13 @@ function startLoadingSequence(isRefresh = false) {
         }, 500);
     }, 3500);
 
-    // Simular progresso visual sincronizado com 15 segundos (15000ms)
+    // Tempo de exibição: 15s para atualização da API, 1.5s para cache local
+    const isCache = !isRefresh && !!localStorage.getItem('mv_data_cache');
+    const DISPLAY_DURATION = isCache ? 1500 : 15000;
+
     let width = 0;
-    const duration = 15000; // 15 segundos
-    const stepTime = 100; // Atualiza a cada 100ms
-    const totalSteps = duration / stepTime;
+    const stepTime = 100;
+    const totalSteps = DISPLAY_DURATION / stepTime;
     const increment = 100 / totalSteps;
 
     const interval = setInterval(() => {
@@ -90,29 +91,35 @@ function startLoadingSequence(isRefresh = false) {
         }
     }, stepTime);
 
-    loadingText.innerText = isRefresh ? "Forçando sincronização total com APIs..." : "Conectando ao Portal de Inteligência...";
+    if (isRefresh) {
+        loadingText.innerText = "Forçando sincronização total com APIs...";
+    } else if (isCache) {
+        const ts = localStorage.getItem('mv_data_cache_ts');
+        const tsStr = ts ? new Date(ts).toLocaleString('pt-BR') : '';
+        loadingText.innerText = tsStr ? `Carregando cache local (${tsStr})...` : "Carregando dados do cache local...";
+    } else {
+        loadingText.innerText = "Conectando ao Portal de Inteligência...";
+    }
 
-    // Chamar o backend de forma definitiva
-    fetchAllData(isRefresh).then((success) => {
-        // FORÇAR a retirada do overlay após os dados chegarem E o tempo de 15s expirar
-        const remainingTime = Math.max(0, 15000 - (Date.now() - startTime));
-        
+    fetchAllData(isRefresh).then(() => {
+        clearInterval(insightInterval);
+        const remainingTime = Math.max(0, DISPLAY_DURATION - (Date.now() - startTime));
+
         setTimeout(() => {
+            clearInterval(interval);
             bar.style.width = "100%";
             loadingText.innerText = "Dashboard Pronto!";
-            
             setTimeout(() => {
                 overlay.classList.add("hidden");
                 app.classList.remove("hidden");
                 setupEventListeners();
-                console.log("Dashboard liberado após 15 segundos.");
-            }, 500);
+            }, 400);
         }, remainingTime);
     }).catch(err => {
         console.error("Erro fatal no carregamento:", err);
+        clearInterval(insightInterval);
+        clearInterval(interval);
         loadingText.innerText = "Falha na conexão. Tentando recuperar...";
-        
-        // Mesmo em erro, se já tivermos dados antigos, podemos tentar mostrar
         setTimeout(() => {
             overlay.classList.add("hidden");
             app.classList.remove("hidden");
@@ -421,61 +428,102 @@ function getStatusColor(input) {
     return { bg: "rgba(255, 255, 255, 0.1)", text: "#A3A3A3" };
 }
 
+const MV_CACHE_KEY = 'mv_data_cache';
+const MV_CACHE_TS_KEY = 'mv_data_cache_ts';
+
+function applyDataToApp(data) {
+    window.lastMetaData = data;
+
+    if (data.leads && data.leads.leads) {
+        allLeads = data.leads.leads;
+    } else if (Array.isArray(data.leads)) {
+        allLeads = data.leads;
+    } else {
+        allLeads = [];
+    }
+
+    if (data.meta) {
+        window.lastMetaDemographics = data.meta.demographics || [];
+        window.lastMetaRegions = data.meta.regions || [];
+        window.lastMetaCampaigns = data.meta.campaigns || [];
+        window.lastMetaPlatforms = data.meta.platforms || [];
+        window.lastMetaGlobal = data.meta.global;
+
+        renderMetaDemographics(window.lastMetaDemographics, window.lastMetaRegions);
+        renderMetaPlatforms(data.meta.platforms || []);
+        renderCampaignsTable(window.lastMetaCampaigns);
+        updateMetaDashboard(window.lastMetaGlobal);
+    }
+
+    applyGlobalFilters();
+    generateRealInsights();
+
+    const innerLoader = document.getElementById("loader");
+    const contentArea = document.getElementById("content-area");
+    if (innerLoader) innerLoader.classList.add("hidden");
+    if (contentArea) contentArea.classList.remove("hidden");
+}
+
 async function fetchAllData(force = false) {
     const loadingText = document.getElementById("loading-text");
-    
+
+    // Usar cache local se não for atualização forçada
+    if (!force) {
+        try {
+            const cached = localStorage.getItem(MV_CACHE_KEY);
+            if (cached) {
+                if (loadingText) loadingText.textContent = "Carregando dados do cache local...";
+                applyDataToApp(JSON.parse(cached));
+                return true;
+            }
+        } catch (e) {
+            console.warn("Cache corrompido, buscando da API...", e);
+            localStorage.removeItem(MV_CACHE_KEY);
+            localStorage.removeItem(MV_CACHE_TS_KEY);
+        }
+    }
+
     try {
-        if (loadingText) loadingText.textContent = "Buscando dados no servidor...";
-        
+        if (loadingText) loadingText.textContent = "Sincronizando com o servidor...";
+
         const url = force ? '/api/data?refresh=true' : '/api/data';
         const response = await fetch(url);
-        
+
         if (!response.ok) {
             if (response.status === 401) {
                 sessionStorage.removeItem("longview_auth");
-                window.location.reload(); 
+                window.location.reload();
                 return false;
             }
             throw new Error('Falha na sincronização');
         }
-        
+
         const data = await response.json();
-        window.lastMetaData = data; // Guardar tudo para acesso posterior
-        
-        // 1. Leads do CRM (Garantir leitura flexível do Cache ou API)
-        if (data.leads && data.leads.leads) {
-            allLeads = data.leads.leads;
-        } else if (Array.isArray(data.leads)) {
-            allLeads = data.leads;
-        } else {
-            allLeads = [];
-        }
-        
-        // 2. Dados do Meta
-        if (data.meta) {
-            window.lastMetaDemographics = data.meta.demographics || [];
-            window.lastMetaRegions = data.meta.regions || [];
-            window.lastMetaCampaigns = data.meta.campaigns || [];
-            window.lastMetaPlatforms = data.meta.platforms || [];
-            window.lastMetaGlobal = data.meta.global;
-            
-            renderMetaDemographics(window.lastMetaDemographics, window.lastMetaRegions);
-            renderMetaPlatforms(data.meta.platforms || []);
-            renderCampaignsTable(window.lastMetaCampaigns);
-            updateMetaDashboard(window.lastMetaGlobal);
+
+        // Salvar no cache local para próximas visitas
+        try {
+            localStorage.setItem(MV_CACHE_KEY, JSON.stringify(data));
+            localStorage.setItem(MV_CACHE_TS_KEY, new Date().toISOString());
+        } catch (e) {
+            console.warn("Não foi possível salvar cache:", e);
         }
 
-        applyGlobalFilters();
+        applyDataToApp(data);
+        return true;
 
-        // REMOVER o spinner interno e mostrar o conteúdo
-        const innerLoader = document.getElementById("loader");
-        const contentArea = document.getElementById("content-area");
-        if (innerLoader) innerLoader.classList.add("hidden");
-        if (contentArea) contentArea.classList.remove("hidden");
-
-        return true; // Sucesso final
     } catch (error) {
         console.error("Erro na sincronização:", error);
+
+        // Fallback: tentar usar cache mesmo em erro
+        try {
+            const cached = localStorage.getItem(MV_CACHE_KEY);
+            if (cached) {
+                if (loadingText) loadingText.textContent = "Servidor indisponível — usando cache local...";
+                applyDataToApp(JSON.parse(cached));
+                return true;
+            }
+        } catch (e) { /* sem cache disponível */ }
+
         alert("Erro ao sincronizar dados. Tente novamente mais tarde.");
         return false;
     }
@@ -669,7 +717,7 @@ function updateDashboard(leads) {
 // --- SISTEMA DE VISUALIZAÇÃO MOBILE (PIRÂMIDES) ---
 function isMobile() { return window.innerWidth < 768; }
 
-function renderMobilePyramidSVG(canvasId, dataObj, unit = "leads") {
+function renderMobilePyramidSVG(canvasId, dataObj, _unit = "leads") {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
     const parent = canvas.parentElement;
@@ -2678,7 +2726,7 @@ function getLeadProjectName(lead) {
 // ============================================================
 // NORMALIZAÇÃO DE TIPOLOGIAS
 // ============================================================
-function normalizeTipologia(tipStr, area, projectName) {
+function normalizeTipologia(tipStr, area, _projectName) {
     const t = (tipStr || "").toLowerCase().trim();
     const a = parseFloat(area) || 0;
 

@@ -336,7 +336,7 @@ export default function TasksPage() {
 
       {/* Tabela de Tarefas */}
       <section className="bg-[#121214]/60 border border-[#1E1E22] rounded-xl overflow-hidden shadow-xl">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
           {loading ? (
             <div className="p-10 text-center text-zinc-500 flex flex-col items-center justify-center gap-3">
               <RefreshCw size={24} className="animate-spin text-zinc-400" />
@@ -354,77 +354,89 @@ export default function TasksPage() {
               </button>
             </div>
           ) : (
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-[#1C1C1E] bg-[#0E0E10]/70 text-[10px] uppercase font-bold text-zinc-300 tracking-wider">
-                  <th className="py-3.5 px-4 font-mono w-24">ID</th>
-                  <th className="py-3.5 px-4">Empreendimento</th>
-                  <th className="py-3.5 px-4">Setor</th>
-                  <th className="py-3.5 px-4">Assunto</th>
-                  <th className="py-3.5 px-4">Responsável</th>
-                  <th className="py-3.5 px-4 text-center">Urgência ?!</th>
-                  <th className="py-3.5 px-4">Status</th>
-                  <th className="py-3.5 px-4 text-center">Progresso</th>
-                  <th className="py-3.5 px-4">Previsão</th>
+            <table className="w-full text-left border-collapse" style={{ minWidth: '1500px' }}>
+              <thead className="sticky top-0 z-10">
+                <tr className="border-b border-[#1C1C1E] bg-[#0E0E10] text-[10px] uppercase font-bold text-zinc-300 tracking-wider">
+                  <th className="py-3.5 px-4 whitespace-nowrap">ID</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Empreendimento</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Geral</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Assunto</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Responsável pela Execução</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Status da Contratação</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap text-center">?!</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Situação</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Status Andamento</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Início</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Previsão de Entrega</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Entrega Efetiva</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Observações e Rotinas</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#1C1C1E]">
-                {filteredTasks.map((task) => (
-                  <tr 
-                    key={task.id}
-                    onClick={() => setSelectedTaskId(task.id)}
-                    className="hover:bg-white/[0.02] cursor-pointer transition-colors duration-150 group"
-                  >
-                    <td className="py-3.5 px-4 font-mono text-xs font-bold text-zinc-400 group-hover:text-zinc-200">
-                      {task.id}
-                    </td>
-                    <td className="py-3.5 px-4 text-xs font-semibold text-white">
-                      {task.project}
-                    </td>
-                    <td className="py-3.5 px-4 text-xs text-zinc-300">
-                      {task.sector}
-                    </td>
-                    <td className="py-3.5 px-4 text-xs text-white font-medium truncate max-w-xs group-hover:text-white">
-                      {task.subject}
-                    </td>
-                    <td 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedRespName(task.responsible);
-                      }}
-                      className="py-3.5 px-4 text-xs text-zinc-300 hover:text-white hover:underline cursor-pointer font-semibold"
+                {filteredTasks.map((task) => {
+                  const isLate = (() => {
+                    if (task.statusAndamento === 'Finalizado' || !task.previsaoEntrega) return false;
+                    const p = task.previsaoEntrega.split('/');
+                    if (p.length !== 3) return false;
+                    let y = parseInt(p[2]); if (y < 100) y += 2000;
+                    return new Date(y, parseInt(p[1]) - 1, parseInt(p[0])) < new Date();
+                  })();
+                  return (
+                    <tr
+                      key={task.id}
+                      onClick={() => setSelectedTaskId(task.id)}
+                      className="hover:bg-white/[0.02] cursor-pointer transition-colors duration-150 group"
                     >
-                      {task.responsible}
-                    </td>
-                    <td className="py-3.5 px-4 text-center text-xs">
-                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${
-                        task.urgencia === 'Emergencial' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
-                        task.urgencia === 'Crítica' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
-                        task.urgencia === 'Alta' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                        task.urgencia === 'Média' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
-                        'bg-zinc-500/10 text-zinc-300 border-zinc-500/20'
-                      }`}>
-                        {task.urgencia}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4 text-xs">
-                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase ${getStatusColor(task.statusAndamento)}`}>
-                        {task.statusAndamento}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4 text-xs">
-                      <div className="flex items-center gap-2 justify-center">
-                        <span className="font-mono text-zinc-200 font-bold">{task.progress}%</span>
-                        <div className="w-12 bg-zinc-800 h-1.5 rounded-full overflow-hidden hidden sm:block">
-                          <div className="bg-white h-1.5 rounded-full" style={{ width: `${task.progress}%` }} />
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-3.5 px-4 text-xs text-zinc-300 font-mono">
-                      {task.previsaoEntrega || '-'}
-                    </td>
-                  </tr>
-                ))}
+                      <td className="py-3 px-4 font-mono text-xs font-bold text-zinc-400 whitespace-nowrap group-hover:text-zinc-200">{task.id}</td>
+                      <td className="py-3 px-4 text-xs font-bold text-white whitespace-nowrap">{task.project}</td>
+                      <td className="py-3 px-4 text-xs text-zinc-300 whitespace-nowrap">{task.sector}</td>
+                      <td className="py-3 px-4 text-xs text-white font-medium" style={{ maxWidth: '220px' }}>
+                        <span className="block truncate" title={task.subject}>{task.subject}</span>
+                      </td>
+                      <td
+                        onClick={(e) => { e.stopPropagation(); setSelectedRespName(task.responsible); }}
+                        className="py-3 px-4 text-xs text-zinc-300 hover:text-white hover:underline cursor-pointer font-semibold whitespace-nowrap"
+                      >{task.responsible}</td>
+                      <td className="py-3 px-4 text-xs whitespace-nowrap">
+                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-semibold border ${
+                          task.statusContratacao?.toLowerCase().includes('contratado') && !task.statusContratacao?.toLowerCase().includes('não')
+                            ? 'text-blue-400 border-blue-500/20 bg-blue-500/10'
+                            : task.statusContratacao?.toLowerCase().includes('não será')
+                            ? 'text-zinc-500 border-zinc-600/20 bg-zinc-600/10'
+                            : task.statusContratacao?.toLowerCase().includes('andamento')
+                            ? 'text-amber-400 border-amber-500/20 bg-amber-500/10'
+                            : 'text-zinc-400 border-zinc-500/20 bg-zinc-500/10'
+                        }`}>{task.statusContratacao || '—'}</span>
+                      </td>
+                      <td className="py-3 px-4 text-center text-xs whitespace-nowrap">
+                        {task.urgencia !== 'Baixa' ? (
+                          <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-semibold border ${
+                            task.urgencia === 'Emergencial' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
+                            task.urgencia === 'Crítica' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
+                            task.urgencia === 'Alta' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                            'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                          }`}>{task.urgencia}</span>
+                        ) : <span className="text-zinc-600 text-xs">—</span>}
+                      </td>
+                      <td className="py-3 px-4 text-xs text-zinc-400" style={{ maxWidth: '180px' }}>
+                        {task.situacao ? <span className="block truncate" title={task.situacao}>{task.situacao.split('\n')[0]}</span> : '—'}
+                      </td>
+                      <td className="py-3 px-4 text-xs whitespace-nowrap">
+                        <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-semibold uppercase ${getStatusColor(task.statusAndamento)}`}>
+                          {task.statusAndamento}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-xs font-mono text-zinc-400 whitespace-nowrap">{task.inicio || '—'}</td>
+                      <td className={`py-3 px-4 text-xs font-mono whitespace-nowrap font-semibold ${isLate ? 'text-red-400' : 'text-zinc-400'}`}>
+                        {task.previsaoEntrega || '—'}
+                      </td>
+                      <td className="py-3 px-4 text-xs font-mono text-zinc-400 whitespace-nowrap">{task.entregaEfetiva || '—'}</td>
+                      <td className="py-3 px-4 text-xs text-zinc-400" style={{ maxWidth: '200px' }}>
+                        {task.observacoesRotinas ? <span className="block truncate" title={task.observacoesRotinas}>{task.observacoesRotinas}</span> : '—'}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}

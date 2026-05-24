@@ -131,8 +131,7 @@ export default function Home() {
     t.statusContratacao.toLowerCase().includes('indefinido')
   ).length;
   
-  // Cálculo de tarefas atrasadas (não finalizadas e previsão de entrega passou)
-  // Como estamos simulando a data atual como 23/05/2026
+  // Cálculo de tarefas atrasadas (não finalizadas e previsão de entrega já passou)
   const SIMULATED_NOW = new Date();
   const delayedTasks = filteredTasks.filter(t => {
     if (t.statusAndamento === 'Finalizado' || !t.previsaoEntrega) return false;
