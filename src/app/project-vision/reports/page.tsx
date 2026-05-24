@@ -64,7 +64,7 @@ export default function ReportsPage() {
   const aguardando = filteredTasks.filter(t => t.statusAndamento === 'Aguardando').length;
   const naoIniciadas = filteredTasks.filter(t => t.statusAndamento === 'Não iniciado').length;
 
-  const SIMULATED_NOW = new Date('2026-05-23');
+  const SIMULATED_NOW = new Date();
   const atrasadas = filteredTasks.filter(t => {
     if (t.statusAndamento === 'Finalizado' || !t.previsaoEntrega) return false;
     const parts = t.previsaoEntrega.split('/');
@@ -261,7 +261,7 @@ export default function ReportsPage() {
           </div>
           <div className="text-right">
             <h4 className="text-xs font-bold text-white print:text-black font-mono">LongView Manager</h4>
-            <p className="text-[10px] text-zinc-500 font-mono mt-0.5">Emissão: 23/05/2026</p>
+            <p className="text-[10px] text-zinc-500 font-mono mt-0.5">Emissão: {new Date().toLocaleDateString('pt-BR')}</p>
           </div>
         </div>
 

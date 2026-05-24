@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
+
+const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,25 +11,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Nenhum arquivo enviado' }, { status: 400 });
     }
 
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const originalName = file instanceof File ? file.name : 'documento.pdf';
-    
-    // Gera um nome de arquivo seguro e único
-    const timestamp = Date.now();
-    const safeName = `${timestamp}-${originalName.replace(/[^a-zA-Z0-9.\-_]/g, '_')}`;
-
-    const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
+    if (file.size > MAX_SIZE_BYTES) {
+      return NextResponse.json(
+        { error: 'Arquivo muito grande. O limite é 5 MB.' },
+        { status: 413 }
+      );
     }
 
-    const filePath = path.join(uploadsDir, safeName);
-    fs.writeFileSync(filePath, buffer);
+    const originalName = file instanceof File ? file.name : 'documento';
+    const mimeType = file.type || 'application/octet-stream';
 
-    const fileUrl = `/uploads/${safeName}`;
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const base64 = buffer.toString('base64');
+    const dataUrl = `data:${mimeType};base64,${base64}`;
 
-    return NextResponse.json({ 
-      url: fileUrl, 
+    return NextResponse.json({
+      url: dataUrl,
       name: originalName,
       size: `${(file.size / 1024).toFixed(1)} KB`
     });

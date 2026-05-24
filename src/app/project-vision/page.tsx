@@ -133,7 +133,7 @@ export default function Home() {
   
   // Cálculo de tarefas atrasadas (não finalizadas e previsão de entrega passou)
   // Como estamos simulando a data atual como 23/05/2026
-  const SIMULATED_NOW = new Date('2026-05-23');
+  const SIMULATED_NOW = new Date();
   const delayedTasks = filteredTasks.filter(t => {
     if (t.statusAndamento === 'Finalizado' || !t.previsaoEntrega) return false;
     // Tenta converter previsaoEntrega (DD/MM/AAAA ou DD/MM/YY) para data
@@ -582,7 +582,7 @@ export default function Home() {
                   <div className="flex items-center justify-between text-xs">
                     <span 
                       onClick={() => {
-                        window.location.href = `/projects/${proj.name.toLowerCase().replace(/ /g, '-')}`;
+                        window.location.href = `/project-vision/projects/${proj.id}`;
                       }}
                       className="font-bold text-zinc-100 hover:text-white cursor-pointer hover:underline"
                     >

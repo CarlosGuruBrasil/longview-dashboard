@@ -24,10 +24,19 @@ export default function TimelinePage() {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [selectedRespName, setSelectedRespName] = useState<string | null>(null);
 
-  // Escala da timeline: Maio/Junho de 2026 (foco principal dos dados do CSV)
-  const START_DATE = new Date('2026-05-01');
-  const END_DATE = new Date('2026-06-30');
-  const TOTAL_DAYS = 61; // 31 em maio + 30 em junho
+  // Janela dinâmica: mês atual + próximo mês
+  const _today = new Date();
+  const START_DATE = new Date(_today.getFullYear(), _today.getMonth(), 1);
+  const END_DATE = new Date(_today.getFullYear(), _today.getMonth() + 2, 0);
+  const TOTAL_DAYS = Math.round((END_DATE.getTime() - START_DATE.getTime()) / (24 * 60 * 60 * 1000)) + 1;
+
+  // Labels dinâmicos para a régua
+  const _month1 = new Date(_today.getFullYear(), _today.getMonth(), 1);
+  const _month2 = new Date(_today.getFullYear(), _today.getMonth() + 1, 1);
+  const _daysInMonth1 = new Date(_today.getFullYear(), _today.getMonth() + 1, 0).getDate();
+  const _widthPct1 = Math.round((_daysInMonth1 / TOTAL_DAYS) * 100);
+  const _labelMonth1 = _month1.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+  const _labelMonth2 = _month2.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
 
   const fetchData = async () => {
     setLoading(true);
@@ -119,10 +128,8 @@ export default function TimelinePage() {
       return 'bg-emerald-500 hover:bg-emerald-400 border border-emerald-400/20'; // verde = finalizado
     }
     
-    // Verifica se está atrasada (não finalizada e previsao passou da data simulated)
-    const SIMULATED_NOW = new Date('2026-05-23');
     const datePrevisao = parseDate(task.previsaoEntrega);
-    if (datePrevisao && datePrevisao < SIMULATED_NOW) {
+    if (datePrevisao && datePrevisao < new Date()) {
       return 'bg-red-500 hover:bg-red-400 border border-red-400/20'; // vermelho = atrasado
     }
 
@@ -229,13 +236,11 @@ export default function TimelinePage() {
           
           {/* Régua Temporal */}
           <div className="flex-1 relative flex">
-            {/* Mês de Maio */}
-            <div className="w-[51%] border-r border-[#1C1C1E] py-2 text-center text-xs font-bold text-white uppercase tracking-wider">
-              Maio 2026
+            <div style={{ width: `${_widthPct1}%` }} className="border-r border-[#1C1C1E] py-2 text-center text-xs font-bold text-white uppercase tracking-wider">
+              {_labelMonth1}
             </div>
-            {/* Mês de Junho */}
-            <div className="w-[49%] py-2 text-center text-xs font-bold text-white uppercase tracking-wider">
-              Junho 2026
+            <div style={{ width: `${100 - _widthPct1}%` }} className="py-2 text-center text-xs font-bold text-white uppercase tracking-wider">
+              {_labelMonth2}
             </div>
 
             {/* Linhas de Grade de fundo (semanas) */}

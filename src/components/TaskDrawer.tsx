@@ -30,10 +30,10 @@ export default function TaskDrawer({ taskId, onClose, onUpdate }: Props) {
   useEffect(() => {
     if (!taskId) return;
     let active = true;
-    
-    Promise.resolve().then(() => {
-      if (active) setLoading(true);
-    });
+
+    setTask(null);
+    setEditMode(false);
+    setLoading(true);
 
     fetch(`/api/tasks/${taskId}`)
       .then(res => res.json())
@@ -92,9 +92,9 @@ export default function TaskDrawer({ taskId, onClose, onUpdate }: Props) {
     }
   };
 
-  if (!taskId || !task) return null;
+  if (!taskId) return null;
 
-  const isEditable = currentUser.role === 'Desenvolvedor' || currentUser.role === 'Diretoria' || currentUser.role === 'Gestor';
+  const isEditable = currentUser.role === 'Desenvolvedor' || currentUser.permissions?.manageProjects === true;
 
   return (
     <>
@@ -103,12 +103,18 @@ export default function TaskDrawer({ taskId, onClose, onUpdate }: Props) {
         {/* Header */}
         <div className="p-5 border-b border-[#1C1C1E] flex justify-between items-center">
           <div>
-            <span className="font-mono text-[10px] text-zinc-500 font-bold">{task.id}</span>
-            <h3 className="text-lg font-bold text-white mt-0.5">{task.subject}</h3>
-            <p className="text-xs text-zinc-400">{task.project} • {task.sector}</p>
+            {task ? (
+              <>
+                <span className="font-mono text-[10px] text-zinc-500 font-bold">{task.id}</span>
+                <h3 className="text-lg font-bold text-white mt-0.5">{task.subject}</h3>
+                <p className="text-xs text-zinc-400">{task.project} • {task.sector}</p>
+              </>
+            ) : (
+              <p className="text-sm text-zinc-500 animate-pulse">Carregando tarefa...</p>
+            )}
           </div>
           <div className="flex items-center gap-2">
-            {isEditable && !editMode && (
+            {isEditable && !editMode && task && (
               <button onClick={() => setEditMode(true)} className="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 font-semibold transition-colors">
                 Editar
               </button>
@@ -121,8 +127,11 @@ export default function TaskDrawer({ taskId, onClose, onUpdate }: Props) {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-5 space-y-6">
-          {loading ? (
-            <p className="text-sm text-zinc-500 text-center py-8">Carregando...</p>
+          {loading || !task ? (
+            <div className="flex flex-col items-center justify-center py-16 gap-3 text-zinc-500">
+              <div className="w-5 h-5 border-2 border-zinc-700 border-t-zinc-400 rounded-full animate-spin" />
+              <p className="text-sm">Carregando tarefa...</p>
+            </div>
           ) : (
             <>
               {/* Status & Urgência */}
@@ -238,7 +247,7 @@ export default function TaskDrawer({ taskId, onClose, onUpdate }: Props) {
         </div>
 
         {/* Footer */}
-        {editMode && (
+        {editMode && task && (
           <div className="p-5 border-t border-[#1C1C1E] flex items-center justify-end gap-3">
             <button onClick={() => setEditMode(false)} className="px-4 py-2 text-xs font-semibold text-zinc-400 hover:text-white bg-zinc-900 border border-zinc-800 rounded-lg transition-colors">
               Cancelar
