@@ -3,132 +3,160 @@ import { cookies } from 'next/headers';
 import axios from 'axios';
 import jwt from 'jsonwebtoken';
 import { kv } from '@vercel/kv';
+import { rateLimit, getClientIp } from '@/lib/rateLimit';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secret-longview-key';
 
-// Helper para validar a assinatura e obter o token JWT na API
+// TTLs de cache por tipo de dado (em segundos)
+const CACHE_TTL = {
+  full:          21600, // 6h  — cache completo (leads + estoque + meta)
+  leads:          1800, // 30min — somente leads CRM
+  estoque:        3600, // 1h  — estoque de unidades
+  meta:           3600, // 1h  — dados Meta Ads
+} as const;
+
+// Helper para validar JWT via cookie
 async function verifyAuth(): Promise<any | null> {
   try {
     const cookieStore = await cookies();
     const token = cookieStore.get('auth_token')?.value;
     if (!token) return null;
     return jwt.verify(token, JWT_SECRET);
-  } catch (e) {
+  } catch {
     return null;
   }
 }
 
 export async function GET(request: NextRequest) {
+  // 1. Autenticação
   const authUser = await verifyAuth();
   if (!authUser) {
     return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
   }
 
+  // 2. Rate limiting: 30 req/min por IP para esta rota pesada
+  const ip = getClientIp(request);
+  const rl = await rateLimit(`data:${ip}`, 30, 60);
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: 'Muitas requisições. Aguarde antes de atualizar novamente.' },
+      {
+        status: 429,
+        headers: {
+          'Retry-After': String(rl.reset),
+          'X-RateLimit-Remaining': '0',
+        },
+      }
+    );
+  }
+
   try {
     const { searchParams } = new URL(request.url);
-    const isMetaOnly = searchParams.get('type') === 'meta';
-    const startDate = searchParams.get('start');
-    const endDate = searchParams.get('end');
+    const isMetaOnly   = searchParams.get('type') === 'meta';
+    const startDate    = searchParams.get('start');
+    const endDate      = searchParams.get('end');
     const forceRefresh = searchParams.get('refresh') === 'true';
 
-    // Verificar se existe cache no Redis (Vercel KV) apenas para a consulta geral
-    if (!forceRefresh && !isMetaOnly && !startDate && !endDate) {
+    // 3. Cache: usa chave específica conforme parâmetros
+    const cacheKey = isMetaOnly
+      ? `dashboard_meta_${startDate ?? 'all'}_${endDate ?? 'all'}`
+      : startDate || endDate
+        ? `dashboard_filtered_${startDate ?? ''}_${endDate ?? ''}`
+        : 'dashboard_data';
+
+    if (!forceRefresh) {
       try {
-        const cachedData = await kv.get<any>('dashboard_data');
-        if (cachedData && cachedData.estoque) {
-          console.log("Servindo dados do Cache (Vercel KV) com estoque atualizado");
-          return NextResponse.json(cachedData);
+        const cachedData = await kv.get<any>(cacheKey);
+        if (cachedData?.estoque || cachedData?.meta) {
+          console.log(`[/api/data] Cache hit: ${cacheKey}`);
+          return NextResponse.json({ ...cachedData, _cached: true });
         }
       } catch (err: any) {
-        console.warn("Erro ao buscar cache no Redis, continuando busca nas APIs:", err.message);
+        console.warn('[/api/data] Erro ao ler cache KV:', err.message);
       }
     }
 
-    // Configurações das APIs
+    // 4. Credenciais das APIs externas
     const CV_CRM_TOKEN = process.env.CV_CRM_TOKEN;
     const CV_CRM_EMAIL = process.env.CV_CRM_EMAIL;
-    const META_TOKEN = process.env.META_TOKEN;
-    const META_ACT_ID = process.env.META_ACT_ID;
+    const META_TOKEN   = process.env.META_TOKEN;
+    const META_ACT_ID  = process.env.META_ACT_ID;
 
-    console.log(`Buscando dados frescos comercial... (MetaOnly: ${isMetaOnly}, Filtros: ${startDate} - ${endDate})`);
+    console.log(`[/api/data] Buscando dados frescos — MetaOnly: ${isMetaOnly}, Filtros: ${startDate} - ${endDate}`);
 
-    // 1. CRM Leads com paginação paralelizada
+    // 5. Busca de leads CRM com paginação paralelizada
     const fetchAllCRMLeads = async () => {
       if (isMetaOnly) return { leads: [], total: 0 };
-      
+
       const limit = 500;
-      
-      // Primeira chamada leve para pegar o total
-      const initialResponse = await axios.get(`https://longviewempreendimentos.cvcrm.com.br/api/v1/comercial/leads`, {
-        params: { limit: 1 },
-        headers: { "email": CV_CRM_EMAIL, "token": CV_CRM_TOKEN, "Accept": "application/json" }
-      });
-      
-      const totalLeads = initialResponse.data.total || 0;
-      
-      // Limitar busca a 5000 por segurança
-      const maxLeads = Math.min(totalLeads, 5000);
-      const totalPages = Math.ceil(maxLeads / limit);
-      
-      const promises = [];
-      for (let page = 1; page <= totalPages; page++) {
-        promises.push(
-          axios.get(`https://longviewempreendimentos.cvcrm.com.br/api/v1/comercial/leads`, {
-            params: { limit, offset: (page - 1) * limit },
-            headers: { "email": CV_CRM_EMAIL, "token": CV_CRM_TOKEN, "Accept": "application/json" }
-          })
-        );
-      }
-      
+      const initialResponse = await axios.get(
+        'https://longviewempreendimentos.cvcrm.com.br/api/v1/comercial/leads',
+        {
+          params: { limit: 1 },
+          headers: { email: CV_CRM_EMAIL, token: CV_CRM_TOKEN, Accept: 'application/json' },
+          timeout: 15000,
+        }
+      );
+
+      const totalLeads  = initialResponse.data.total || 0;
+      const maxLeads    = Math.min(totalLeads, 5000);
+      const totalPages  = Math.ceil(maxLeads / limit);
+
+      const promises = Array.from({ length: totalPages }, (_, i) =>
+        axios.get('https://longviewempreendimentos.cvcrm.com.br/api/v1/comercial/leads', {
+          params: { limit, offset: i * limit },
+          headers: { email: CV_CRM_EMAIL, token: CV_CRM_TOKEN, Accept: 'application/json' },
+          timeout: 15000,
+        })
+      );
+
       const results = await Promise.all(promises);
-      let allLeads: any[] = [];
-      results.forEach((res: any) => {
-        const leads = res.data.leads || [];
-        allLeads = allLeads.concat(leads);
-      });
-      
+      const allLeads = results.flatMap((res: any) => res.data.leads || []);
       return { leads: allLeads, total: allLeads.length };
     };
 
-    const crmPromise = fetchAllCRMLeads();
-
-    // CRM Empreendimentos
+    // 6. Empreendimentos e estoque
     const fetchAllCVCRMProjects = async () => {
       if (isMetaOnly) return [];
       try {
-        const response = await axios.get(`https://longviewempreendimentos.cvcrm.com.br/api/v1/cadastros/empreendimentos`, {
-          headers: { "email": CV_CRM_EMAIL, "token": CV_CRM_TOKEN, "Accept": "application/json" }
-        });
+        const response = await axios.get(
+          'https://longviewempreendimentos.cvcrm.com.br/api/v1/cadastros/empreendimentos',
+          {
+            headers: { email: CV_CRM_EMAIL, token: CV_CRM_TOKEN, Accept: 'application/json' },
+            timeout: 15000,
+          }
+        );
         return Array.isArray(response.data) ? response.data : [];
       } catch (err: any) {
-        console.error("Erro ao buscar lista de empreendimentos:", err.message);
+        console.error('[/api/data] Erro ao buscar empreendimentos:', err.message);
         return [];
       }
     };
 
-    // Primeiro buscar os empreendimentos ativos para estoque
-    const activeProjects = await fetchAllCVCRMProjects();
-    const activeProjectIds = activeProjects.map((p: any) => p.idempreendimento).filter(Boolean);
-
     const fetchCVCRMEstoque = async (idEmpreendimento: string) => {
       if (isMetaOnly) return null;
       try {
-        const response = await axios.get(`https://longviewempreendimentos.cvcrm.com.br/api/v1/cadastros/empreendimentos/${idEmpreendimento}`, {
-          params: { limite_dados_unidade: 1000 },
-          headers: { "email": CV_CRM_EMAIL, "token": CV_CRM_TOKEN, "Accept": "application/json" }
-        });
+        const response = await axios.get(
+          `https://longviewempreendimentos.cvcrm.com.br/api/v1/cadastros/empreendimentos/${idEmpreendimento}`,
+          {
+            params: { limite_dados_unidade: 1000 },
+            headers: { email: CV_CRM_EMAIL, token: CV_CRM_TOKEN, Accept: 'application/json' },
+            timeout: 15000,
+          }
+        );
         return { id: idEmpreendimento, data: response.data };
       } catch (err: any) {
-        console.error(`Erro ao buscar estoque para empreendimento ${idEmpreendimento}:`, err.message);
+        console.error(`[/api/data] Erro ao buscar estoque ${idEmpreendimento}:`, err.message);
         return { id: idEmpreendimento, data: null };
       }
     };
 
-    // Estoques em paralelo
-    const estoquePromises = Promise.all(activeProjectIds.map((id: string) => fetchCVCRMEstoque(id)));
+    // Buscar projetos ativos para montar lista de estoques
+    const activeProjects   = await fetchAllCVCRMProjects();
+    const activeProjectIds = activeProjects.map((p: any) => p.idempreendimento).filter(Boolean);
 
-    // Filtros de tempo para o Meta Ads
-    let timeParams: any = { date_preset: 'maximum' };
+    // 7. Parâmetros de tempo para o Meta Ads
+    let timeParams: Record<string, string> = { date_preset: 'maximum' };
     if (startDate && endDate) {
       timeParams = { time_range: JSON.stringify({ since: startDate, until: endDate }) };
     } else if (startDate) {
@@ -138,119 +166,102 @@ export async function GET(request: NextRequest) {
       timeParams = { time_range: JSON.stringify({ since: '2020-01-01', until: endDate }) };
     }
 
-    // Chamadas Meta Ads
-    const metaCampPromise = axios.get(`https://graph.facebook.com/v18.0/${META_ACT_ID}/insights`, {
-      params: {
-        level: 'campaign',
-        fields: 'campaign_id,campaign_name,spend,impressions,clicks,actions,date_start,date_stop',
-        ...timeParams,
-        limit: 500,
-        access_token: META_TOKEN
-      }
-    });
+    // 8. Disparar todas as chamadas em paralelo
+    const metaBase = `https://graph.facebook.com/v18.0/${META_ACT_ID}`;
+    const metaHeaders = { access_token: META_TOKEN };
 
-    const metaCampDetailsPromise = axios.get(`https://graph.facebook.com/v18.0/${META_ACT_ID}/campaigns`, {
-      params: {
-        fields: 'id,name,created_time,start_time,stop_time,status,objective,buying_type',
-        limit: 1000,
-        access_token: META_TOKEN
-      }
-    });
-
-    const metaDemoPromise = axios.get(`https://graph.facebook.com/v18.0/${META_ACT_ID}/insights`, {
-      params: {
-        level: 'account',
-        fields: 'clicks,impressions,spend',
-        breakdowns: 'gender,age',
-        ...timeParams,
-        access_token: META_TOKEN
-      }
-    });
-
-    const metaRegionPromise = axios.get(`https://graph.facebook.com/v18.0/${META_ACT_ID}/insights`, {
-      params: {
-        level: 'account',
-        fields: 'clicks,impressions,spend',
-        breakdowns: 'region',
-        ...timeParams,
-        access_token: META_TOKEN
-      }
-    });
-
-    const metaGlobalPromise = axios.get(`https://graph.facebook.com/v18.0/${META_ACT_ID}/insights`, {
-      params: {
-        level: 'account',
-        fields: 'clicks,impressions,spend,actions',
-        ...timeParams,
-        access_token: META_TOKEN
-      }
-    });
-
-    const metaPlatformPromise = axios.get(`https://graph.facebook.com/v18.0/${META_ACT_ID}/insights`, {
-      params: {
-        level: 'account',
-        fields: 'clicks,impressions,spend',
-        breakdowns: 'publisher_platform',
-        ...timeParams,
-        access_token: META_TOKEN
-      }
-    });
-
-    const results = await Promise.allSettled([
-      crmPromise,
-      metaCampPromise,
-      metaDemoPromise,
-      metaRegionPromise,
-      metaGlobalPromise,
-      metaPlatformPromise,
-      metaCampDetailsPromise,
-      estoquePromises
+    const [
+      crmResult,
+      metaCampResult,
+      metaDemoResult,
+      metaRegionResult,
+      metaGlobalResult,
+      metaPlatformResult,
+      metaCampDetailsResult,
+      estoqueResults,
+    ] = await Promise.allSettled([
+      fetchAllCRMLeads(),
+      axios.get(`${metaBase}/insights`, {
+        params: { level: 'campaign', fields: 'campaign_id,campaign_name,spend,impressions,clicks,actions,date_start,date_stop', ...timeParams, limit: 500, ...metaHeaders },
+        timeout: 20000,
+      }),
+      axios.get(`${metaBase}/insights`, {
+        params: { level: 'account', fields: 'clicks,impressions,spend', breakdowns: 'gender,age', ...timeParams, ...metaHeaders },
+        timeout: 20000,
+      }),
+      axios.get(`${metaBase}/insights`, {
+        params: { level: 'account', fields: 'clicks,impressions,spend', breakdowns: 'region', ...timeParams, ...metaHeaders },
+        timeout: 20000,
+      }),
+      axios.get(`${metaBase}/insights`, {
+        params: { level: 'account', fields: 'clicks,impressions,spend,actions', ...timeParams, ...metaHeaders },
+        timeout: 20000,
+      }),
+      axios.get(`${metaBase}/insights`, {
+        params: { level: 'account', fields: 'clicks,impressions,spend', breakdowns: 'publisher_platform', ...timeParams, ...metaHeaders },
+        timeout: 20000,
+      }),
+      axios.get(`${metaBase}/campaigns`, {
+        params: { fields: 'id,name,created_time,start_time,stop_time,status,objective,buying_type', limit: 1000, ...metaHeaders },
+        timeout: 20000,
+      }),
+      Promise.all(activeProjectIds.map((id: string) => fetchCVCRMEstoque(id))),
     ]);
 
-    const crmData = results[0].status === 'fulfilled' ? results[0].value : { leads: [] };
-    const metaCampRes = results[1].status === 'fulfilled' ? (results[1].value as any) : { data: { data: [] } };
-    const metaDemoRes = results[2].status === 'fulfilled' ? (results[2].value as any) : { data: { data: [] } };
-    const metaRegionRes = results[3].status === 'fulfilled' ? (results[3].value as any) : { data: { data: [] } };
-    const metaGlobalRes = results[4].status === 'fulfilled' ? (results[4].value as any) : { data: { data: [] } };
-    const metaPlatformRes = results[5].status === 'fulfilled' ? (results[5].value as any) : { data: { data: [] } };
-    const metaCampDetailsRes = results[6].status === 'fulfilled' ? (results[6].value as any) : { data: { data: [] } };
-    const estoqueResults = results[7].status === 'fulfilled' ? results[7].value : [];
+    // 9. Extrair resultados com fallback seguro
+    const crmData           = crmResult.status === 'fulfilled' ? crmResult.value : { leads: [], total: 0 };
+    const metaCampRes       = metaCampResult.status === 'fulfilled' ? (metaCampResult.value as any) : { data: { data: [] } };
+    const metaDemoRes       = metaDemoResult.status === 'fulfilled' ? (metaDemoResult.value as any) : { data: { data: [] } };
+    const metaRegionRes     = metaRegionResult.status === 'fulfilled' ? (metaRegionResult.value as any) : { data: { data: [] } };
+    const metaGlobalRes     = metaGlobalResult.status === 'fulfilled' ? (metaGlobalResult.value as any) : { data: { data: [] } };
+    const metaPlatformRes   = metaPlatformResult.status === 'fulfilled' ? (metaPlatformResult.value as any) : { data: { data: [] } };
+    const metaCampDetailsRes = metaCampDetailsResult.status === 'fulfilled' ? (metaCampDetailsResult.value as any) : { data: { data: [] } };
+    const rawEstoque        = estoqueResults.status === 'fulfilled' ? estoqueResults.value : [];
 
+    // 10. Montar mapa de estoque
     const estoqueMap: Record<string, any> = {};
-    if (Array.isArray(estoqueResults)) {
-      estoqueResults.forEach((item: any) => {
-        if (item && item.id && item.data) {
-          estoqueMap[item.id] = item.data;
-        }
+    if (Array.isArray(rawEstoque)) {
+      rawEstoque.forEach((item: any) => {
+        if (item?.id && item?.data) estoqueMap[item.id] = item.data;
       });
     }
 
+    // 11. Montar payload final
     const fullData = {
-      leads: crmData,
+      leads:     crmData,
       meta: {
-        campaigns: metaCampRes.data?.data || [],
-        campaignDetails: metaCampDetailsRes.data?.data || [],
-        demographics: metaDemoRes.data?.data || [],
-        regions: metaRegionRes.data?.data || [],
-        platforms: metaPlatformRes.data?.data || [],
-        global: metaGlobalRes.data?.data ? metaGlobalRes.data.data[0] : null
+        campaigns:       metaCampRes.data?.data ?? [],
+        campaignDetails: metaCampDetailsRes.data?.data ?? [],
+        demographics:    metaDemoRes.data?.data ?? [],
+        regions:         metaRegionRes.data?.data ?? [],
+        platforms:       metaPlatformRes.data?.data ?? [],
+        global:          metaGlobalRes.data?.data?.[0] ?? null,
       },
-      estoque: estoqueMap,
-      updatedAt: new Date().toISOString()
+      estoque:   estoqueMap,
+      updatedAt: new Date().toISOString(),
+      _cached:   false,
     };
 
-    // Cache no Redis se NÃO for um request filtrado por data ou exclusivo do meta
+    // 12. Salvar no cache KV (apenas requests sem filtros de data)
     if (!isMetaOnly && !startDate && !endDate) {
       try {
-        await kv.set('dashboard_data', fullData, { ex: 21600 }); // 6 horas
+        await kv.set('dashboard_data', fullData, { ex: CACHE_TTL.full });
+        console.log(`[/api/data] Cache salvo: dashboard_data (TTL ${CACHE_TTL.full}s)`);
       } catch (err: any) {
-        console.warn("Erro ao salvar dados de cache no Redis:", err.message);
+        console.warn('[/api/data] Erro ao salvar cache KV:', err.message);
       }
+    } else if (isMetaOnly) {
+      try {
+        await kv.set(cacheKey, fullData, { ex: CACHE_TTL.meta });
+      } catch { /* non-critical */ }
     }
 
     return NextResponse.json(fullData);
   } catch (error: any) {
-    console.error("Erro ao sincronizar dados comercial:", error.response?.data || error.message);
-    return NextResponse.json({ error: "Erro na sincronização das APIs.", details: error.message }, { status: 500 });
+    console.error('[/api/data] Erro crítico:', error.response?.data || error.message);
+    return NextResponse.json(
+      { error: 'Erro na sincronização das APIs externas.', details: error.message },
+      { status: 500 }
+    );
   }
 }

@@ -205,7 +205,7 @@ export default function ProjectsPage() {
                     <div className="absolute inset-0 bg-[#09090B] flex items-center justify-center p-6 border-b border-[#1C1C1E]">
                       <div className="relative w-32 h-12">
                         <Image
-                          src="/logo longview.png"
+                          src="/logolongview.png"
                           alt="LongView Fallback Logo"
                           fill
                           style={{ objectFit: 'contain' }}
@@ -388,7 +388,7 @@ export default function ProjectsPage() {
                       ) : (
                         <div className="relative w-16 h-8 opacity-40">
                           <Image 
-                            src="/logo longview.png" 
+                            src="/logolongview.png" 
                             alt="Logo Fallback Preview" 
                             fill
                             style={{ objectFit: 'contain' }}

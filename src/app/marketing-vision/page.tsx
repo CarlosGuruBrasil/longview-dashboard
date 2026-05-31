@@ -75,7 +75,7 @@ export default function MarketingVisionPage() {
         <aside className="sidebar">
           <div className="logo-container flex flex-col items-center" style={{ paddingTop: '32px', paddingBottom: '24px', borderBottom: '1px solid rgba(28,28,30,0.5)' }}>
             <div style={{ position: 'relative', width: '176px', height: '56px' }}>
-              <img src="/logo longview.png" alt="LongView" style={{ width: '176px', height: '56px', objectFit: 'contain' }} />
+              <img src="/logolongview.png" alt="LongView" style={{ width: '176px', height: '56px', objectFit: 'contain' }} />
             </div>
             <span className="text-[9px] uppercase font-bold tracking-widest text-[#0ea5e9] mt-1">
               Marketing Vision

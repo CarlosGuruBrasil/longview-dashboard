@@ -208,7 +208,7 @@ export default function ReportsPage() {
               {/* Logo LongView */}
               <div className="relative w-32 h-10 print:w-28 print:h-9">
                 <Image
-                  src="/logo longview.png"
+                  src="/logolongview.png"
                   alt="LongView"
                   fill
                   style={{ objectFit: 'contain', objectPosition: 'left' }}
@@ -337,7 +337,7 @@ export default function ReportsPage() {
           <div className="hidden print:flex justify-between items-end pt-8 text-[9pt] text-zinc-600 border-t border-zinc-300">
             <div className="flex items-end gap-6">
               <div className="relative w-24 h-8">
-                <Image src="/logo longview.png" alt="LongView" fill style={{ objectFit: 'contain', objectPosition: 'left' }} />
+                <Image src="/logolongview.png" alt="LongView" fill style={{ objectFit: 'contain', objectPosition: 'left' }} />
               </div>
               <div>
                 <p className="font-semibold">LongView Manager — Sistema de Gestão de Projetos</p>

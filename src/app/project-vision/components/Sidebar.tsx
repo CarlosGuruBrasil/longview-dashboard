@@ -59,7 +59,7 @@ export default function Sidebar() {
         <div className="pt-8 pb-6 flex flex-col items-center justify-center border-b border-[#1C1C1E]/50">
           <div className="relative w-44 h-14">
             <Image 
-              src="/logo longview.png" 
+              src="/logolongview.png" 
               alt="LONGVIEW Logo" 
               fill
               style={{ objectFit: 'contain' }}

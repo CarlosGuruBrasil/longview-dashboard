@@ -47,7 +47,7 @@ export default async function SelectAppPage() {
       <header className="flex justify-between items-center max-w-5xl w-full mx-auto relative z-10">
         <div className="relative w-36 h-10 flex items-center">
           <Image
-            src="/logo longview.png"
+            src="/logolongview.png"
             alt="LongView"
             fill
             className="object-contain object-left"

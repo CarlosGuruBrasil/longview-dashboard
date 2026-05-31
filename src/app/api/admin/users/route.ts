@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { readUsers, writeUsers, DbUser, UserPermissions } from '@/lib/db-kv';
+import { rateLimit, getClientIp } from '@/lib/rateLimit';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
@@ -28,6 +29,12 @@ async function checkAdminAuth(): Promise<any | null> {
 
 // GET: Listar usuários cadastrados
 export async function GET(request: NextRequest) {
+  const ip = getClientIp(request);
+  const rl = await rateLimit(`admin:${ip}`, 60, 60);
+  if (!rl.success) {
+    return NextResponse.json({ error: 'Muitas requisições.' }, { status: 429 });
+  }
+
   const adminUser = await checkAdminAuth();
   if (!adminUser) {
     return NextResponse.json({ error: 'Acesso negado. Apenas administradores podem gerenciar usuários.' }, { status: 403 });

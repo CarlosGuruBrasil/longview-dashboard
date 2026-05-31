@@ -243,7 +243,7 @@ export default function AdminUsersPage() {
         
         <div className="relative w-36 h-12 flex items-center">
           <Image
-            src="/logo longview.png"
+            src="/logolongview.png"
             alt="LongView"
             fill
             className="object-contain object-right"

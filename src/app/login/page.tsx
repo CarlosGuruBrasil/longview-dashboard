@@ -54,7 +54,7 @@ export default function LoginPage() {
         <div className="flex flex-col items-center mb-8">
           <div className="relative w-48 h-16 mb-4 flex items-center justify-center">
             <Image
-              src="/logo longview.png"
+              src="/logolongview.png"
               alt="LongView"
               fill
               className="object-contain"
