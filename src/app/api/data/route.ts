@@ -7,6 +7,7 @@ import { rateLimit, getClientIp } from '@/lib/rateLimit';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secret-longview-key';
 const META_API_VERSION = 'v21.0'; // Atualizado de v18.0
+const META_PAGE_ID = '259079394232614'; // Longview Empreendimentos
 
 const CACHE_TTL = {
   full:   21600, // 6h
@@ -173,6 +174,12 @@ export async function GET(request: NextRequest) {
 
       // 10. Estoque por empreendimento
       estoqueResults,
+
+      // 11. Formulários de leads Meta
+      leadFormsResult,
+
+      // 12. Dados da página Facebook
+      pageResult,
     ] = await Promise.allSettled([
       fetchAllCRMLeads(),
 
@@ -298,6 +305,8 @@ export async function GET(request: NextRequest) {
     const metaDeviceRes     = metaDeviceResult.status === 'fulfilled' ? (metaDeviceResult.value as any) : { data: { data: [] } };
     const metaDailyRes      = metaDailyResult.status === 'fulfilled' ? (metaDailyResult.value as any) : { data: { data: [] } };
     const rawEstoque        = estoqueResults.status === 'fulfilled' ? estoqueResults.value : [];
+    const leadFormsRes      = leadFormsResult.status === 'fulfilled' ? (leadFormsResult.value as any) : null;
+    const pageDataRes       = pageResult.status === 'fulfilled' ? (pageResult.value as any) : null;
 
     // Log erros das chamadas Meta para diagnóstico
     [
@@ -352,6 +361,10 @@ export async function GET(request: NextRequest) {
         daily:           metaDailyRes.data?.data ?? [],
       },
       estoque:   estoqueMap,
+      // Formulários de leads Meta (via página)
+      leadForms: leadFormsRes?.data?.data ?? [],
+      // Dados básicos da página Facebook + Instagram ID
+      page: pageDataRes?.data ?? null,
       updatedAt: new Date().toISOString(),
       _cached:   false,
     };
