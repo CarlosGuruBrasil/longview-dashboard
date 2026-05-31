@@ -762,6 +762,27 @@ export default function MarketingVisionPage() {
                     <p>Custo por Lead (CRM)</p>
                   </div>
                 </div>
+                <div className="stat-card glass-card">
+                  <i className="ph ph-eye" style={{ color: '#F59E0B', fontSize: '32px' }}></i>
+                  <div>
+                    <h3 id="meta-reach">0</h3>
+                    <p>Alcance Único</p>
+                  </div>
+                </div>
+                <div className="stat-card glass-card">
+                  <i className="ph ph-repeat" style={{ color: '#8B5CF6', fontSize: '32px' }}></i>
+                  <div>
+                    <h3 id="meta-frequency">0x</h3>
+                    <p>Frequência Média</p>
+                  </div>
+                </div>
+                <div className="stat-card glass-card">
+                  <i className="ph ph-person" style={{ color: '#EC4899', fontSize: '32px' }}></i>
+                  <div>
+                    <h3 id="meta-cpp">R$ 0,00</h3>
+                    <p>Custo por Pessoa Alcançada</p>
+                  </div>
+                </div>
               </div>
 
               <div className="lists-grid" style={{ marginTop: '24px' }}>
@@ -783,6 +804,18 @@ export default function MarketingVisionPage() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--card-border)', paddingBottom: '8px' }}>
                       <span style={{ color: 'var(--text-secondary)' }}>Leads no Formulário do FB</span>
                       <strong id="meta-leads-api" style={{ color: '#10B981' }}>0</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--card-border)', paddingBottom: '8px' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>CPL Direto Meta (cost_per_lead)</span>
+                      <strong id="meta-cpl-direct" style={{ color: '#F59E0B' }}>—</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--card-border)', paddingBottom: '8px' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>Gasto Médio Diário</span>
+                      <strong id="meta-avg-daily-spend" style={{ color: '#fff' }}>R$ 0,00</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>Período Ativo</span>
+                      <strong id="meta-active-days" style={{ color: '#94a3b8' }}>—</strong>
                     </div>
                   </div>
                 </div>
@@ -819,6 +852,49 @@ export default function MarketingVisionPage() {
                     <canvas id="metaPlatformChart"></canvas>
                   </div>
                 </div>
+                <div className="chart-card glass-card">
+                  <h3>Device: Mobile vs Desktop</h3>
+                  <div className="chart-container" style={{ position: 'relative', height: '250px', width: '100%' }}>
+                    <canvas id="metaDeviceChart"></canvas>
+                  </div>
+                </div>
+              </div>
+
+              {/* Gráfico de Evolução Diária */}
+              <div className="table-card glass-card" style={{ marginTop: '24px' }}>
+                <h3 style={{ marginBottom: '16px' }}>Evolução Diária — Investimento & Cliques</h3>
+                <div style={{ position: 'relative', height: '280px', width: '100%' }}>
+                  <canvas id="metaDailyChart"></canvas>
+                </div>
+              </div>
+
+              {/* Tabela de Adsets */}
+              <div className="table-card glass-card" style={{ marginTop: '24px' }}>
+                <div className="table-header">
+                  <h3>Desempenho por Conjunto de Anúncios (Adsets)</h3>
+                </div>
+                <div className="table-container">
+                  <div className="overflow-x-auto">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Campanha</th>
+                          <th>Conjunto (Adset)</th>
+                          <th>Investimento</th>
+                          <th>Alcance</th>
+                          <th>Impressões</th>
+                          <th>Cliques</th>
+                          <th>CTR</th>
+                          <th>CPC</th>
+                          <th>CPM</th>
+                          <th>Leads (Meta)</th>
+                          <th>CPL (Meta)</th>
+                        </tr>
+                      </thead>
+                      <tbody id="table-adsets-body"></tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
 
               <div className="table-card glass-card" style={{ marginTop: '24px' }}>
@@ -842,16 +918,20 @@ export default function MarketingVisionPage() {
                       <thead>
                         <tr>
                           <th className="sortable" data-sort="campanha">CAMPANHA</th>
-                          <th className="sortable" data-sort="objetivo">OBJETIVO</th>
-                          <th className="sortable" data-sort="inicio">INÍCIO</th>
-                          <th>Término</th>
-                          <th>Duração</th>
-                          <th>Investimento</th>
-                          <th>Imp / Cliques</th>
-                          <th>Leads (Meta)</th>
-                          <th>Custo por Lead</th>
-                          <th>Total CRM</th>
-                          <th>Distribuição no Funil (CRM)</th>
+                          <th>OBJETIVO</th>
+                          <th>INÍCIO</th>
+                          <th>TÉRMINO</th>
+                          <th>DURAÇÃO</th>
+                          <th>INVEST.</th>
+                          <th>ALCANCE</th>
+                          <th>FREQ.</th>
+                          <th>CTR</th>
+                          <th>CPC</th>
+                          <th>IMP / CLIQUES</th>
+                          <th>LEADS META</th>
+                          <th>CPL META</th>
+                          <th>LEADS CRM</th>
+                          <th>FUNIL (CRM)</th>
                         </tr>
                       </thead>
                       <tbody id="table-campaigns-body"></tbody>

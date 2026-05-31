@@ -6,16 +6,13 @@ import { kv } from '@vercel/kv';
 import { rateLimit, getClientIp } from '@/lib/rateLimit';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secret-longview-key';
+const META_API_VERSION = 'v21.0'; // Atualizado de v18.0
 
-// TTLs de cache por tipo de dado (em segundos)
 const CACHE_TTL = {
-  full:          21600, // 6h  — cache completo (leads + estoque + meta)
-  leads:          1800, // 30min — somente leads CRM
-  estoque:        3600, // 1h  — estoque de unidades
-  meta:           3600, // 1h  — dados Meta Ads
+  full:   21600, // 6h
+  meta:    3600, // 1h
 } as const;
 
-// Helper para validar JWT via cookie
 async function verifyAuth(): Promise<any | null> {
   try {
     const cookieStore = await cookies();
@@ -28,25 +25,17 @@ async function verifyAuth(): Promise<any | null> {
 }
 
 export async function GET(request: NextRequest) {
-  // 1. Autenticação
   const authUser = await verifyAuth();
   if (!authUser) {
     return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
   }
 
-  // 2. Rate limiting: 30 req/min por IP para esta rota pesada
   const ip = getClientIp(request);
   const rl = await rateLimit(`data:${ip}`, 30, 60);
   if (!rl.success) {
     return NextResponse.json(
       { error: 'Muitas requisições. Aguarde antes de atualizar novamente.' },
-      {
-        status: 429,
-        headers: {
-          'Retry-After': String(rl.reset),
-          'X-RateLimit-Remaining': '0',
-        },
-      }
+      { status: 429, headers: { 'Retry-After': String(rl.reset) } }
     );
   }
 
@@ -57,7 +46,6 @@ export async function GET(request: NextRequest) {
     const endDate      = searchParams.get('end');
     const forceRefresh = searchParams.get('refresh') === 'true';
 
-    // 3. Cache: usa chave específica conforme parâmetros
     const cacheKey = isMetaOnly
       ? `dashboard_meta_${startDate ?? 'all'}_${endDate ?? 'all'}`
       : startDate || endDate
@@ -76,7 +64,6 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 4. Credenciais das APIs externas
     const CV_CRM_TOKEN = process.env.CV_CRM_TOKEN;
     const CV_CRM_EMAIL = process.env.CV_CRM_EMAIL;
     const META_TOKEN   = process.env.META_TOKEN;
@@ -84,78 +71,62 @@ export async function GET(request: NextRequest) {
 
     console.log(`[/api/data] Buscando dados frescos — MetaOnly: ${isMetaOnly}, Filtros: ${startDate} - ${endDate}`);
 
-    // 5. Busca de leads CRM com paginação paralelizada
+    // ─── CRM: Leads paginados ─────────────────────────────────────────────────
     const fetchAllCRMLeads = async () => {
       if (isMetaOnly) return { leads: [], total: 0 };
-
       const limit = 500;
-      const initialResponse = await axios.get(
+      const initial = await axios.get(
         'https://longviewempreendimentos.cvcrm.com.br/api/v1/comercial/leads',
-        {
-          params: { limit: 1 },
-          headers: { email: CV_CRM_EMAIL, token: CV_CRM_TOKEN, Accept: 'application/json' },
-          timeout: 15000,
-        }
+        { params: { limit: 1 }, headers: { email: CV_CRM_EMAIL, token: CV_CRM_TOKEN, Accept: 'application/json' }, timeout: 15000 }
       );
-
-      const totalLeads  = initialResponse.data.total || 0;
-      const maxLeads    = Math.min(totalLeads, 5000);
-      const totalPages  = Math.ceil(maxLeads / limit);
-
-      const promises = Array.from({ length: totalPages }, (_, i) =>
+      const totalLeads = initial.data.total || 0;
+      const maxLeads   = Math.min(totalLeads, 5000);
+      const totalPages = Math.ceil(maxLeads / limit);
+      const promises   = Array.from({ length: totalPages }, (_, i) =>
         axios.get('https://longviewempreendimentos.cvcrm.com.br/api/v1/comercial/leads', {
           params: { limit, offset: i * limit },
           headers: { email: CV_CRM_EMAIL, token: CV_CRM_TOKEN, Accept: 'application/json' },
           timeout: 15000,
         })
       );
-
-      const results = await Promise.all(promises);
+      const results  = await Promise.all(promises);
       const allLeads = results.flatMap((res: any) => res.data.leads || []);
       return { leads: allLeads, total: allLeads.length };
     };
 
-    // 6. Empreendimentos e estoque
+    // ─── CRM: Empreendimentos e Estoque ───────────────────────────────────────
     const fetchAllCVCRMProjects = async () => {
       if (isMetaOnly) return [];
       try {
-        const response = await axios.get(
+        const r = await axios.get(
           'https://longviewempreendimentos.cvcrm.com.br/api/v1/cadastros/empreendimentos',
-          {
-            headers: { email: CV_CRM_EMAIL, token: CV_CRM_TOKEN, Accept: 'application/json' },
-            timeout: 15000,
-          }
+          { headers: { email: CV_CRM_EMAIL, token: CV_CRM_TOKEN, Accept: 'application/json' }, timeout: 15000 }
         );
-        return Array.isArray(response.data) ? response.data : [];
+        return Array.isArray(r.data) ? r.data : [];
       } catch (err: any) {
-        console.error('[/api/data] Erro ao buscar empreendimentos:', err.message);
+        console.error('[/api/data] Erro empreendimentos:', err.message);
         return [];
       }
     };
 
-    const fetchCVCRMEstoque = async (idEmpreendimento: string) => {
+    const fetchCVCRMEstoque = async (id: string) => {
       if (isMetaOnly) return null;
       try {
-        const response = await axios.get(
-          `https://longviewempreendimentos.cvcrm.com.br/api/v1/cadastros/empreendimentos/${idEmpreendimento}`,
-          {
-            params: { limite_dados_unidade: 1000 },
-            headers: { email: CV_CRM_EMAIL, token: CV_CRM_TOKEN, Accept: 'application/json' },
-            timeout: 15000,
-          }
+        const r = await axios.get(
+          `https://longviewempreendimentos.cvcrm.com.br/api/v1/cadastros/empreendimentos/${id}`,
+          { params: { limite_dados_unidade: 1000 }, headers: { email: CV_CRM_EMAIL, token: CV_CRM_TOKEN, Accept: 'application/json' }, timeout: 15000 }
         );
-        return { id: idEmpreendimento, data: response.data };
+        return { id, data: r.data };
       } catch (err: any) {
-        console.error(`[/api/data] Erro ao buscar estoque ${idEmpreendimento}:`, err.message);
-        return { id: idEmpreendimento, data: null };
+        console.error(`[/api/data] Erro estoque ${id}:`, err.message);
+        return { id, data: null };
       }
     };
 
-    // Buscar projetos ativos para montar lista de estoques
     const activeProjects   = await fetchAllCVCRMProjects();
     const activeProjectIds = activeProjects.map((p: any) => p.idempreendimento).filter(Boolean);
 
-    // 7. Parâmetros de tempo para o Meta Ads
+    // ─── Meta Ads: parâmetros de tempo ────────────────────────────────────────
     let timeParams: Record<string, string> = { date_preset: 'maximum' };
     if (startDate && endDate) {
       timeParams = { time_range: JSON.stringify({ since: startDate, until: endDate }) };
@@ -166,59 +137,186 @@ export async function GET(request: NextRequest) {
       timeParams = { time_range: JSON.stringify({ since: '2020-01-01', until: endDate }) };
     }
 
-    // 8. Disparar todas as chamadas em paralelo
-    const metaBase = `https://graph.facebook.com/v18.0/${META_ACT_ID}`;
-    const metaHeaders = { access_token: META_TOKEN };
+    const metaBase = `https://graph.facebook.com/${META_API_VERSION}/${META_ACT_ID}`;
+    const metaAuth = { access_token: META_TOKEN };
 
+    // ─── Meta Ads: todas as chamadas em paralelo ──────────────────────────────
     const [
       crmResult,
-      metaCampResult,
-      metaDemoResult,
-      metaRegionResult,
+
+      // 1. KPIs globais da conta — agora com reach, frequency, cpc, cpm, ctr, cpp, cost_per_action_type
       metaGlobalResult,
-      metaPlatformResult,
+
+      // 2. Campanhas com dados enriquecidos — reach, frequency, cpc, cpm, ctr, cpp
+      metaCampResult,
+
+      // 3. Detalhes das campanhas (datas reais, status, objetivo)
       metaCampDetailsResult,
+
+      // 4. Adsets — granularidade entre campanha e anúncio
+      metaAdsetResult,
+
+      // 5. Demographic breakdown: gender + age
+      metaDemoResult,
+
+      // 6. Regional breakdown
+      metaRegionResult,
+
+      // 7. Platform breakdown (fb vs instagram vs audience_network)
+      metaPlatformResult,
+
+      // 8. Device breakdown (mobile vs desktop)
+      metaDeviceResult,
+
+      // 9. Daily breakdown — série temporal de spend/clicks/impressions
+      metaDailyResult,
+
+      // 10. Estoque por empreendimento
       estoqueResults,
     ] = await Promise.allSettled([
       fetchAllCRMLeads(),
+
+      // Global — campos completos incluindo métricas calculadas pela Meta
       axios.get(`${metaBase}/insights`, {
-        params: { level: 'campaign', fields: 'campaign_id,campaign_name,spend,impressions,clicks,actions,date_start,date_stop', ...timeParams, limit: 500, ...metaHeaders },
+        params: {
+          level: 'account',
+          fields: 'spend,impressions,clicks,reach,frequency,cpc,cpm,ctr,cpp,actions,cost_per_action_type',
+          ...timeParams,
+          ...metaAuth,
+        },
         timeout: 20000,
       }),
+
+      // Campanhas enriquecidas
       axios.get(`${metaBase}/insights`, {
-        params: { level: 'account', fields: 'clicks,impressions,spend', breakdowns: 'gender,age', ...timeParams, ...metaHeaders },
+        params: {
+          level: 'campaign',
+          fields: 'campaign_id,campaign_name,spend,impressions,clicks,reach,frequency,cpc,cpm,ctr,actions,cost_per_action_type,date_start,date_stop',
+          ...timeParams,
+          limit: 500,
+          ...metaAuth,
+        },
         timeout: 20000,
       }),
-      axios.get(`${metaBase}/insights`, {
-        params: { level: 'account', fields: 'clicks,impressions,spend', breakdowns: 'region', ...timeParams, ...metaHeaders },
-        timeout: 20000,
-      }),
-      axios.get(`${metaBase}/insights`, {
-        params: { level: 'account', fields: 'clicks,impressions,spend,actions', ...timeParams, ...metaHeaders },
-        timeout: 20000,
-      }),
-      axios.get(`${metaBase}/insights`, {
-        params: { level: 'account', fields: 'clicks,impressions,spend', breakdowns: 'publisher_platform', ...timeParams, ...metaHeaders },
-        timeout: 20000,
-      }),
+
+      // Detalhes estruturais das campanhas
       axios.get(`${metaBase}/campaigns`, {
-        params: { fields: 'id,name,created_time,start_time,stop_time,status,objective,buying_type', limit: 1000, ...metaHeaders },
+        params: {
+          fields: 'id,name,created_time,start_time,stop_time,status,objective,buying_type,daily_budget,lifetime_budget,spend_cap',
+          limit: 1000,
+          ...metaAuth,
+        },
         timeout: 20000,
       }),
+
+      // Adsets — granularidade intermediária
+      axios.get(`${metaBase}/insights`, {
+        params: {
+          level: 'adset',
+          fields: 'campaign_id,campaign_name,adset_id,adset_name,spend,impressions,clicks,reach,cpc,cpm,ctr,actions,cost_per_action_type,optimization_goal,targeting',
+          ...timeParams,
+          limit: 500,
+          ...metaAuth,
+        },
+        timeout: 20000,
+      }),
+
+      // Demographic: gender + age
+      axios.get(`${metaBase}/insights`, {
+        params: {
+          level: 'account',
+          fields: 'clicks,impressions,spend,reach',
+          breakdowns: 'gender,age',
+          ...timeParams,
+          ...metaAuth,
+        },
+        timeout: 20000,
+      }),
+
+      // Regional
+      axios.get(`${metaBase}/insights`, {
+        params: {
+          level: 'account',
+          fields: 'clicks,impressions,spend,reach',
+          breakdowns: 'region',
+          ...timeParams,
+          ...metaAuth,
+        },
+        timeout: 20000,
+      }),
+
+      // Platform
+      axios.get(`${metaBase}/insights`, {
+        params: {
+          level: 'account',
+          fields: 'clicks,impressions,spend,reach',
+          breakdowns: 'publisher_platform',
+          ...timeParams,
+          ...metaAuth,
+        },
+        timeout: 20000,
+      }),
+
+      // Device: mobile vs desktop
+      axios.get(`${metaBase}/insights`, {
+        params: {
+          level: 'account',
+          fields: 'clicks,impressions,spend,reach',
+          breakdowns: 'device_platform',
+          ...timeParams,
+          ...metaAuth,
+        },
+        timeout: 20000,
+      }),
+
+      // Daily time series — evolução diária de spend, impressions, clicks, reach
+      axios.get(`${metaBase}/insights`, {
+        params: {
+          level: 'account',
+          fields: 'spend,impressions,clicks,reach,actions',
+          time_increment: 1, // 1 = diário
+          ...(startDate || endDate ? timeParams : { date_preset: 'last_30d' }), // default 30 dias para daily
+          limit: 90, // máximo 90 dias de série diária
+          ...metaAuth,
+        },
+        timeout: 20000,
+      }),
+
+      // Estoque
       Promise.all(activeProjectIds.map((id: string) => fetchCVCRMEstoque(id))),
     ]);
 
-    // 9. Extrair resultados com fallback seguro
+    // ─── Extrair resultados ───────────────────────────────────────────────────
     const crmData           = crmResult.status === 'fulfilled' ? crmResult.value : { leads: [], total: 0 };
+    const metaGlobalRes     = metaGlobalResult.status === 'fulfilled' ? (metaGlobalResult.value as any) : { data: { data: [] } };
     const metaCampRes       = metaCampResult.status === 'fulfilled' ? (metaCampResult.value as any) : { data: { data: [] } };
+    const metaCampDetailsRes = metaCampDetailsResult.status === 'fulfilled' ? (metaCampDetailsResult.value as any) : { data: { data: [] } };
+    const metaAdsetRes      = metaAdsetResult.status === 'fulfilled' ? (metaAdsetResult.value as any) : { data: { data: [] } };
     const metaDemoRes       = metaDemoResult.status === 'fulfilled' ? (metaDemoResult.value as any) : { data: { data: [] } };
     const metaRegionRes     = metaRegionResult.status === 'fulfilled' ? (metaRegionResult.value as any) : { data: { data: [] } };
-    const metaGlobalRes     = metaGlobalResult.status === 'fulfilled' ? (metaGlobalResult.value as any) : { data: { data: [] } };
     const metaPlatformRes   = metaPlatformResult.status === 'fulfilled' ? (metaPlatformResult.value as any) : { data: { data: [] } };
-    const metaCampDetailsRes = metaCampDetailsResult.status === 'fulfilled' ? (metaCampDetailsResult.value as any) : { data: { data: [] } };
+    const metaDeviceRes     = metaDeviceResult.status === 'fulfilled' ? (metaDeviceResult.value as any) : { data: { data: [] } };
+    const metaDailyRes      = metaDailyResult.status === 'fulfilled' ? (metaDailyResult.value as any) : { data: { data: [] } };
     const rawEstoque        = estoqueResults.status === 'fulfilled' ? estoqueResults.value : [];
 
-    // 10. Montar mapa de estoque
+    // Log erros das chamadas Meta para diagnóstico
+    [
+      ['global', metaGlobalResult],
+      ['campaigns', metaCampResult],
+      ['campaignDetails', metaCampDetailsResult],
+      ['adsets', metaAdsetResult],
+      ['demographics', metaDemoResult],
+      ['regions', metaRegionResult],
+      ['platforms', metaPlatformResult],
+      ['devices', metaDeviceResult],
+      ['daily', metaDailyResult],
+    ].forEach(([name, result]: any) => {
+      if (result.status === 'rejected') {
+        console.error(`[/api/data] Meta ${name} falhou:`, result.reason?.message);
+      }
+    });
+
+    // ─── Montar mapa de estoque ───────────────────────────────────────────────
     const estoqueMap: Record<string, any> = {};
     if (Array.isArray(rawEstoque)) {
       rawEstoque.forEach((item: any) => {
@@ -226,29 +324,45 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 11. Montar payload final
+    // ─── Payload final ────────────────────────────────────────────────────────
     const fullData = {
       leads:     crmData,
       meta: {
+        // KPIs globais — agora com reach, frequency, cpc, cpm, ctr, cpp
+        global:          metaGlobalRes.data?.data?.[0] ?? null,
+
+        // Campanhas — agora com reach, frequency, cpc, cpm, ctr
         campaigns:       metaCampRes.data?.data ?? [],
+
+        // Detalhes estruturais das campanhas (datas reais, orçamentos)
         campaignDetails: metaCampDetailsRes.data?.data ?? [],
+
+        // Adsets — nova granularidade
+        adsets:          metaAdsetRes.data?.data ?? [],
+
+        // Breakdowns
         demographics:    metaDemoRes.data?.data ?? [],
         regions:         metaRegionRes.data?.data ?? [],
         platforms:       metaPlatformRes.data?.data ?? [],
-        global:          metaGlobalRes.data?.data?.[0] ?? null,
+
+        // Novo: breakdown por device (mobile vs desktop)
+        devices:         metaDeviceRes.data?.data ?? [],
+
+        // Novo: série temporal diária para gráfico de evolução
+        daily:           metaDailyRes.data?.data ?? [],
       },
       estoque:   estoqueMap,
       updatedAt: new Date().toISOString(),
       _cached:   false,
     };
 
-    // 12. Salvar no cache KV (apenas requests sem filtros de data)
+    // ─── Salvar no cache ──────────────────────────────────────────────────────
     if (!isMetaOnly && !startDate && !endDate) {
       try {
         await kv.set('dashboard_data', fullData, { ex: CACHE_TTL.full });
-        console.log(`[/api/data] Cache salvo: dashboard_data (TTL ${CACHE_TTL.full}s)`);
+        console.log(`[/api/data] Cache salvo: dashboard_data`);
       } catch (err: any) {
-        console.warn('[/api/data] Erro ao salvar cache KV:', err.message);
+        console.warn('[/api/data] Erro ao salvar cache:', err.message);
       }
     } else if (isMetaOnly) {
       try {

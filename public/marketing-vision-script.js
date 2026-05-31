@@ -448,15 +448,21 @@ function applyDataToApp(data) {
     }
 
     if (data.meta) {
-        window.lastMetaDemographics = data.meta.demographics || [];
-        window.lastMetaRegions = data.meta.regions || [];
-        window.lastMetaCampaigns = data.meta.campaigns || [];
-        window.lastMetaPlatforms = data.meta.platforms || [];
-        window.lastMetaGlobal = data.meta.global;
+        window.lastMetaDemographics  = data.meta.demographics  || [];
+        window.lastMetaRegions       = data.meta.regions       || [];
+        window.lastMetaCampaigns     = data.meta.campaigns     || [];
+        window.lastMetaPlatforms     = data.meta.platforms     || [];
+        window.lastMetaDevices       = data.meta.devices       || [];
+        window.lastMetaAdsets        = data.meta.adsets        || [];
+        window.lastMetaDaily         = data.meta.daily         || [];
+        window.lastMetaGlobal        = data.meta.global;
 
         renderMetaDemographics(window.lastMetaDemographics, window.lastMetaRegions);
         renderMetaPlatforms(data.meta.platforms || []);
+        renderMetaDevices(data.meta.devices || []);
+        renderMetaDaily(data.meta.daily || []);
         renderCampaignsTable(window.lastMetaCampaigns);
+        renderAdsetsTable(window.lastMetaAdsets);
         updateMetaDashboard(window.lastMetaGlobal);
     }
 
@@ -591,9 +597,21 @@ async function fetchFilteredMetaData(start, end) {
         window.lastMetaData = data; // CRITICAL: Atualizar dados globais ao filtrar
         
         if (data.meta) {
+            window.lastMetaDemographics = data.meta.demographics || [];
+            window.lastMetaRegions      = data.meta.regions      || [];
+            window.lastMetaCampaigns    = data.meta.campaigns    || [];
+            window.lastMetaPlatforms    = data.meta.platforms    || [];
+            window.lastMetaDevices      = data.meta.devices      || [];
+            window.lastMetaAdsets       = data.meta.adsets       || [];
+            window.lastMetaDaily        = data.meta.daily        || [];
+            window.lastMetaGlobal       = data.meta.global;
+
             renderMetaDemographics(data.meta.demographics || [], data.meta.regions || []);
             renderMetaPlatforms(data.meta.platforms || []);
+            renderMetaDevices(data.meta.devices || []);
+            renderMetaDaily(data.meta.daily || []);
             renderCampaignsTable(data.meta.campaigns || []);
+            renderAdsetsTable(data.meta.adsets || []);
             updateMetaDashboard(data.meta.global);
         }
         
@@ -1759,10 +1777,15 @@ function renderCampaignsTable(campaigns) {
     );
 
     filtered.forEach(camp => {
-        const name = camp.campaign_name || "Desconhecido";
-        const spend = parseFloat(camp.spend || 0);
+        const name        = camp.campaign_name || "Desconhecido";
+        const spend       = parseFloat(camp.spend || 0);
         const impressions = parseInt(camp.impressions || 0);
-        const clicks = parseInt(camp.clicks || 0);
+        const clicks      = parseInt(camp.clicks || 0);
+        const reach       = parseInt(camp.reach || 0);
+        const frequency   = parseFloat(camp.frequency || 0);
+        const cpc         = parseFloat(camp.cpc || 0);
+        const cpm         = parseFloat(camp.cpm || 0);
+        const ctr         = parseFloat(camp.ctr || 0);
         
         // Metadados
         const id = camp.campaign_id ? camp.campaign_id.toString() : "";
@@ -1810,6 +1833,15 @@ function renderCampaignsTable(campaigns) {
             cplStr = formatCurrency(spend / totalLeadsForCPL);
         }
         
+        // CPL direto da Meta por campanha
+        let campCplMeta = 0;
+        if (camp.cost_per_action_type) {
+            const cpa = camp.cost_per_action_type.find(a =>
+                a.action_type === 'lead' || a.action_type.includes('leadgen')
+            );
+            if (cpa) campCplMeta = parseFloat(cpa.value || 0);
+        }
+
         const tr = document.createElement("tr");
         tr.innerHTML = `
             <td data-label="Campanha"><strong>${name}</strong></td>
@@ -1818,9 +1850,13 @@ function renderCampaignsTable(campaigns) {
             <td data-label="Término" style="font-size: 12px; color: var(--text-secondary);">${stopStr}</td>
             <td data-label="Duração" style="font-size: 12px;">${durationStr}</td>
             <td data-label="Investimento"><strong style="color: #F43F5E;">${formatCurrency(spend)}</strong></td>
+            <td data-label="Alcance" style="font-size: 12px;">${reach > 0 ? reach.toLocaleString('pt-BR') : '—'}</td>
+            <td data-label="Freq." style="font-size: 12px;">${frequency > 0 ? frequency.toFixed(2) + 'x' : '—'}</td>
+            <td data-label="CTR">${ctr > 0 ? ctr.toFixed(2) + '%' : '—'}</td>
+            <td data-label="CPC">${cpc > 0 ? formatCurrency(cpc) : '—'}</td>
             <td data-label="Imp/Cliques">${impressions.toLocaleString('pt-BR')} / ${clicks.toLocaleString('pt-BR')}</td>
-            <td data-label="Meta Leads">${metaLeads}</td>
-            <td data-label="CPL"><strong>${cplStr}</strong></td>
+            <td data-label="Leads (Meta)">${metaLeads > 0 ? metaLeads : '—'}</td>
+            <td data-label="CPL Meta">${campCplMeta > 0 ? formatCurrency(campCplMeta) : cplStr}</td>
             <td data-label="CRM Leads"><strong style="color: #0ea5e9; font-size: 1.1em;">${crmLeadsCount}</strong></td>
             <td data-label="Status Funil" style="max-width: 320px; line-height: 1.6;">${badgesHtml}</td>
         `;
@@ -1984,9 +2020,37 @@ function updateMetaDashboard(insights) {
     const cplCRM = totalLeadsCrm > 0 ? spend / totalLeadsCrm : 0;
     document.getElementById("meta-cpl").innerText = formatCurrency(cplCRM);
 
-    document.getElementById("meta-cpc").innerText = formatCurrency(parseFloat(insights.cpc || 0));
-    document.getElementById("meta-cpm").innerText = formatCurrency(parseFloat(insights.cpm || 0));
-    document.getElementById("meta-ctr").innerText = (parseFloat(insights.ctr || 0)).toFixed(2) + "%";
+    // Métricas calculadas pela Meta (v21.0) — mais precisas que calcular manualmente
+    document.getElementById("meta-cpc").innerText   = formatCurrency(parseFloat(insights.cpc || 0));
+    document.getElementById("meta-cpm").innerText   = formatCurrency(parseFloat(insights.cpm || 0));
+    document.getElementById("meta-ctr").innerText   = (parseFloat(insights.ctr || 0)).toFixed(2) + "%";
+
+    // Novos KPIs: Reach, Frequency, CPP
+    const reach     = parseInt(insights.reach || 0);
+    const frequency = parseFloat(insights.frequency || 0);
+    const cpp       = parseFloat(insights.cpp || 0);
+
+    const elReach = document.getElementById("meta-reach");
+    if (elReach) elReach.innerText = reach.toLocaleString('pt-BR');
+
+    const elFreq = document.getElementById("meta-frequency");
+    if (elFreq) elFreq.innerText = frequency.toFixed(2) + "x";
+
+    const elCpp = document.getElementById("meta-cpp");
+    if (elCpp) elCpp.innerText = formatCurrency(cpp);
+
+    // CPL direto da Meta (cost_per_action_type) — mais preciso que calcular pelo CRM
+    let metaCplDirect = 0;
+    if (insights.cost_per_action_type) {
+        const leadCpa = insights.cost_per_action_type.find(a =>
+            a.action_type === 'lead' ||
+            a.action_type === 'offsite_conversion.fb_pixel_lead' ||
+            a.action_type.includes('leadgen')
+        );
+        if (leadCpa) metaCplDirect = parseFloat(leadCpa.value || 0);
+    }
+    const elCplMeta = document.getElementById("meta-cpl-direct");
+    if (elCplMeta) elCplMeta.innerText = metaCplDirect > 0 ? formatCurrency(metaCplDirect) : "—";
 
     // Chart Pie: Meta vs Resto
     const ctx = document.getElementById("marketingPieChart");
@@ -2109,6 +2173,200 @@ function formatCompactCurrency(value) {
         return "R$ " + val.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 1 }) + " mil";
     }
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 }).format(value);
+}
+
+
+// ─── RENDER: Device breakdown (Mobile vs Desktop) ─────────────────────────────
+function renderMetaDevices(deviceData) {
+    const devices = {};
+    deviceData.forEach(d => {
+        const platform = d.device_platform || 'other';
+        const key = platform.charAt(0).toUpperCase() + platform.slice(1);
+        devices[key] = (devices[key] || 0) + parseInt(d.clicks || 0);
+    });
+
+    const ctx = document.getElementById("metaDeviceChart");
+    if (!ctx) return;
+
+    const labels = Object.keys(devices);
+    const values = Object.values(devices);
+    const colors = { 'Mobile': '#0ea5e9', 'Desktop': '#8B5CF6', 'Other': '#64748b' };
+
+    if (window.metaDeviceChartInstance) window.metaDeviceChartInstance.destroy();
+    window.metaDeviceChartInstance = new Chart(ctx.getContext('2d'), {
+        type: 'doughnut',
+        plugins: [ChartDataLabels],
+        data: {
+            labels,
+            datasets: [{
+                data: values,
+                backgroundColor: labels.map(l => colors[l] || '#64748b'),
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom', labels: { color: '#e2e8f0' } },
+                datalabels: {
+                    color: '#fff',
+                    font: { weight: 'bold' },
+                    formatter: (val, ctx) => {
+                        const sum = ctx.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+                        return sum > 0 ? ((val / sum) * 100).toFixed(1) + "%" : "";
+                    }
+                }
+            }
+        }
+    });
+}
+
+// ─── RENDER: Daily time series (gráfico de evolução) ─────────────────────────
+function renderMetaDaily(dailyData) {
+    if (!dailyData || dailyData.length === 0) return;
+
+    const sorted = [...dailyData].sort((a, b) => new Date(a.date_start) - new Date(b.date_start));
+    const labels    = sorted.map(d => new Date(d.date_start).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }));
+    const spendData = sorted.map(d => parseFloat(d.spend || 0));
+    const clickData = sorted.map(d => parseInt(d.clicks || 0));
+    const reachData = sorted.map(d => parseInt(d.reach || 0));
+
+    // Spend acumulado
+    const cumulativeSpend = [];
+    spendData.reduce((acc, val, i) => { cumulativeSpend[i] = acc + val; return cumulativeSpend[i]; }, 0);
+
+    const ctx = document.getElementById("metaDailyChart");
+    if (!ctx) return;
+
+    if (window.metaDailyChartInstance) window.metaDailyChartInstance.destroy();
+    window.metaDailyChartInstance = new Chart(ctx.getContext('2d'), {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: 'Investimento Diário (R$)',
+                    data: spendData,
+                    borderColor: '#F43F5E',
+                    backgroundColor: 'rgba(244, 63, 94, 0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    yAxisID: 'ySpend',
+                    pointRadius: sorted.length > 30 ? 0 : 3,
+                },
+                {
+                    label: 'Cliques Diários',
+                    data: clickData,
+                    borderColor: '#0ea5e9',
+                    backgroundColor: 'rgba(14, 165, 233, 0.08)',
+                    fill: false,
+                    tension: 0.4,
+                    yAxisID: 'yClicks',
+                    pointRadius: sorted.length > 30 ? 0 : 3,
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            scales: {
+                x: {
+                    ticks: { color: '#94a3b8', maxRotation: 45, autoSkip: true, maxTicksLimit: 15 },
+                    grid: { color: 'rgba(255,255,255,0.04)' }
+                },
+                ySpend: {
+                    type: 'linear',
+                    position: 'left',
+                    ticks: { color: '#F43F5E', callback: v => 'R$' + v.toLocaleString('pt-BR') },
+                    grid: { color: 'rgba(255,255,255,0.04)' }
+                },
+                yClicks: {
+                    type: 'linear',
+                    position: 'right',
+                    ticks: { color: '#0ea5e9' },
+                    grid: { display: false }
+                }
+            },
+            plugins: {
+                legend: { labels: { color: '#e2e8f0' } },
+                tooltip: {
+                    callbacks: {
+                        label: ctx => {
+                            if (ctx.dataset.label.includes('Investimento')) {
+                                return ' ' + ctx.dataset.label + ': ' + formatCurrency(ctx.raw);
+                            }
+                            return ' ' + ctx.dataset.label + ': ' + ctx.raw.toLocaleString('pt-BR');
+                        }
+                    }
+                },
+                datalabels: { display: false }
+            }
+        }
+    });
+
+    // Atualizar métricas de resumo do período
+    const totalSpend    = spendData.reduce((a, b) => a + b, 0);
+    const totalClicks   = clickData.reduce((a, b) => a + b, 0);
+    const avgDailySpend = spendData.length > 0 ? totalSpend / spendData.length : 0;
+    const elAvgSpend    = document.getElementById("meta-avg-daily-spend");
+    if (elAvgSpend) elAvgSpend.innerText = formatCurrency(avgDailySpend);
+    const elDays = document.getElementById("meta-active-days");
+    if (elDays) elDays.innerText = spendData.filter(s => s > 0).length + " dias ativos";
+}
+
+// ─── RENDER: Adsets table ────────────────────────────────────────────────────
+function renderAdsetsTable(adsets) {
+    const tbody = document.getElementById("table-adsets-body");
+    if (!tbody || !adsets || adsets.length === 0) return;
+    tbody.innerHTML = "";
+
+    const sorted = [...adsets].sort((a, b) => parseFloat(b.spend || 0) - parseFloat(a.spend || 0));
+
+    sorted.forEach(adset => {
+        const spend       = parseFloat(adset.spend || 0);
+        const impressions = parseInt(adset.impressions || 0);
+        const clicks      = parseInt(adset.clicks || 0);
+        const reach       = parseInt(adset.reach || 0);
+        const cpc         = parseFloat(adset.cpc || 0);
+        const cpm         = parseFloat(adset.cpm || 0);
+        const ctr         = parseFloat(adset.ctr || 0);
+
+        let metaLeads = 0;
+        if (adset.actions) {
+            const leadAction = adset.actions.find(a =>
+                a.action_type === 'lead' ||
+                a.action_type === 'offsite_conversion.fb_pixel_lead' ||
+                a.action_type.includes('leadgen')
+            );
+            if (leadAction) metaLeads = parseInt(leadAction.value || 0);
+        }
+
+        let cplDirect = 0;
+        if (adset.cost_per_action_type) {
+            const cpa = adset.cost_per_action_type.find(a =>
+                a.action_type === 'lead' || a.action_type.includes('leadgen')
+            );
+            if (cpa) cplDirect = parseFloat(cpa.value || 0);
+        }
+
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td data-label="Campanha" style="font-size:11px;color:var(--text-secondary);">${adset.campaign_name || '—'}</td>
+            <td data-label="Adset"><strong>${adset.adset_name || '—'}</strong></td>
+            <td data-label="Investimento"><strong style="color:#F43F5E;">${formatCurrency(spend)}</strong></td>
+            <td data-label="Alcance">${reach.toLocaleString('pt-BR')}</td>
+            <td data-label="Impressões">${impressions.toLocaleString('pt-BR')}</td>
+            <td data-label="Cliques">${clicks.toLocaleString('pt-BR')}</td>
+            <td data-label="CTR">${ctr.toFixed(2)}%</td>
+            <td data-label="CPC">${formatCurrency(cpc)}</td>
+            <td data-label="CPM">${formatCurrency(cpm)}</td>
+            <td data-label="Leads (Meta)">${metaLeads > 0 ? metaLeads : '—'}</td>
+            <td data-label="CPL (Meta)">${cplDirect > 0 ? formatCurrency(cplDirect) : '—'}</td>
+        `;
+        tbody.appendChild(tr);
+    });
 }
 
 function applyCampaignTableFilters() {
