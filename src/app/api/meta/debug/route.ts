@@ -1,51 +1,59 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAdminAuth } from '@/lib/auth';
 import axios from 'axios';
 
+// Rota temporária de diagnóstico — protegida por secret na query string
+// Remover após análise
 export async function GET(request: NextRequest) {
-  const admin = await verifyAdminAuth();
-  if (!admin) {
+  const secret = request.nextUrl.searchParams.get('secret');
+  if (secret !== process.env.DEBUG_SECRET) {
     return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
   }
 
   const META_TOKEN  = process.env.META_TOKEN;
   const META_ACT_ID = process.env.META_ACT_ID;
 
-  if (!META_TOKEN) {
-    return NextResponse.json({ error: 'META_TOKEN não configurado' }, { status: 500 });
-  }
-
-  const [debugRes, meRes, adAccountRes, pagesRes] = await Promise.allSettled([
+  const [debugRes, meRes, adAccountRes, pagesRes, leadFormsRes] = await Promise.allSettled([
+    // 1. Escopos e tipo do token
     axios.get(`https://graph.facebook.com/v21.0/debug_token`, {
       params: { input_token: META_TOKEN, access_token: META_TOKEN },
       timeout: 10000,
     }),
+    // 2. Identidade
     axios.get(`https://graph.facebook.com/v21.0/me`, {
       params: { fields: 'id,name', access_token: META_TOKEN },
       timeout: 10000,
     }),
+    // 3. Conta de anúncios
     axios.get(`https://graph.facebook.com/v21.0/${META_ACT_ID}`, {
       params: { fields: 'id,name,account_status,currency,timezone_name,business', access_token: META_TOKEN },
       timeout: 10000,
     }),
+    // 4. Páginas acessíveis (posts + leads)
     axios.get(`https://graph.facebook.com/v21.0/me/accounts`, {
-      params: { fields: 'id,name,category,tasks', access_token: META_TOKEN },
+      params: { fields: 'id,name,category,tasks,access_token', access_token: META_TOKEN },
+      timeout: 10000,
+    }),
+    // 5. Formulários de leads (test direto)
+    axios.get(`https://graph.facebook.com/v21.0/${META_ACT_ID}/leadgen_forms`, {
+      params: { fields: 'id,name,status,leads_count', access_token: META_TOKEN },
       timeout: 10000,
     }),
   ]);
 
+  const extract = (r: any) =>
+    r.status === 'fulfilled'
+      ? r.value.data
+      : { _error: r.reason?.response?.data || r.reason?.message };
+
   return NextResponse.json({
-    token_debug: debugRes.status === 'fulfilled'
-      ? (debugRes.value as any).data
-      : { error: (debugRes as any).reason?.response?.data || (debugRes as any).reason?.message },
-    me: meRes.status === 'fulfilled'
-      ? (meRes.value as any).data
-      : { error: (meRes as any).reason?.response?.data || (meRes as any).reason?.message },
-    ad_account: adAccountRes.status === 'fulfilled'
-      ? (adAccountRes.value as any).data
-      : { error: (adAccountRes as any).reason?.response?.data || (adAccountRes as any).reason?.message },
-    pages: pagesRes.status === 'fulfilled'
-      ? (pagesRes.value as any).data
-      : { error: (pagesRes as any).reason?.response?.data || (pagesRes as any).reason?.message },
+    token_debug:  extract(debugRes),
+    me:           extract(meRes),
+    ad_account:   extract(adAccountRes),
+    pages:        extract(pagesRes),
+    leadgen_forms: extract(leadFormsRes),
+    env: {
+      META_ACT_ID: META_ACT_ID ? `${META_ACT_ID.slice(0,6)}...` : 'AUSENTE',
+      META_TOKEN:  META_TOKEN  ? `${META_TOKEN.slice(0,12)}...` : 'AUSENTE',
+    }
   });
 }
