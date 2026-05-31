@@ -291,6 +291,25 @@ export async function GET(request: NextRequest) {
 
       // Estoque
       Promise.all(activeProjectIds.map((id: string) => fetchCVCRMEstoque(id))),
+
+      // Leads de formulários Meta (via página, não via ad_account)
+      axios.get(`https://graph.facebook.com/${META_API_VERSION}/${META_PAGE_ID}/leadgen_forms`, {
+        params: {
+          fields: 'id,name,status,leads_count,created_time',
+          limit: 50,
+          ...metaAuth,
+        },
+        timeout: 15000,
+      }),
+
+      // Dados da página Facebook + ID do Instagram Business Account
+      axios.get(`https://graph.facebook.com/${META_API_VERSION}/${META_PAGE_ID}`, {
+        params: {
+          fields: 'id,name,fan_count,followers_count,instagram_business_account',
+          ...metaAuth,
+        },
+        timeout: 10000,
+      }),
     ]);
 
     // ─── Extrair resultados ───────────────────────────────────────────────────
