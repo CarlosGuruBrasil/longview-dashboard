@@ -1083,6 +1083,21 @@ export default function MarketingVisionPage() {
                       <strong id="leads-meta-selected-form" style={{ fontSize: '13px', color: '#10b981' }}>Todos</strong>
                     </div>
                   </div>
+                  {/* Stats de cruzamento CRM */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '12px', marginTop: '4px' }}>
+                    <div>
+                      <p style={{ margin: 0, fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Cruzados c/ CRM</p>
+                      <strong id="leads-meta-crm-matched" style={{ fontSize: '18px', color: '#10b981' }}>—</strong>
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      <p style={{ margin: 0, fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Taxa de match</p>
+                      <strong id="leads-meta-crm-rate" style={{ fontSize: '18px', color: '#f59e0b' }}>—</strong>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <p style={{ margin: 0, fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Total leads CRM</p>
+                      <strong id="leads-meta-crm-total" style={{ fontSize: '18px' }}>—</strong>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -1104,6 +1119,7 @@ export default function MarketingVisionPage() {
                         <th>CONJUNTO</th>
                         <th>FORMULÁRIO</th>
                         <th>OUTROS CAMPOS</th>
+                        <th style={{ color: '#10b981' }}>MATCH CRM</th>
                       </tr>
                     </thead>
                     <tbody id="table-leads-meta-body"></tbody>

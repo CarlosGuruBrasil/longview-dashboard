@@ -2688,7 +2688,7 @@ async function loadLeadsMeta(formId, refresh) {
         leadsMetaData = await res.json();
 
         renderLeadsMetaForms(leadsMetaData.forms || []);
-        renderLeadsMetaTable(leadsMetaData.leads || []);
+        renderLeadsMetaTable(leadsMetaData.leads || [], leadsMetaData.crm_stats);
 
         const totalEl = document.getElementById('leads-meta-total');
         const formsCountEl = document.getElementById('leads-meta-forms-count');
@@ -2731,15 +2731,25 @@ function getFieldValue(fieldData, keys) {
     return found?.values?.[0] || '—';
 }
 
-function renderLeadsMetaTable(leads) {
+function renderLeadsMetaTable(leads, crmStats) {
     const tbody = document.getElementById('table-leads-meta-body');
     const countEl = document.getElementById('leads-meta-table-count');
     if (!tbody) return;
     if (countEl) countEl.textContent = `(${leads.length} leads)`;
     tbody.innerHTML = '';
 
+    // Atualizar stats de cruzamento
+    if (crmStats) {
+        const elMatch = document.getElementById('leads-meta-crm-matched');
+        const elRate = document.getElementById('leads-meta-crm-rate');
+        const elTotal = document.getElementById('leads-meta-crm-total');
+        if (elMatch) elMatch.textContent = crmStats.matched || 0;
+        if (elRate) elRate.textContent = (crmStats.match_rate || 0) + '%';
+        if (elTotal) elTotal.textContent = crmStats.total_crm_leads || 0;
+    }
+
     if (leads.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-secondary);padding:24px;">Nenhum lead encontrado. Selecione um formulário com leads.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text-secondary);padding:24px;">Nenhum lead encontrado. Selecione um formulário com leads.</td></tr>';
         return;
     }
 
@@ -2751,7 +2761,27 @@ function renderLeadsMetaTable(leads) {
         const outros   = fd.filter(f => !['full_name','name','nome','email','phone','telefone','celular','whatsapp'].some(k => (f.name||'').toLowerCase().includes(k)));
         const outrosStr = outros.map(f => `<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);margin-right:4px;">${f.name}: ${f.values?.[0] || '—'}</span>`).join('');
 
+        const crm = lead._crm_match;
+        let crmCell = '';
+        if (crm) {
+            const statusColors = { 'Vendido': '#10b981', 'Ganho': '#10b981', 'Perdido': '#f43f5e', 'Novo': '#0ea5e9' };
+            const statusColor = statusColors[crm.situacao] || '#f59e0b';
+            crmCell = `
+                <div style="display:flex;flex-direction:column;gap:4px;">
+                    <div style="display:flex;align-items:center;gap:6px;">
+                        <span style="width:8px;height:8px;border-radius:50%;background:#10b981;flex-shrink:0;"></span>
+                        <a href="${crm.link}" target="_blank" style="color:#fff;font-size:12px;font-weight:600;text-decoration:none;">${crm.nome}</a>
+                    </div>
+                    <span style="font-size:11px;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,0.06);color:${statusColor};border:1px solid ${statusColor}33;display:inline-block;width:fit-content;">${crm.situacao}</span>
+                    ${crm.corretor && crm.corretor !== '—' ? `<span style="font-size:10px;color:var(--text-secondary);">👤 ${crm.corretor}</span>` : ''}
+                    ${crm.valor ? `<span style="font-size:10px;color:#10b981;">💰 R$ ${parseFloat(crm.valor).toLocaleString('pt-BR')}</span>` : ''}
+                </div>`;
+        } else {
+            crmCell = `<span style="font-size:11px;color:#64748b;padding:3px 8px;background:rgba(100,116,139,0.1);border:1px solid rgba(100,116,139,0.2);border-radius:4px;">Sem match</span>`;
+        }
+
         const tr = document.createElement('tr');
+        tr.style.borderLeft = crm ? '2px solid #10b981' : '2px solid transparent';
         tr.innerHTML = `
             <td style="font-size:12px;color:var(--text-secondary);white-space:nowrap;">${lead.created_time ? new Date(lead.created_time).toLocaleDateString('pt-BR', {day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—'}</td>
             <td><strong>${nome}</strong></td>
@@ -2760,7 +2790,8 @@ function renderLeadsMetaTable(leads) {
             <td style="font-size:11px;color:var(--text-secondary);">${lead.campaign_name || '—'}</td>
             <td style="font-size:11px;color:var(--text-secondary);">${lead.adset_name || '—'}</td>
             <td style="font-size:11px;color:var(--text-secondary);">${lead._form_name || '—'}</td>
-            <td style="max-width:200px;">${outrosStr || '<span style="color:var(--text-secondary);font-size:12px;">—</span>'}</td>`;
+            <td style="max-width:180px;">${outrosStr || '<span style="color:var(--text-secondary);font-size:12px;">—</span>'}</td>
+            <td style="min-width:180px;">${crmCell}</td>`;
         tbody.appendChild(tr);
     });
 }
