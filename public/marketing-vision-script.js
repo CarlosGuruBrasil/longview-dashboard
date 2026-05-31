@@ -2134,20 +2134,167 @@ function switchView(viewName) {
         "oportunidades-perdas": "Oportunidades & Perdas",
         "empreendimentos": "Gestão de Empreendimentos",
         "vendas": "Relatório de Vendas",
-        "marketing": "Marketing ADS"
+        "marketing": "Marketing ADS",
+        "campanhas": "Controle de Campanhas",
+        "leads-meta": "Leads Meta (Formulários)",
+        "publicar": "Publicar nas Redes Sociais"
     };
     document.getElementById("page-title").textContent = titleMap[viewName] || "Dashboard";
     
     if (viewName === "empreendimentos") {
         updateEmpreendimentos(filteredLeads);
     } else if (viewName === "vendas") {
-        // Re-renderizar a tela de vendas para garantir cruzamento atualizado com o inventário
         const salesLeads = filteredLeads.filter(l => isSale(l));
         applySalesTableFilters();
         renderTop5(salesLeads);
         renderSalesSummary(salesLeads);
+    } else if (viewName === "campanhas") {
+        loadCampanhasControl();
+    } else if (viewName === "leads-meta") {
+        loadLeadsMeta(selectedFormId, false);
+    } else if (viewName === "publicar") {
+        loadPostsRecentes(currentPostPlatform);
     }
 }
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EVENT LISTENERS — Novas views
+// ═══════════════════════════════════════════════════════════════════════════
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Campanhas: botão atualizar
+    const btnRefreshCamp = document.getElementById('btn-refresh-campanhas');
+    if (btnRefreshCamp) btnRefreshCamp.addEventListener('click', loadCampanhasControl);
+
+    // Campanhas: filtro
+    const filterCamp = document.getElementById('filter-campanhas');
+    if (filterCamp) filterCamp.addEventListener('input', function() {
+        const q = this.value.toLowerCase();
+        document.querySelectorAll('#table-campanhas-control-body tr').forEach(tr => {
+            tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
+        });
+    });
+
+    // Adsets: filtro
+    const filterAdsets = document.getElementById('filter-adsets-control');
+    if (filterAdsets) filterAdsets.addEventListener('input', function() {
+        const q = this.value.toLowerCase();
+        document.querySelectorAll('#table-adsets-control-body tr').forEach(tr => {
+            tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
+        });
+    });
+
+    // Budget modal
+    const budgetModal = document.getElementById('budget-modal');
+    const budgetCancelBtn = document.getElementById('budget-cancel-btn');
+    const budgetSaveBtn = document.getElementById('budget-save-btn');
+
+    if (budgetCancelBtn) budgetCancelBtn.addEventListener('click', () => {
+        if (budgetModal) budgetModal.style.display = 'none';
+        budgetModalTarget = null;
+    });
+
+    if (budgetSaveBtn) budgetSaveBtn.addEventListener('click', async () => {
+        if (!budgetModalTarget) return;
+        const val = document.getElementById('budget-input')?.value;
+        if (!val || isNaN(parseFloat(val)) || parseFloat(val) < 1) {
+            alert('Informe um valor válido (mínimo R$ 1,00)');
+            return;
+        }
+        budgetSaveBtn.textContent = 'Salvando...';
+        try {
+            const res = await fetch('/api/meta/campaigns', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: budgetModalTarget.id, type: budgetModalTarget.type, daily_budget: val }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Erro');
+            if (budgetModal) budgetModal.style.display = 'none';
+            showCampanhasStatus('Orçamento atualizado com sucesso!', 'success');
+            await loadCampanhasControl();
+        } catch (err) {
+            showCampanhasStatus('Erro: ' + err.message, 'error');
+        } finally {
+            budgetSaveBtn.textContent = 'Salvar';
+            budgetModalTarget = null;
+        }
+    });
+
+    // Leads Meta: botão atualizar
+    const btnRefreshLeads = document.getElementById('btn-refresh-leads-meta');
+    if (btnRefreshLeads) btnRefreshLeads.addEventListener('click', () => loadLeadsMeta(selectedFormId, true));
+
+    // Leads Meta: filtro
+    const filterLeadsMeta = document.getElementById('filter-leads-meta');
+    if (filterLeadsMeta) filterLeadsMeta.addEventListener('input', function() {
+        const q = this.value.toLowerCase();
+        document.querySelectorAll('#table-leads-meta-body tr').forEach(tr => {
+            tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
+        });
+    });
+
+    // Publicar: char count
+    const pubMessage = document.getElementById('pub-message');
+    if (pubMessage) pubMessage.addEventListener('input', function() {
+        const el = document.getElementById('pub-char-count');
+        if (el) el.textContent = this.value.length + ' caracteres';
+        const previewText = document.getElementById('pub-preview-text');
+        if (previewText) previewText.textContent = this.value;
+        if (this.value.trim()) {
+            const box = document.getElementById('pub-preview-box');
+            if (box) box.style.display = 'block';
+        }
+    });
+
+    // Publicar: preview de imagem
+    const pubImageUrl = document.getElementById('pub-image-url');
+    if (pubImageUrl) pubImageUrl.addEventListener('input', function() {
+        const previewDiv = document.getElementById('pub-image-preview');
+        const previewImg = document.getElementById('pub-image-preview-img');
+        const previewImage = document.getElementById('pub-preview-image');
+        if (this.value.trim()) {
+            if (previewDiv) previewDiv.style.display = 'block';
+            if (previewImg) previewImg.src = this.value;
+            if (previewImage) { previewImage.src = this.value; previewImage.style.display = 'block'; }
+        } else {
+            if (previewDiv) previewDiv.style.display = 'none';
+            if (previewImage) previewImage.style.display = 'none';
+        }
+    });
+
+    // Publicar: botão preview
+    const btnPreview = document.getElementById('btn-preview-post');
+    if (btnPreview) btnPreview.addEventListener('click', function() {
+        const box = document.getElementById('pub-preview-box');
+        if (box) box.style.display = box.style.display === 'none' ? 'block' : 'none';
+    });
+
+    // Publicar: botão publicar
+    const btnPublish = document.getElementById('btn-publish-post');
+    if (btnPublish) btnPublish.addEventListener('click', publishPost);
+
+    // Publicar: switch platform tabs
+    const btnFb = document.getElementById('btn-posts-facebook');
+    const btnIg = document.getElementById('btn-posts-instagram');
+    if (btnFb) btnFb.addEventListener('click', function() {
+        currentPostPlatform = 'facebook';
+        this.style.background = 'rgba(24,119,242,0.15)';
+        this.style.border = '1px solid rgba(24,119,242,0.4)';
+        this.style.color = '#1877F2';
+        if (btnIg) { btnIg.style.background = 'rgba(255,255,255,0.05)'; btnIg.style.border = '1px solid rgba(255,255,255,0.1)'; btnIg.style.color = 'var(--text-secondary)'; }
+        loadPostsRecentes('facebook');
+    });
+    if (btnIg) btnIg.addEventListener('click', function() {
+        currentPostPlatform = 'instagram';
+        this.style.background = 'rgba(225,48,108,0.15)';
+        this.style.border = '1px solid rgba(225,48,108,0.4)';
+        this.style.color = '#E1306C';
+        if (btnFb) { btnFb.style.background = 'rgba(255,255,255,0.05)'; btnFb.style.border = '1px solid rgba(255,255,255,0.1)'; btnFb.style.color = 'var(--text-secondary)'; }
+        loadPostsRecentes('instagram');
+    });
+});
 
 function showLoader() {
     document.getElementById("loader").classList.remove("hidden");
@@ -2367,6 +2514,362 @@ function renderAdsetsTable(adsets) {
         `;
         tbody.appendChild(tr);
     });
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CAMPANHAS — Controle de campanhas e adsets via /api/meta/campaigns
+// ═══════════════════════════════════════════════════════════════════════════
+
+let campanhasData = { campaigns: [], adsets: [] };
+let budgetModalTarget = null;
+
+async function loadCampanhasControl() {
+    const statusEl = document.getElementById('campanhas-status');
+    try {
+        if (statusEl) { statusEl.style.display = 'block'; statusEl.style.background = 'rgba(14,165,233,0.1)'; statusEl.style.border = '1px solid rgba(14,165,233,0.3)'; statusEl.style.color = '#0ea5e9'; statusEl.textContent = 'Carregando dados do Meta...'; }
+
+        const res = await fetch('/api/meta/campaigns');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        campanhasData = await res.json();
+
+        renderCampanhasControl(campanhasData.campaigns || []);
+        renderAdsetsControl(campanhasData.adsets || []);
+
+        if (statusEl) statusEl.style.display = 'none';
+    } catch (err) {
+        console.error('[campanhas]', err);
+        if (statusEl) { statusEl.style.display = 'block'; statusEl.style.background = 'rgba(244,63,94,0.1)'; statusEl.style.border = '1px solid rgba(244,63,94,0.3)'; statusEl.style.color = '#f43f5e'; statusEl.textContent = 'Erro ao carregar campanhas: ' + err.message; }
+    }
+}
+
+function statusBadge(status, effective) {
+    const s = effective || status || '';
+    const isActive = s === 'ACTIVE';
+    const isPaused = s === 'PAUSED';
+    const bg     = isActive ? 'rgba(16,185,129,0.15)' : isPaused ? 'rgba(245,158,11,0.15)' : 'rgba(113,113,122,0.15)';
+    const border = isActive ? 'rgba(16,185,129,0.4)'  : isPaused ? 'rgba(245,158,11,0.4)'  : 'rgba(113,113,122,0.4)';
+    const color  = isActive ? '#10b981'               : isPaused ? '#f59e0b'               : '#71717a';
+    const label  = isActive ? 'Ativa'                 : isPaused ? 'Pausada'               : s;
+    return `<span style="font-size:11px;padding:3px 8px;border-radius:20px;background:${bg};border:1px solid ${border};color:${color};font-weight:600;">${label}</span>`;
+}
+
+function formatBudget(cents) {
+    if (!cents) return '—';
+    return 'R$ ' + (parseInt(cents) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+}
+
+function renderCampanhasControl(campaigns) {
+    const tbody = document.getElementById('table-campanhas-control-body');
+    const count = document.getElementById('campanhas-count');
+    if (!tbody) return;
+    if (count) count.textContent = `(${campaigns.length})`;
+    tbody.innerHTML = '';
+
+    const translateObj = (obj) => {
+        const map = { LEAD_GENERATION: 'Leads', TRAFFIC: 'Tráfego', AWARENESS: 'Reconhecimento', ENGAGEMENT: 'Engajamento', SALES: 'Vendas', CONVERSIONS: 'Conversões', OUTCOME_LEADS: 'Leads' };
+        return map[obj] || obj || '—';
+    };
+
+    campaigns.forEach(camp => {
+        const isActive = camp.status === 'ACTIVE';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><strong style="font-size:13px;">${camp.name || '—'}</strong><br><span style="font-size:11px;color:var(--text-secondary);">${camp.id}</span></td>
+            <td>${statusBadge(camp.status, camp.effective_status)}</td>
+            <td style="font-size:12px;">${translateObj(camp.objective)}</td>
+            <td style="font-size:13px;">${formatBudget(camp.daily_budget)}</td>
+            <td style="font-size:13px;">${formatBudget(camp.lifetime_budget)}</td>
+            <td style="font-size:12px;color:#10b981;">${camp.start_time ? new Date(camp.start_time).toLocaleDateString('pt-BR') : '—'}</td>
+            <td>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                    <button onclick="toggleCampaign('${camp.id}','campaign','${isActive ? 'PAUSED' : 'ACTIVE'}')" style="padding:5px 10px;border-radius:6px;border:1px solid ${isActive ? 'rgba(245,158,11,0.4)' : 'rgba(16,185,129,0.4)'};background:${isActive ? 'rgba(245,158,11,0.1)' : 'rgba(16,185,129,0.1)'};color:${isActive ? '#f59e0b' : '#10b981'};cursor:pointer;font-size:11px;font-weight:600;">
+                        ${isActive ? '⏸ Pausar' : '▶ Ativar'}
+                    </button>
+                    <button onclick="openBudgetModal('${camp.id}','campaign','${camp.name}')" style="padding:5px 10px;border-radius:6px;border:1px solid rgba(14,165,233,0.3);background:rgba(14,165,233,0.08);color:#0ea5e9;cursor:pointer;font-size:11px;font-weight:600;">
+                        💰 Orçamento
+                    </button>
+                </div>
+            </td>`;
+        tbody.appendChild(tr);
+    });
+
+    if (campaigns.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-secondary);padding:24px;">Nenhuma campanha encontrada</td></tr>';
+    }
+}
+
+function renderAdsetsControl(adsets) {
+    const tbody = document.getElementById('table-adsets-control-body');
+    const count = document.getElementById('adsets-count');
+    if (!tbody) return;
+    if (count) count.textContent = `(${adsets.length})`;
+    tbody.innerHTML = '';
+
+    adsets.forEach(adset => {
+        const isActive = adset.status === 'ACTIVE';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td style="font-size:11px;color:var(--text-secondary);">${adset.campaign_name || '—'}</td>
+            <td><strong style="font-size:13px;">${adset.name || '—'}</strong></td>
+            <td>${statusBadge(adset.status, adset.effective_status)}</td>
+            <td style="font-size:13px;">${formatBudget(adset.daily_budget)}</td>
+            <td style="font-size:12px;color:#10b981;">${adset.start_time ? new Date(adset.start_time).toLocaleDateString('pt-BR') : '—'}</td>
+            <td style="font-size:12px;color:var(--text-secondary);">${adset.end_time ? new Date(adset.end_time).toLocaleDateString('pt-BR') : 'Sem fim'}</td>
+            <td>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                    <button onclick="toggleCampaign('${adset.id}','adset','${isActive ? 'PAUSED' : 'ACTIVE'}')" style="padding:5px 10px;border-radius:6px;border:1px solid ${isActive ? 'rgba(245,158,11,0.4)' : 'rgba(16,185,129,0.4)'};background:${isActive ? 'rgba(245,158,11,0.1)' : 'rgba(16,185,129,0.1)'};color:${isActive ? '#f59e0b' : '#10b981'};cursor:pointer;font-size:11px;font-weight:600;">
+                        ${isActive ? '⏸ Pausar' : '▶ Ativar'}
+                    </button>
+                    <button onclick="openBudgetModal('${adset.id}','adset','${adset.name}')" style="padding:5px 10px;border-radius:6px;border:1px solid rgba(14,165,233,0.3);background:rgba(14,165,233,0.08);color:#0ea5e9;cursor:pointer;font-size:11px;font-weight:600;">
+                        💰 Orçamento
+                    </button>
+                </div>
+            </td>`;
+        tbody.appendChild(tr);
+    });
+
+    if (adsets.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-secondary);padding:24px;">Nenhum conjunto encontrado</td></tr>';
+    }
+}
+
+async function toggleCampaign(id, type, action) {
+    const confirmMsg = action === 'PAUSED' ? `Pausar ${type === 'campaign' ? 'campanha' : 'conjunto'}?` : `Ativar ${type === 'campaign' ? 'campanha' : 'conjunto'}?`;
+    if (!confirm(confirmMsg)) return;
+    try {
+        const res = await fetch('/api/meta/campaigns', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id, type, action }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Erro desconhecido');
+        showCampanhasStatus(`${type === 'campaign' ? 'Campanha' : 'Conjunto'} ${action === 'PAUSED' ? 'pausado' : 'ativado'} com sucesso!`, 'success');
+        await loadCampanhasControl();
+    } catch (err) {
+        showCampanhasStatus('Erro: ' + err.message, 'error');
+    }
+}
+
+function openBudgetModal(id, type, name) {
+    budgetModalTarget = { id, type };
+    document.getElementById('budget-modal-name').textContent = name;
+    document.getElementById('budget-input').value = '';
+    document.getElementById('budget-modal').style.display = 'flex';
+}
+
+function showCampanhasStatus(msg, type) {
+    const el = document.getElementById('campanhas-status');
+    if (!el) return;
+    el.style.display = 'block';
+    el.style.background = type === 'success' ? 'rgba(16,185,129,0.1)' : 'rgba(244,63,94,0.1)';
+    el.style.border = `1px solid ${type === 'success' ? 'rgba(16,185,129,0.3)' : 'rgba(244,63,94,0.3)'}`;
+    el.style.color = type === 'success' ? '#10b981' : '#f43f5e';
+    el.textContent = msg;
+    setTimeout(() => { if (el) el.style.display = 'none'; }, 4000);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LEADS META — Formulários e leads brutos
+// ═══════════════════════════════════════════════════════════════════════════
+
+let leadsMetaData = { forms: [], leads: [] };
+let selectedFormId = null;
+
+async function loadLeadsMeta(formId, refresh) {
+    try {
+        let url = '/api/meta/leads';
+        if (formId) url += `?form_id=${formId}`;
+        if (refresh) url += (formId ? '&' : '?') + 'refresh=true';
+
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        leadsMetaData = await res.json();
+
+        renderLeadsMetaForms(leadsMetaData.forms || []);
+        renderLeadsMetaTable(leadsMetaData.leads || []);
+
+        const totalEl = document.getElementById('leads-meta-total');
+        const formsCountEl = document.getElementById('leads-meta-forms-count');
+        if (totalEl) totalEl.textContent = (leadsMetaData.total_leads || leadsMetaData.leads?.length || 0).toLocaleString('pt-BR');
+        if (formsCountEl) formsCountEl.textContent = (leadsMetaData.forms || []).filter(f => f.status !== 'ARCHIVED').length;
+    } catch (err) {
+        console.error('[leads-meta]', err);
+        const tbody = document.getElementById('table-leads-meta-body');
+        if (tbody) tbody.innerHTML = `<tr><td colspan="8" style="color:#f43f5e;text-align:center;padding:24px;">Erro: ${err.message}</td></tr>`;
+    }
+}
+
+function renderLeadsMetaForms(forms) {
+    const list = document.getElementById('leads-meta-forms-list');
+    if (!list) return;
+    list.innerHTML = '';
+    const active = forms.filter(f => f.status !== 'ARCHIVED');
+    if (active.length === 0) {
+        list.innerHTML = '<p style="color:var(--text-secondary);font-size:13px;">Nenhum formulário ativo encontrado</p>';
+        return;
+    }
+    const allBtn = document.createElement('button');
+    allBtn.textContent = `Todos os formulários (${forms.reduce((a, f) => a + (f.leads_count || 0), 0)} leads)`;
+    allBtn.style.cssText = `width:100%;text-align:left;padding:10px 12px;border-radius:8px;background:${selectedFormId === null ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.05)'};border:1px solid ${selectedFormId === null ? 'rgba(16,185,129,0.4)' : 'rgba(255,255,255,0.08)'};color:${selectedFormId === null ? '#10b981' : '#fff'};cursor:pointer;font-size:13px;font-weight:600;`;
+    allBtn.onclick = () => { selectedFormId = null; document.getElementById('leads-meta-selected-form').textContent = 'Todos'; loadLeadsMeta(null, false); };
+    list.appendChild(allBtn);
+
+    active.forEach(form => {
+        const btn = document.createElement('button');
+        btn.textContent = `${form.name} (${(form.leads_count || 0).toLocaleString('pt-BR')} leads)`;
+        btn.style.cssText = `width:100%;text-align:left;padding:10px 12px;border-radius:8px;background:${selectedFormId === form.id ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.05)'};border:1px solid ${selectedFormId === form.id ? 'rgba(16,185,129,0.4)' : 'rgba(255,255,255,0.08)'};color:${selectedFormId === form.id ? '#10b981' : '#e5e5e5'};cursor:pointer;font-size:13px;`;
+        btn.onclick = () => { selectedFormId = form.id; document.getElementById('leads-meta-selected-form').textContent = form.name; loadLeadsMeta(form.id, false); };
+        list.appendChild(btn);
+    });
+}
+
+function getFieldValue(fieldData, keys) {
+    if (!fieldData) return '—';
+    const found = fieldData.find(f => keys.some(k => (f.name || '').toLowerCase().includes(k)));
+    return found?.values?.[0] || '—';
+}
+
+function renderLeadsMetaTable(leads) {
+    const tbody = document.getElementById('table-leads-meta-body');
+    const countEl = document.getElementById('leads-meta-table-count');
+    if (!tbody) return;
+    if (countEl) countEl.textContent = `(${leads.length} leads)`;
+    tbody.innerHTML = '';
+
+    if (leads.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-secondary);padding:24px;">Nenhum lead encontrado. Selecione um formulário com leads.</td></tr>';
+        return;
+    }
+
+    leads.forEach(lead => {
+        const fd = lead.field_data || [];
+        const nome     = getFieldValue(fd, ['name', 'nome', 'full_name']);
+        const email    = getFieldValue(fd, ['email', 'e-mail']);
+        const telefone = getFieldValue(fd, ['phone', 'telefone', 'tel', 'celular', 'whatsapp']);
+        const outros   = fd.filter(f => !['full_name','name','nome','email','phone','telefone','celular','whatsapp'].some(k => (f.name||'').toLowerCase().includes(k)));
+        const outrosStr = outros.map(f => `<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);margin-right:4px;">${f.name}: ${f.values?.[0] || '—'}</span>`).join('');
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td style="font-size:12px;color:var(--text-secondary);white-space:nowrap;">${lead.created_time ? new Date(lead.created_time).toLocaleDateString('pt-BR', {day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—'}</td>
+            <td><strong>${nome}</strong></td>
+            <td style="font-size:13px;">${email}</td>
+            <td style="font-size:13px;">${telefone !== '—' ? `<a href="https://wa.me/55${telefone.replace(/\D/g,'')}" target="_blank" style="color:#25D366;text-decoration:none;" title="Abrir WhatsApp">📱 ${telefone}</a>` : '—'}</td>
+            <td style="font-size:11px;color:var(--text-secondary);">${lead.campaign_name || '—'}</td>
+            <td style="font-size:11px;color:var(--text-secondary);">${lead.adset_name || '—'}</td>
+            <td style="font-size:11px;color:var(--text-secondary);">${lead._form_name || '—'}</td>
+            <td style="max-width:200px;">${outrosStr || '<span style="color:var(--text-secondary);font-size:12px;">—</span>'}</td>`;
+        tbody.appendChild(tr);
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PUBLICAR — Posts Facebook e Instagram
+// ═══════════════════════════════════════════════════════════════════════════
+
+let currentPostPlatform = 'facebook';
+
+async function loadPostsRecentes(platform) {
+    const grid = document.getElementById('posts-recentes-grid');
+    if (!grid) return;
+    grid.innerHTML = '<p style="color:var(--text-secondary);font-size:13px;">Carregando...</p>';
+    try {
+        const res = await fetch(`/api/meta/publish?platform=${platform}`);
+        const data = await res.json();
+        renderPostsGrid(data.posts || [], platform);
+    } catch (err) {
+        grid.innerHTML = `<p style="color:#f43f5e;font-size:13px;">Erro: ${err.message}</p>`;
+    }
+}
+
+function renderPostsGrid(posts, platform) {
+    const grid = document.getElementById('posts-recentes-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    if (posts.length === 0) {
+        grid.innerHTML = '<p style="color:var(--text-secondary);font-size:13px;">Nenhum post encontrado</p>';
+        return;
+    }
+    posts.forEach(post => {
+        const card = document.createElement('div');
+        card.style.cssText = 'background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px;overflow:hidden;';
+        const imgSrc = post.full_picture || post.media_url || post.thumbnail_url || '';
+        const text = post.message || post.caption || post.story || '';
+        const date = post.created_time || post.timestamp || '';
+        const link = post.permalink_url || post.permalink || '#';
+        const likes = post.likes?.summary?.total_count ?? post.like_count ?? 0;
+        const comments = post.comments?.summary?.total_count ?? post.comments_count ?? 0;
+        card.innerHTML = `
+            ${imgSrc ? `<img src="${imgSrc}" alt="" style="width:100%;height:160px;object-fit:cover;">` : ''}
+            <div style="padding:12px;">
+                <p style="font-size:12px;color:var(--text-secondary);margin:0 0 6px;">${date ? new Date(date).toLocaleDateString('pt-BR', {day:'2-digit',month:'short',year:'numeric'}) : ''}</p>
+                <p style="font-size:13px;line-height:1.5;margin:0 0 10px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;">${text}</p>
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                    <div style="display:flex;gap:12px;font-size:12px;color:var(--text-secondary);">
+                        <span>❤️ ${likes.toLocaleString('pt-BR')}</span>
+                        <span>💬 ${comments.toLocaleString('pt-BR')}</span>
+                    </div>
+                    ${link !== '#' ? `<a href="${link}" target="_blank" style="font-size:11px;color:#0ea5e9;text-decoration:none;">Ver post →</a>` : ''}
+                </div>
+            </div>`;
+        grid.appendChild(card);
+    });
+}
+
+async function publishPost() {
+    const message  = document.getElementById('pub-message')?.value?.trim();
+    const imageUrl = document.getElementById('pub-image-url')?.value?.trim();
+    const fbChecked = document.getElementById('pub-facebook')?.checked;
+    const igChecked = document.getElementById('pub-instagram')?.checked;
+
+    if (!message) { showPubStatus('O texto do post é obrigatório.', 'error'); return; }
+    if (!fbChecked && !igChecked) { showPubStatus('Selecione ao menos uma plataforma.', 'error'); return; }
+    if (igChecked && !imageUrl) { showPubStatus('Instagram requer uma URL de imagem.', 'error'); return; }
+
+    const platforms = [];
+    if (fbChecked) platforms.push('facebook');
+    if (igChecked) platforms.push('instagram');
+
+    const btn = document.getElementById('btn-publish-post');
+    if (btn) { btn.disabled = true; btn.textContent = 'Publicando...'; }
+
+    try {
+        const res = await fetch('/api/meta/publish', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message, image_url: imageUrl || undefined, platforms }),
+        });
+        const data = await res.json();
+        const successes = Object.entries(data.results || {}).filter(([,v]) => v.success).map(([k]) => k);
+        const errors    = Object.entries(data.results || {}).filter(([,v]) => !v.success).map(([k,v]) => `${k}: ${JSON.stringify(v.error)}`);
+
+        if (successes.length > 0) {
+            showPubStatus(`✅ Publicado com sucesso em: ${successes.join(', ')}${errors.length > 0 ? '\n⚠ Erro em: ' + errors.join('; ') : ''}`, 'success');
+            document.getElementById('pub-message').value = '';
+            document.getElementById('pub-image-url').value = '';
+            document.getElementById('pub-preview-box').style.display = 'none';
+            loadPostsRecentes(currentPostPlatform);
+        } else {
+            showPubStatus('Erro ao publicar: ' + errors.join('; '), 'error');
+        }
+    } catch (err) {
+        showPubStatus('Erro: ' + err.message, 'error');
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph ph-paper-plane-tilt"></i> Publicar Agora'; }
+    }
+}
+
+function showPubStatus(msg, type) {
+    const el = document.getElementById('pub-status');
+    if (!el) return;
+    el.style.display = 'block';
+    el.style.background = type === 'success' ? 'rgba(16,185,129,0.1)' : 'rgba(244,63,94,0.1)';
+    el.style.border = `1px solid ${type === 'success' ? 'rgba(16,185,129,0.3)' : 'rgba(244,63,94,0.3)'}`;
+    el.style.color = type === 'success' ? '#10b981' : '#f43f5e';
+    el.style.whiteSpace = 'pre-wrap';
+    el.textContent = msg;
 }
 
 function applyCampaignTableFilters() {

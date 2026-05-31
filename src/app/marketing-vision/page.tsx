@@ -108,6 +108,18 @@ export default function MarketingVisionPage() {
                 <i className="ph ph-megaphone"></i>
                 <span>Marketing ADS</span>
               </a>
+              <a href="#" className="nav-item" data-view="campanhas">
+                <i className="ph ph-sliders"></i>
+                <span>Campanhas</span>
+              </a>
+              <a href="#" className="nav-item" data-view="leads-meta">
+                <i className="ph ph-clipboard-text"></i>
+                <span>Leads Meta</span>
+              </a>
+              <a href="#" className="nav-item" data-view="publicar">
+                <i className="ph ph-paper-plane-tilt"></i>
+                <span>Publicar</span>
+              </a>
 
               {isAdmin && (
                 <a href="/admin/users" className="nav-item" style={{ color: '#c084fc' }}>
@@ -184,6 +196,18 @@ export default function MarketingVisionPage() {
           <a href="#" className="mobile-nav-item" data-view="marketing">
             <i className="ph ph-megaphone"></i>
             <span>Ads</span>
+          </a>
+          <a href="#" className="mobile-nav-item" data-view="campanhas">
+            <i className="ph ph-sliders"></i>
+            <span>Campanhas</span>
+          </a>
+          <a href="#" className="mobile-nav-item" data-view="leads-meta">
+            <i className="ph ph-clipboard-text"></i>
+            <span>Leads</span>
+          </a>
+          <a href="#" className="mobile-nav-item" data-view="publicar">
+            <i className="ph ph-paper-plane-tilt"></i>
+            <span>Publicar</span>
           </a>
         </nav>
 
@@ -937,6 +961,248 @@ export default function MarketingVisionPage() {
                       <tbody id="table-campaigns-body"></tbody>
                     </table>
                   </div>
+                </div>
+              </div>
+            </div>
+
+            {/* VIEW: CAMPANHAS — Controle de campanhas e adsets */}
+            <div id="view-campanhas" className="view-section hidden">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+                <div>
+                  <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>Controle de Campanhas</h2>
+                  <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>Pause, ative ou ajuste orçamentos diretamente pelo dashboard</p>
+                </div>
+                <button id="btn-refresh-campanhas" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', borderRadius: '8px', background: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.3)', color: '#0ea5e9', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
+                  <i className="ph ph-arrows-clockwise"></i> Atualizar
+                </button>
+              </div>
+
+              {/* Status indicator */}
+              <div id="campanhas-status" style={{ display: 'none', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', fontSize: '13px' }}></div>
+
+              {/* Campanhas */}
+              <div className="table-card glass-card" style={{ marginBottom: '24px' }}>
+                <div className="table-header">
+                  <h3>Campanhas <span id="campanhas-count" style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: '400' }}></span></h3>
+                  <input type="text" id="filter-campanhas" placeholder="Buscar campanha..." style={{ padding: '6px 12px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '13px', width: '200px' }} />
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>CAMPANHA</th>
+                        <th>STATUS</th>
+                        <th>OBJETIVO</th>
+                        <th>ORÇAMENTO DIÁRIO</th>
+                        <th>ORÇAMENTO TOTAL</th>
+                        <th>INÍCIO</th>
+                        <th>AÇÕES</th>
+                      </tr>
+                    </thead>
+                    <tbody id="table-campanhas-control-body"></tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Adsets */}
+              <div className="table-card glass-card">
+                <div className="table-header">
+                  <h3>Conjuntos de Anúncios (Adsets) <span id="adsets-count" style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: '400' }}></span></h3>
+                  <input type="text" id="filter-adsets-control" placeholder="Buscar conjunto..." style={{ padding: '6px 12px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '13px', width: '200px' }} />
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>CAMPANHA</th>
+                        <th>CONJUNTO</th>
+                        <th>STATUS</th>
+                        <th>ORÇAMENTO DIÁRIO</th>
+                        <th>INÍCIO</th>
+                        <th>FIM</th>
+                        <th>AÇÕES</th>
+                      </tr>
+                    </thead>
+                    <tbody id="table-adsets-control-body"></tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Modal de edição de orçamento */}
+              <div id="budget-modal" style={{ display: 'none', position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ background: '#18181b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', padding: '28px', width: '360px', maxWidth: '90vw' }}>
+                  <h3 style={{ margin: '0 0 8px', fontSize: '16px' }}>Editar Orçamento</h3>
+                  <p id="budget-modal-name" style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: '0 0 20px' }}></p>
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>Orçamento Diário (R$)</label>
+                    <input id="budget-input" type="number" step="0.01" min="1" placeholder="Ex: 150.00" style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: '14px', boxSizing: 'border-box' }} />
+                  </div>
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <button id="budget-cancel-btn" style={{ flex: 1, padding: '10px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', cursor: 'pointer', fontSize: '13px' }}>Cancelar</button>
+                    <button id="budget-save-btn" style={{ flex: 1, padding: '10px', borderRadius: '8px', background: 'rgba(14,165,233,0.15)', border: '1px solid rgba(14,165,233,0.4)', color: '#0ea5e9', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>Salvar</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* VIEW: LEADS META — Leads dos formulários Meta */}
+            <div id="view-leads-meta" className="view-section hidden">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+                <div>
+                  <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>Leads Meta (Formulários)</h2>
+                  <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>Leads coletados diretamente pelos formulários do Facebook e Instagram</p>
+                </div>
+                <button id="btn-refresh-leads-meta" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', borderRadius: '8px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', color: '#10b981', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
+                  <i className="ph ph-arrows-clockwise"></i> Atualizar
+                </button>
+              </div>
+
+              {/* Formulários disponíveis */}
+              <div className="lists-grid" style={{ marginBottom: '24px' }}>
+                <div className="list-card glass-card">
+                  <h3>Formulários Ativos</h3>
+                  <div id="leads-meta-forms-list" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Carregando formulários...</p>
+                  </div>
+                </div>
+                <div className="stat-card glass-card" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <i className="ph ph-clipboard-text" style={{ fontSize: '32px', color: '#10b981' }}></i>
+                    <div>
+                      <h3 id="leads-meta-total" style={{ margin: 0, fontSize: '28px' }}>—</h3>
+                      <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-secondary)' }}>Total de Leads nos Formulários</p>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '12px' }}>
+                    <div>
+                      <p style={{ margin: 0, fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Formulários ativos</p>
+                      <strong id="leads-meta-forms-count" style={{ fontSize: '18px' }}>—</strong>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <p style={{ margin: 0, fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Formulário selecionado</p>
+                      <strong id="leads-meta-selected-form" style={{ fontSize: '13px', color: '#10b981' }}>Todos</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tabela de leads */}
+              <div className="table-card glass-card">
+                <div className="table-header">
+                  <h3>Leads do Formulário <span id="leads-meta-table-count" style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: '400' }}></span></h3>
+                  <input type="text" id="filter-leads-meta" placeholder="Buscar nome, e-mail, telefone..." style={{ padding: '6px 12px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '13px', width: '240px' }} />
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>DATA</th>
+                        <th>NOME</th>
+                        <th>E-MAIL</th>
+                        <th>TELEFONE</th>
+                        <th>CAMPANHA</th>
+                        <th>CONJUNTO</th>
+                        <th>FORMULÁRIO</th>
+                        <th>OUTROS CAMPOS</th>
+                      </tr>
+                    </thead>
+                    <tbody id="table-leads-meta-body"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            {/* VIEW: PUBLICAR — Publicação de posts FB/Instagram */}
+            <div id="view-publicar" className="view-section hidden">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
+                <div>
+                  <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>Publicar nas Redes Sociais</h2>
+                  <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>Longview Empreendimentos — Facebook & Instagram</p>
+                </div>
+              </div>
+
+              <div className="lists-grid" style={{ alignItems: 'flex-start' }}>
+                {/* Formulário de publicação */}
+                <div className="list-card glass-card" style={{ gridColumn: '1 / -1' }}>
+                  <h3 style={{ marginBottom: '20px' }}>Novo Post</h3>
+
+                  {/* Plataformas */}
+                  <div style={{ marginBottom: '16px' }}>
+                    <p style={{ fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Publicar em</p>
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px' }}>
+                        <input type="checkbox" id="pub-facebook" defaultChecked style={{ accentColor: '#0ea5e9' }} />
+                        <i className="ph ph-facebook-logo" style={{ color: '#1877F2', fontSize: '18px' }}></i>
+                        <span>Facebook</span>
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px' }}>
+                        <input type="checkbox" id="pub-instagram" style={{ accentColor: '#E1306C' }} />
+                        <i className="ph ph-instagram-logo" style={{ color: '#E1306C', fontSize: '18px' }}></i>
+                        <span>Instagram</span>
+                      </label>
+                    </div>
+                    <p id="pub-instagram-note" style={{ margin: '6px 0 0', fontSize: '11px', color: '#F59E0B' }}>
+                      ⚠ Instagram requer imagem. Posts de texto puro não são suportados.
+                    </p>
+                  </div>
+
+                  {/* Texto */}
+                  <div style={{ marginBottom: '16px' }}>
+                    <p style={{ fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Texto do post *</p>
+                    <textarea id="pub-message" rows={5} placeholder="Escreva o texto do seu post aqui..." style={{ width: '100%', padding: '12px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '14px', lineHeight: '1.6', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
+                    <p id="pub-char-count" style={{ margin: '4px 0 0', fontSize: '11px', color: 'var(--text-secondary)', textAlign: 'right' }}>0 caracteres</p>
+                  </div>
+
+                  {/* URL da imagem */}
+                  <div style={{ marginBottom: '20px' }}>
+                    <p style={{ fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>URL da Imagem (opcional para Facebook, obrigatório para Instagram)</p>
+                    <input type="url" id="pub-image-url" placeholder="https://sua-imagem.com/foto.jpg" style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '14px', boxSizing: 'border-box' }} />
+                    <div id="pub-image-preview" style={{ display: 'none', marginTop: '12px' }}>
+                      <img id="pub-image-preview-img" src="" alt="Preview" style={{ maxWidth: '320px', maxHeight: '200px', borderRadius: '8px', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.1)' }} />
+                    </div>
+                  </div>
+
+                  {/* Preview */}
+                  <div id="pub-preview-box" style={{ display: 'none', marginBottom: '20px', padding: '16px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                    <p style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '10px', letterSpacing: '0.05em' }}>Preview</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                      <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '14px', fontWeight: '700' }}>L</div>
+                      <div>
+                        <strong style={{ fontSize: '13px' }}>Longview Empreendimentos</strong>
+                        <p style={{ margin: 0, fontSize: '11px', color: 'var(--text-secondary)' }}>Agora</p>
+                      </div>
+                    </div>
+                    <p id="pub-preview-text" style={{ margin: '0 0 10px', fontSize: '14px', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}></p>
+                    <img id="pub-preview-image" src="" alt="" style={{ display: 'none', width: '100%', maxHeight: '280px', borderRadius: '8px', objectFit: 'cover' }} />
+                  </div>
+
+                  {/* Status de envio */}
+                  <div id="pub-status" style={{ display: 'none', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', fontSize: '13px' }}></div>
+
+                  {/* Botões */}
+                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                    <button id="btn-preview-post" style={{ padding: '10px 20px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <i className="ph ph-eye"></i> Pré-visualizar
+                    </button>
+                    <button id="btn-publish-post" style={{ padding: '10px 24px', borderRadius: '8px', background: 'linear-gradient(135deg, rgba(14,165,233,0.2), rgba(99,102,241,0.2))', border: '1px solid rgba(14,165,233,0.4)', color: '#0ea5e9', cursor: 'pointer', fontSize: '13px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <i className="ph ph-paper-plane-tilt"></i> Publicar Agora
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Posts recentes */}
+              <div style={{ marginTop: '24px' }}>
+                <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
+                  <button id="btn-posts-facebook" class="posts-platform-btn active" style={{ padding: '8px 16px', borderRadius: '8px', background: 'rgba(24,119,242,0.15)', border: '1px solid rgba(24,119,242,0.4)', color: '#1877F2', cursor: 'pointer', fontSize: '13px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <i className="ph ph-facebook-logo"></i> Posts Facebook
+                  </button>
+                  <button id="btn-posts-instagram" class="posts-platform-btn" style={{ padding: '8px 16px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '13px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <i className="ph ph-instagram-logo"></i> Posts Instagram
+                  </button>
+                </div>
+                <div id="posts-recentes-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Carregando posts recentes...</p>
                 </div>
               </div>
             </div>
