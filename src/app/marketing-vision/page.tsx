@@ -1194,10 +1194,10 @@ export default function MarketingVisionPage() {
               {/* Posts recentes */}
               <div style={{ marginTop: '24px' }}>
                 <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
-                  <button id="btn-posts-facebook" class="posts-platform-btn active" style={{ padding: '8px 16px', borderRadius: '8px', background: 'rgba(24,119,242,0.15)', border: '1px solid rgba(24,119,242,0.4)', color: '#1877F2', cursor: 'pointer', fontSize: '13px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <button id="btn-posts-facebook" className="posts-platform-btn active" style={{ padding: '8px 16px', borderRadius: '8px', background: 'rgba(24,119,242,0.15)', border: '1px solid rgba(24,119,242,0.4)', color: '#1877F2', cursor: 'pointer', fontSize: '13px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <i className="ph ph-facebook-logo"></i> Posts Facebook
                   </button>
-                  <button id="btn-posts-instagram" class="posts-platform-btn" style={{ padding: '8px 16px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '13px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <button id="btn-posts-instagram" className="posts-platform-btn" style={{ padding: '8px 16px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '13px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <i className="ph ph-instagram-logo"></i> Posts Instagram
                   </button>
                 </div>
