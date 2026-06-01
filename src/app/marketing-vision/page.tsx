@@ -120,6 +120,10 @@ export default function MarketingVisionPage() {
                 <i className="ph ph-paper-plane-tilt"></i>
                 <span>Publicar</span>
               </a>
+              <a href="#" className="nav-item" data-view="score-leads">
+                <i className="ph ph-lightning"></i>
+                <span>Score de Leads</span>
+              </a>
 
               {isAdmin && (
                 <a href="/admin/users" className="nav-item" style={{ color: '#c084fc' }}>
@@ -208,6 +212,10 @@ export default function MarketingVisionPage() {
           <a href="#" className="mobile-nav-item" data-view="publicar">
             <i className="ph ph-paper-plane-tilt"></i>
             <span>Publicar</span>
+          </a>
+          <a href="#" className="mobile-nav-item" data-view="score-leads">
+            <i className="ph ph-lightning"></i>
+            <span>Score</span>
           </a>
         </nav>
 
@@ -1219,6 +1227,110 @@ export default function MarketingVisionPage() {
                 </div>
                 <div id="posts-recentes-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
                   <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Carregando posts recentes...</p>
+                </div>
+              </div>
+            </div>
+
+
+            {/* ===================== SCORE DE LEADS ===================== */}
+            <div id="view-score-leads" className="view-section hidden">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
+                <div>
+                  <h2 style={{ fontSize: '20px', fontWeight: '700', color: '#fff', margin: 0 }}>Score de Intenção de Compra</h2>
+                  <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>Qualificação automática de leads com cruzamento Meta Ads + CVCRM + RD Station</p>
+                </div>
+                <button id="btn-calcular-scores" style={{ padding: '10px 20px', borderRadius: '8px', background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <i className="ph ph-lightning-slash"></i> Calcular Scores
+                </button>
+              </div>
+
+              {/* KPIs Score */}
+              <div id="score-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+                <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '20px' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '10px' }}>Total Analisados</div>
+                  <div id="score-total" style={{ fontSize: '28px', fontWeight: '800', color: '#fff' }}>—</div>
+                </div>
+                <div style={{ background: 'var(--card-bg)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '12px', padding: '20px' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '10px' }}>🚀 Quentes (75+)</div>
+                  <div id="score-quentes" style={{ fontSize: '28px', fontWeight: '800', color: '#ef4444' }}>—</div>
+                </div>
+                <div style={{ background: 'var(--card-bg)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '12px', padding: '20px' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '10px' }}>🔥 Mornos (40-74)</div>
+                  <div id="score-mornos" style={{ fontSize: '28px', fontWeight: '800', color: '#f59e0b' }}>—</div>
+                </div>
+                <div style={{ background: 'var(--card-bg)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '12px', padding: '20px' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '10px' }}>❄️ Frios (0-39)</div>
+                  <div id="score-frios" style={{ fontSize: '28px', fontWeight: '800', color: '#3b82f6' }}>—</div>
+                </div>
+                <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '20px' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '10px' }}>Score Médio</div>
+                  <div id="score-medio" style={{ fontSize: '28px', fontWeight: '800', color: '#a78bfa' }}>—</div>
+                </div>
+                <div style={{ background: 'var(--card-bg)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '12px', padding: '20px' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '10px' }}>Enviados ao RD</div>
+                  <div id="score-enviados-rd" style={{ fontSize: '28px', fontWeight: '800', color: '#10b981' }}>—</div>
+                </div>
+              </div>
+
+              {/* Legenda de Pontuação */}
+              <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '20px', marginBottom: '24px' }}>
+                <h3 style={{ fontSize: '13px', fontWeight: '700', color: '#fff', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Como o Score é Calculado</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px' }}>
+                  {[
+                    { label: 'Match Meta × CRM', pts: '+30', desc: 'Lead aparece nas 2 fontes', color: '#10b981' },
+                    { label: 'Campanha de Leads', pts: '+15', desc: 'Origem via Lead Ad do Meta', color: '#6366f1' },
+                    { label: 'Etapa Qualificado+', pts: '+20', desc: 'Avançou no funil do CRM', color: '#f59e0b' },
+                    { label: 'Simulação feita', pts: '+15', desc: 'Fez simulação financeira', color: '#ec4899' },
+                    { label: 'Visita ao stand', pts: '+20', desc: 'Visitou fisicamente', color: '#8b5cf6' },
+                    { label: 'Sem contato 7+ dias', pts: '-10', desc: 'Lead esfriando', color: '#ef4444' },
+                    { label: 'Telefone válido', pts: '+5', desc: 'Dados completos', color: '#06b6d4' },
+                    { label: 'Corretor atribuído', pts: '+5', desc: 'Em tratamento ativo', color: '#84cc16' },
+                  ].map((item, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                      <span style={{ fontSize: '13px', fontWeight: '800', color: item.color, minWidth: '40px', textAlign: 'right' }}>{item.pts}</span>
+                      <div>
+                        <div style={{ fontSize: '12px', fontWeight: '600', color: '#fff' }}>{item.label}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>{item.desc}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Tabela de Leads com Score */}
+              <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '12px', overflow: 'hidden' }}>
+                <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+                  <h3 style={{ fontSize: '14px', fontWeight: '700', color: '#fff', margin: 0 }}>Leads Ranqueados por Intenção</h3>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <input id="score-search" type="text" placeholder="Buscar por nome, email..." style={{ padding: '7px 12px', borderRadius: '7px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: '12px', width: '200px' }} />
+                    <select id="score-filter-temp" style={{ padding: '7px 10px', borderRadius: '7px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: '12px' }}>
+                      <option value="">Todas temperaturas</option>
+                      <option value="quente">🚀 Quentes</option>
+                      <option value="morno">🔥 Mornos</option>
+                      <option value="frio">❄️ Frios</option>
+                    </select>
+                  </div>
+                </div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                    <thead>
+                      <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border-color)' }}>
+                        <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Score</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Lead</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Temperatura</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Sinais</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>CRM</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ação</th>
+                      </tr>
+                    </thead>
+                    <tbody id="score-table-body">
+                      <tr>
+                        <td colSpan={6} style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                          Clique em <strong style={{color:'#fff'}}>Calcular Scores</strong> para analisar seus leads
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>

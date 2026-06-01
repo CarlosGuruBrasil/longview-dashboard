@@ -1997,11 +1997,17 @@ function switchView(viewName) {
         "oportunidades-perdas": "Oportunidades & Perdas",
         "empreendimentos": "Gestão de Empreendimentos",
         "vendas": "Relatório de Vendas",
-        "marketing": "Marketing ADS"
+        "marketing": "Marketing ADS",
+        "campanhas": "Controle de Campanhas",
+        "leads-meta": "Leads Meta",
+        "publicar": "Publicar Post",
+        "score-leads": "Score de Intenção de Compra"
     };
     document.getElementById("page-title").textContent = titleMap[viewName] || "Dashboard";
     
-    if (viewName === "empreendimentos") {
+    if (viewName === "score-leads") {
+        setupScoreView();
+    } else if (viewName === "empreendimentos") {
         updateEmpreendimentos(filteredLeads);
     } else if (viewName === "vendas") {
         // Re-renderizar a tela de vendas para garantir cruzamento atualizado com o inventário
@@ -3501,3 +3507,224 @@ function updateEmpreendimentos(leads) {
     setupStockFilters();
 }
 
+
+// ============================================================
+// MOTOR DE SCORE DE INTENÇÃO — Score de Leads View
+// ============================================================
+
+let _scoreLeadsCache = null;
+
+function calcularScore(lead, metaLeads) {
+    let score = 0;
+    const sinais = [];
+
+    // Base: tem dados completos
+    if (lead.telefone || lead.celular) { score += 5; sinais.push('📱 Tel. válido'); }
+    if (lead.corretor) { score += 5; sinais.push('👤 Corretor'); }
+
+    // Etapa no CRM
+    const etapa = (lead.etapa_negocio || lead.situacao || '').toLowerCase();
+    if (etapa.includes('qualif')) { score += 15; sinais.push('✅ Qualificado'); }
+    if (etapa.includes('propos') || etapa.includes('proposta')) { score += 20; sinais.push('📄 Proposta'); }
+    if (etapa.includes('visit')) { score += 20; sinais.push('🏠 Visita'); }
+    if (etapa.includes('simul')) { score += 15; sinais.push('🔢 Simulação'); }
+    if (etapa.includes('negoc')) { score += 18; sinais.push('🤝 Negociando'); }
+
+    // Velocidade: dias sem contato
+    const updated = lead.updated_at || lead.created_at;
+    if (updated) {
+        const dias = Math.floor((Date.now() - new Date(updated).getTime()) / 86400000);
+        if (dias > 30) { score -= 15; sinais.push('⏰ +30d sem contato'); }
+        else if (dias > 7)  { score -= 10; sinais.push('⏰ +7d sem contato'); }
+        else if (dias <= 2) { score += 5;  sinais.push('⚡ Recente'); }
+    }
+
+    // Match com Meta Leads (cruzamento por telefone/email)
+    if (metaLeads && metaLeads.length > 0) {
+        const telLead = (lead.telefone || lead.celular || '').replace(/\D/g, '').slice(-8);
+        const emailLead = (lead.email || '').toLowerCase().trim();
+        const match = metaLeads.find(ml => {
+            const telMeta = (ml.telefone || ml.phone_number || '').replace(/\D/g, '').slice(-8);
+            const emailMeta = (ml.email || '').toLowerCase().trim();
+            return (telLead && telMeta && telLead === telMeta) ||
+                   (emailLead && emailMeta && emailLead === emailMeta);
+        });
+        if (match) {
+            score += 30;
+            sinais.push('🎯 Match Meta');
+            // Bônus de campanha
+            if ((match.campanha || match.ad_name || '').toLowerCase().includes('lead')) {
+                score += 15; sinais.push('📣 Lead Ad');
+            }
+        }
+    }
+
+    // Clamp 0-100
+    score = Math.max(0, Math.min(100, score));
+    const temp = score >= 75 ? 'quente' : score >= 40 ? 'morno' : 'frio';
+    return { score, temperatura: temp, sinais };
+}
+
+function renderScoreTable(leads) {
+    const tbody = document.getElementById('score-table-body');
+    const search = (document.getElementById('score-search')?.value || '').toLowerCase();
+    const filterTemp = document.getElementById('score-filter-temp')?.value || '';
+
+    const filtered = leads.filter(l => {
+        const matchSearch = !search ||
+            (l.nome || '').toLowerCase().includes(search) ||
+            (l.email || '').toLowerCase().includes(search);
+        const matchTemp = !filterTemp || l._score.temperatura === filterTemp;
+        return matchSearch && matchTemp;
+    });
+
+    if (!filtered.length) {
+        tbody.innerHTML = '<tr><td colspan="6" style="padding:32px;text-align:center;color:var(--text-secondary)">Nenhum lead encontrado</td></tr>';
+        return;
+    }
+
+    const tempConfig = {
+        quente: { label: '🚀 Quente', color: '#ef4444', bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.3)' },
+        morno:  { label: '🔥 Morno',  color: '#f59e0b', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.3)' },
+        frio:   { label: '❄️ Frio',   color: '#3b82f6', bg: 'rgba(59,130,246,0.1)', border: 'rgba(59,130,246,0.3)' },
+    };
+
+    tbody.innerHTML = filtered.map(lead => {
+        const s = lead._score;
+        const tc = tempConfig[s.temperatura];
+        const barWidth = s.score + '%';
+        const crmLink = lead.id
+            ? `<a href="https://longviewempreendimentos.cvcrm.com.br/leads/${lead.id}" target="_blank" style="color:#60a5fa;font-size:11px;text-decoration:none">${lead.etapa_negocio || lead.situacao || 'Ver CRM'} ↗</a>`
+            : '<span style="color:var(--text-secondary);font-size:11px">Meta only</span>';
+
+        return `
+        <tr style="border-bottom:1px solid var(--border-color);transition:background 0.15s" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background=''">
+          <td style="padding:14px 16px;min-width:100px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:20px;font-weight:800;color:${tc.color};min-width:32px">${s.score}</span>
+              <div style="flex:1">
+                <div style="height:4px;border-radius:2px;background:rgba(255,255,255,0.07);overflow:hidden">
+                  <div style="height:100%;width:${barWidth};background:${tc.color};border-radius:2px;transition:width 0.5s"></div>
+                </div>
+              </div>
+            </div>
+          </td>
+          <td style="padding:14px 16px">
+            <div style="font-weight:600;color:#fff;font-size:13px">${lead.nome || 'Sem nome'}</div>
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:2px">${lead.email || ''}</div>
+          </td>
+          <td style="padding:14px 16px">
+            <span style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;background:${tc.bg};color:${tc.color};border:1px solid ${tc.border}">${tc.label}</span>
+          </td>
+          <td style="padding:14px 16px;max-width:200px">
+            <div style="display:flex;flex-wrap:wrap;gap:4px">
+              ${s.sinais.map(sig => `<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,0.05);color:var(--text-secondary)">${sig}</span>`).join('')}
+            </div>
+          </td>
+          <td style="padding:14px 16px">${crmLink}</td>
+          <td style="padding:14px 16px">
+            <button onclick="enviarScoreRD('${lead.email || ''}', ${s.score}, '${lead.nome || ''}', '${lead.telefone || lead.celular || ''}')"
+              style="padding:5px 10px;border-radius:6px;background:rgba(124,58,237,0.15);border:1px solid rgba(124,58,237,0.3);color:#a78bfa;cursor:pointer;font-size:11px;font-weight:600;display:flex;align-items:center;gap:5px;white-space:nowrap">
+              <i class="ph ph-paper-plane-right"></i> Enviar RD
+            </button>
+          </td>
+        </tr>`;
+    }).join('');
+}
+
+function updateScoreKPIs(leads) {
+    const quentes = leads.filter(l => l._score.temperatura === 'quente').length;
+    const mornos  = leads.filter(l => l._score.temperatura === 'morno').length;
+    const frios   = leads.filter(l => l._score.temperatura === 'frio').length;
+    const medio   = leads.length
+        ? Math.round(leads.reduce((a, l) => a + l._score.score, 0) / leads.length)
+        : 0;
+
+    const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    set('score-total',   leads.length);
+    set('score-quentes', quentes);
+    set('score-mornos',  mornos);
+    set('score-frios',   frios);
+    set('score-medio',   medio + '/100');
+}
+
+async function calcularScoresLeads() {
+    const btn = document.getElementById('btn-calcular-scores');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ph ph-spinner"></i> Calculando...'; }
+
+    try {
+        // 1. Buscar leads CRM (já disponíveis no globalData)
+        const crmLeads = window.globalData?.leads || [];
+
+        // 2. Buscar leads Meta para cruzamento
+        let metaLeads = [];
+        try {
+            const metaRes = await fetch('/api/meta/leads');
+            if (metaRes.ok) {
+                const metaJson = await metaRes.json();
+                metaLeads = metaJson.leads || [];
+            }
+        } catch (e) { console.warn('[score] Meta leads fetch falhou:', e.message); }
+
+        // 3. Calcular score para cada lead CRM
+        const leadsComScore = crmLeads
+            .map(lead => ({ ...lead, _score: calcularScore(lead, metaLeads) }))
+            .sort((a, b) => b._score.score - a._score.score);
+
+        _scoreLeadsCache = leadsComScore;
+
+        // 4. Atualizar UI
+        updateScoreKPIs(leadsComScore);
+        renderScoreTable(leadsComScore);
+
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph ph-lightning-slash"></i> Recalcular'; }
+        showToast(`${leadsComScore.length} leads analisados!`, 'success');
+    } catch (err) {
+        console.error('[score] Erro:', err);
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph ph-lightning-slash"></i> Calcular Scores'; }
+        showToast('Erro ao calcular scores', 'error');
+    }
+}
+
+async function enviarScoreRD(email, score, nome, telefone) {
+    if (!email) { showToast('Lead sem email — não é possível enviar ao RD', 'error'); return; }
+    try {
+        const res = await fetch('/api/rd/score', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, score, nome, telefone, origem: 'dashboard_score' }),
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast(`Score ${score} (${data.temperatura}) enviado ao RD Station!`, 'success');
+            // Atualizar contador
+            const el = document.getElementById('score-enviados-rd');
+            if (el) el.textContent = parseInt(el.textContent || '0', 10) + 1;
+        } else {
+            showToast('Erro ao enviar score: ' + (data.error || 'desconhecido'), 'error');
+        }
+    } catch (err) {
+        showToast('Erro de rede ao enviar score', 'error');
+    }
+}
+
+function setupScoreView() {
+    // Botão calcular
+    const btn = document.getElementById('btn-calcular-scores');
+    if (btn) btn.addEventListener('click', calcularScoresLeads);
+
+    // Filtros em tempo real
+    const search = document.getElementById('score-search');
+    const filterTemp = document.getElementById('score-filter-temp');
+    const rerender = () => { if (_scoreLeadsCache) renderScoreTable(_scoreLeadsCache); };
+    if (search) search.addEventListener('input', rerender);
+    if (filterTemp) filterTemp.addEventListener('change', rerender);
+}
+
+// Registrar setup no init global
+if (typeof window !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', () => {
+        // Aguardar o script principal inicializar e então setar
+        setTimeout(setupScoreView, 500);
+    });
+}
