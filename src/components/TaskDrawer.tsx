@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Save, Clock, AlertTriangle, User, Building2, Calendar, Tag, FileText, ChevronDown } from 'lucide-react';
+import { X, Save, Clock, AlertTriangle, User, Building2, Calendar, Tag, FileText, ChevronDown, Trash2 } from 'lucide-react';
 import { Task, ChangeLog, Comment } from '@/lib/db';
 import { useUser } from '@/context/UserContext';
 
@@ -17,6 +17,8 @@ export default function TaskDrawer({ taskId, onClose, onUpdate }: Props) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editMode, setEditMode] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Form fields
   const [status, setStatus] = useState<string>('');
@@ -92,9 +94,27 @@ export default function TaskDrawer({ taskId, onClose, onUpdate }: Props) {
     }
   };
 
+  const handleDelete = async () => {
+    if (!task) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/tasks/${task.id}`, { method: 'DELETE' });
+      if (res.ok) {
+        onUpdate();
+        onClose();
+      }
+    } catch (e) {
+      console.error('Erro ao excluir tarefa:', e);
+    } finally {
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
+  };
+
   if (!taskId) return null;
 
-  const isEditable = currentUser.role === 'Desenvolvedor' || currentUser.permissions?.manageProjects === true;
+  const isEditable  = currentUser.role === 'Desenvolvedor' || currentUser.permissions?.manageProjects === true;
+  const isDeletable = currentUser.role === 'Desenvolvedor' || currentUser.role === 'Diretoria';
 
   return (
     <>
@@ -114,6 +134,15 @@ export default function TaskDrawer({ taskId, onClose, onUpdate }: Props) {
             )}
           </div>
           <div className="flex items-center gap-2">
+            {isDeletable && !editMode && task && (
+              <button
+                onClick={() => setConfirmDelete(true)}
+                className="text-xs px-3 py-1.5 rounded-lg bg-red-950/40 hover:bg-red-900/50 text-red-400 border border-red-900/50 font-semibold transition-colors flex items-center gap-1.5"
+              >
+                <Trash2 size={12} />
+                Excluir
+              </button>
+            )}
             {isEditable && !editMode && task && (
               <button onClick={() => setEditMode(true)} className="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 font-semibold transition-colors">
                 Editar
@@ -259,6 +288,47 @@ export default function TaskDrawer({ taskId, onClose, onUpdate }: Props) {
           </div>
         )}
       </div>
+      {/* Modal de confirmação de exclusão */}
+      {confirmDelete && task && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setConfirmDelete(false)} />
+          <div className="relative bg-[#111113] border border-red-900/40 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-950/50 border border-red-900/50 flex items-center justify-center flex-shrink-0">
+                <Trash2 size={18} className="text-red-400" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white">Excluir tarefa?</h3>
+                <p className="text-xs text-zinc-500 mt-0.5">Esta ação não pode ser desfeita</p>
+              </div>
+            </div>
+            <div className="bg-zinc-900/60 border border-zinc-800 rounded-lg p-3 mb-5">
+              <p className="text-xs font-mono text-zinc-500">{task.id}</p>
+              <p className="text-sm font-semibold text-white mt-0.5">{task.subject}</p>
+              <p className="text-xs text-zinc-400 mt-0.5">{task.project} • {task.sector}</p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmDelete(false)}
+                className="flex-1 px-4 py-2.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-semibold transition-colors border border-zinc-700"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="flex-1 px-4 py-2.5 rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-sm font-bold transition-colors flex items-center justify-center gap-2"
+              >
+                {deleting ? (
+                  <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />Excluindo...</>
+                ) : (
+                  <><Trash2 size={13} />Excluir tarefa</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
