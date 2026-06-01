@@ -1,15 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
+import { getValidRDToken } from '../token/route';
 import axios from 'axios';
 
 const RD_BASE = 'https://api.rd.services';
+
+async function getToken() {
+  return (await getValidRDToken()) || process.env.RD_TOKEN_PRIVATE || null;
+}
 
 export async function GET(request: NextRequest) {
   const user = await verifyAuth();
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
 
-  const token = process.env.RD_TOKEN_PRIVATE;
-  if (!token) return NextResponse.json({ error: 'RD_TOKEN_PRIVATE não configurado' }, { status: 500 });
+  const token = await getToken();
+  if (!token) return NextResponse.json({ error: 'Token RD Station não configurado. Acesse /api/rd/token para autorizar.' }, { status: 500 });
 
   const { searchParams } = new URL(request.url);
   const email = searchParams.get('email');
@@ -31,8 +36,8 @@ export async function PATCH(request: NextRequest) {
   const user = await verifyAuth();
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
 
-  const token = process.env.RD_TOKEN_PRIVATE;
-  if (!token) return NextResponse.json({ error: 'RD_TOKEN_PRIVATE não configurado' }, { status: 500 });
+  const token = await getToken();
+  if (!token) return NextResponse.json({ error: 'Token RD Station não configurado.' }, { status: 500 });
 
   const body = await request.json();
   const { email, uuid, ...fields } = body;
