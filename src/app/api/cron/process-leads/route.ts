@@ -137,7 +137,7 @@ async function sendToRD(lead: any, score: number): Promise<boolean> {
 
   try {
     await axios.post(
-      'https://api.rd.services/platform/events',
+      'https://api.rd.services/platform/conversions',
       { event_type: 'CONVERSION', event_family: 'CDP', payload },
       { params: { api_key: apiKey }, timeout: 15000 }
     );
