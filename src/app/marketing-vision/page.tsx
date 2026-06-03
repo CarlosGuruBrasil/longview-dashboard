@@ -1414,6 +1414,7 @@ export default function MarketingVisionPage() {
               </div>
             </div>
           </div>
+          </div>
 
         </main>
       </div>
