@@ -4588,6 +4588,46 @@ window.loadAutoStatus = async function() {
       }
     }
 
+    // ── Gatilho Sem Conexão ────────────────────────────────────────────────
+    const sc = data.semConexao || {};
+    if (el('sc-total'))   el('sc-total').textContent   = sc.totalDisparos ?? '0';
+    if (el('sc-today'))   el('sc-today').textContent   = sc.todayCount    ?? '0';
+    if (el('sc-last'))    el('sc-last').textContent    = fmtDate(sc.lastReceived) || 'Nunca';
+    if (el('sc-webhook')) el('sc-webhook').textContent = '/api/cv/webhook';
+
+    const scBadge = el('sem-conexao-badge');
+    if (scBadge) {
+      const active = sc.totalDisparos > 0;
+      scBadge.textContent       = active ? `${sc.totalDisparos} disparos totais` : 'Aguardando 1º gatilho';
+      scBadge.style.background  = active ? 'rgba(74,222,128,0.1)'  : 'rgba(251,146,60,0.1)';
+      scBadge.style.color       = active ? '#4ade80' : '#fb923c';
+      scBadge.style.borderColor = active ? 'rgba(74,222,128,0.25)' : 'rgba(251,146,60,0.25)';
+    }
+
+    const scList = el('sem-conexao-list');
+    if (scList) {
+      const events = sc.recentEvents || [];
+      if (events.length === 0) {
+        scList.innerHTML = '<div style="color:var(--text-secondary);font-size:13px">Nenhum disparo ainda — aguardando leads entrarem em Sem Conexão no CV CRM</div>';
+      } else {
+        scList.innerHTML = events.map(ev => {
+          const icon   = ev.rdOk ? '&#x2713;' : '&#x26A0;';
+          const color  = ev.rdOk ? '#4ade80' : '#f59e0b';
+          const source = ev.evento === 'sem_conexao_cron' ? 'cron' : 'webhook';
+          return `
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 12px;background:rgba(255,255,255,0.03);border-radius:8px;border-left:3px solid ${color}">
+              <span style="color:${color};font-size:13px;font-weight:700">${icon}</span>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;color:#fff;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${ev.nome || 'Lead ' + ev.leadId}</div>
+                <div style="font-size:11px;color:var(--text-secondary)">Etapa: ${ev.etapa} · via ${source}</div>
+              </div>
+              <span style="font-size:11px;color:var(--text-secondary);white-space:nowrap">${fmtDate(ev.ts)}</span>
+            </div>
+          `;
+        }).join('');
+      }
+    }
+
   } catch (e) {
     console.error('[loadAutoStatus]', e.message);
   }

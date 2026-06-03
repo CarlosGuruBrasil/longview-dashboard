@@ -58,6 +58,17 @@ function getTier(score: number) {
   return             { label: 'frio',   conversion_id: 'lead_frio_longview'   };
 }
 
+// Padrões de etapa "Sem Conexão" no CV CRM
+const SEM_CONEXAO_PATTERNS = [
+  'sem conexão', 'sem conexao', 'sem contato', 'semconexao', 'sem_conexao',
+  'inativo', 'lost contact', 'perdido contato',
+];
+
+function isSemConexaoEtapa(etapaNome: string): boolean {
+  const n = (etapaNome || '').toLowerCase().trim();
+  return SEM_CONEXAO_PATTERNS.some(p => n.includes(p));
+}
+
 async function fetchActiveLeads(): Promise<any[]> {
   const email   = process.env.CV_CRM_EMAIL;
   const token   = process.env.CV_CRM_TOKEN;
@@ -79,6 +90,60 @@ async function fetchActiveLeads(): Promise<any[]> {
       headers, params: { limit: 1000, situacao: 'Ativo' }, timeout: 25000,
     });
     return res.data?.leads || [];
+  }
+}
+
+// Busca todos os leads dos últimos 30 dias (incluindo sem conexão)
+async function fetchAllRecentLeads(): Promise<any[]> {
+  const email   = process.env.CV_CRM_EMAIL;
+  const token   = process.env.CV_CRM_TOKEN;
+  const base    = 'https://longviewempreendimentos.cvcrm.com.br/api/v1';
+  const headers = { email, token, Accept: 'application/json' };
+  const since30 = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
+
+  try {
+    const res = await axios.get(`${base}/comercial/leads`, {
+      headers,
+      params: { limit: 1000, data_criacao_inicio: since30 }, // sem filtro de situacao
+      timeout: 25000,
+    });
+    return res.data?.leads || [];
+  } catch {
+    return [];
+  }
+}
+
+// Dispara gatilho "Sem Conexão" no RD Station
+async function triggerSemConexaoRD(lead: any): Promise<boolean> {
+  const apiKey  = process.env.RD_TOKEN_PUBLIC;
+  const email   = lead.email?.toLowerCase()?.trim();
+  const phone   = lead.telefone || lead.celular || '';
+  if (!apiKey || (!email && !phone)) return false;
+
+  const etapa = lead.etapa?.nome || lead.etapa || 'Sem Conexão';
+  const payload: Record<string, any> = {
+    conversion_identifier: 'sem_conexao_longview',
+    cf_etapa_crm:          etapa,
+    cf_origem_captacao:    'crm_cron',
+    cf_data_score:         new Date().toISOString().split('T')[0],
+    tags:                  ['sem_conexao', 'reativacao_automatica', 'cv_crm'],
+    available_for_mailing: true,
+    legal_bases: [{ category: 'communications', type: 'consent', status: 'granted' }],
+  };
+  if (email)     payload.email          = email;
+  if (lead.nome) payload.name           = lead.nome;
+  if (phone)     payload.personal_phone = phone;
+
+  try {
+    await axios.post(
+      'https://api.rd.services/platform/events',
+      { event_type: 'CONVERSION', event_family: 'CDP', payload },
+      { params: { api_key: apiKey }, timeout: 12000 }
+    );
+    return true;
+  } catch (err: any) {
+    console.warn('[recalc] sem_conexao RD error:', err.response?.data || err.message);
+    return false;
   }
 }
 
@@ -186,12 +251,14 @@ export async function GET(request: NextRequest) {
     startedAt, ok: false,
     total: 0, quentes: 0, mornos: 0, frios: 0,
     sentToRD: 0, capiSent: 0, errors: 0,
+    semConexao: 0, semConexaoSentRD: 0,
   };
 
   try {
-    const [crmLeads, metaLeads] = await Promise.all([
+    const [crmLeads, metaLeads, allRecentLeads] = await Promise.all([
       fetchActiveLeads(),
       fetchRecentMetaLeads(),
+      fetchAllRecentLeads(),
     ]);
 
     stats.total = crmLeads.length;
@@ -249,6 +316,45 @@ export async function GET(request: NextRequest) {
     if (capiQueue.length > 0) {
       const capiResult = await sendCAPIEvents(capiQueue.slice(0, 100)); // cap 100/run
       stats.capiSent = capiResult.sent;
+    }
+
+    // ── Fallback: detecta leads "Sem Conexão" não capturados pelo webhook ──
+    const semConexaoLeads = allRecentLeads.filter(lead => {
+      const etapaNome    = lead.etapa?.nome    || lead.etapa    || '';
+      const situacaoNome = lead.situacao?.nome || lead.situacao || '';
+      return isSemConexaoEtapa(etapaNome) || isSemConexaoEtapa(situacaoNome);
+    });
+
+    stats.semConexao = semConexaoLeads.length;
+    console.log(`[recalc-scores] ${semConexaoLeads.length} leads Sem Conexão encontrados`);
+
+    for (const lead of semConexaoLeads) {
+      try {
+        const leadId   = String(lead.id || lead.codigo || '');
+        const dedupKey = `cv:sem_conexao:sent:${leadId}`;
+        const alreadySent = leadId ? await kv.get(dedupKey) : null;
+        if (alreadySent) continue; // webhook já processou
+
+        const ok = await triggerSemConexaoRD(lead);
+        if (ok) {
+          stats.semConexaoSentRD++;
+          if (leadId) await kv.set(dedupKey, new Date().toISOString(), { ex: 30 * 86400 });
+          // Log no webhook KV para aparecer no painel
+          const existing: any[] = (await kv.get('cv:webhook:log')) || [];
+          const entry = {
+            ts:        new Date().toISOString(),
+            leadId,
+            nome:      lead.nome || '?',
+            etapa:     lead.etapa?.nome || lead.etapa || 'Sem Conexão',
+            evento:    'sem_conexao_cron',
+            triggered: true,
+            rdOk:      true,
+          };
+          await kv.set('cv:webhook:log', [entry, ...existing].slice(0, 200));
+          const count = ((await kv.get<number>('cv:webhook:sem_conexao_count')) || 0) + 1;
+          await kv.set('cv:webhook:sem_conexao_count', count);
+        }
+      } catch { stats.errors++; }
     }
 
     stats.ok         = true;

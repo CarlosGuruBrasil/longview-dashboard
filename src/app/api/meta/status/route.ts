@@ -31,6 +31,9 @@ export async function GET(request: NextRequest) {
       scoresLastStats,
       capiLog,
       capiLast,
+      cvWebhookLog,
+      cvWebhookLast,
+      cvSemConexaoCount,
     ] = await Promise.allSettled([
       kv.get('meta:sync:last'),
       kv.get('meta:sync:lastRun'),
@@ -40,6 +43,9 @@ export async function GET(request: NextRequest) {
       kv.get('meta:scores:lastStats'),
       kv.get('meta:capi:log'),
       kv.get('meta:capi:last'),
+      kv.get('cv:webhook:log'),
+      kv.get('cv:webhook:last'),
+      kv.get('cv:webhook:sem_conexao_count'),
     ]);
 
     const get = (r: PromiseSettledResult<any>) => r.status === 'fulfilled' ? r.value : null;
@@ -88,7 +94,17 @@ export async function GET(request: NextRequest) {
     const today = new Date().toISOString().split('T')[0];
     const capiToday = capiEvents.filter((e: any) => e.ts?.startsWith(today)).length;
 
+    const cvLog    = (get(cvWebhookLog) as any[]) || [];
+    const cvToday  = cvLog.filter((e: any) => e.ts?.startsWith(today) && e.triggered).length;
+
     return NextResponse.json({
+      semConexao: {
+        webhookUrl:    'https://longview-dashboard.vercel.app/api/cv/webhook',
+        lastReceived:  get(cvWebhookLast),
+        totalDisparos: get(cvSemConexaoCount) || 0,
+        todayCount:    cvToday,
+        recentEvents:  cvLog.slice(0, 20),
+      },
       sync: {
         lastRun:     get(syncLastRun),
         nextRun:     nextRun(get(syncLastRun) as string, 24 * 7), // semanal

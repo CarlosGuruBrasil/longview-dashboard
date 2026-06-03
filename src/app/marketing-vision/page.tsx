@@ -1395,6 +1395,49 @@ export default function MarketingVisionPage() {
                 ))}
               </div>
 
+              {/* Gatilho Sem Conexão */}
+              <div style={{ background: 'var(--card-bg)', border: '1px solid rgba(251,146,60,0.3)', borderRadius: '16px', padding: '20px', marginBottom: '24px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(251,146,60,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <i className="ph ph-envelope-open" style={{ fontSize: '18px', color: '#fb923c' }}></i>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '14px', fontWeight: '700', color: '#fff' }}>Gatilho: Sem Conexão → E-mail RD Station</div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Webhook CV CRM + fallback diário — dispara reativação automática</div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <div id="sem-conexao-badge" style={{ fontSize: '11px', padding: '4px 12px', borderRadius: '20px', background: 'rgba(251,146,60,0.1)', color: '#fb923c', fontWeight: '700', border: '1px solid rgba(251,146,60,0.25)' }}>carregando...</div>
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '16px' }}>
+                  {([
+                    { id: 'sc-total',   label: 'Total disparos',   color: '#fb923c' },
+                    { id: 'sc-today',   label: 'Hoje',             color: '#4ade80' },
+                    { id: 'sc-last',    label: 'Último disparo',   color: '#94a3b8', small: true },
+                    { id: 'sc-webhook', label: 'Webhook URL',      color: '#60a5fa', small: true },
+                  ] as {id:string;label:string;color:string;small?:boolean}[]).map(s => (
+                    <div key={s.id} style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '10px', padding: '12px' }}>
+                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginBottom: '4px' }}>{s.label}</div>
+                      <div id={s.id} style={{ fontSize: s.small ? '10px' : '24px', fontWeight: s.small ? '400' : '800', color: s.color, wordBreak: 'break-all' }}>—</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>Últimos disparos</div>
+                <div id="sem-conexao-list" style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '180px', overflowY: 'auto' }}>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>carregando...</div>
+                </div>
+                <div style={{ marginTop: '14px', padding: '12px 14px', background: 'rgba(251,146,60,0.06)', borderRadius: '10px', border: '1px dashed rgba(251,146,60,0.2)' }}>
+                  <div style={{ fontSize: '12px', color: '#fb923c', fontWeight: '600', marginBottom: '4px' }}>Como configurar no CV CRM</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.6' }}>
+                    Configurações → Integrações → Webhooks → Adicionar Webhook<br />
+                    URL: <span style={{ color: '#60a5fa', fontFamily: 'monospace' }}>https://longview-dashboard.vercel.app/api/cv/webhook</span><br />
+                    Evento: mudança de etapa do lead
+                  </div>
+                </div>
+              </div>
+
               {/* CAPI — eventos hoje */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px', marginBottom: '24px' }}>
                 <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '20px' }}>
