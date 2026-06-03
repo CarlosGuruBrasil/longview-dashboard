@@ -226,8 +226,6 @@ export default function MarketingVisionPage() {
             <i className="ph ph-users-three"></i>
             <span>Audiências</span>
           </a>
-            <span>Score</span>
-          </a>
         </nav>
 
         {/* Main Content */}

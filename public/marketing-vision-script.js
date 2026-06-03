@@ -2139,7 +2139,9 @@ function switchView(viewName) {
         "marketing": "Marketing ADS",
         "campanhas": "Controle de Campanhas",
         "leads-meta": "Leads Meta (Formulários)",
-        "publicar": "Publicar nas Redes Sociais"
+        "publicar": "Publicar nas Redes Sociais",
+        "score-leads": "Score de Intenção de Compra",
+        "audiences": "Audiências CRM → Meta Ads"
     };
     document.getElementById("page-title").textContent = titleMap[viewName] || "Dashboard";
     
