@@ -24,9 +24,11 @@ export function proxy(request: NextRequest) {
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api/auth') || // rotas de api de auth (/api/auth/login)
-    pathname === '/api/rd/callback'  || // OAuth2 callback — deve ser público
-    pathname === '/api/rd/token'     || // status do token — acesso interno
-    pathname === '/api/rd/webhook'   || // webhooks do RD — acesso externo
+    pathname === '/api/rd/callback'        || // OAuth2 callback — deve ser público
+    pathname === '/api/rd/token'           || // status do token — acesso interno
+    pathname === '/api/rd/webhook'         || // webhooks do RD — acesso externo
+    pathname === '/api/meta/setup-pixel'   || // setup temporário — sem auth
+    pathname.startsWith('/api/cron/')      || // cron jobs — autenticados pelo CRON_SECRET
     pathname === '/login' ||
     pathname === '/favicon.ico' ||
     pathname.includes('logo') || // imagens de logo
