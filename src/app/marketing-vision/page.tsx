@@ -1349,7 +1349,7 @@ export default function MarketingVisionPage() {
           <div id="view-audiences" className="view-section hidden">
             <div style={{ maxWidth: '900px' }}>
               <div style={{ marginBottom: '24px' }}>
-                <h2 style={{ fontSize: '22px', fontWeight: '700', color: '#fff', margin: '0 0 6px' }}>Audiências CRM → Meta Ads</h2>
+                <h2 style={{ fontSize: '22px', fontWeight: '700', color: '#fff', margin: '0 0 6px' }}>Audiências CRM — Meta Ads</h2>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '14px', margin: 0 }}>
                   Sincroniza a base do CV CRM com o Meta Ads para criar audiências qualificadas e Lookalike de compradores reais.
                 </p>
@@ -1395,7 +1395,7 @@ export default function MarketingVisionPage() {
                 </div>
                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                   <button id="aud-btn-run" onClick={() => (window as any).runAudienceSync()} style={{ padding: '10px 22px', borderRadius: '8px', background: '#fff', color: '#000', border: 'none', fontWeight: '700', fontSize: '14px', cursor: 'pointer' }}>
-                    Sincronizar CRM → Meta
+                    Sincronizar CRM — Meta
                   </button>
                   <button id="aud-btn-list" onClick={() => (window as any).listAudiences()} style={{ padding: '10px 18px', borderRadius: '8px', background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', fontSize: '14px', cursor: 'pointer' }}>
                     Ver Audiências Existentes
