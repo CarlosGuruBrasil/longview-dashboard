@@ -28,6 +28,7 @@ export function proxy(request: NextRequest) {
     pathname === '/api/rd/token'           || // status do token — acesso interno
     pathname === '/api/rd/webhook'         || // webhooks do RD — acesso externo
     pathname === '/api/meta/setup-pixel'   || // setup temporário — sem auth
+    pathname === '/api/meta/audit'         || // auditoria temporária — sem auth
     pathname.startsWith('/api/cron/')      || // cron jobs — autenticados pelo CRON_SECRET
     pathname === '/login' ||
     pathname === '/favicon.ico' ||
