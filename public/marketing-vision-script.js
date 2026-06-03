@@ -119,11 +119,12 @@ function startLoadingSequence(isRefresh = false) {
         console.error("Erro fatal no carregamento:", err);
         clearInterval(insightInterval);
         clearInterval(interval);
-        loadingText.innerText = "Falha na conexão. Tentando recuperar...";
+        loadingText.innerText = "Servidor lento. Carregando com dados disponíveis...";
         setTimeout(() => {
             overlay.classList.add("hidden");
             app.classList.remove("hidden");
-        }, 3000);
+            setupEventListeners();
+        }, 2000);
     });
 }
 
@@ -535,7 +536,8 @@ async function fetchAllData(force = false) {
             }
         } catch (e) { /* sem cache disponível */ }
 
-        alert("Erro ao sincronizar dados. Tente novamente mais tarde.");
+        // Sem cache e sem dados — mostrar erro inline sem alert
+        if (loadingText) loadingText.textContent = "Erro ao conectar. Tente atualizar a página.";
         return false;
     }
 }
