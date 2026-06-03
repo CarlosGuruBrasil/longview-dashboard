@@ -2141,7 +2141,7 @@ function switchView(viewName) {
         "leads-meta": "Leads Meta (Formulários)",
         "publicar": "Publicar nas Redes Sociais",
         "score-leads": "Score de Intenção de Compra",
-        "audiences": "Audiências CRM → Meta Ads"
+        "audiences": "Automação CRM — Meta Ads"
     };
     document.getElementById("page-title").textContent = titleMap[viewName] || "Dashboard";
     
@@ -2158,6 +2158,8 @@ function switchView(viewName) {
         loadLeadsMeta(selectedFormId, false);
     } else if (viewName === "publicar") {
         loadPostsRecentes(currentPostPlatform);
+    } else if (viewName === "audiences") {
+        loadAutoStatus();
     }
 }
 
@@ -4441,85 +4443,158 @@ function audRenderResult(audiences) {
   card.style.display = 'block';
 }
 
-window.runAudienceSync = async function() {
-  const btn = document.getElementById('aud-btn-run');
-  if (btn) { btn.disabled = true; btn.textContent = 'Sincronizando...'; }
+// ─── PAINEL DE MONITORAMENTO DA AUTOMAÇÃO CRM → META ─────────────────────────
 
-  const filter    = document.getElementById('aud-filter')?.value || 'compradores';
-  const lookalike = document.getElementById('aud-lookalike')?.value !== 'false';
-  const logEl     = document.getElementById('aud-log');
-  if (logEl) logEl.innerHTML = '';
+function fmtDate(iso) {
+  if (!iso) return '—';
+  try {
+    return new Date(iso).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+  } catch { return iso; }
+}
 
-  audLog('=== iniciando pipeline CRM → Meta Ads ===', 'info');
-  audLog(`filtro: ${filter} | lookalike: ${lookalike ? 'sim' : 'não'}`);
-  audSetStep(0);
+function statusBadge(ok) {
+  if (ok === null || ok === undefined) return { text: 'Aguardando', bg: 'rgba(255,255,255,0.05)', color: '#94a3b8' };
+  return ok
+    ? { text: 'OK', bg: 'rgba(74,222,128,0.1)', color: '#4ade80' }
+    : { text: 'Falhou', bg: 'rgba(239,68,68,0.1)', color: '#ef4444' };
+}
+
+function renderMetricChip(text, color) {
+  return `<span style="font-size:11px;padding:3px 8px;border-radius:12px;background:rgba(255,255,255,0.05);color:${color || '#94a3b8'}">${text}</span>`;
+}
+
+window.loadAutoStatus = async function() {
+  const btn = document.getElementById('aud-refresh-btn');
+  if (btn) btn.disabled = true;
 
   try {
-    const res = await fetch('/api/meta/audiences', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: filter, create_lookalike: lookalike }),
-    });
-
+    const res  = await fetch('/api/meta/status');
     const data = await res.json();
+    if (data.error) throw new Error(data.error);
 
-    // Exibir log do servidor
-    if (data.log && Array.isArray(data.log)) {
-      data.log.forEach(line => {
-        const type = line.includes('[✓]') || line.includes('concluído') ? 'ok'
-                   : line.includes('[ERRO]') ? 'err'
-                   : line.includes('warn') ? 'warn' : '';
-        audLog(line, type);
-      });
+    // ── Cron: Sync Audiências ──────────────────────────────────────────────
+    const sync = data.sync || {};
+    const syncBadge = statusBadge(sync.ok);
+    const syncStatusEl = document.getElementById('cron-sync-status');
+    if (syncStatusEl) {
+      syncStatusEl.textContent     = syncBadge.text;
+      syncStatusEl.style.background = syncBadge.bg;
+      syncStatusEl.style.color      = syncBadge.color;
+    }
+    const el = (id) => document.getElementById(id);
+    if (el('cron-sync-last'))    el('cron-sync-last').textContent    = fmtDate(sync.lastRun);
+    if (el('cron-sync-next'))    el('cron-sync-next').textContent    = sync.nextRun || '—';
+    if (el('cron-sync-metrics')) el('cron-sync-metrics').innerHTML   = [
+      sync.totalBuyers != null ? renderMetricChip(`${sync.totalBuyers} compradores`, '#a78bfa') : '',
+      sync.totalBase   != null ? renderMetricChip(`${sync.totalBase} base total`, '#c4b5fd') : '',
+    ].filter(Boolean).join('');
+
+    // ── Cron: Process Leads ────────────────────────────────────────────────
+    const leads = data.leads || {};
+    const lBadge = statusBadge(leads.ok);
+    const lStatusEl = document.getElementById('cron-leads-status');
+    if (lStatusEl) {
+      lStatusEl.textContent      = lBadge.text;
+      lStatusEl.style.background = lBadge.bg;
+      lStatusEl.style.color      = lBadge.color;
+    }
+    if (el('cron-leads-last'))    el('cron-leads-last').textContent    = fmtDate(leads.lastRun);
+    if (el('cron-leads-next'))    el('cron-leads-next').textContent    = leads.nextRun || '—';
+    if (el('cron-leads-metrics')) el('cron-leads-metrics').innerHTML   = [
+      leads.newLeads ? renderMetricChip(`+${leads.newLeads} leads`, '#60a5fa') : '',
+      leads.sentToRD ? renderMetricChip(`${leads.sentToRD} → RD`,  '#34d399') : '',
+      leads.capiSent ? renderMetricChip(`${leads.capiSent} CAPI`,  '#f59e0b') : '',
+    ].filter(Boolean).join('');
+
+    // ── Cron: Recalc Scores ────────────────────────────────────────────────
+    const scores = data.scores || {};
+    const sBadge = statusBadge(scores.ok);
+    const sStatusEl = document.getElementById('cron-scores-status');
+    if (sStatusEl) {
+      sStatusEl.textContent      = sBadge.text;
+      sStatusEl.style.background = sBadge.bg;
+      sStatusEl.style.color      = sBadge.color;
+    }
+    if (el('cron-scores-last'))    el('cron-scores-last').textContent    = fmtDate(scores.lastRun);
+    if (el('cron-scores-next'))    el('cron-scores-next').textContent    = scores.nextRun || '—';
+    if (el('cron-scores-metrics')) el('cron-scores-metrics').innerHTML   = [
+      scores.total   ? renderMetricChip(`${scores.total} analisados`, '#94a3b8') : '',
+      scores.sentToRD ? renderMetricChip(`${scores.sentToRD} → RD`,   '#34d399') : '',
+      scores.capiSent ? renderMetricChip(`${scores.capiSent} CAPI`,   '#f59e0b') : '',
+    ].filter(Boolean).join('');
+
+    // ── Score Distribution ─────────────────────────────────────────────────
+    if (el('score-dist-quente')) el('score-dist-quente').textContent = scores.quentes ?? '—';
+    if (el('score-dist-morno'))  el('score-dist-morno').textContent  = scores.mornos  ?? '—';
+    if (el('score-dist-frio'))   el('score-dist-frio').textContent   = scores.frios   ?? '—';
+    if (scores.sentToRD && scores.quentes) {
+      const rdRate = Math.round((scores.sentToRD / (scores.quentes + scores.mornos)) * 100) || 0;
+      if (el('score-dist-quente-rd')) el('score-dist-quente-rd').textContent = `${scores.sentToRD} enviados ao RD (${rdRate}%)`;
     }
 
-    if (data.error && !data.audiences?.length) {
-      audLog(`Erro: ${data.error}`, 'err');
-    } else {
-      audSetStep(3);
+    // ── CAPI ───────────────────────────────────────────────────────────────
+    const capi = data.capi || {};
+    if (el('capi-today')) el('capi-today').textContent = capi.todayCount ?? '0';
+    if (el('capi-last'))  el('capi-last').textContent  = fmtDate(capi.last);
 
-      // Métricas
-      const upload = data.upload || {};
-      audSetMetric('aud-m-total',    upload.total    ?? '—', '#fff');
-      audSetMetric('aud-m-valid',    upload.total    ?? '—', '#4ade80');
-      audSetMetric('aud-m-received', upload.received ?? '—', '#60a5fa');
-      audSetMetric('aud-m-invalid',  upload.invalid  ?? 0,   upload.invalid > 0 ? '#f87171' : '#94a3b8');
-
-      if (data.audiences?.length) {
-        audRenderResult(data.audiences);
+    const capiList = el('capi-events-list');
+    if (capiList) {
+      const events = capi.recentEvents || [];
+      if (events.length === 0) {
+        capiList.innerHTML = '<div style="color:var(--text-secondary);font-size:13px">Nenhum evento ainda — aguardando próximo cron</div>';
+      } else {
+        const eventColors = { Lead: '#60a5fa', Purchase: '#4ade80', ViewContent: '#a78bfa', InitiateCheckout: '#f59e0b' };
+        capiList.innerHTML = events.map(ev => `
+          <div style="display:flex;align-items:center;gap:10px;padding:6px 10px;background:rgba(255,255,255,0.03);border-radius:8px">
+            <span style="font-size:11px;padding:2px 8px;border-radius:12px;font-weight:600;background:${(eventColors[ev.event] || '#94a3b8') + '20'};color:${eventColors[ev.event] || '#94a3b8'}">${ev.event}</span>
+            <span style="font-size:12px;color:#fff;flex:1">${ev.email || '—'}</span>
+            <span style="font-size:11px;color:var(--text-secondary)">${fmtDate(ev.ts)}</span>
+          </div>
+        `).join('');
       }
-
-      audLog('=== pipeline concluído ===', 'ok');
-    }
-  } catch (e) {
-    audLog(`Erro de rede: ${e.message}`, 'err');
-  }
-
-  if (btn) { btn.disabled = false; btn.textContent = 'Sincronizar CRM → Meta'; }
-};
-
-window.listAudiences = async function() {
-  const logEl = document.getElementById('aud-log');
-  if (logEl) logEl.innerHTML = '';
-  audLog('buscando audiências existentes na conta Meta...', 'info');
-
-  try {
-    const res  = await fetch('/api/meta/audiences');
-    const data = await res.json();
-
-    if (data.error) {
-      audLog(`Erro: ${data.error}`, 'err');
-      return;
     }
 
-    const audiences = (data.audiences || [])
-      .filter(a => a.name?.startsWith('LV |') || true) // mostra todas
-      .map(a => ({ ...a, type: a.subtype === 'LOOKALIKE' ? 'lookalike' : 'existing' }));
+    // ── Audiências no Meta ─────────────────────────────────────────────────
+    const audList = el('aud-live-list');
+    if (audList) {
+      const audiences = data.audiences || [];
+      if (audiences.length === 0) {
+        audList.innerHTML = '<div style="color:var(--text-secondary);font-size:13px">Nenhuma audiência encontrada — o sync semanal criará automaticamente</div>';
+      } else {
+        const typeMap = {
+          CUSTOM:    { label: 'Custom',    color: '#4ade80' },
+          LOOKALIKE: { label: 'Lookalike', color: '#60a5fa' },
+        };
+        audList.innerHTML = audiences.map(a => {
+          const cfg = typeMap[a.subtype] || { label: a.subtype, color: '#94a3b8' };
+          const countMin = a.count_min ? Number(a.count_min).toLocaleString('pt-BR') : null;
+          const countMax = a.count_max ? Number(a.count_max).toLocaleString('pt-BR') : null;
+          const countStr = countMin ? `~${countMin}${countMax && countMax !== countMin ? ' — ' + countMax : '+'} pessoas` : 'processando...';
+          const statusColor = a.status === 'Pronta' ? '#4ade80' : '#f59e0b';
+          return `
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:rgba(255,255,255,0.03);border-radius:12px;border-left:3px solid ${cfg.color}">
+              <div style="flex:1">
+                <div style="font-weight:600;color:#fff;font-size:14px">${a.name}</div>
+                <div style="font-size:12px;color:var(--text-secondary);margin-top:3px">ID: ${a.id} · Atualizada: ${fmtDate(a.updated)}</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px">
+                <span style="font-size:12px;color:${statusColor};font-weight:600">${a.status}</span>
+                <span style="font-size:12px;color:var(--text-secondary)">${countStr}</span>
+                <span style="font-size:11px;padding:3px 10px;border-radius:20px;background:${cfg.color + '20'};color:${cfg.color};font-weight:600">${cfg.label}</span>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+    }
 
-    audLog(`${audiences.length} audiências encontradas`, 'ok');
-    if (audiences.length) audRenderResult(audiences);
-    else audLog('nenhuma audiência encontrada na conta', 'warn');
   } catch (e) {
-    audLog(`Erro: ${e.message}`, 'err');
+    console.error('[loadAutoStatus]', e.message);
   }
+
+  if (btn) btn.disabled = false;
 };
+
+// Mantém compatibilidade retroativa (não chamadas mais ativamente)
+window.runAudienceSync = () => console.log('[deprecated] use automação automática');
+window.listAudiences   = () => window.loadAutoStatus();

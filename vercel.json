@@ -1,6 +1,11 @@
 {
   "framework": "nextjs",
   "regions": ["gru1"],
+  "crons": [
+    { "path": "/api/cron/sync-audiences", "schedule": "0 6 * * 0" },
+    { "path": "/api/cron/process-leads",  "schedule": "0 */2 * * *" },
+    { "path": "/api/cron/recalc-scores",  "schedule": "0 7 * * *" }
+  ],
   "functions": {
     "src/app/api/data/route.ts": {
       "maxDuration": 30
@@ -10,6 +15,18 @@
     },
     "src/app/api/upload/route.ts": {
       "maxDuration": 15
+    },
+    "src/app/api/cron/sync-audiences/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/cron/process-leads/route.ts": {
+      "maxDuration": 45
+    },
+    "src/app/api/cron/recalc-scores/route.ts": {
+      "maxDuration": 45
+    },
+    "src/app/api/meta/capi/route.ts": {
+      "maxDuration": 20
     }
   },
   "headers": [
