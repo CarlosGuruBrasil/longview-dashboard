@@ -4366,3 +4366,156 @@ function updateEmpreendimentos(leads) {
     setupStockFilters();
 }
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AUDIÊNCIAS CRM → META ADS
+// ─────────────────────────────────────────────────────────────────────────────
+
+function audLog(msg, type = '') {
+  const el = document.getElementById('aud-log');
+  if (!el) return;
+  const ts = new Date().toLocaleTimeString('pt-BR');
+  const color = type === 'ok' ? '#4ade80' : type === 'err' ? '#f87171' : type === 'warn' ? '#fbbf24' : '#94a3b8';
+  el.innerHTML += `\n<span style="color:${color}">[${ts}] ${msg}</span>`;
+  el.scrollTop = el.scrollHeight;
+}
+
+function audSetStep(n) {
+  for (let i = 0; i < 4; i++) {
+    const el = document.getElementById(`aud-step-${i}`);
+    if (!el) continue;
+    if (i < n) {
+      el.style.background = 'rgba(74,222,128,0.08)';
+      el.style.color = '#4ade80';
+    } else if (i === n) {
+      el.style.background = 'rgba(255,255,255,0.08)';
+      el.style.color = '#fff';
+      el.style.fontWeight = '600';
+    } else {
+      el.style.background = 'rgba(255,255,255,0.02)';
+      el.style.color = 'var(--text-secondary)';
+      el.style.fontWeight = 'normal';
+    }
+  }
+}
+
+function audSetMetric(id, val, color) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = val;
+  if (color) el.style.color = color;
+}
+
+function audRenderResult(audiences) {
+  const card = document.getElementById('aud-result-card');
+  const list = document.getElementById('aud-result-list');
+  if (!card || !list) return;
+
+  const typeConfig = {
+    custom:    { label: 'Custom Audience', color: '#4ade80', bg: 'rgba(74,222,128,0.08)' },
+    lookalike: { label: 'Lookalike',       color: '#60a5fa', bg: 'rgba(96,165,250,0.08)' },
+    exclusao:  { label: 'Exclusão',        color: '#fbbf24', bg: 'rgba(251,191,36,0.08)' },
+    existing:  { label: 'Existente',       color: '#94a3b8', bg: 'rgba(148,163,184,0.06)' },
+  };
+
+  list.innerHTML = audiences.map(a => {
+    const cfg = typeConfig[a.type] || typeConfig.existing;
+    const count = a.approximate_count_lower_bound
+      ? `~${Number(a.approximate_count_lower_bound).toLocaleString('pt-BR')}+ pessoas`
+      : a.count ? `${a.count} contatos` : '';
+    return `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:rgba(255,255,255,0.03);border-radius:10px;border-left:3px solid ${cfg.color}">
+        <div>
+          <div style="font-weight:600;color:#fff;font-size:14px">${a.name}</div>
+          <div style="font-size:12px;color:var(--text-secondary);margin-top:2px">${a.id !== 'pendente' ? 'ID: ' + a.id : ''} ${count ? '· ' + count : ''}</div>
+        </div>
+        <span style="font-size:11px;padding:4px 10px;border-radius:20px;font-weight:600;background:${cfg.bg};color:${cfg.color}">${cfg.label}</span>
+      </div>
+    `;
+  }).join('');
+
+  card.style.display = 'block';
+}
+
+window.runAudienceSync = async function() {
+  const btn = document.getElementById('aud-btn-run');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sincronizando...'; }
+
+  const filter    = document.getElementById('aud-filter')?.value || 'compradores';
+  const lookalike = document.getElementById('aud-lookalike')?.value !== 'false';
+  const logEl     = document.getElementById('aud-log');
+  if (logEl) logEl.innerHTML = '';
+
+  audLog('=== iniciando pipeline CRM → Meta Ads ===', 'info');
+  audLog(`filtro: ${filter} | lookalike: ${lookalike ? 'sim' : 'não'}`);
+  audSetStep(0);
+
+  try {
+    const res = await fetch('/api/meta/audiences', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: filter, create_lookalike: lookalike }),
+    });
+
+    const data = await res.json();
+
+    // Exibir log do servidor
+    if (data.log && Array.isArray(data.log)) {
+      data.log.forEach(line => {
+        const type = line.includes('[✓]') || line.includes('concluído') ? 'ok'
+                   : line.includes('[ERRO]') ? 'err'
+                   : line.includes('warn') ? 'warn' : '';
+        audLog(line, type);
+      });
+    }
+
+    if (data.error && !data.audiences?.length) {
+      audLog(`Erro: ${data.error}`, 'err');
+    } else {
+      audSetStep(3);
+
+      // Métricas
+      const upload = data.upload || {};
+      audSetMetric('aud-m-total',    upload.total    ?? '—', '#fff');
+      audSetMetric('aud-m-valid',    upload.total    ?? '—', '#4ade80');
+      audSetMetric('aud-m-received', upload.received ?? '—', '#60a5fa');
+      audSetMetric('aud-m-invalid',  upload.invalid  ?? 0,   upload.invalid > 0 ? '#f87171' : '#94a3b8');
+
+      if (data.audiences?.length) {
+        audRenderResult(data.audiences);
+      }
+
+      audLog('=== pipeline concluído ===', 'ok');
+    }
+  } catch (e) {
+    audLog(`Erro de rede: ${e.message}`, 'err');
+  }
+
+  if (btn) { btn.disabled = false; btn.textContent = 'Sincronizar CRM → Meta'; }
+};
+
+window.listAudiences = async function() {
+  const logEl = document.getElementById('aud-log');
+  if (logEl) logEl.innerHTML = '';
+  audLog('buscando audiências existentes na conta Meta...', 'info');
+
+  try {
+    const res  = await fetch('/api/meta/audiences');
+    const data = await res.json();
+
+    if (data.error) {
+      audLog(`Erro: ${data.error}`, 'err');
+      return;
+    }
+
+    const audiences = (data.audiences || [])
+      .filter(a => a.name?.startsWith('LV |') || true) // mostra todas
+      .map(a => ({ ...a, type: a.subtype === 'LOOKALIKE' ? 'lookalike' : 'existing' }));
+
+    audLog(`${audiences.length} audiências encontradas`, 'ok');
+    if (audiences.length) audRenderResult(audiences);
+    else audLog('nenhuma audiência encontrada na conta', 'warn');
+  } catch (e) {
+    audLog(`Erro: ${e.message}`, 'err');
+  }
+};

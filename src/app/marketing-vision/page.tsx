@@ -125,6 +125,11 @@ export default function MarketingVisionPage() {
                 <span>Score de Leads</span>
               </a>
 
+              <a href="#" className="nav-item" data-view="audiences">
+                <i className="ph ph-users-three"></i>
+                <span>Audiências CRM</span>
+              </a>
+
               {isAdmin && (
                 <a href="/admin/users" className="nav-item" style={{ color: '#c084fc' }}>
                   <i className="ph ph-gear"></i>
@@ -215,6 +220,12 @@ export default function MarketingVisionPage() {
           </a>
           <a href="#" className="mobile-nav-item" data-view="score-leads">
             <i className="ph ph-lightning"></i>
+            <span>Score</span>
+          </a>
+          <a href="#" className="mobile-nav-item" data-view="audiences">
+            <i className="ph ph-users-three"></i>
+            <span>Audiências</span>
+          </a>
             <span>Score</span>
           </a>
         </nav>
@@ -1335,7 +1346,77 @@ export default function MarketingVisionPage() {
               </div>
             </div>
 
+
+          {/* ─── VIEW: AUDIÊNCIAS CRM ─────────────────────────────────── */}
+          <div id="view-audiences" className="view-section hidden">
+            <div style={{ maxWidth: '900px' }}>
+              <div style={{ marginBottom: '24px' }}>
+                <h2 style={{ fontSize: '22px', fontWeight: '700', color: '#fff', margin: '0 0 6px' }}>Audiências CRM → Meta Ads</h2>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '14px', margin: 0 }}>
+                  Sincroniza a base do CV CRM com o Meta Ads para criar audiências qualificadas e Lookalike de compradores reais.
+                </p>
+              </div>
+              <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px', marginBottom: '20px' }}>
+                <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '20px' }}>configurar sincronização</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Base a sincronizar</label>
+                    <select id="aud-filter" style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: '14px' }}>
+                      <option value="compradores">Compradores (clientes com contrato)</option>
+                      <option value="ativos">Leads ativos no funil</option>
+                      <option value="todos">Todos os leads do CRM</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Criar Lookalike automático</label>
+                    <select id="aud-lookalike" style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: '14px' }}>
+                      <option value="true">Sim — criar Lookalike 1% Brasil</option>
+                      <option value="false">Não — somente Custom Audience</option>
+                    </select>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '0', marginBottom: '20px', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  {(['1. Buscar CRM', '2. Criar Audiência', '3. Upload SHA-256', '4. Lookalike'] as string[]).map((s: string, i: number) => (
+                    <div key={i} id={`aud-step-${i}`} style={{ flex: 1, padding: '10px 8px', textAlign: 'center', fontSize: '12px', color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.02)', borderRight: i < 3 ? '1px solid rgba(255,255,255,0.08)' : 'none' }}>
+                      {s}
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '20px' }}>
+                  {([
+                    { id: 'aud-m-total',    label: 'Contatos CRM',      color: '#fff' },
+                    { id: 'aud-m-valid',    label: 'Válidos p/ upload', color: '#4ade80' },
+                    { id: 'aud-m-received', label: 'Enviados ao Meta',  color: '#60a5fa' },
+                    { id: 'aud-m-invalid',  label: 'Inválidos',         color: '#f87171' },
+                  ] as {id:string;label:string;color:string}[]).map((m: {id:string;label:string;color:string}) => (
+                    <div key={m.id} style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '10px', padding: '12px 14px' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px' }}>{m.label}</div>
+                      <div id={m.id} style={{ fontSize: '24px', fontWeight: '700', color: m.color }}>—</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                  <button id="aud-btn-run" onClick={() => (window as any).runAudienceSync()} style={{ padding: '10px 22px', borderRadius: '8px', background: '#fff', color: '#000', border: 'none', fontWeight: '700', fontSize: '14px', cursor: 'pointer' }}>
+                    Sincronizar CRM → Meta
+                  </button>
+                  <button id="aud-btn-list" onClick={() => (window as any).listAudiences()} style={{ padding: '10px 18px', borderRadius: '8px', background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', fontSize: '14px', cursor: 'pointer' }}>
+                    Ver Audiências Existentes
+                  </button>
+                </div>
+              </div>
+              <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
+                <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>log de execução</div>
+                <div id="aud-log" style={{ fontFamily: 'monospace', fontSize: '12px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '14px', minHeight: '120px', maxHeight: '240px', overflowY: 'auto', color: '#94a3b8', whiteSpace: 'pre-wrap' }}>
+                  aguardando execução...
+                </div>
+              </div>
+              <div id="aud-result-card" style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '20px', display: 'none' }}>
+                <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '16px' }}>audiências criadas / disponíveis</div>
+                <div id="aud-result-list" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}></div>
+              </div>
+            </div>
           </div>
+
         </main>
       </div>
     </div>
