@@ -45,15 +45,10 @@ export async function GET(req: NextRequest) {
 
   const log: any[] = [];
 
-  // 1. Criar 2 campanhas ABO
-  const [rL, rR] = await Promise.all([
-    api(token, `${ACT}/campaigns`, { name:'HUB Beira Mar | Leads | Formulario | Jun 2026', objective:'OUTCOME_LEADS', status:'PAUSED', buying_type:'AUCTION', special_ad_categories:[], is_adset_budget_sharing_enabled:false }).catch(e => ({ data:{ err: e.response?.data?.error?.message||e.message, full: JSON.stringify(e.response?.data) } })),
-    api(token, `${ACT}/campaigns`, { name:'HUB Beira Mar | Retargeting | Leads | Jun 2026', objective:'OUTCOME_LEADS', status:'PAUSED', buying_type:'AUCTION', special_ad_categories:[], is_adset_budget_sharing_enabled:false }).catch(e => ({ data:{ err: e.response?.data?.error?.message||e.message, full: JSON.stringify(e.response?.data) } })),
-  ]);
-  const campL = (rL as any).data?.id;
-  const campR = (rR as any).data?.id;
-  log.push({ step:'campaigns', campL, campR, errL:(rL as any).data?.err, errR:(rR as any).data?.err, fullL:(rL as any).data?.full, fullR:(rR as any).data?.full });
-  if (!campL || !campR) return NextResponse.json({ ok:false, log });
+  // Campanhas ja criadas com sucesso via token Longview
+  const campL = '120249915769170415'; // HUB Beira Mar | Leads | Formulario | Jun 2026
+  const campR = '120249915769150415'; // HUB Beira Mar | Retargeting | Leads | Jun 2026
+  log.push({ step:'campaigns', campL, campR, note:'usando campanhas existentes' });
 
   // 2. Criar 4 adsets com daily_budget
   const adsetRes = await Promise.all(ADSETS_DEF.map(async cfg => {
