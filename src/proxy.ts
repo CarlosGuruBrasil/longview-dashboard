@@ -28,7 +28,8 @@ export function proxy(request: NextRequest) {
     pathname === '/api/rd/token'           || // status do token — acesso interno
     pathname === '/api/rd/webhook'         || // webhooks do RD — acesso externo
     pathname === '/api/cv/webhook'         || // webhooks do CV CRM — acesso externo
-    pathname.startsWith('/api/cron/')      || // cron jobs — autenticados pelo CRON_SECRET
+    pathname.startsWith('/api/cron/')              || // cron jobs — autenticados pelo CRON_SECRET
+    pathname === '/api/meta/create-lead-ad'        || // lead ad creation — auth via CRON_SECRET
     pathname === '/login' ||
     pathname === '/favicon.ico' ||
     pathname.includes('logo') || // imagens de logo
