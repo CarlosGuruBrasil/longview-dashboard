@@ -80,9 +80,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: validAdSets.length > 0, adsets:adsetRes, validAdSets, log });
   }
 
+  // step=ads: pula criacao de adsets, usa apenas os EXISTING_ADSETS
+  const finalAdSets = step === 'ads' ? EXISTING_ADSETS : validAdSets;
+
   // 3. Criar 12 anuncios
   const adRes: any[] = [];
-  for (const adSet of validAdSets) {
+  for (const adSet of finalAdSets) {
     for (const copy of COPIES) {
       try {
         const r = await api(token, `${ACT}/ads`, {
