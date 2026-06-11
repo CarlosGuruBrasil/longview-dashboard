@@ -81,7 +81,13 @@ export async function GET(req: NextRequest) {
   }
 
   // step=ads: pula criacao de adsets, usa apenas os EXISTING_ADSETS
-  const finalAdSets = step === 'ads' ? EXISTING_ADSETS : validAdSets;
+  // adset_idx=0,1,2 para processar um adset por vez (evita timeout)
+  let finalAdSets = step === 'ads' ? EXISTING_ADSETS : validAdSets;
+  const adsetIdx = url.searchParams.get('adset_idx');
+  if (adsetIdx !== null) {
+    const idx = parseInt(adsetIdx);
+    finalAdSets = finalAdSets.filter((_:any, i:number) => i === idx);
+  }
 
   // 3. Criar 12 anuncios
   const adRes: any[] = [];
