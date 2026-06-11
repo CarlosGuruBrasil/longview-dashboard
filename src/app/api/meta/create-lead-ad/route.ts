@@ -16,10 +16,14 @@ const COPIES = [
 ];
 
 const ADSETS_DEF = [
-  { camp:'leads', name:'HBM | Formulario | Brasil Amplo | 28-55',      budget:68000, targeting:{ geo_locations:{ countries:['BR'] }, age_min:28, age_max:55 } },
-  { camp:'leads', name:'HBM | Formulario | Grande Florianopolis',       budget:62000, targeting:{ geo_locations:{ custom_locations:[{ latitude:-27.5935, longitude:-48.5761, radius:30, distance_unit:'kilometer' }] } } },
-  { camp:'ret',   name:'HBM | Retargeting | IG + FB Engajados 365d',   budget:26000, targeting:{ geo_locations:{ countries:['BR'] }, custom_audiences:[{id:'120249105925720415'},{id:'120249105927630415'},{id:'120246234250200415'},{id:'120247232752100415'}] } },
+  { camp:'leads', name:'HBM | Formulario | Brasil Amplo | 28-55',      budget:68000, targeting:{ geo_locations:{ countries:['BR'] }, age_min:28, age_max:55, targeting_automation:{ advantage_audience:1 } } },
   { camp:'ret',   name:'HBM | Retargeting | Viram Videos + Leads CRM', budget:24000, targeting:{ geo_locations:{ countries:['BR'] }, custom_audiences:[{id:'120246234223350415'},{id:'120247232761650415'},{id:'120249899124900415'}] } },
+];
+
+// Ad sets ja criados com sucesso — usados na etapa de anuncios
+const EXISTING_ADSETS = [
+  { name:'HBM | Formulario | Grande Florianopolis',    id:'120249915947690415', ok:true },
+  { name:'HBM | Retargeting | IG + FB Engajados 365d', id:'120249915947700415', ok:true },
 ];
 
 function auth(req: NextRequest): boolean {
@@ -70,7 +74,7 @@ export async function GET(req: NextRequest) {
     }
   }));
   log.push({ step:'adsets', results:adsetRes });
-  const validAdSets = adsetRes.filter(a => a.ok && a.id);
+  const validAdSets = [...EXISTING_ADSETS, ...adsetRes.filter(a => a.ok && a.id)];
 
   if (step === 'adsets') {
     return NextResponse.json({ ok: validAdSets.length > 0, adsets:adsetRes, validAdSets, log });
