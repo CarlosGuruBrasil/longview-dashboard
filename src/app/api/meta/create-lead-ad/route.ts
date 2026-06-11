@@ -57,9 +57,10 @@ export async function GET(req: NextRequest) {
       const r = await api(token, `${ACT}/adsets`, {
         name: cfg.name, campaign_id: campId,
         billing_event: 'IMPRESSIONS', optimization_goal: 'LEAD_GENERATION',
+        bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
         destination_type: 'ON_AD', daily_budget: cfg.budget,
         promoted_object: { page_id: PAGE_ID }, targeting: cfg.targeting,
-        status: 'PAUSED', end_time: END,
+        status: 'PAUSED',
       });
       return { name:cfg.name, id:(r as any).data?.id, ok:true };
     } catch (e: any) {
