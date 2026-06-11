@@ -47,12 +47,12 @@ export async function GET(req: NextRequest) {
 
   // 1. Criar 2 campanhas ABO
   const [rL, rR] = await Promise.all([
-    api(token, `${ACT}/campaigns`, { name:'HUB Beira Mar | Leads | Formulario | Jun 2026', objective:'OUTCOME_LEADS', status:'PAUSED', buying_type:'AUCTION', special_ad_categories:[] }).catch(e => ({ data:{ err: e.response?.data?.error?.message||e.message } })),
-    api(token, `${ACT}/campaigns`, { name:'HUB Beira Mar | Retargeting | Leads | Jun 2026', objective:'OUTCOME_LEADS', status:'PAUSED', buying_type:'AUCTION', special_ad_categories:[] }).catch(e => ({ data:{ err: e.response?.data?.error?.message||e.message } })),
+    api(token, `${ACT}/campaigns`, { name:'HUB Beira Mar | Leads | Formulario | Jun 2026', objective:'OUTCOME_LEADS', status:'PAUSED', buying_type:'AUCTION', special_ad_categories:[] }).catch(e => ({ data:{ err: e.response?.data?.error?.message||e.message, full: JSON.stringify(e.response?.data) } })),
+    api(token, `${ACT}/campaigns`, { name:'HUB Beira Mar | Retargeting | Leads | Jun 2026', objective:'OUTCOME_LEADS', status:'PAUSED', buying_type:'AUCTION', special_ad_categories:[] }).catch(e => ({ data:{ err: e.response?.data?.error?.message||e.message, full: JSON.stringify(e.response?.data) } })),
   ]);
   const campL = (rL as any).data?.id;
   const campR = (rR as any).data?.id;
-  log.push({ step:'campaigns', campL, campR, errL:(rL as any).data?.err, errR:(rR as any).data?.err });
+  log.push({ step:'campaigns', campL, campR, errL:(rL as any).data?.err, errR:(rR as any).data?.err, fullL:(rL as any).data?.full, fullR:(rR as any).data?.full });
   if (!campL || !campR) return NextResponse.json({ ok:false, log });
 
   // 2. Criar 4 adsets com daily_budget
