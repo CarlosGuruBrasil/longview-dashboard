@@ -16,7 +16,6 @@ const COPIES = [
 ];
 
 const ADSETS_DEF = [
-  { camp:'leads', name:'HBM | Formulario | Brasil Amplo | 28-55',      budget:68000, targeting:{ geo_locations:{ countries:['BR'] }, targeting_automation:{ advantage_audience:{ age_min_suggestion:28, age_max_suggestion:55 } } } },
   { camp:'ret',   name:'HBM | Retargeting | Viram Videos + Leads CRM', budget:24000, targeting:{ geo_locations:{ countries:['BR'] }, custom_audiences:[{id:'120246234223350415'},{id:'120247232761650415'},{id:'120249899124900415'}] } },
 ];
 
@@ -24,6 +23,7 @@ const ADSETS_DEF = [
 const EXISTING_ADSETS = [
   { name:'HBM | Formulario | Grande Florianopolis',    id:'120249915947690415', ok:true },
   { name:'HBM | Retargeting | IG + FB Engajados 365d', id:'120249915947700415', ok:true },
+  { name:'HBM | Formulario | Brasil Amplo | 28-55',    id:'120249916157890415', ok:true },
 ];
 
 function auth(req: NextRequest): boolean {
