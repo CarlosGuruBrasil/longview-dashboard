@@ -69,6 +69,27 @@ function isSemConexaoEtapa(etapaNome: string): boolean {
   return SEM_CONEXAO_PATTERNS.some(p => n.includes(p));
 }
 
+// TTL do dedup: 90 dias. Lead parado na etapa nao recebe novamente.
+const SEM_CONEXAO_DEDUP_TTL = 90 * 86400;
+
+/**
+ * Identidade estavel do lead para deduplicacao.
+ * Prioridade: email > telefone > id do CRM.
+ * O RD Station identifica contatos por email, entao email e a chave primaria.
+ * Inclui idlead/referencia porque o CV CRM nao retorna "id" em todos os endpoints.
+ */
+function getSemConexaoDedupKey(lead: any): string | null {
+  const email = String(lead.email || lead.email_principal || '').toLowerCase().trim();
+  const phone = String(lead.telefone || lead.celular || lead.fone || '').replace(/\D/g, '');
+  const leadId = String(
+    lead.idlead || lead.id_lead || lead.id || lead.codigo || lead.lead_id || lead.referencia || ''
+  ).trim();
+  if (email)  return `cv:sem_conexao:sent:email:${email}`;
+  if (phone)  return `cv:sem_conexao:sent:phone:${phone}`;
+  if (leadId) return `cv:sem_conexao:sent:${leadId}`;
+  return null;
+}
+
 async function fetchActiveLeads(): Promise<any[]> {
   const email   = process.env.CV_CRM_EMAIL;
   const token   = process.env.CV_CRM_TOKEN;
@@ -328,22 +349,39 @@ export async function GET(request: NextRequest) {
     stats.semConexao = semConexaoLeads.length;
     console.log(`[recalc-scores] ${semConexaoLeads.length} leads Sem Conexão encontrados`);
 
+    // Modo seed: marca os leads atuais como ja processados SEM disparar o RD.
+    // Uso unico apos deploy: /api/cron/recalc-scores?seed=1
+    const seedOnly = new URL(request.url).searchParams.get('seed') === '1';
+
     for (const lead of semConexaoLeads) {
       try {
-        const leadId   = String(lead.id || lead.codigo || '');
-        const dedupKey = `cv:sem_conexao:sent:${leadId}`;
-        const alreadySent = leadId ? await kv.get(dedupKey) : null;
-        if (alreadySent) continue; // webhook já processou
+        const dedupKey = getSemConexaoDedupKey(lead);
+
+        // Sem identidade estavel (sem email, telefone e id): nunca dispara.
+        // Disparar sem dedup foi a causa de emails duplicados diarios.
+        if (!dedupKey) {
+          stats.semConexaoSkipped = (stats.semConexaoSkipped || 0) + 1;
+          continue;
+        }
+
+        const alreadySent = await kv.get(dedupKey);
+        if (alreadySent) continue; // webhook ou cron anterior ja processou
+
+        if (seedOnly) {
+          await kv.set(dedupKey, `seed:${new Date().toISOString()}`, { ex: SEM_CONEXAO_DEDUP_TTL });
+          stats.semConexaoSeeded = (stats.semConexaoSeeded || 0) + 1;
+          continue;
+        }
 
         const ok = await triggerSemConexaoRD(lead);
         if (ok) {
           stats.semConexaoSentRD++;
-          if (leadId) await kv.set(dedupKey, new Date().toISOString(), { ex: 30 * 86400 });
+          await kv.set(dedupKey, new Date().toISOString(), { ex: SEM_CONEXAO_DEDUP_TTL });
           // Log no webhook KV para aparecer no painel
           const existing: any[] = (await kv.get('cv:webhook:log')) || [];
           const entry = {
             ts:        new Date().toISOString(),
-            leadId,
+            leadId:    dedupKey.split(':').pop(),
             nome:      lead.nome || '?',
             etapa:     lead.etapa?.nome || lead.etapa || 'Sem Conexão',
             evento:    'sem_conexao_cron',

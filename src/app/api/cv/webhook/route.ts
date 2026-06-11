@@ -119,7 +119,9 @@ export async function POST(request: NextRequest) {
   const lead     = body.lead    || body.data?.lead || body;
   const etapa    = lead.etapa?.nome || lead.etapa || lead.etapa_nome || body.etapa_nome || '';
   const situacao = lead.situacao?.nome || lead.situacao || '';
-  const leadId   = String(lead.id || lead.codigo || lead.lead_id || '');
+  const leadId   = String(
+    lead.idlead || lead.id_lead || lead.id || lead.codigo || lead.lead_id || lead.referencia || ''
+  ).trim();
 
   // Verifica se é uma mudança de etapa para "Sem Conexão"
   const semConexao = isSemConexao(etapa) || isSemConexao(situacao);
@@ -129,11 +131,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, action: 'ignored', etapa });
   }
 
-  // Evita enviar duplicado para o mesmo lead (dedup por 30 dias)
-  const dedupKey = `cv:sem_conexao:sent:${leadId}`;
+  // Identidade estavel para dedup: email > telefone > id do CRM.
+  // Mesma convencao de chave usada pelo cron recalc-scores.
+  const leadEmail = String(lead.email || lead.email_principal || '').toLowerCase().trim();
+  const leadPhone = String(lead.telefone || lead.celular || lead.fone || '').replace(/\D/g, '');
+  const dedupKey =
+    leadEmail ? `cv:sem_conexao:sent:email:${leadEmail}` :
+    leadPhone ? `cv:sem_conexao:sent:phone:${leadPhone}` :
+    leadId    ? `cv:sem_conexao:sent:${leadId}` : null;
+
+  // Sem identidade nao ha como deduplicar nem como o RD identificar o contato
+  if (!dedupKey) {
+    await logEvent({ ...body, lead, etapa, evento: 'sem_conexao_sem_identidade' }, false);
+    return NextResponse.json({ ok: true, action: 'skipped_no_identity', etapa });
+  }
+
+  // Evita enviar duplicado para o mesmo contato (dedup por 90 dias)
   const alreadySent = await kv.get(dedupKey);
   if (alreadySent) {
-    console.log(`[cv/webhook] Lead ${leadId} já processado — dedup`);
+    console.log(`[cv/webhook] Contato ${dedupKey} já processado — dedup`);
     await logEvent({ ...body, lead, etapa, evento: 'sem_conexao_dedup' }, false);
     return NextResponse.json({ ok: true, action: 'dedup', leadId });
   }
@@ -142,14 +158,14 @@ export async function POST(request: NextRequest) {
   const rdResult = await triggerRDSemConexao({
     id:       leadId,
     nome:     lead.nome || lead.name || '',
-    email:    lead.email || lead.email_principal || '',
+    email:    leadEmail,
     telefone: lead.telefone || lead.celular || lead.fone || '',
     etapa,
   });
 
-  // Marca como enviado por 30 dias
+  // Marca como enviado por 90 dias
   if (rdResult.ok) {
-    await kv.set(dedupKey, new Date().toISOString(), { ex: 30 * 86400 });
+    await kv.set(dedupKey, new Date().toISOString(), { ex: 90 * 86400 });
   }
 
   await logEvent({ ...body, lead, etapa, evento: 'sem_conexao' }, true, rdResult);
