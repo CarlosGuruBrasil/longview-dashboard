@@ -30,7 +30,7 @@ function isAuthorized(request: NextRequest): boolean {
   return (request.headers.get('authorization') || '').replace('Bearer ', '') === allowed;
 }
 
-async function createAdSet(campaignId: string, name: string, targeting: object): Promise<string | null> {
+async function createAdSet(campaignId: string, name: string, targeting: object): Promise<{id:string|null,err:string|null}> {
   try {
     const res = await axios.post(`${META_BASE}/${ACT}/adsets`, {
       name, campaign_id: campaignId, billing_event: 'IMPRESSIONS',
@@ -39,10 +39,10 @@ async function createAdSet(campaignId: string, name: string, targeting: object):
       status: 'PAUSED', start_time: new Date().toISOString(), end_time: END_TIME,
       access_token: META_TOKEN,
     }, { timeout: 15000 });
-    return res.data?.id || null;
+    return {id: res.data?.id || null, err: null};
   } catch (err: any) {
-    console.error('adset err:', err.response?.data?.error?.message || err.message);
-    return null;
+    const msg = err.response?.data?.error?.error_user_msg || err.response?.data?.error?.message || err.message;
+    return {id: null, err: msg};
   }
 }
 
@@ -71,12 +71,14 @@ export async function GET(request: NextRequest) {
   if (!META_TOKEN) return NextResponse.json({ error: 'META_TOKEN nao configurado' }, { status: 500 });
 
   // Cria 4 ad sets nas campanhas ja existentes
-  const [asAmplo, asGfloripa, asEngajados, asVideos] = await Promise.all([
+  const [rAmplo, rGfloripa, rEngajados, rVideos] = await Promise.all([
     createAdSet(CAMP_LEADS,    'HBM | Formulario | Brasil Amplo | 28-55',       { geo_locations: { countries: ['BR'] }, age_min: 28, age_max: 55 }),
     createAdSet(CAMP_LEADS,    'HBM | Formulario | Grande Florianopolis',        { geo_locations: { custom_locations: [{ latitude: -27.5935, longitude: -48.5761, radius: 30, distance_unit: 'kilometer' }] }, age_min: 28, age_max: 60 }),
     createAdSet(CAMP_RETARGET, 'HBM | Retargeting | IG + FB Engajados 365d',   { geo_locations: { countries: ['BR'] }, custom_audiences: [{ id: '120249105925720415' }, { id: '120249105927630415' }, { id: '120246234250200415' }, { id: '120247232752100415' }] }),
     createAdSet(CAMP_RETARGET, 'HBM | Retargeting | Viram Videos + Leads CRM', { geo_locations: { countries: ['BR'] }, custom_audiences: [{ id: '120246234223350415' }, { id: '120247232761650415' }, { id: '120249899124900415' }] }),
   ]);
+  const asErrors = [rAmplo.err, rGfloripa.err, rEngajados.err, rVideos.err].filter(Boolean);
+  const asAmplo = rAmplo.id; const asGfloripa = rGfloripa.id; const asEngajados = rEngajados.id; const asVideos = rVideos.id;
 
   const adSets = [
     { id: asAmplo,     label: 'Brasil Amplo' },
@@ -105,7 +107,7 @@ export async function GET(request: NextRequest) {
 
   const created = results.filter(r => r.ok).length;
   const failed  = results.filter(r => !r.ok).length;
-  return NextResponse.json({ ok: failed === 0, campaigns: { leads: CAMP_LEADS, retargeting: CAMP_RETARGET }, ad_sets: adSets, created, failed, results });
+  return NextResponse.json({ ok: failed === 0, campaigns: { leads: CAMP_LEADS, retargeting: CAMP_RETARGET }, ad_set_errors: asErrors, ad_sets: adSets, created, failed, results });
 }
 
 export async function POST(request: NextRequest) {
