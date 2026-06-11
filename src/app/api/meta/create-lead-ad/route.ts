@@ -42,6 +42,7 @@ export async function GET(req: NextRequest) {
 
   if (exec !== '1') return NextResponse.json({ ok:true, ready:true });
   if (!token)       return NextResponse.json({ error:'user_token obrigatorio como query param' }, { status:400 });
+  const step = url.searchParams.get('step') || 'all';
 
   const log: any[] = [];
 
@@ -70,6 +71,10 @@ export async function GET(req: NextRequest) {
   }));
   log.push({ step:'adsets', results:adsetRes });
   const validAdSets = adsetRes.filter(a => a.ok && a.id);
+
+  if (step === 'adsets') {
+    return NextResponse.json({ ok: validAdSets.length > 0, adsets:adsetRes, validAdSets, log });
+  }
 
   // 3. Criar 12 anuncios
   const adRes: any[] = [];
