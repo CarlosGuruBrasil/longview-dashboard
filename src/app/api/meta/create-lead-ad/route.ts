@@ -16,7 +16,7 @@ const COPIES = [
 ];
 
 const ADSETS_DEF = [
-  { camp:'leads', name:'HBM | Formulario | Brasil Amplo | 28-55',      budget:68000, targeting:{ geo_locations:{ countries:['BR'] }, age_min:28, age_max:55, targeting_automation:{ advantage_audience:1 } } },
+  { camp:'leads', name:'HBM | Formulario | Brasil Amplo | 28-55',      budget:68000, targeting:{ geo_locations:{ countries:['BR'] }, targeting_automation:{ advantage_audience:{ age_min_suggestion:28, age_max_suggestion:55 } } } },
   { camp:'ret',   name:'HBM | Retargeting | Viram Videos + Leads CRM', budget:24000, targeting:{ geo_locations:{ countries:['BR'] }, custom_audiences:[{id:'120246234223350415'},{id:'120247232761650415'},{id:'120249899124900415'}] } },
 ];
 
