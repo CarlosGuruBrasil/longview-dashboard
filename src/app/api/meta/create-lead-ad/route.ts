@@ -35,6 +35,7 @@ async function createAdSet(campaignId: string, name: string, targeting: object):
     const res = await axios.post(`${META_BASE}/${ACT}/adsets`, {
       name, campaign_id: campaignId, billing_event: 'IMPRESSIONS',
       optimization_goal: 'LEAD_GENERATION', destination_type: 'ON_AD',
+      bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
       promoted_object: { page_id: PAGE_ID }, targeting,
       status: 'PAUSED', start_time: new Date().toISOString(), end_time: END_TIME,
       access_token: META_TOKEN,
