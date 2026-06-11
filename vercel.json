@@ -7,6 +7,9 @@
     { "path": "/api/cron/recalc-scores",  "schedule": "0 7 * * *" }
   ],
   "functions": {
+    "src/app/api/meta/create-lead-ad/route.ts": {
+      "maxDuration": 60
+    },
     "src/app/api/data/route.ts": {
       "maxDuration": 30
     },
