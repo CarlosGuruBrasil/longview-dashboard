@@ -2144,17 +2144,20 @@ function filterAdsTable() {
 
 function switchView(viewName) {
     currentView = viewName;
-    
+
+    // Sub-views destacam o item pai no menu lateral
+    const navHighlight = ({ campanhas: 'marketing', 'leads-meta': 'marketing', 'score-leads': 'leads' })[viewName] || viewName;
+
     // Atualizar classes ativa (Desktop)
     document.querySelectorAll(".nav-item").forEach(n => {
         n.classList.remove("active");
-        if (n.getAttribute("data-view") === viewName) n.classList.add("active");
+        if (n.getAttribute("data-view") === navHighlight) n.classList.add("active");
     });
 
     // Atualizar classes ativa (Mobile)
     document.querySelectorAll(".mobile-nav-item").forEach(n => {
         n.classList.remove("active");
-        if (n.getAttribute("data-view") === viewName) n.classList.add("active");
+        if (n.getAttribute("data-view") === navHighlight) n.classList.add("active");
     });
 
     document.querySelectorAll(".view-section").forEach(sec => {

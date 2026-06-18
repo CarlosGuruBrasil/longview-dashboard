@@ -109,23 +109,10 @@ export default function MarketingVisionPage() {
                 <i className="ph ph-megaphone"></i>
                 <span>Marketing ADS</span>
               </a>
-              <a href="#" className="nav-item" data-view="campanhas">
-                <i className="ph ph-sliders"></i>
-                <span>Campanhas</span>
-              </a>
-              <a href="#" className="nav-item" data-view="leads-meta">
-                <i className="ph ph-clipboard-text"></i>
-                <span>Leads Meta</span>
-              </a>
               <a href="#" className="nav-item" data-view="publicar">
                 <i className="ph ph-paper-plane-tilt"></i>
                 <span>Publicar</span>
               </a>
-              <a href="#" className="nav-item" data-view="score-leads">
-                <i className="ph ph-lightning"></i>
-                <span>Score de Leads</span>
-              </a>
-
               <a href="#" className="nav-item" data-view="audiences">
                 <i className="ph ph-users-three"></i>
                 <span>Audiências CRM</span>
@@ -212,21 +199,9 @@ export default function MarketingVisionPage() {
             <i className="ph ph-megaphone"></i>
             <span>Ads</span>
           </a>
-          <a href="#" className="mobile-nav-item" data-view="campanhas">
-            <i className="ph ph-sliders"></i>
-            <span>Campanhas</span>
-          </a>
-          <a href="#" className="mobile-nav-item" data-view="leads-meta">
-            <i className="ph ph-clipboard-text"></i>
-            <span>Leads</span>
-          </a>
           <a href="#" className="mobile-nav-item" data-view="publicar">
             <i className="ph ph-paper-plane-tilt"></i>
             <span>Publicar</span>
-          </a>
-          <a href="#" className="mobile-nav-item" data-view="score-leads">
-            <i className="ph ph-lightning"></i>
-            <span>Score</span>
           </a>
           <a href="#" className="mobile-nav-item" data-view="audiences">
             <i className="ph ph-users-three"></i>
@@ -391,6 +366,10 @@ export default function MarketingVisionPage() {
 
             {/* VIEW: LEADS */}
             <div id="view-leads" className="view-section hidden">
+              <div style={{ display: 'flex', gap: '2px', marginBottom: '24px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                <button onClick={() => (window as any).switchView('leads')} style={{ padding: '8px 20px', background: 'transparent', border: 'none', borderBottom: '2px solid #0ea5e9', color: '#0ea5e9', cursor: 'pointer', fontSize: '13px', fontWeight: '700', marginBottom: '-1px' }}>Leads CRM</button>
+                <button onClick={() => (window as any).switchView('score-leads')} style={{ padding: '8px 20px', background: 'transparent', border: 'none', borderBottom: '2px solid transparent', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '13px', fontWeight: '600', marginBottom: '-1px' }}>Score</button>
+              </div>
               <div className="leads-summary-row" id="leads-summary-container"></div>
 
               <div className="charts-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', marginBottom: '24px' }}>
@@ -778,6 +757,11 @@ export default function MarketingVisionPage() {
 
             {/* VIEW: MARKETING ADS */}
             <div id="view-marketing" className="view-section hidden">
+              <div style={{ display: 'flex', gap: '2px', marginBottom: '24px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                <button onClick={() => (window as any).switchView('marketing')} style={{ padding: '8px 20px', background: 'transparent', border: 'none', borderBottom: '2px solid #0ea5e9', color: '#0ea5e9', cursor: 'pointer', fontSize: '13px', fontWeight: '700', marginBottom: '-1px' }}>Visão Geral</button>
+                <button onClick={() => (window as any).switchView('campanhas')} style={{ padding: '8px 20px', background: 'transparent', border: 'none', borderBottom: '2px solid transparent', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '13px', fontWeight: '600', marginBottom: '-1px' }}>Campanhas</button>
+                <button onClick={() => (window as any).switchView('leads-meta')} style={{ padding: '8px 20px', background: 'transparent', border: 'none', borderBottom: '2px solid transparent', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '13px', fontWeight: '600', marginBottom: '-1px' }}>Leads Meta</button>
+              </div>
               <div className="stats-grid meta-stats-grid">
                 <div className="stat-card glass-card">
                   <i className="ph ph-currency-circle-dollar" style={{ color: '#F43F5E', fontSize: '32px' }}></i>
@@ -995,6 +979,11 @@ export default function MarketingVisionPage() {
 
             {/* VIEW: CAMPANHAS — Controle de campanhas e adsets */}
             <div id="view-campanhas" className="view-section hidden">
+              <div style={{ display: 'flex', gap: '2px', marginBottom: '24px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                <button onClick={() => (window as any).switchView('marketing')} style={{ padding: '8px 20px', background: 'transparent', border: 'none', borderBottom: '2px solid transparent', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '13px', fontWeight: '600', marginBottom: '-1px' }}>Visão Geral</button>
+                <button onClick={() => (window as any).switchView('campanhas')} style={{ padding: '8px 20px', background: 'transparent', border: 'none', borderBottom: '2px solid #0ea5e9', color: '#0ea5e9', cursor: 'pointer', fontSize: '13px', fontWeight: '700', marginBottom: '-1px' }}>Campanhas</button>
+                <button onClick={() => (window as any).switchView('leads-meta')} style={{ padding: '8px 20px', background: 'transparent', border: 'none', borderBottom: '2px solid transparent', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '13px', fontWeight: '600', marginBottom: '-1px' }}>Leads Meta</button>
+              </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
                 <div>
                   <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>Controle de Campanhas</h2>
@@ -1075,6 +1064,11 @@ export default function MarketingVisionPage() {
 
             {/* VIEW: LEADS META — Leads dos formulários Meta */}
             <div id="view-leads-meta" className="view-section hidden">
+              <div style={{ display: 'flex', gap: '2px', marginBottom: '24px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                <button onClick={() => (window as any).switchView('marketing')} style={{ padding: '8px 20px', background: 'transparent', border: 'none', borderBottom: '2px solid transparent', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '13px', fontWeight: '600', marginBottom: '-1px' }}>Visão Geral</button>
+                <button onClick={() => (window as any).switchView('campanhas')} style={{ padding: '8px 20px', background: 'transparent', border: 'none', borderBottom: '2px solid transparent', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '13px', fontWeight: '600', marginBottom: '-1px' }}>Campanhas</button>
+                <button onClick={() => (window as any).switchView('leads-meta')} style={{ padding: '8px 20px', background: 'transparent', border: 'none', borderBottom: '2px solid #0ea5e9', color: '#0ea5e9', cursor: 'pointer', fontSize: '13px', fontWeight: '700', marginBottom: '-1px' }}>Leads Meta</button>
+              </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
                 <div>
                   <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>Leads Meta (Formulários)</h2>
@@ -1254,6 +1248,10 @@ export default function MarketingVisionPage() {
 
             {/* ===================== SCORE DE LEADS ===================== */}
             <div id="view-score-leads" className="view-section hidden">
+              <div style={{ display: 'flex', gap: '2px', marginBottom: '24px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                <button onClick={() => (window as any).switchView('leads')} style={{ padding: '8px 20px', background: 'transparent', border: 'none', borderBottom: '2px solid transparent', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '13px', fontWeight: '600', marginBottom: '-1px' }}>Leads CRM</button>
+                <button onClick={() => (window as any).switchView('score-leads')} style={{ padding: '8px 20px', background: 'transparent', border: 'none', borderBottom: '2px solid #0ea5e9', color: '#0ea5e9', cursor: 'pointer', fontSize: '13px', fontWeight: '700', marginBottom: '-1px' }}>Score</button>
+              </div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
                 <div>
                   <h2 style={{ fontSize: '20px', fontWeight: '700', color: '#fff', margin: 0 }}>Score de Intenção de Compra</h2>
