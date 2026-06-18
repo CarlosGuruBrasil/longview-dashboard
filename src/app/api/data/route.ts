@@ -44,10 +44,11 @@ async function fetchAllCRMLeads(email: string, token: string) {
     const allLeads = results
       .filter(r => r.status === 'fulfilled')
       .flatMap((r: any) => r.value.data?.leads || []);
-    return { leads: allLeads, total: allLeads.length };
+    // crmTotal = total REAL na base do CRM (allLeads é limitado a 3000 acima)
+    return { leads: allLeads, total: allLeads.length, crmTotal: initial.data.total || allLeads.length };
   } catch (err: any) {
     console.warn('[/api/data] CRM leads falhou:', err.message);
-    return { leads: [], total: 0 };
+    return { leads: [], total: 0, crmTotal: 0 };
   }
 }
 

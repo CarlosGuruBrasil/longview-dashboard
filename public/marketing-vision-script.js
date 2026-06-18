@@ -227,6 +227,21 @@ function setupEventListeners() {
     const filterBtn = document.getElementById("filter-btn");
     if (filterBtn) filterBtn.addEventListener("click", applyGlobalFilters);
 
+    // Padrão ao abrir o app: filtrar no mês atual (1º dia → hoje).
+    // Só preenche se vazios — não sobrescreve um filtro manual num refresh,
+    // e o botão "Limpar" volta a mostrar a base toda.
+    (function setDefaultMonthFilter() {
+        const startEl = document.getElementById("start-date");
+        const endEl = document.getElementById("end-date");
+        if (startEl && endEl && !startEl.value && !endEl.value) {
+            const now = new Date();
+            const pad = n => String(n).padStart(2, '0');
+            const toStr = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+            startEl.value = toStr(new Date(now.getFullYear(), now.getMonth(), 1));
+            endEl.value = toStr(now);
+        }
+    })();
+
     // Filtros de Coluna (Leads e Campanhas)
     document.querySelectorAll(".col-filter").forEach(input => {
         const handler = () => {
@@ -446,6 +461,11 @@ function applyDataToApp(data) {
         allLeads = data.leads;
     } else {
         allLeads = [];
+    }
+
+    // Verificação do total: compara o que veio do CRM com o que foi carregado (teto 3000).
+    if (data.leads && typeof data.leads.crmTotal === 'number') {
+        console.log(`[Leads] Base real no CRM: ${data.leads.crmTotal} | carregados: ${allLeads.length}${data.leads.crmTotal > allLeads.length ? ' (LIMITADO em 3000)' : ''}`);
     }
 
     if (data.meta) {
