@@ -130,6 +130,12 @@ export default function MarketingVisionPage() {
                 <span>Audiências CRM</span>
               </a>
 
+              {/* Sem data-view: o script legado ignora e o link navega normalmente */}
+              <a href="/marketing-vision/links" className="nav-item">
+                <i className="ph ph-qr-code"></i>
+                <span>Links &amp; QR</span>
+              </a>
+
               {isAdmin && (
                 <a href="/admin/users" className="nav-item" style={{ color: '#c084fc' }}>
                   <i className="ph ph-gear"></i>

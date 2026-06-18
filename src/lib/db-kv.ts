@@ -321,3 +321,99 @@ export async function seedDatabaseIfEmpty(): Promise<void> {
     }
   }
 }
+
+// 4. LINKS DE MARKETING (encurtador + rastreio de cliques)
+export interface ShortLink {
+  slug: string;
+  url: string;
+  title: string;
+  active: boolean;
+  createdAt: string;
+  createdBy: string;
+}
+
+const LOCAL_LINKS_FILE = path.join(DATA_DIR, 'links-kv-local.json');
+
+function readLocalLinksFile(): { links: ShortLink[]; clicks: Record<string, number> } {
+  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+  if (fs.existsSync(LOCAL_LINKS_FILE)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(LOCAL_LINKS_FILE, 'utf-8'));
+      return { links: data.links || [], clicks: data.clicks || {} };
+    } catch (e) {
+      console.error('Erro ao ler links locais:', e);
+    }
+  }
+  return { links: [], clicks: {} };
+}
+
+export async function readLinks(): Promise<ShortLink[]> {
+  if (isKvAvailable()) {
+    try {
+      return (await kv.get<ShortLink[]>('links_db')) || [];
+    } catch (e) {
+      console.error('Erro ao ler links do Vercel KV, usando fallback local:', e);
+    }
+  }
+  return readLocalLinksFile().links;
+}
+
+export async function writeLinks(links: ShortLink[]): Promise<void> {
+  if (isKvAvailable()) {
+    try {
+      await kv.set('links_db', links);
+      return;
+    } catch (e) {
+      console.error('Erro ao salvar links no Vercel KV, salvando localmente:', e);
+    }
+  }
+  const data = readLocalLinksFile();
+  fs.writeFileSync(LOCAL_LINKS_FILE, JSON.stringify({ ...data, links }, null, 2), 'utf-8');
+}
+
+// Incremento ATÔMICO de cliques (kv.incr evita corrida em cliques concorrentes).
+export async function incrClick(slug: string): Promise<void> {
+  if (isKvAvailable()) {
+    try {
+      await kv.incr(`clicks:${slug}`);
+      return;
+    } catch (e) {
+      console.error('Erro ao incrementar clique no KV:', e);
+    }
+  }
+  // Fallback local: read-modify-write (dev single-user, corrida irrelevante).
+  const data = readLocalLinksFile();
+  data.clicks[slug] = (data.clicks[slug] || 0) + 1;
+  fs.writeFileSync(LOCAL_LINKS_FILE, JSON.stringify(data, null, 2), 'utf-8');
+}
+
+export async function getClicks(slugs: string[]): Promise<Record<string, number>> {
+  const out: Record<string, number> = {};
+  if (slugs.length === 0) return out;
+  if (isKvAvailable()) {
+    try {
+      const vals = await Promise.all(slugs.map(s => kv.get<number>(`clicks:${s}`)));
+      slugs.forEach((s, i) => { out[s] = vals[i] || 0; });
+      return out;
+    } catch (e) {
+      console.error('Erro ao ler cliques do KV:', e);
+    }
+  }
+  const { clicks } = readLocalLinksFile();
+  slugs.forEach(s => { out[s] = clicks[s] || 0; });
+  return out;
+}
+
+export async function delClick(slug: string): Promise<void> {
+  if (isKvAvailable()) {
+    try {
+      await kv.del(`clicks:${slug}`);
+      return;
+    } catch (e) {
+      console.error('Erro ao remover contador de cliques no KV:', e);
+    }
+  }
+  const data = readLocalLinksFile();
+  delete data.clicks[slug];
+  fs.writeFileSync(LOCAL_LINKS_FILE, JSON.stringify(data, null, 2), 'utf-8');
+}
