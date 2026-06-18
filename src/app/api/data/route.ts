@@ -28,6 +28,23 @@ async function verifyAuth(): Promise<any | null> {
   }
 }
 
+async function fetchLeadsFromPostgres(): Promise<{ leads: any[]; total: number; crmTotal: number } | null> {
+  if (!process.env.DATABASE_URL) return null;
+  try {
+    const { sql, ensureSchema } = await import('@/lib/pg');
+    await ensureSchema();
+    const rows = await sql<{ count: string }[]>`SELECT COUNT(*) AS count FROM leads`;
+    const count = parseInt(rows[0]?.count ?? '0', 10);
+    if (count === 0) return null; // sync ainda não rodou
+    const leads = await sql`SELECT raw FROM leads ORDER BY data_cadastro DESC NULLS LAST`;
+    const leadsArr = leads.map((r: any) => (typeof r.raw === 'object' ? r.raw : JSON.parse(r.raw)));
+    return { leads: leadsArr, total: leadsArr.length, crmTotal: leadsArr.length };
+  } catch (e: any) {
+    console.warn('[/api/data] Postgres leads falhou, usando CRM direto:', e.message);
+    return null;
+  }
+}
+
 async function fetchAllCRMLeads(email: string, token: string) {
   const headers = { email, token, Accept: 'application/json' };
   const base    = 'https://longviewempreendimentos.cvcrm.com.br/api/v1/comercial/leads';
@@ -142,6 +159,9 @@ export async function GET(request: NextRequest) {
       const metaBase = `https://graph.facebook.com/${META_API_VERSION}/${META_ACT_ID}`;
       const metaAuth = { access_token: META_TOKEN };
 
+      // Leads: prefer Postgres (sem o cap de 3000), fallback para CRM ao vivo
+      const pgLeads = await fetchLeadsFromPostgres();
+
       // TUDO em paralelo — CRM + projetos + 9 chamadas Meta simultaneamente
       const [
         crmResult, projectsResult,
@@ -150,7 +170,7 @@ export async function GET(request: NextRequest) {
         metaPlatformResult, metaDeviceResult, metaDailyResult,
         leadFormsResult, pageResult,
       ] = await Promise.allSettled([
-        fetchAllCRMLeads(CV_CRM_EMAIL, CV_CRM_TOKEN),
+        pgLeads ? Promise.resolve(pgLeads) : fetchAllCRMLeads(CV_CRM_EMAIL, CV_CRM_TOKEN),
         fetchCVCRMProjects(CV_CRM_EMAIL, CV_CRM_TOKEN),
         axios.get(`${metaBase}/insights`, { params: { level: 'account', fields: 'spend,impressions,clicks,reach,frequency,cpc,cpm,ctr,cpp,actions,cost_per_action_type', ...timeParams, ...metaAuth }, timeout: 15000 }),
         axios.get(`${metaBase}/insights`, { params: { level: 'campaign', fields: 'campaign_id,campaign_name,spend,impressions,clicks,reach,frequency,cpc,cpm,ctr,actions,cost_per_action_type,date_start,date_stop', ...timeParams, limit: 500, ...metaAuth }, timeout: 15000 }),

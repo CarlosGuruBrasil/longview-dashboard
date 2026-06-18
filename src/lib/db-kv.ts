@@ -1,27 +1,23 @@
-import { kv } from '@vercel/kv';
 import fs from 'fs';
 import path from 'path';
 import bcrypt from 'bcryptjs';
 
-// Interfaces de Permissões
+// ─── Interfaces (mantidas idênticas para não quebrar importadores) ────────────
+
 export interface UserPermissions {
-  // Marketing Vision
   viewMarketingDashboard: boolean;
   viewMarketingLeads: boolean;
   viewMarketingOportunidades: boolean;
   viewMarketingEstoque: boolean;
   viewMarketingAds: boolean;
   viewMarketingVendas: boolean;
-  // Project Vision
   viewProjectVision: boolean;
-  manageProjects: boolean; // criar, editar e atualizar tarefas
-  manageCommentsDocs: boolean; // adicionar comentários e documentos
-  deleteTasks: boolean; // deletar tarefas
-  // Admin
-  isAdmin: boolean; // Acesso ao painel de usuários (/admin/users)
+  manageProjects: boolean;
+  manageCommentsDocs: boolean;
+  deleteTasks: boolean;
+  isAdmin: boolean;
 }
 
-// Interface de Usuário no Banco
 export interface DbUser {
   id: string;
   name: string;
@@ -32,388 +28,276 @@ export interface DbUser {
   createdAt: string;
 }
 
-// Interfaces do Project Vision herdadas
-export interface Subtask {
-  id: string;
-  title: string;
-  completed: boolean;
-}
-
-export interface Comment {
-  id: string;
-  userId: string;
-  userName: string;
-  role: string;
-  content: string;
-  createdAt: string;
-}
-
-export interface Document {
-  id: string;
-  name: string;
-  category: string;
-  uploadDate: string;
-  uploader: string;
-  size?: string;
-  version: number;
-  url: string;
-}
-
-export interface ChangeLog {
-  id: string;
-  field: string;
-  oldValue: string;
-  newValue: string;
-  userName: string;
-  date: string;
-}
+export interface Subtask { id: string; title: string; completed: boolean; }
+export interface Comment { id: string; userId: string; userName: string; role: string; content: string; createdAt: string; }
+export interface Document { id: string; name: string; category: string; uploadDate: string; uploader: string; size?: string; version: number; url: string; }
+export interface ChangeLog { id: string; field: string; oldValue: string; newValue: string; userName: string; date: string; }
 
 export interface Task {
-  id: string;
-  project: string;
-  sector: string;
-  subject: string;
-  description: string;
-  responsible: string;
-  secondaryResponsibles: string[];
-  statusContratacao: string;
+  id: string; project: string; sector: string; subject: string; description: string;
+  responsible: string; secondaryResponsibles: string[]; statusContratacao: string;
   statusAndamento: 'Não iniciado' | 'Em andamento' | 'Aguardando' | 'Em análise' | 'Finalizado';
   urgencia: 'Baixa' | 'Média' | 'Alta' | 'Crítica' | 'Emergencial';
-  inicio: string;
-  previsaoEntrega: string;
-  entregaEfetiva: string;
-  situacao: string;
-  observacoesRotinas: string;
-  progress: number;
-  subtasks: Subtask[];
-  comments: Comment[];
-  documents: Document[];
-  logs: ChangeLog[];
-  dependencies: string[];
-  tags: string[];
+  inicio: string; previsaoEntrega: string; entregaEfetiva: string;
+  situacao: string; observacoesRotinas: string; progress: number;
+  subtasks: Subtask[]; comments: Comment[]; documents: Document[];
+  logs: ChangeLog[]; dependencies: string[]; tags: string[];
 }
 
-export interface Project {
-  id: string;
-  name: string;
-  description: string;
-  status: string;
-  progress: number;
-  banner: string;
+export interface Project { id: string; name: string; description: string; status: string; progress: number; banner: string; }
+export interface Responsible { id: string; name: string; phone: string; email: string; company: string; photo?: string; }
+export interface ProjectDatabaseState { tasks: Task[]; projects: Project[]; responsibles: Responsible[]; }
+
+export interface ShortLink { slug: string; url: string; title: string; active: boolean; createdAt: string; createdBy: string; }
+
+// ─── Backend detection ────────────────────────────────────────────────────────
+
+const isPg = (): boolean => !!process.env.DATABASE_URL;
+
+// ─── Local file fallback (dev sem Postgres) ───────────────────────────────────
+
+const DATA_DIR          = path.join(process.cwd(), 'data');
+const LOCAL_USERS_FILE  = path.join(DATA_DIR, 'users-kv-local.json');
+const LOCAL_PROJ_FILE   = path.join(DATA_DIR, 'projects-kv-local.json');
+const LOCAL_LINKS_FILE  = path.join(DATA_DIR, 'links-kv-local.json');
+
+function ensureDataDir() {
+  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-export interface Responsible {
-  id: string;
-  name: string;
-  phone: string;
-  email: string;
-  company: string;
-  photo?: string;
+function readJson<T>(file: string, fallback: T): T {
+  ensureDataDir();
+  if (!fs.existsSync(file)) return fallback;
+  try { return JSON.parse(fs.readFileSync(file, 'utf-8')); } catch { return fallback; }
 }
 
-export interface ProjectDatabaseState {
-  tasks: Task[];
-  projects: Project[];
-  responsibles: Responsible[];
+function writeJson(file: string, data: unknown): void {
+  ensureDataDir();
+  fs.writeFileSync(file, JSON.stringify(data, null, 2), 'utf-8');
 }
 
-// Configuração do Fallback Local (caso as credenciais do Vercel KV não existam no ambiente)
-const DATA_DIR = path.join(process.cwd(), 'data');
-const LOCAL_USERS_FILE = path.join(DATA_DIR, 'users-kv-local.json');
-const LOCAL_PROJECTS_FILE = path.join(DATA_DIR, 'projects-kv-local.json');
+// ─── Postgres lazy import (only when DATABASE_URL is set) ────────────────────
 
-// Helper para checar se o KV real está disponível
-const isKvAvailable = (): boolean => {
-  return !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
-};
+async function getPg() {
+  const { sql, ensureSchema } = await import('./pg');
+  await ensureSchema();
+  return sql;
+}
 
-// --- IMPLEMENTAÇÃO DO BANCO DE DADOS (COM ADAPTADOR RESILIENTE) ---
+// ─── 1. USUÁRIOS ─────────────────────────────────────────────────────────────
 
-// 1. USUÁRIOS
 export async function readUsers(): Promise<DbUser[]> {
-  if (isKvAvailable()) {
+  if (isPg()) {
     try {
-      const users = await kv.get<DbUser[]>('users_db');
-      return users || [];
-    } catch (e) {
-      console.error('Erro ao ler usuários do Vercel KV, usando fallback local:', e);
-    }
+      const db = await getPg();
+      const rows = await db<{ data: DbUser }[]>`SELECT data FROM app_users ORDER BY created_at`;
+      // `data` column stores the full DbUser JSON
+      return rows.map(r => (typeof r.data === 'object' ? r.data : JSON.parse(r.data as unknown as string)));
+    } catch (e) { console.error('[db-kv] readUsers PG error:', e); }
   }
-
-  // Fallback Local
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
-  if (fs.existsSync(LOCAL_USERS_FILE)) {
-    try {
-      const content = fs.readFileSync(LOCAL_USERS_FILE, 'utf-8');
-      return JSON.parse(content);
-    } catch (e) {
-      console.error('Erro ao ler usuários locais:', e);
-    }
-  }
-  return [];
+  return readJson<DbUser[]>(LOCAL_USERS_FILE, []);
 }
 
 export async function writeUsers(users: DbUser[]): Promise<void> {
-  if (isKvAvailable()) {
+  if (isPg()) {
     try {
-      await kv.set('users_db', users);
+      const db = await getPg();
+      // upsert all — delete orphans via NOT IN
+      if (users.length === 0) {
+        await db`DELETE FROM app_users`;
+        return;
+      }
+      for (const u of users) {
+        await db`
+          INSERT INTO app_users (id, email, password_hash, name, role, permissions, data, created_at)
+          VALUES (${u.id}, ${u.email}, ${u.passwordHash}, ${u.name}, ${u.role},
+                  ${JSON.stringify(u.permissions)}, ${JSON.stringify(u)}, ${u.createdAt})
+          ON CONFLICT (id) DO UPDATE SET
+            email         = EXCLUDED.email,
+            password_hash = EXCLUDED.password_hash,
+            name          = EXCLUDED.name,
+            role          = EXCLUDED.role,
+            permissions   = EXCLUDED.permissions,
+            data          = EXCLUDED.data
+        `;
+      }
+      const ids = users.map(u => u.id);
+      await db`DELETE FROM app_users WHERE id <> ALL(${ids}::text[])`;
       return;
-    } catch (e) {
-      console.error('Erro ao salvar usuários no Vercel KV, salvando localmente:', e);
-    }
+    } catch (e) { console.error('[db-kv] writeUsers PG error:', e); }
   }
-
-  // Salvar Local
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
-  fs.writeFileSync(LOCAL_USERS_FILE, JSON.stringify(users, null, 2), 'utf-8');
+  writeJson(LOCAL_USERS_FILE, users);
 }
 
-// 2. TAREFAS E PROJETOS (PROJECT VISION)
+// ─── 2. PROJECT VISION (tasks + projetos) ────────────────────────────────────
+
 export async function readProjectData(): Promise<ProjectDatabaseState> {
-  if (isKvAvailable()) {
+  if (isPg()) {
     try {
-      const data = await kv.get<ProjectDatabaseState>('projects_db');
-      if (data && data.tasks && data.projects) {
-        return data;
-      }
-    } catch (e) {
-      console.error('Erro ao ler dados de projetos do Vercel KV, usando fallback local:', e);
-    }
+      const db = await getPg();
+      const rows = await db<{ data: ProjectDatabaseState }[]>`
+        SELECT data FROM project_state WHERE key = 'state'
+      `;
+      if (rows.length > 0) return rows[0].data;
+    } catch (e) { console.error('[db-kv] readProjectData PG error:', e); }
   }
 
-  // Fallback Local
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
-  if (fs.existsSync(LOCAL_PROJECTS_FILE)) {
-    try {
-      const content = fs.readFileSync(LOCAL_PROJECTS_FILE, 'utf-8');
-      return JSON.parse(content);
-    } catch (e) {
-      console.error('Erro ao ler dados de projetos locais:', e);
-    }
-  }
-  
-  // Tentar migrar do db.json original se existir
-  const legacyDbFile = path.join(DATA_DIR, 'db.json');
-  if (fs.existsSync(legacyDbFile)) {
-    try {
-      const content = fs.readFileSync(legacyDbFile, 'utf-8');
-      const legacyData = JSON.parse(content);
-      const state: ProjectDatabaseState = {
-        tasks: legacyData.tasks || [],
-        projects: legacyData.projects || [],
-        responsibles: legacyData.responsibles || []
-      };
-      await writeProjectData(state);
-      return state;
-    } catch (e) {
-      console.error('Erro ao migrar dados legados:', e);
-    }
-  }
+  const local = readJson<ProjectDatabaseState | null>(LOCAL_PROJ_FILE, null);
+  if (local) return local;
 
+  // migrate from legacy db.json
+  const legacy = path.join(DATA_DIR, 'db.json');
+  if (fs.existsSync(legacy)) {
+    try {
+      const d = JSON.parse(fs.readFileSync(legacy, 'utf-8'));
+      return { tasks: d.tasks || [], projects: d.projects || [], responsibles: d.responsibles || [] };
+    } catch { /* ignore */ }
+  }
   return { tasks: [], projects: [], responsibles: [] };
 }
 
 export async function writeProjectData(state: ProjectDatabaseState): Promise<void> {
-  if (isKvAvailable()) {
+  if (isPg()) {
     try {
-      await kv.set('projects_db', state);
+      const db = await getPg();
+      await db`
+        INSERT INTO project_state (key, data) VALUES ('state', ${JSON.stringify(state)})
+        ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data
+      `;
       return;
-    } catch (e) {
-      console.error('Erro ao salvar dados de projetos no Vercel KV, salvando localmente:', e);
-    }
+    } catch (e) { console.error('[db-kv] writeProjectData PG error:', e); }
   }
-
-  // Salvar Local
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
-  fs.writeFileSync(LOCAL_PROJECTS_FILE, JSON.stringify(state, null, 2), 'utf-8');
+  writeJson(LOCAL_PROJ_FILE, state);
 }
 
-// 3. MIGRACAO E INICIALIZAÇÃO INICIAL (SEMENTE)
+// ─── 3. SEED ─────────────────────────────────────────────────────────────────
+
 export async function seedDatabaseIfEmpty(): Promise<void> {
   const users = await readUsers();
-  
-  if (users.length === 0) {
-    console.log('Banco de dados de usuários vazio. Criando usuários administrativos padrão...');
-    
-    // Senhas padrão
-    const developerPasswordHash = await bcrypt.hash('Guru$2026', 10);
-    const diretoriaPasswordHash = await bcrypt.hash('Longview$2026', 10);
+  if (users.length > 0) return;
 
-    const defaultUsers: DbUser[] = [
-      {
-        id: 'usr-dev',
-        name: 'Carlos Santos (Desenvolvedor)',
-        email: 'carlos@longview.com.br',
-        passwordHash: developerPasswordHash,
-        role: 'Desenvolvedor',
-        permissions: {
-          viewMarketingDashboard: true,
-          viewMarketingLeads: true,
-          viewMarketingOportunidades: true,
-          viewMarketingEstoque: true,
-          viewMarketingAds: true,
-          viewMarketingVendas: true,
-          viewProjectVision: true,
-          manageProjects: true,
-          manageCommentsDocs: true,
-          deleteTasks: true,
-          isAdmin: true
-        },
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: 'usr-admin',
-        name: 'Diretoria Executiva',
-        email: 'diretoria@longview.com.br',
-        passwordHash: diretoriaPasswordHash,
-        role: 'Diretoria',
-        permissions: {
-          viewMarketingDashboard: true,
-          viewMarketingLeads: true,
-          viewMarketingOportunidades: true,
-          viewMarketingEstoque: true,
-          viewMarketingAds: true,
-          viewMarketingVendas: true,
-          viewProjectVision: true,
-          manageProjects: true,
-          manageCommentsDocs: true,
-          deleteTasks: true,
-          isAdmin: true // Também é administrador, permitindo criar novos usuários
-        },
-        createdAt: new Date().toISOString()
-      }
-    ];
+  console.log('[db-kv] Semeando usuários padrão...');
+  const [developerHash, diretoriaHash] = await Promise.all([
+    bcrypt.hash('Guru$2026', 10),
+    bcrypt.hash('Longview$2026', 10),
+  ]);
 
-    await writeUsers(defaultUsers);
-    console.log('Usuários iniciais semeados com sucesso!');
-  }
+  const allPerms: UserPermissions = {
+    viewMarketingDashboard: true, viewMarketingLeads: true, viewMarketingOportunidades: true,
+    viewMarketingEstoque: true, viewMarketingAds: true, viewMarketingVendas: true,
+    viewProjectVision: true, manageProjects: true, manageCommentsDocs: true,
+    deleteTasks: true, isAdmin: true,
+  };
 
-  // Garantir inicialização dos projetos
-  const projectData = await readProjectData();
-  if (projectData.tasks.length === 0 && projectData.projects.length === 0) {
-    console.log('Banco de dados de tarefas vazio. Tentando importar dados...');
-    
-    // Tenta carregar do db.ts legado que tem lógica de importação de CSV
-    const legacyDbFile = path.join(DATA_DIR, 'db.json');
-    if (!fs.existsSync(legacyDbFile)) {
-      // Se nem o db.json existe, vamos ler do original importando do CSV
-      try {
-        const { readDatabase } = require('./db');
-        const legacyState = readDatabase();
-        const state: ProjectDatabaseState = {
-          tasks: legacyState.tasks || [],
-          projects: legacyState.projects || [],
-          responsibles: legacyState.responsibles || []
-        };
-        await writeProjectData(state);
-        console.log('Importado do CSV legado com sucesso!');
-      } catch (e) {
-        console.error('Falha ao rodar o importador legado:', e);
-      }
-    }
-  }
-}
+  await writeUsers([
+    { id: 'usr-dev',   name: 'Carlos Santos (Desenvolvedor)', email: 'carlos@longview.com.br',   passwordHash: developerHash, role: 'Desenvolvedor', permissions: allPerms, createdAt: new Date().toISOString() },
+    { id: 'usr-admin', name: 'Diretoria Executiva',           email: 'diretoria@longview.com.br', passwordHash: diretoriaHash, role: 'Diretoria',    permissions: allPerms, createdAt: new Date().toISOString() },
+  ]);
 
-// 4. LINKS DE MARKETING (encurtador + rastreio de cliques)
-export interface ShortLink {
-  slug: string;
-  url: string;
-  title: string;
-  active: boolean;
-  createdAt: string;
-  createdBy: string;
-}
-
-const LOCAL_LINKS_FILE = path.join(DATA_DIR, 'links-kv-local.json');
-
-function readLocalLinksFile(): { links: ShortLink[]; clicks: Record<string, number> } {
-  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-  if (fs.existsSync(LOCAL_LINKS_FILE)) {
+  // import tasks from legacy CSV if nothing in project state
+  const proj = await readProjectData();
+  if (proj.tasks.length === 0) {
     try {
-      const data = JSON.parse(fs.readFileSync(LOCAL_LINKS_FILE, 'utf-8'));
-      return { links: data.links || [], clicks: data.clicks || {} };
-    } catch (e) {
-      console.error('Erro ao ler links locais:', e);
-    }
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { readDatabase } = require('./db');
+      const leg = readDatabase();
+      await writeProjectData({ tasks: leg.tasks || [], projects: leg.projects || [], responsibles: leg.responsibles || [] });
+    } catch { /* no CSV, no problem */ }
   }
-  return { links: [], clicks: {} };
 }
+
+// ─── 4. LINKS ────────────────────────────────────────────────────────────────
 
 export async function readLinks(): Promise<ShortLink[]> {
-  if (isKvAvailable()) {
+  if (isPg()) {
     try {
-      return (await kv.get<ShortLink[]>('links_db')) || [];
-    } catch (e) {
-      console.error('Erro ao ler links do Vercel KV, usando fallback local:', e);
-    }
+      const db = await getPg();
+      const rows = await db<ShortLink[]>`
+        SELECT slug, url, title, active, created_at AS "createdAt", created_by AS "createdBy"
+        FROM short_links ORDER BY created_at DESC
+      `;
+      return rows;
+    } catch (e) { console.error('[db-kv] readLinks PG error:', e); }
   }
-  return readLocalLinksFile().links;
+  const d = readJson<{ links: ShortLink[] }>(LOCAL_LINKS_FILE, { links: [] });
+  return d.links;
 }
 
 export async function writeLinks(links: ShortLink[]): Promise<void> {
-  if (isKvAvailable()) {
+  if (isPg()) {
     try {
-      await kv.set('links_db', links);
+      const db = await getPg();
+      if (links.length === 0) {
+        await db`DELETE FROM short_links`;
+        return;
+      }
+      for (const l of links) {
+        await db`
+          INSERT INTO short_links (slug, url, title, active, created_at, created_by)
+          VALUES (${l.slug}, ${l.url}, ${l.title}, ${l.active}, ${l.createdAt}, ${l.createdBy})
+          ON CONFLICT (slug) DO UPDATE SET
+            url        = EXCLUDED.url,
+            title      = EXCLUDED.title,
+            active     = EXCLUDED.active,
+            created_by = EXCLUDED.created_by
+        `;
+      }
+      const slugs = links.map(l => l.slug);
+      await db`DELETE FROM short_links WHERE slug <> ALL(${slugs}::text[])`;
       return;
-    } catch (e) {
-      console.error('Erro ao salvar links no Vercel KV, salvando localmente:', e);
-    }
+    } catch (e) { console.error('[db-kv] writeLinks PG error:', e); }
   }
-  const data = readLocalLinksFile();
-  fs.writeFileSync(LOCAL_LINKS_FILE, JSON.stringify({ ...data, links }, null, 2), 'utf-8');
+  const d = readJson<{ links: ShortLink[]; clicks: Record<string, number> }>(LOCAL_LINKS_FILE, { links: [], clicks: {} });
+  writeJson(LOCAL_LINKS_FILE, { ...d, links });
 }
 
-// Incremento ATÔMICO de cliques (kv.incr evita corrida em cliques concorrentes).
+// ─── 5. CLIQUES ──────────────────────────────────────────────────────────────
+
 export async function incrClick(slug: string): Promise<void> {
-  if (isKvAvailable()) {
+  if (isPg()) {
     try {
-      await kv.incr(`clicks:${slug}`);
+      const db = await getPg();
+      await db`
+        INSERT INTO link_clicks (slug, count) VALUES (${slug}, 1)
+        ON CONFLICT (slug) DO UPDATE SET count = link_clicks.count + 1
+      `;
       return;
-    } catch (e) {
-      console.error('Erro ao incrementar clique no KV:', e);
-    }
+    } catch (e) { console.error('[db-kv] incrClick PG error:', e); }
   }
-  // Fallback local: read-modify-write (dev single-user, corrida irrelevante).
-  const data = readLocalLinksFile();
-  data.clicks[slug] = (data.clicks[slug] || 0) + 1;
-  fs.writeFileSync(LOCAL_LINKS_FILE, JSON.stringify(data, null, 2), 'utf-8');
+  const d = readJson<{ links: ShortLink[]; clicks: Record<string, number> }>(LOCAL_LINKS_FILE, { links: [], clicks: {} });
+  d.clicks[slug] = (d.clicks[slug] || 0) + 1;
+  writeJson(LOCAL_LINKS_FILE, d);
 }
 
 export async function getClicks(slugs: string[]): Promise<Record<string, number>> {
   const out: Record<string, number> = {};
   if (slugs.length === 0) return out;
-  if (isKvAvailable()) {
+
+  if (isPg()) {
     try {
-      const vals = await Promise.all(slugs.map(s => kv.get<number>(`clicks:${s}`)));
-      slugs.forEach((s, i) => { out[s] = vals[i] || 0; });
+      const db = await getPg();
+      const rows = await db<{ slug: string; count: number }[]>`
+        SELECT slug, count FROM link_clicks WHERE slug = ANY(${slugs}::text[])
+      `;
+      rows.forEach(r => { out[r.slug] = Number(r.count); });
+      slugs.forEach(s => { if (!(s in out)) out[s] = 0; });
       return out;
-    } catch (e) {
-      console.error('Erro ao ler cliques do KV:', e);
-    }
+    } catch (e) { console.error('[db-kv] getClicks PG error:', e); }
   }
-  const { clicks } = readLocalLinksFile();
+  const { clicks } = readJson<{ clicks: Record<string, number> }>(LOCAL_LINKS_FILE, { clicks: {} });
   slugs.forEach(s => { out[s] = clicks[s] || 0; });
   return out;
 }
 
 export async function delClick(slug: string): Promise<void> {
-  if (isKvAvailable()) {
+  if (isPg()) {
     try {
-      await kv.del(`clicks:${slug}`);
+      const db = await getPg();
+      await db`DELETE FROM link_clicks WHERE slug = ${slug}`;
       return;
-    } catch (e) {
-      console.error('Erro ao remover contador de cliques no KV:', e);
-    }
+    } catch (e) { console.error('[db-kv] delClick PG error:', e); }
   }
-  const data = readLocalLinksFile();
-  delete data.clicks[slug];
-  fs.writeFileSync(LOCAL_LINKS_FILE, JSON.stringify(data, null, 2), 'utf-8');
+  const d = readJson<{ links: ShortLink[]; clicks: Record<string, number> }>(LOCAL_LINKS_FILE, { links: [], clicks: {} });
+  delete d.clicks[slug];
+  writeJson(LOCAL_LINKS_FILE, d);
 }
