@@ -542,6 +542,18 @@ async function fetchAllData(force = false) {
     }
 }
 
+// Normaliza datas do CRM (ISO yyyy-mm-dd OU brasileiro dd/mm/yyyy) para yyyy-mm-dd,
+// permitindo comparação confiável com os <input type=date> (sempre yyyy-mm-dd).
+function toISODate(raw) {
+    if (!raw) return "";
+    const s = String(raw).trim().split(' ')[0].split('T')[0];
+    if (s.includes('/')) {
+        const [d, m, y] = s.split('/');
+        return (y && m && d) ? `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}` : "";
+    }
+    return s;
+}
+
 function applyGlobalFilters() {
     const startDate = document.getElementById("start-date").value;
     const endDate = document.getElementById("end-date").value;
@@ -552,7 +564,7 @@ function applyGlobalFilters() {
         filteredLeads = allLeads;
     } else {
         filteredLeads = allLeads.filter(lead => {
-            const leadDateStr = (lead.data_cadastramento || lead.data_cad || "").split(' ')[0];
+            const leadDateStr = toISODate(lead.data_cadastramento || lead.data_cad);
             if (!leadDateStr) return false;
             
             if (startDate && leadDateStr < startDate) return false;
@@ -2141,7 +2153,8 @@ function switchView(viewName) {
         "leads-meta": "Leads Meta (Formulários)",
         "publicar": "Publicar nas Redes Sociais",
         "score-leads": "Score de Intenção de Compra",
-        "audiences": "Automação CRM — Meta Ads"
+        "audiences": "Automação CRM — Meta Ads",
+        "links": "Links, QR & Acessos"
     };
     document.getElementById("page-title").textContent = titleMap[viewName] || "Dashboard";
     
@@ -3240,8 +3253,8 @@ function renderOportunidadesRecentesTable(leadsArray) {
     tbody.innerHTML = "";
 
     const sorted = [...leadsArray].sort((a, b) => {
-        const dateA = a.data_cadastramento || a.data_cad || "";
-        const dateB = b.data_cadastramento || b.data_cad || "";
+        const dateA = toISODate(a.data_cadastramento || a.data_cad);
+        const dateB = toISODate(b.data_cadastramento || b.data_cad);
         return dateB.localeCompare(dateA);
     }).slice(0, 20);
 
@@ -3286,8 +3299,8 @@ function renderDescartesRecentesTable(leadsArray) {
     tbody.innerHTML = "";
 
     const sorted = [...leadsArray].sort((a, b) => {
-        const dateA = a.data_cadastramento || a.data_cad || "";
-        const dateB = b.data_cadastramento || b.data_cad || "";
+        const dateA = toISODate(a.data_cadastramento || a.data_cad);
+        const dateB = toISODate(b.data_cadastramento || b.data_cad);
         return dateB.localeCompare(dateA);
     }).slice(0, 20);
 

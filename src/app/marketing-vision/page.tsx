@@ -3,6 +3,7 @@
 import React, { useEffect } from 'react';
 import Script from 'next/script';
 import { useUser } from '@/context/UserContext';
+import LinksView from './LinksView';
 import './style.css';
 
 function getRoleStyle(role: string): React.CSSProperties {
@@ -130,8 +131,7 @@ export default function MarketingVisionPage() {
                 <span>Audiências CRM</span>
               </a>
 
-              {/* Sem data-view: o script legado ignora e o link navega normalmente */}
-              <a href="/marketing-vision/links" className="nav-item">
+              <a href="#" className="nav-item" data-view="links">
                 <i className="ph ph-qr-code"></i>
                 <span>Links &amp; QR</span>
               </a>
@@ -231,6 +231,10 @@ export default function MarketingVisionPage() {
           <a href="#" className="mobile-nav-item" data-view="audiences">
             <i className="ph ph-users-three"></i>
             <span>Audiências</span>
+          </a>
+          <a href="#" className="mobile-nav-item" data-view="links">
+            <i className="ph ph-qr-code"></i>
+            <span>Links</span>
           </a>
         </nav>
 
@@ -1494,6 +1498,11 @@ export default function MarketingVisionPage() {
               </div>
 
             </div>
+          </div>
+
+          {/* VIEW: LINKS & QR — view interna (sidebar permanece, SPA não recarrega) */}
+          <div id="view-links" className="view-section hidden">
+            <LinksView />
           </div>
           </div>
 
