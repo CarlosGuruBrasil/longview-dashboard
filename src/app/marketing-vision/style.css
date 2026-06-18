@@ -50,7 +50,7 @@ body::after {
 .app-container { display: flex; min-height: 100vh; }
 
 /* Sidebar */
-.sidebar { width: var(--sidebar-width); background-color: var(--bg-sidebar); border-right: 1px solid #1C1C1E; display: flex; flex-direction: column; padding: 0; z-index: 10; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+.sidebar { width: var(--sidebar-width); background-color: var(--bg-sidebar); border-right: 1px solid #1C1C1E; display: flex; flex-direction: column; padding: 0; z-index: 10; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; height: 100vh; position: sticky; top: 0; overflow: hidden; flex-shrink: 0; }
 .nav-menu-wrapper { padding: 16px; flex: 1; overflow-y: auto; }
 .logo-container { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 0; }
 .nav-menu { display: flex; flex-direction: column; gap: 6px; flex: 1; }
