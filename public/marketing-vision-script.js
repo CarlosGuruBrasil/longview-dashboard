@@ -463,8 +463,14 @@ function applyDataToApp(data) {
         allLeads = [];
     }
 
-    // Verificação do total: compara o que veio do CRM com o que foi carregado (teto 3000).
-    if (data.leads && typeof data.leads.crmTotal === 'number') {
+    // Total REAL da base (independe do filtro de período) — exibido como subtítulo do card.
+    if (data.leads && typeof data.leads.crmTotal === 'number' && data.leads.crmTotal > 0) {
+        window.crmTotalLeads = data.leads.crmTotal;
+        const elTotal = document.getElementById("kpi-leads-total");
+        if (elTotal) {
+            elTotal.textContent = `de ${data.leads.crmTotal.toLocaleString('pt-BR')} na base`;
+            elTotal.style.display = "block";
+        }
         console.log(`[Leads] Base real no CRM: ${data.leads.crmTotal} | carregados: ${allLeads.length}${data.leads.crmTotal > allLeads.length ? ' (LIMITADO em 3000)' : ''}`);
     }
 

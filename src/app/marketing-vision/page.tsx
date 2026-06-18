@@ -324,6 +324,7 @@ export default function MarketingVisionPage() {
                   <div className="stat-details">
                     <h3>Total de Leads</h3>
                     <p id="kpi-leads" className="stat-value">0</p>
+                    <span id="kpi-leads-total" style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'none' }}></span>
                   </div>
                 </div>
                 <div className="stat-card glass-card">
