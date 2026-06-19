@@ -19,34 +19,26 @@ export async function GET(request: NextRequest) {
   try {
     await ensureSchema();
     
-    // 1. Agrupa e conta por raw->'situacao'->>'nome' no Postgres
-    const rawSituacoes = await sql`
-      SELECT raw->'situacao'->>'nome' as situacao_nome, COUNT(*) as qtd
+    // Busca a linha inteira do primeiro lead do Postgres
+    const rows = await sql`
+      SELECT id, nome, status, raw
       FROM leads
-      GROUP BY raw->'situacao'->>'nome'
-      ORDER BY qtd DESC
+      LIMIT 1
     `;
     
-    // 2. Agrupa e conta pela coluna 'status' no Postgres
-    const colStatus = await sql`
-      SELECT status, COUNT(*) as qtd
-      FROM leads
-      GROUP BY status
-      ORDER BY qtd DESC
-    `;
+    if (rows.length === 0) {
+      return NextResponse.json({ error: 'Nenhum lead encontrado no Postgres de produção' });
+    }
     
-    // 3. Mostra uma amostra de 3 leads quaisquer do Postgres
-    const sampleLeads = await sql`
-      SELECT id, nome, status, raw->'situacao' as situacao_raw, raw->>'data_venda' as data_venda, raw->>'valor_venda' as valor_venda
-      FROM leads
-      LIMIT 3
-    `;
+    const lead = rows[0];
+    const rawObj = typeof lead.raw === 'string' ? JSON.parse(lead.raw) : lead.raw;
     
     return NextResponse.json({
-      postgresCount: sampleLeads.length > 0 ? (await sql`SELECT COUNT(*) AS count FROM leads`)[0].count : 0,
-      rawSituacoesCount: rawSituacoes,
-      colStatusCount: colStatus,
-      sampleLeads
+      id: lead.id,
+      nome: lead.nome,
+      statusColumn: lead.status,
+      rawKeys: Object.keys(rawObj || {}),
+      rawSample: rawObj
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
