@@ -19,43 +19,34 @@ export async function GET(request: NextRequest) {
   try {
     await ensureSchema();
     
-    // 1. Conta registros no Postgres
-    const [countRow] = await sql`SELECT COUNT(*) AS count FROM leads`;
-    const pgCount = parseInt(countRow?.count ?? '0', 10);
+    // 1. Agrupa e conta por raw->'situacao'->>'nome' no Postgres
+    const rawSituacoes = await sql`
+      SELECT raw->'situacao'->>'nome' as situacao_nome, COUNT(*) as qtd
+      FROM leads
+      GROUP BY raw->'situacao'->>'nome'
+      ORDER BY qtd DESC
+    `;
     
-    // 2. Busca leads ao vivo do CV CRM
-    const email = process.env.CV_CRM_EMAIL;
-    const token = process.env.CV_CRM_TOKEN;
-    if (!email || !token) {
-      return NextResponse.json({ error: 'Faltam credenciais do CV CRM no backend' });
-    }
+    // 2. Agrupa e conta pela coluna 'status' no Postgres
+    const colStatus = await sql`
+      SELECT status, COUNT(*) as qtd
+      FROM leads
+      GROUP BY status
+      ORDER BY qtd DESC
+    `;
     
-    const headers = { email, token, Accept: 'application/json' };
-    const base = 'https://longviewempreendimentos.cvcrm.com.br/api/v1/comercial/leads';
-    
-    // Busca até 500 leads para garantir que pegamos as vendas
-    const res = await axios.get(base, { params: { limit: 500 }, headers, timeout: 15000 });
-    const leads = res.data?.leads || [];
-    
-    const sales = leads.filter(isSale);
-    
-    const salesReport = sales.map((l: any) => ({
-      idlead: l.idlead,
-      nome: l.nome,
-      situacao: l.situacao?.nome,
-      data_cad: l.data_cad,
-      data_venda: l.data_venda,
-      has_data_venda: l.data_venda != null && l.data_venda !== '',
-      valor_venda: l.valor_venda,
-      valor_negocio: l.valor_negocio,
-      qtde_reservas: l.qtde_reservas_associadas
-    }));
+    // 3. Mostra uma amostra de 3 leads quaisquer do Postgres
+    const sampleLeads = await sql`
+      SELECT id, nome, status, raw->'situacao' as situacao_raw, raw->>'data_venda' as data_venda, raw->>'valor_venda' as valor_venda
+      FROM leads
+      LIMIT 3
+    `;
     
     return NextResponse.json({
-      postgresCount: pgCount,
-      totalLeadsLiveFetched: leads.length,
-      totalSalesFound: sales.length,
-      salesReport
+      postgresCount: sampleLeads.length > 0 ? (await sql`SELECT COUNT(*) AS count FROM leads`)[0].count : 0,
+      rawSituacoesCount: rawSituacoes,
+      colStatusCount: colStatus,
+      sampleLeads
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
