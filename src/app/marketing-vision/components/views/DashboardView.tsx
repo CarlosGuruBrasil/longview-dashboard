@@ -10,7 +10,16 @@ import SalesGrowthChart from '../charts/SalesGrowthChart'
 import PieDonutChart from '../charts/PieDonutChart'
 
 export default function DashboardView() {
-  const { filteredLeads, allLeads, crmTotal } = useData()
+  const { filteredLeads, allLeads, crmTotal, loading } = useData()
+
+  if (loading && allLeads.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
+        <div className="w-8 h-8 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm text-zinc-400">Carregando dados...</p>
+      </div>
+    )
+  }
   const [salesChartMode, setSalesChartMode] = useState<'month' | 'year'>('month')
 
   // KPI: Total Vendas

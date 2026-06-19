@@ -1,5 +1,5 @@
 'use client';
-import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
 import type { Lead, MetaData, EstoqueData, MetaLeadForm, MetaPageInfo, DateRange, ActiveView } from '../types';
 import { toISODate, getLeadDate } from '../utils/leads';
 
@@ -77,6 +77,14 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
   }, [allLeads, dateRange]);
 
   const clearFilters = useCallback(() => setDateRange(DEFAULT_DATE), []);
+
+  // Auto-fetch se o SSR não trouxe dados (fallback de segurança)
+  useEffect(() => {
+    if (allLeads.length === 0 && !initialData) {
+      refresh();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const refresh = useCallback(async (force = false) => {
     setLoading(true);
