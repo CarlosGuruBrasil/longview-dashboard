@@ -114,6 +114,102 @@ async function fetchMetaLive(startDate?: string | null, endDate?: string | null)
   };
 }
 
+async function fetchMetaOrphanedLeads(
+  leadForms: any[],
+  metaAuth: { access_token: string },
+  META_API_VERSION: string
+): Promise<{ orphanedLeads: any[]; totalMetaLeads: number; error: string | null }> {
+  if (!leadForms || leadForms.length === 0) {
+    return { orphanedLeads: [], totalMetaLeads: 0, error: null };
+  }
+
+  const activeForms = leadForms.filter((f: any) => f.status === 'ACTIVE' && (f.leads_count ?? 0) > 0);
+  if (activeForms.length === 0) {
+    return { orphanedLeads: [], totalMetaLeads: 0, error: null };
+  }
+
+  try {
+    console.log(`[meta-validation] Buscando leads de ${activeForms.length} formulários ativos no Meta Ads...`);
+    const results = await Promise.allSettled(
+      activeForms.map((f: any) =>
+        axios.get(`https://graph.facebook.com/${META_API_VERSION}/${f.id}/leads`, {
+          params: { fields: 'id,created_time,field_data', limit: 200, ...metaAuth },
+          timeout: 15000
+        }).then(r => ({ formName: f.name, leads: r.data?.data || [] }))
+      )
+    );
+
+    const metaLeads: any[] = [];
+    results.forEach((res: any) => {
+      if (res.status === 'fulfilled') {
+        const { formName, leads } = res.value;
+        leads.forEach((lead: any) => {
+          let email = '';
+          let phone = '';
+          let name = '';
+          if (Array.isArray(lead.field_data)) {
+            lead.field_data.forEach((fd: any) => {
+              const fieldName = (fd.name || '').toLowerCase();
+              const val = fd.values?.[0] || '';
+              if (fieldName.includes('email')) {
+                email = val;
+              } else if (fieldName.includes('phone') || fieldName.includes('tel') || fieldName.includes('cel')) {
+                phone = val;
+              } else if (fieldName.includes('name') || fieldName.includes('nome')) {
+                name = val;
+              }
+            });
+          }
+          metaLeads.push({
+            id: lead.id,
+            createdTime: lead.created_time,
+            formName,
+            name,
+            email,
+            phone
+          });
+        });
+      }
+    });
+
+    if (metaLeads.length === 0) {
+      return { orphanedLeads: [], totalMetaLeads: 0, error: null };
+    }
+
+    if (!process.env.DATABASE_URL) {
+      return { orphanedLeads: [], totalMetaLeads: metaLeads.length, error: 'DATABASE_URL não configurada no backend' };
+    }
+
+    const { sql } = await import('@/lib/pg');
+    const dbLeads = await sql`SELECT email, telefone FROM leads`;
+    const dbEmails = new Set(dbLeads.map(l => l.email?.toLowerCase().trim()).filter(Boolean));
+    const dbPhones = new Set(dbLeads.map(l => l.telefone?.replace(/\D/g, '') || '').filter(Boolean));
+
+    const orphanedLeads = metaLeads.filter(ml => {
+      const mEmail = ml.email?.toLowerCase().trim();
+      const mPhone = ml.phone?.replace(/\D/g, '') || '';
+      const hasEmail = mEmail && dbEmails.has(mEmail);
+      let hasPhone = false;
+      if (mPhone) {
+        if (dbPhones.has(mPhone)) {
+          hasPhone = true;
+        } else {
+          const phoneNoDdi = mPhone.replace(/^55/, '');
+          if (dbPhones.has(phoneNoDdi) || dbPhones.has('55' + mPhone)) {
+            hasPhone = true;
+          }
+        }
+      }
+      return !hasEmail && !hasPhone;
+    });
+
+    return { orphanedLeads, totalMetaLeads: metaLeads.length, error: null };
+  } catch (err: any) {
+    console.error('[meta-validation] Erro ao validar leads do Meta:', err.message);
+    return { orphanedLeads: [], totalMetaLeads: 0, error: `Erro na API do Meta: ${err.message}` };
+  }
+}
+
 export async function GET(request: NextRequest) {
   const authUser = await verifyAuth();
   if (!authUser) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
@@ -269,12 +365,21 @@ export async function GET(request: NextRequest) {
     leadForms: [], page: null,
   };
 
+  const META_TOKEN = process.env.META_TOKEN;
+  const metaAuth = { access_token: META_TOKEN || '' };
+  
+  let metaValidation = { orphanedLeads: [] as any[], totalMetaLeads: 0, error: null as string | null };
+  if (META_TOKEN && metaFinal.leadForms && metaFinal.leadForms.length > 0) {
+    metaValidation = await fetchMetaOrphanedLeads(metaFinal.leadForms, metaAuth, 'v21.0');
+  }
+
   return NextResponse.json({
     leads:     leadsResult,
     meta:      metaFinal,
     estoque:   estoqueData?.estoque ?? {},
     leadForms: metaFinal.leadForms,
     page:      metaFinal.page,
+    metaValidation,
     updatedAt: new Date().toISOString(),
     _cached:   !needMetaLive && !needEstoqueLive && !!pgLeads,
   });

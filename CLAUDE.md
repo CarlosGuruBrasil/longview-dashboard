@@ -28,6 +28,7 @@ As seguintes variáveis estão ativas e configuradas no painel da aplicação no
 - O bug de parsing de datas brasileiras no gráfico de crescimento de leads foi corrigido.
 - O bug de parsing de estoque (unidades zeradas) na tela de Empreendimentos foi corrigido.
 - O mecanismo de sincronização forçada (`/api/data?sync=true`) foi implantado para atualizar retroativamente os leads salvos no banco.
+- A integração de corretores do CV CRM e a validação de leads órfãos do Meta Ads foram implementadas e a validação local (`npm run build` e `npx tsc`) passou com sucesso.
 
 ---
 
@@ -59,4 +60,16 @@ As seguintes variáveis estão ativas e configuradas no painel da aplicação no
 
 ### 7. Correção do Erro de Tipo no KV (Rate-Limiter)
 - **O que foi feito:** Corrigido o método `incr` no arquivo `src/lib/kv.ts` para serializar os inteiros em strings JSON (`JSON.stringify`) antes de inseri-los na coluna `JSONB` do Postgres, eliminando os erros de tipo na console de produção e no rate limit.
+
+### 8. Integração de Responsáveis do CV CRM e Cache Persistente
+- **O que foi feito:** 
+  - Atualizada a rota `src/app/api/responsibles/route.ts` para consumir a API de corretores do CV CRM (V1: `/api/v1/cadastros/corretores`) usando cabeçalhos permanentes (`email`/`token`).
+  - Implementado cache persistente de 15 minutos no Postgres (`cv_responsibles_cache`) na tabela `project_state` para evitar chamadas de API frequentes.
+  - Implementada mesclagem inteligente e desduplicação (por e-mail e nome normalizados) entre os responsáveis retornados pelo CV CRM e os responsáveis locais cadastrados no banco.
+
+### 9. Validação e Cruzamento de Leads Meta Ads vs CV CRM (Leads Órfãos)
+- **O que foi feito:**
+  - Atualizada a rota `src/app/api/data/route.ts` para buscar formulários de leads ativos e contatos do Meta Ads através da Graph API.
+  - Criado mecanismo resiliente de cruzamento (comparando e-mail normalizado e telefone sem caracteres especiais/com tolerância a DDI) com a tabela local `leads` (Postgres) para identificar e-mails e telefones captados em anúncios mas que ainda não constam no CRM (leads órfãos).
+  - Atualizado o frontend (`DataContext.tsx` e `LeadsView.tsx`) adicionando uma nova aba de "Validação Meta" com cartões de KPI (Ex. leads não integrados) e uma tabela com as informações dos leads não integrados no CRM (nome, e-mail, telefone, formulário de origem, e data de captação).
 

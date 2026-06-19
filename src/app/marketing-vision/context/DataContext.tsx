@@ -13,6 +13,7 @@ interface DataContextValue {
   crmTotal: number;
   updatedAt: string;
   loading: boolean;
+  metaValidation: { orphanedLeads: any[]; totalMetaLeads: number; error: string | null } | null;
 
   // filtered
   filteredLeads: Lead[];
@@ -48,6 +49,7 @@ interface DataProviderProps {
     leadForms: MetaLeadForm[];
     page: MetaPageInfo | null;
     updatedAt: string;
+    metaValidation?: { orphanedLeads: any[]; totalMetaLeads: number; error: string | null } | null;
   };
 }
 
@@ -59,6 +61,7 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
   const [estoque, setEstoque] = useState<EstoqueData>(initialData?.estoque ?? {});
   const [leadForms, setLeadForms] = useState<MetaLeadForm[]>(initialData?.leadForms ?? []);
   const [metaPage, setMetaPage] = useState<MetaPageInfo | null>(initialData?.page ?? null);
+  const [metaValidation, setMetaValidation] = useState<{ orphanedLeads: any[]; totalMetaLeads: number; error: string | null } | null>(initialData?.metaValidation ?? null);
   const [crmTotal, setCrmTotal] = useState(initialData?.crmTotal ?? 0);
   const [updatedAt, setUpdatedAt] = useState(initialData?.updatedAt ?? '');
   const [loading, setLoading] = useState(false);
@@ -100,6 +103,7 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
       setEstoque(data.estoque ?? {});
       setLeadForms(data.leadForms ?? []);
       setMetaPage(data.page ?? null);
+      setMetaValidation(data.metaValidation ?? null);
       setUpdatedAt(data.updatedAt ?? new Date().toISOString());
     } catch (e) {
       console.error('[DataContext] refresh error:', e);
@@ -111,7 +115,7 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
   return (
     <DataContext.Provider value={{
       allLeads, metaData, estoque, leadForms, metaPage,
-      crmTotal, updatedAt, loading,
+      crmTotal, updatedAt, loading, metaValidation,
       filteredLeads,
       dateRange, setDateRange, clearFilters,
       activeView, setActiveView,
