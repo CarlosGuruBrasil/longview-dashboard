@@ -170,6 +170,34 @@ export async function writeProjectData(state: ProjectDatabaseState): Promise<voi
   writeJson(LOCAL_PROJ_FILE, state);
 }
 
+// Atomic read-modify-write with row-level lock — prevents lost updates under concurrent users
+export async function mutateProjectData(
+  fn: (state: ProjectDatabaseState) => void | Promise<void>
+): Promise<ProjectDatabaseState> {
+  if (isPg()) {
+    const { sql: pgSql, ensureSchema } = await import('./pg');
+    await ensureSchema();
+    return pgSql.begin(async (tx) => {
+      // FOR UPDATE locks the row; concurrent callers wait instead of racing
+      const rows = await tx<{ data: ProjectDatabaseState }[]>`
+        SELECT data FROM project_state WHERE key = 'state' FOR UPDATE
+      `;
+      const state: ProjectDatabaseState = rows[0]?.data ?? { tasks: [], projects: [], responsibles: [] };
+      await fn(state);
+      await tx`
+        INSERT INTO project_state (key, data) VALUES ('state', ${JSON.stringify(state)})
+        ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data
+      `;
+      return state;
+    });
+  }
+  // local dev: single process, no race — plain read-write is fine
+  const state = await readProjectData();
+  await fn(state);
+  await writeProjectData(state);
+  return state;
+}
+
 // ─── 3. SEED ─────────────────────────────────────────────────────────────────
 
 export async function seedDatabaseIfEmpty(): Promise<void> {

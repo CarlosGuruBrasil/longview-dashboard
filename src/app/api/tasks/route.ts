@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { readProjectData, writeProjectData, Task } from '@/lib/db-kv';
+import { readProjectData, mutateProjectData, Task } from '@/lib/db-kv';
 
 export async function GET(request: NextRequest) {
   try {
@@ -72,68 +72,52 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const db = await readProjectData();
+    let newTask: Task;
 
-    const lastId = db.tasks.length > 0 
-      ? Math.max(...db.tasks.map(t => parseInt(t.id.replace('LVM-', '')))) 
-      : 0;
-    
-    const newId = `LVM-${String(lastId + 1).padStart(4, '0')}`;
+    await mutateProjectData((db) => {
+      const lastId = db.tasks.length > 0
+        ? Math.max(...db.tasks.map(t => parseInt(t.id.replace('LVM-', ''))))
+        : 0;
+      const newId = `LVM-${String(lastId + 1).padStart(4, '0')}`;
 
-    const newTask: Task = {
-      id: newId,
-      project: body.project || 'Geral',
-      sector: body.sector || 'Gestão',
-      subject: body.subject || 'Sem Assunto',
-      description: body.description || '',
-      responsible: body.responsible || 'Não atribuído',
-      secondaryResponsibles: body.secondaryResponsibles || [],
-      statusContratacao: body.statusContratacao || 'Indefinido',
-      statusAndamento: body.statusAndamento || 'Não iniciado',
-      urgencia: body.urgencia || 'Baixa',
-      inicio: body.inicio || '',
-      previsaoEntrega: body.previsaoEntrega || '',
-      entregaEfetiva: body.entregaEfetiva || '',
-      situacao: body.situacao || '',
-      observacoesRotinas: body.observacoesRotinas || '',
-      progress: body.progress || 0,
-      subtasks: body.subtasks || [],
-      comments: [],
-      documents: [],
-      dependencies: body.dependencies || [],
-      tags: body.tags || [body.sector].filter(Boolean),
-      logs: [
-        {
-          id: `log-${newId}-1`,
-          field: 'criacao',
-          oldValue: 'N/A',
-          newValue: 'Criada',
-          userName: body.userName || 'Sistema',
-          date: new Date().toISOString()
-        }
-      ]
-    };
+      newTask = {
+        id: newId,
+        project: body.project || 'Geral',
+        sector: body.sector || 'Gestão',
+        subject: body.subject || 'Sem Assunto',
+        description: body.description || '',
+        responsible: body.responsible || 'Não atribuído',
+        secondaryResponsibles: body.secondaryResponsibles || [],
+        statusContratacao: body.statusContratacao || 'Indefinido',
+        statusAndamento: body.statusAndamento || 'Não iniciado',
+        urgencia: body.urgencia || 'Baixa',
+        inicio: body.inicio || '',
+        previsaoEntrega: body.previsaoEntrega || '',
+        entregaEfetiva: body.entregaEfetiva || '',
+        situacao: body.situacao || '',
+        observacoesRotinas: body.observacoesRotinas || '',
+        progress: body.progress || 0,
+        subtasks: body.subtasks || [],
+        comments: [],
+        documents: [],
+        dependencies: body.dependencies || [],
+        tags: body.tags || [body.sector].filter(Boolean),
+        logs: [{ id: `log-${newId}-1`, field: 'criacao', oldValue: 'N/A', newValue: 'Criada', userName: body.userName || 'Sistema', date: new Date().toISOString() }],
+      };
 
-    db.tasks.push(newTask);
+      db.tasks.push(newTask!);
 
-    const projTasks = db.tasks.filter(t => t.project.toLowerCase() === newTask.project.toLowerCase());
-    const finished = projTasks.filter(t => t.statusAndamento === 'Finalizado').length;
-    const progress = projTasks.length > 0 ? Math.round((finished / projTasks.length) * 100) : 0;
-    
-    db.projects = db.projects.map(p => {
-      if (p.name.toLowerCase() === newTask.project.toLowerCase()) {
-        return {
-          ...p,
-          progress,
-          status: progress === 100 ? 'Finalizado' : progress > 0 ? 'Em andamento' : 'Não iniciado'
-        };
-      }
-      return p;
+      const projTasks = db.tasks.filter(t => t.project.toLowerCase() === newTask!.project.toLowerCase());
+      const finished = projTasks.filter(t => t.statusAndamento === 'Finalizado').length;
+      const progress = projTasks.length > 0 ? Math.round((finished / projTasks.length) * 100) : 0;
+      db.projects = db.projects.map(p =>
+        p.name.toLowerCase() === newTask!.project.toLowerCase()
+          ? { ...p, progress, status: progress === 100 ? 'Finalizado' : progress > 0 ? 'Em andamento' : 'Não iniciado' }
+          : p
+      );
     });
 
-    await writeProjectData(db);
-
-    return NextResponse.json({ task: newTask }, { status: 201 });
+    return NextResponse.json({ task: newTask! }, { status: 201 });
   } catch (error) {
     console.error('Erro ao criar tarefa:', error);
     return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });

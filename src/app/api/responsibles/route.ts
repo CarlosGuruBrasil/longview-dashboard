@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { readProjectData, writeProjectData, Responsible } from '@/lib/db-kv';
+import { readProjectData, mutateProjectData, Responsible } from '@/lib/db-kv';
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,28 +14,23 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const db = await readProjectData();
-    
-    if (!db.responsibles) {
-      db.responsibles = [];
-    }
+    let newResponsible: Responsible | undefined;
 
-    const lastId = db.responsibles.length > 0
-      ? Math.max(...db.responsibles.map(r => parseInt(r.id.replace('resp-', '')) || 0))
-      : 0;
-    const newId = `resp-${lastId + 1}`;
-
-    const newResponsible: Responsible = {
-      id: newId,
-      name: body.name.trim(),
-      phone: body.phone.trim() || '',
-      email: body.email.trim() || '',
-      company: body.company.trim() || 'LongView',
-      photo: body.photo || undefined
-    };
-
-    db.responsibles.push(newResponsible);
-    await writeProjectData(db);
+    await mutateProjectData((db) => {
+      if (!db.responsibles) db.responsibles = [];
+      const lastId = db.responsibles.length > 0
+        ? Math.max(...db.responsibles.map(r => parseInt(r.id.replace('resp-', '')) || 0))
+        : 0;
+      newResponsible = {
+        id: `resp-${lastId + 1}`,
+        name: body.name.trim(),
+        phone: body.phone.trim() || '',
+        email: body.email.trim() || '',
+        company: body.company.trim() || 'LongView',
+        photo: body.photo || undefined,
+      };
+      db.responsibles.push(newResponsible!);
+    });
 
     return NextResponse.json({ responsible: newResponsible }, { status: 201 });
   } catch (error) {

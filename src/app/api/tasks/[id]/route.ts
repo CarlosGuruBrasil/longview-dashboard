@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { readProjectData, writeProjectData, Task, ChangeLog } from '@/lib/db-kv';
+import { readProjectData, mutateProjectData, Task, ChangeLog } from '@/lib/db-kv';
 
 export async function GET(
   request: NextRequest,
@@ -28,68 +28,45 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
-    const db = await readProjectData();
+    let updatedTask: Task | undefined;
 
-    const taskIndex = db.tasks.findIndex(t => t.id === id);
-    if (taskIndex === -1) {
-      return NextResponse.json({ error: 'Tarefa não encontrada' }, { status: 404 });
-    }
+    const result = await mutateProjectData((db) => {
+      const taskIndex = db.tasks.findIndex(t => t.id === id);
+      if (taskIndex === -1) return;
 
-    const task = db.tasks[taskIndex];
-    const user = body.currentUser || { name: 'Sistema', role: 'Diretoria' };
+      const task = db.tasks[taskIndex];
+      const user = body.currentUser || { name: 'Sistema', role: 'Diretoria' };
 
-    const logs: ChangeLog[] = [];
-    const fieldsToTrack: (keyof Task)[] = [
-      'statusAndamento', 'urgencia', 'responsible', 'previsaoEntrega', 'statusContratacao'
-    ];
+      const fieldsToTrack: (keyof Task)[] = ['statusAndamento', 'urgencia', 'responsible', 'previsaoEntrega', 'statusContratacao'];
+      const logs: ChangeLog[] = fieldsToTrack
+        .filter(f => body[f] !== undefined && body[f] !== task[f])
+        .map(f => ({ id: `log-${id}-${Date.now()}-${f}`, field: String(f), oldValue: String(task[f] || 'Vazio'), newValue: String(body[f]), userName: user.name, date: new Date().toISOString() }));
 
-    fieldsToTrack.forEach(field => {
-      if (body[field] !== undefined && body[field] !== task[field]) {
-        logs.push({
-          id: `log-${id}-${Date.now()}-${field}`,
-          field: String(field),
-          oldValue: String(task[field] || 'Vazio'),
-          newValue: String(body[field]),
-          userName: user.name,
-          date: new Date().toISOString()
-        });
-      }
+      updatedTask = {
+        ...task, ...body,
+        logs: [...(task.logs || []), ...logs],
+        subtasks:  body.subtasks  !== undefined ? body.subtasks  : task.subtasks,
+        comments:  body.comments  !== undefined ? body.comments  : task.comments,
+        documents: body.documents !== undefined ? body.documents : task.documents,
+      };
+
+      if (body.statusAndamento === 'Finalizado') updatedTask!.progress = 100;
+      else if (body.statusAndamento !== undefined && task.statusAndamento === 'Finalizado')
+        updatedTask!.progress = body.progress !== undefined ? body.progress : 50;
+
+      db.tasks[taskIndex] = updatedTask!;
+
+      const projectTasks = db.tasks.filter(t => t.project.toLowerCase() === updatedTask!.project.toLowerCase());
+      const finished = projectTasks.filter(t => t.statusAndamento === 'Finalizado').length;
+      const projectProgress = projectTasks.length > 0 ? Math.round((finished / projectTasks.length) * 100) : 0;
+      db.projects = db.projects.map(p =>
+        p.name.toLowerCase() === updatedTask!.project.toLowerCase()
+          ? { ...p, progress: projectProgress, status: projectProgress === 100 ? 'Finalizado' : projectProgress > 0 ? 'Em andamento' : 'Não iniciado' }
+          : p
+      );
     });
 
-    const updatedTask = {
-      ...task,
-      ...body,
-      logs: [...(task.logs || []), ...logs],
-      subtasks: body.subtasks !== undefined ? body.subtasks : task.subtasks,
-      comments: body.comments !== undefined ? body.comments : task.comments,
-      documents: body.documents !== undefined ? body.documents : task.documents,
-    };
-
-    if (body.statusAndamento === 'Finalizado') {
-      updatedTask.progress = 100;
-    } else if (body.statusAndamento !== undefined && task.statusAndamento === 'Finalizado') {
-      updatedTask.progress = body.progress !== undefined ? body.progress : 50;
-    }
-
-    db.tasks[taskIndex] = updatedTask;
-
-    const projectTasks = db.tasks.filter(t => t.project.toLowerCase() === updatedTask.project.toLowerCase());
-    const finished = projectTasks.filter(t => t.statusAndamento === 'Finalizado').length;
-    const projectProgress = projectTasks.length > 0 ? Math.round((finished / projectTasks.length) * 100) : 0;
-
-    db.projects = db.projects.map(p => {
-      if (p.name.toLowerCase() === updatedTask.project.toLowerCase()) {
-        return {
-          ...p,
-          progress: projectProgress,
-          status: projectProgress === 100 ? 'Finalizado' : projectProgress > 0 ? 'Em andamento' : 'Não iniciado'
-        };
-      }
-      return p;
-    });
-
-    await writeProjectData(db);
-
+    if (!updatedTask) return NextResponse.json({ error: 'Tarefa não encontrada' }, { status: 404 });
     return NextResponse.json({ task: updatedTask });
   } catch (error) {
     console.error('Erro ao atualizar tarefa:', error);
@@ -103,32 +80,24 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const db = await readProjectData();
+    let found = false;
 
-    const task = db.tasks.find(t => t.id === id);
-    if (!task) {
-      return NextResponse.json({ error: 'Tarefa não encontrada' }, { status: 404 });
-    }
-
-    db.tasks = db.tasks.filter(t => t.id !== id);
-
-    const projectTasks = db.tasks.filter(t => t.project.toLowerCase() === task.project.toLowerCase());
-    const finished = projectTasks.filter(t => t.statusAndamento === 'Finalizado').length;
-    const projectProgress = projectTasks.length > 0 ? Math.round((finished / projectTasks.length) * 100) : 0;
-
-    db.projects = db.projects.map(p => {
-      if (p.name.toLowerCase() === task.project.toLowerCase()) {
-        return {
-          ...p,
-          progress: projectProgress,
-          status: projectProgress === 100 ? 'Finalizado' : projectProgress > 0 ? 'Em andamento' : 'Não iniciado'
-        };
-      }
-      return p;
+    await mutateProjectData((db) => {
+      const task = db.tasks.find(t => t.id === id);
+      if (!task) return;
+      found = true;
+      db.tasks = db.tasks.filter(t => t.id !== id);
+      const projectTasks = db.tasks.filter(t => t.project.toLowerCase() === task.project.toLowerCase());
+      const finished = projectTasks.filter(t => t.statusAndamento === 'Finalizado').length;
+      const projectProgress = projectTasks.length > 0 ? Math.round((finished / projectTasks.length) * 100) : 0;
+      db.projects = db.projects.map(p =>
+        p.name.toLowerCase() === task.project.toLowerCase()
+          ? { ...p, progress: projectProgress, status: projectProgress === 100 ? 'Finalizado' : projectProgress > 0 ? 'Em andamento' : 'Não iniciado' }
+          : p
+      );
     });
 
-    await writeProjectData(db);
-
+    if (!found) return NextResponse.json({ error: 'Tarefa não encontrada' }, { status: 404 });
     return NextResponse.json({ success: true, message: 'Tarefa deletada com sucesso' });
   } catch (error) {
     console.error('Erro ao deletar tarefa:', error);
