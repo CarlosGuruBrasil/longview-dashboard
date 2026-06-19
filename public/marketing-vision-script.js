@@ -178,8 +178,13 @@ function generateRealInsights() {
 }
 
 function showApp() {
-    // Se já estiver logado, faz o fluxo de carregamento rápido
-    startLoadingSequence();
+    // Dados já estão em cache/Postgres — mostra o app imediatamente e busca em background
+    const overlay = document.getElementById("loading-overlay");
+    const app = document.getElementById("main-app");
+    if (overlay) overlay.classList.add("hidden");
+    if (app) app.classList.remove("hidden");
+    setupEventListeners();
+    fetchAllData(false).catch(err => console.error("[showApp] Erro ao carregar dados:", err));
 }
 
 function setupEventListeners() {
@@ -202,7 +207,7 @@ function setupEventListeners() {
 
                 if (res.ok) {
                     sessionStorage.setItem("longview_auth", "true");
-                    startLoadingSequence();
+                    showApp();
                 } else {
                     alert("Usuário ou senha incorretos.");
                     loginBtn.innerText = "Entrar no Painel";
@@ -221,7 +226,7 @@ function setupEventListeners() {
     const refreshBtn = document.getElementById("refresh-btn");
     if (refreshBtn && !refreshBtn.getAttribute('data-events-set')) {
         refreshBtn.setAttribute('data-events-set', 'true');
-        refreshBtn.addEventListener("click", () => startLoadingSequence(true));
+        refreshBtn.addEventListener("click", () => fetchAllData(true).catch(console.error));
     }
 
     const filterBtn = document.getElementById("filter-btn");
@@ -330,7 +335,7 @@ function setupEventListeners() {
     const mRefreshBtn = document.getElementById("m-refresh-btn");
     if (mRefreshBtn) {
         mRefreshBtn.addEventListener("click", () => {
-            startLoadingSequence(true);
+            fetchAllData(true).catch(console.error);
             mobileSidebar.classList.add("hidden");
         });
     }
@@ -398,8 +403,8 @@ setupEventListeners();
 // Helpers
 function isSale(lead) {
     if (!lead.situacao || !lead.situacao.nome) return false;
-    const s = lead.situacao.nome.toLowerCase();
-    return s === "venda realizada" || s.includes("negócio ganho") || s.includes("negocio ganho") || s.includes("vendid");
+    const s = lead.situacao.nome.toLowerCase().trim();
+    return s === "venda realizada" || s.includes("negócio ganho") || s.includes("negocio ganho") || s.includes("vendid") || s.includes("venda real");
 }
 
 function getOrigin(lead) {
@@ -736,7 +741,7 @@ function updateDashboard(leads) {
                 if (isSale(lead)) {
                     totalVendasQtd++;
                     if (lead.valor_negocio) {
-                        const numStr = lead.valor_negocio.replace(/\./g, '').replace(',', '.');
+                        const numStr = lead.valor_negocio.toString().replace(/\./g, '').replace(',', '.');
                         const num = parseFloat(numStr);
                         if (!isNaN(num)) valorTotalVendas += num;
                     }
@@ -1597,7 +1602,7 @@ function renderTop5(salesLeads) {
         
         let val = 0;
         if (lead.valor_negocio) {
-            val = parseFloat(lead.valor_negocio.replace(/\./g, '').replace(',', '.'));
+            val = parseFloat(lead.valor_negocio.toString().replace(/\./g, '').replace(',', '.'));
             if (isNaN(val)) val = 0;
         }
         
@@ -3204,7 +3209,7 @@ function updateOportunidadesPerdas(leads) {
             const leadsSemCorretor = leads.filter(l => !isSale(l) && !isLoss(l) && (!l.corretor || !l.corretor.nome || l.corretor.nome === "-" || l.corretor.nome.trim() === ""));
             const totalSemCorretor = leadsSemCorretor.length;
 
-            const hoje = new Date("2026-05-21T12:00:00");
+            const hoje = new Date();
             const leadsEsfriando = leads.filter(l => {
                 if (isSale(l) || isLoss(l)) return false;
                 let lastDateStr = l.ultima_data_conversao || l.data_cad || "";

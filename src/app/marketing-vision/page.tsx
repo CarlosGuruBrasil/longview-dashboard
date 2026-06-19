@@ -55,20 +55,8 @@ export default function MarketingVisionPage() {
         </div>
       </div>
 
-      {/* Tela de Carregamento (Pós-Login) */}
-      <div id="loading-overlay" className="loading-overlay">
-        <div className="loading-content">
-          <img src="/logolongview.png" alt="LongView" className="loading-logo" />
-          <div className="progress-container">
-            <div id="progress-bar" className="progress-bar"></div>
-          </div>
-          <p id="loading-text" style={{ whiteSpace: 'nowrap', marginBottom: '20px' }}>Iniciando sincronização inteligente...</p>
-          <div className="loading-insight-box">
-            <p id="insight-title">VOCÊ SABIA?</p>
-            <p id="insight-text">A LongView utiliza inteligência de dados para otimizar cada conversão.</p>
-          </div>
-        </div>
-      </div>
+      {/* loading-overlay removido — dados carregam direto do Postgres */}
+      <div id="loading-overlay" className="hidden"></div>
 
       {/* App Principal */}
       <div className="app-container hidden" id="main-app">
