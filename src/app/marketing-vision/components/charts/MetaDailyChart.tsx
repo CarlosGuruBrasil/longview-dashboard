@@ -74,7 +74,7 @@ function CustomTooltip({ active, payload, label, metric }: CustomTooltipProps) {
 export default function MetaDailyChart({ daily, metric, onMetricChange }: MetaDailyChartProps) {
   const data = daily
     .slice()
-    .sort((a, b) => a.date_start.localeCompare(b.date_start))
+    .sort((a, b) => (a.date_start ?? '').localeCompare(b.date_start ?? ''))
     .map(d => ({
       date: formatDate(d.date_start),
       value: Number(d[metric] ?? 0),

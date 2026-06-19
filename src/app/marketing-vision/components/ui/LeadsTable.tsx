@@ -55,9 +55,10 @@ export default function LeadsTable({ leads }: LeadsTableProps) {
 
       if (dateFilter) {
         const iso = toISODate(lead.data_cad || lead.data_cadastro || lead.data_cadastramento);
-        // dd/mm → check against day and month portion of iso date (yyyy-mm-dd)
+        if (!iso) return false;
         const [yy, mm, dd] = iso.split('-');
-        const dateParts = `${dd}${mm}${yy}`;
+        if (!dd || !mm || !yy) return false;
+        const dateParts = `${dd}/${mm}/${yy}`;
         if (!dateParts.includes(dateFilter)) return false;
       }
 
