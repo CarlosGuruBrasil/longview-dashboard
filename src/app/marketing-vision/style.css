@@ -395,16 +395,10 @@ body::after {
 }
 
 /* Tela de Carregamento Premium */
+/* loading-overlay removido — forçado oculto */
+#loading-overlay,
 .loading-overlay {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100vw; height: 100vh;
-    background: #000000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 10000;
-    flex-direction: column;
+    display: none !important;
 }
 .loading-content {
     display: flex;

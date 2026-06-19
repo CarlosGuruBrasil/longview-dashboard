@@ -59,7 +59,7 @@ export default function MarketingVisionPage() {
       <div id="loading-overlay" className="hidden"></div>
 
       {/* App Principal */}
-      <div className="app-container hidden" id="main-app">
+      <div className="app-container" id="main-app">
         {/* Sidebar */}
         <aside className="sidebar">
           <div className="logo-container flex flex-col items-center" style={{ paddingTop: '32px', paddingBottom: '24px', borderBottom: '1px solid rgba(28,28,30,0.5)' }}>

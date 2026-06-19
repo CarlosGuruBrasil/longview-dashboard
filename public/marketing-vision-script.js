@@ -1,3 +1,11 @@
+// Oculta o loading overlay imediatamente — dados carregam do Postgres em background
+(function() {
+    var el = document.getElementById('loading-overlay');
+    if (el) el.style.cssText = 'display:none!important';
+    var app = document.getElementById('main-app');
+    if (app) app.classList.remove('hidden');
+})();
+
 // Configurações removidas por segurança (Agora estão no Backend)
 let allLeads = [];
 let filteredLeads = [];
@@ -567,8 +575,16 @@ async function fetchAllData(force = false) {
             }
         } catch (e) { /* sem cache disponível */ }
 
-        // Sem cache e sem dados — mostrar erro inline sem alert
-        if (loadingText) loadingText.textContent = "Erro ao conectar. Tente atualizar a página.";
+        // Sem cache e sem dados — mostra banner não-intrusivo no topo
+        const banner = document.getElementById('mv-error-banner') || (() => {
+            const b = document.createElement('div');
+            b.id = 'mv-error-banner';
+            b.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#1e1e2e;border:1px solid #f43f5e;color:#f87171;padding:10px 20px;border-radius:10px;font-size:13px;z-index:9999;display:flex;align-items:center;gap:10px';
+            b.innerHTML = '<span>⚠️ Erro ao conectar com o servidor. Tentando novamente...</span><button onclick="this.parentElement.remove()" style="background:none;border:none;color:#f87171;cursor:pointer;font-size:16px">×</button>';
+            document.body.appendChild(b);
+            setTimeout(() => b.remove(), 8000);
+            return b;
+        })();
         return false;
     }
 }
