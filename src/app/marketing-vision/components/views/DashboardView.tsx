@@ -7,12 +7,12 @@ import { isSale, getOrigin, getLeadValueNumber } from '../../utils/leads'
 import { formatCurrency } from '../../utils/formatters'
 import KpiCard from '../ui/KpiCard'
 import SalesGrowthChart from '../charts/SalesGrowthChart'
-import PieDonutChart from '../charts/PieDonutChart'
+import StatusBarChart from '../charts/StatusBarChart'
+import OriginsBarChart from '../charts/OriginsBarChart'
 
 export default function DashboardView() {
   const { filteredLeads, allLeads, crmTotal, loading } = useData()
 
-  // ALL hooks must be declared before any early return
   const [salesChartMode, setSalesChartMode] = useState<'month' | 'year'>('month')
 
   const salesLeads = useMemo(() => filteredLeads.filter(isSale), [filteredLeads])
@@ -27,42 +27,31 @@ export default function DashboardView() {
     [salesLeads]
   )
 
-  const salesByOrigin = useMemo(() => {
-    const map = new Map<string, number>()
+  // Vendas por Origem — mostra quantidade e VGV das vendas realizadas
+  const salesByOriginData = useMemo(() => {
+    const map = new Map<string, { quantidade: number; vgv: number }>()
     for (const lead of salesLeads) {
       const origin = getOrigin(lead)
-      map.set(origin, (map.get(origin) ?? 0) + 1)
+      const existing = map.get(origin) ?? { quantidade: 0, vgv: 0 }
+      existing.quantidade++
+      existing.vgv += getLeadValueNumber(lead)
+      map.set(origin, existing)
     }
     const sorted = Array.from(map.entries())
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value)
-    
+      .map(([name, data]) => ({ name, ...data }))
+      .sort((a, b) => b.quantidade - a.quantidade)
+
     if (sorted.length <= 6) return sorted
-    
+
     const top = sorted.slice(0, 5)
-    const restSum = sorted.slice(5).reduce((sum, item) => sum + item.value, 0)
-    top.push({ name: 'Outros', value: restSum })
+    const rest = sorted.slice(5)
+    const otherQtd = rest.reduce((s, i) => s + i.quantidade, 0)
+    const otherVgv = rest.reduce((s, i) => s + i.vgv, 0)
+    top.push({ name: 'Outros', quantidade: otherQtd, vgv: otherVgv })
     return top
   }, [salesLeads])
 
-  const leadsByOrigin = useMemo(() => {
-    const map = new Map<string, number>()
-    for (const lead of filteredLeads) {
-      const origin = getOrigin(lead)
-      map.set(origin, (map.get(origin) ?? 0) + 1)
-    }
-    const sorted = Array.from(map.entries())
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value)
-    
-    if (sorted.length <= 6) return sorted
-    
-    const top = sorted.slice(0, 5)
-    const restSum = sorted.slice(5).reduce((sum, item) => sum + item.value, 0)
-    top.push({ name: 'Outros', value: restSum })
-    return top
-  }, [filteredLeads])
-
+  // Leads por Status — gráfico de barras
   const leadsByStatus = useMemo(() => {
     const map = new Map<string, number>()
     for (const lead of filteredLeads) {
@@ -72,16 +61,15 @@ export default function DashboardView() {
     const sorted = Array.from(map.entries())
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value)
-    
+
     if (sorted.length <= 8) return sorted
-    
+
     const top = sorted.slice(0, 7)
-    const restSum = sorted.slice(7).reduce((sum, item) => sum + item.value, 0)
-    top.push({ name: 'Outros status', value: restSum })
+    const restSum = sorted.slice(7).reduce((s, i) => s + i.value, 0)
+    top.push({ name: 'Outros', value: restSum })
     return top
   }, [filteredLeads])
 
-  // Early return AFTER all hooks
   if (loading && allLeads.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-3">
@@ -93,6 +81,7 @@ export default function DashboardView() {
 
   return (
     <div className="flex flex-col gap-6">
+      {/* KPI Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard icon={Users} label="Total de Leads" value={filteredLeads.length}
           subtitle={`de ${crmTotal.toLocaleString('pt-BR')} na base`} color="#0ea5e9" />
@@ -101,14 +90,21 @@ export default function DashboardView() {
         <KpiCard icon={Banknote} label="Valor Total (Vendas)" value={formatCurrency(totalSalesValue)} color="#a855f7" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Gráfico de Vendas Realizadas — largura total */}
+      <div className="w-full">
         <SalesGrowthChart allLeads={allLeads} mode={salesChartMode} onModeChange={setSalesChartMode} />
-        <PieDonutChart title="Vendas por Origem" data={salesByOrigin} />
       </div>
 
+      {/* Vendas por Origem (quantidade + VGV) e Leads por Status (barras) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <PieDonutChart title="Leads por Origem" data={leadsByOrigin} />
-        <PieDonutChart title="Leads por Status" data={leadsByStatus} />
+        <OriginsBarChart
+          title="Vendas por Origem — Quantidade e VGV"
+          data={salesByOriginData}
+        />
+        <StatusBarChart
+          title="Leads por Status"
+          data={leadsByStatus}
+        />
       </div>
     </div>
   )

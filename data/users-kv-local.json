@@ -1,0 +1,44 @@
+[
+  {
+    "id": "usr-dev",
+    "name": "Carlos Santos (Desenvolvedor)",
+    "email": "carlos@longview.com.br",
+    "passwordHash": "$2b$10$2bS6OMMyIq4fN/EpK52j6eX9sYv82DKNNz9OrgaxKxH0TyN6rCuRe",
+    "role": "Desenvolvedor",
+    "permissions": {
+      "viewMarketingDashboard": true,
+      "viewMarketingLeads": true,
+      "viewMarketingOportunidades": true,
+      "viewMarketingEstoque": true,
+      "viewMarketingAds": true,
+      "viewMarketingVendas": true,
+      "viewProjectVision": true,
+      "manageProjects": true,
+      "manageCommentsDocs": true,
+      "deleteTasks": true,
+      "isAdmin": true
+    },
+    "createdAt": "2026-06-18T13:00:05.656Z"
+  },
+  {
+    "id": "usr-admin",
+    "name": "Diretoria Executiva",
+    "email": "diretoria@longview.com.br",
+    "passwordHash": "$2b$10$fAt0j.lm.u9wNDEGSTejl.HhiQp0fJAvMU7cybtsHwmV6/EdMS5Du",
+    "role": "Diretoria",
+    "permissions": {
+      "viewMarketingDashboard": true,
+      "viewMarketingLeads": true,
+      "viewMarketingOportunidades": true,
+      "viewMarketingEstoque": true,
+      "viewMarketingAds": true,
+      "viewMarketingVendas": true,
+      "viewProjectVision": true,
+      "manageProjects": true,
+      "manageCommentsDocs": true,
+      "deleteTasks": true,
+      "isAdmin": true
+    },
+    "createdAt": "2026-06-18T13:00:05.656Z"
+  }
+]

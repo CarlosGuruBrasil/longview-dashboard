@@ -1,13 +1,13 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { ShoppingBag, DollarSign, TrendingUp, MousePointerClick } from 'lucide-react'
+import { useMemo, useState, useEffect } from 'react'
+import { ShoppingBag, DollarSign, TrendingUp, MousePointerClick, RefreshCw } from 'lucide-react'
 import { useData } from '../../context/DataContext'
-import { isSale, getLeadValueNumber, getLeadDate, getLeadTags } from '../../utils/leads'
+import { isSale, getLeadValueNumber } from '../../utils/leads'
 import { formatCurrency, formatDate, CHART_PALETTE } from '../../utils/formatters'
 import GlassCard from '../ui/GlassCard'
 import KpiCard from '../ui/KpiCard'
-import type { Lead } from '../../types'
+import type { CvdwVenda } from '../../types'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -22,18 +22,18 @@ function groupBy<T>(items: T[], key: (item: T) => string): Map<string, T[]> {
   return map
 }
 
-function topByVgv(map: Map<string, Lead[]>, limit = 5): Array<{ name: string; count: number; vgv: number }> {
+function topByVgv(map: Map<string, CvdwVenda[]>, limit = 5) {
   return Array.from(map.entries())
-    .map(([name, leads]) => ({
+    .map(([name, vendas]) => ({
       name,
-      count: leads.length,
-      vgv: leads.reduce((s, l) => s + getLeadValueNumber(l), 0),
+      count: vendas.length,
+      vgv: vendas.reduce((s, v) => s + (v.valor_contrato ?? 0), 0),
     }))
     .sort((a, b) => b.vgv - a.vgv)
     .slice(0, limit)
 }
 
-function hasVisitaStage(lead: Lead): boolean {
+function hasVisitaStage(lead: any): boolean {
   const s = (lead.situacao?.nome || '').toLowerCase()
   return s.includes('visita')
 }
@@ -78,56 +78,49 @@ function RankingCard({ title, items }: RankingCardProps) {
   )
 }
 
-// ── table filters ─────────────────────────────────────────────────────────────
+// ── sales table ───────────────────────────────────────────────────────────────
 
 interface SalesTableProps {
-  sales: Lead[]
+  vendas: CvdwVenda[]
 }
 
-function SalesTable({ sales }: SalesTableProps) {
+function SalesTable({ vendas }: SalesTableProps) {
   const [search, setSearch] = useState('')
   const [corretor, setCorretor] = useState('')
   const [imobiliaria, setImobiliaria] = useState('')
-  const [gestor, setGestor] = useState('')
   const [empreendimento, setEmpreendimento] = useState('')
 
   const corretores = useMemo(() => {
-    const set = new Set(sales.map(l => l.corretor?.nome).filter(Boolean) as string[])
+    const set = new Set(vendas.map(v => v.corretor).filter(Boolean) as string[])
     return Array.from(set).sort()
-  }, [sales])
+  }, [vendas])
 
   const imobiliarias = useMemo(() => {
-    const set = new Set(sales.map(l => l.imobiliaria?.nome).filter(Boolean) as string[])
+    const set = new Set(vendas.map(v => v.imobiliaria).filter(Boolean) as string[])
     return Array.from(set).sort()
-  }, [sales])
-
-  const gestores = useMemo(() => {
-    const set = new Set(sales.map(l => l.gestor?.nome).filter(Boolean) as string[])
-    return Array.from(set).sort()
-  }, [sales])
+  }, [vendas])
 
   const empreendimentos = useMemo(() => {
-    const set = new Set(
-      sales.flatMap(l => l.empreendimento?.map(e => e.nome).filter(Boolean) ?? []) as string[],
-    )
+    const set = new Set(vendas.map(v => v.empreendimento).filter(Boolean) as string[])
     return Array.from(set).sort()
-  }, [sales])
+  }, [vendas])
 
   const filtered = useMemo(() => {
-    return sales
-      .filter(l => {
-        if (search && !l.nome?.toLowerCase().includes(search.toLowerCase())) return false
-        if (corretor && l.corretor?.nome !== corretor) return false
-        if (imobiliaria && l.imobiliaria?.nome !== imobiliaria) return false
-        if (gestor && l.gestor?.nome !== gestor) return false
-        if (empreendimento && !l.empreendimento?.some(e => e.nome === empreendimento)) return false
+    return vendas
+      .filter(v => {
+        if (search && !v.cliente?.toLowerCase().includes(search.toLowerCase())) return false
+        if (corretor && v.corretor !== corretor) return false
+        if (imobiliaria && v.imobiliaria !== imobiliaria) return false
+        if (empreendimento && v.empreendimento !== empreendimento) return false
         return true
       })
-      .slice(0, 200)
-  }, [sales, search, corretor, imobiliaria, gestor, empreendimento])
+      .slice(0, 300)
+  }, [vendas, search, corretor, imobiliaria, empreendimento])
 
   const selectClass =
     'bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-zinc-300 outline-none focus:border-sky-500/50 transition-colors'
+
+  const cols = ['Cliente', 'Data Reserva', 'Data Venda', 'Empreendimento', 'Bloco/Unidade', 'Corretor', 'Imobiliária', 'Valor Contrato', 'Tipologia']
 
   return (
     <div className="flex flex-col gap-3">
@@ -135,7 +128,7 @@ function SalesTable({ sales }: SalesTableProps) {
       <div className="flex flex-wrap gap-2">
         <input
           type="text"
-          placeholder="Buscar nome..."
+          placeholder="Buscar cliente..."
           value={search}
           onChange={e => setSearch(e.target.value)}
           className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-zinc-300 placeholder-zinc-600 outline-none focus:border-sky-500/50 transition-colors min-w-[140px]"
@@ -143,7 +136,6 @@ function SalesTable({ sales }: SalesTableProps) {
         {([
           ['Corretor', corretores, corretor, setCorretor],
           ['Imobiliária', imobiliarias, imobiliaria, setImobiliaria],
-          ['Gestor', gestores, gestor, setGestor],
           ['Empreendimento', empreendimentos, empreendimento, setEmpreendimento],
         ] as const).map(([label, opts, val, setter]) => (
           <select
@@ -158,13 +150,12 @@ function SalesTable({ sales }: SalesTableProps) {
             ))}
           </select>
         ))}
-        {(search || corretor || imobiliaria || gestor || empreendimento) && (
+        {(search || corretor || imobiliaria || empreendimento) && (
           <button
             onClick={() => {
               setSearch('')
               setCorretor('')
               setImobiliaria('')
-              setGestor('')
               setEmpreendimento('')
             }}
             className="px-3 py-1.5 text-xs rounded-lg border border-white/10 text-zinc-400 hover:text-zinc-200 hover:border-white/20 transition-colors"
@@ -182,7 +173,7 @@ function SalesTable({ sales }: SalesTableProps) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-white/10">
-              {['Nome', 'Cadastro', 'Empreendimento', 'Corretor', 'Imobiliária', 'Gestor', 'Valor', 'Tags'].map(col => (
+              {cols.map(col => (
                 <th
                   key={col}
                   className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap"
@@ -196,72 +187,67 @@ function SalesTable({ sales }: SalesTableProps) {
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-3 py-8 text-center text-sm" style={{ color: '#71717a' }}>
+                <td colSpan={cols.length} className="px-3 py-8 text-center text-sm" style={{ color: '#71717a' }}>
                   Nenhuma venda encontrada
                 </td>
               </tr>
             ) : (
-              filtered.map((l, i) => {
-                const v = getLeadValueNumber(l)
-                const tags = getLeadTags(l)
-                return (
-                  <tr
-                    key={l.idlead ?? l.id ?? i}
-                    className="border-b border-white/5 hover:bg-white/5 transition-colors"
+              filtered.map((v, i) => (
+                <tr
+                  key={`${v.idreserva ?? i}-${v.idunidade ?? i}`}
+                  className="border-b border-white/5 hover:bg-white/5 transition-colors"
+                >
+                  {/* Cliente */}
+                  <td className="px-3 py-2 font-medium whitespace-nowrap" style={{ color: '#e4e4e7' }}>
+                    <div className="flex items-center gap-2">
+                      <span>{v.cliente || '-'}</span>
+                      {v.associados && v.associados.length > 0 && (
+                        <span
+                          className="text-[10px] bg-purple-500/10 text-purple-400 border border-purple-500/20 px-1.5 py-0.5 rounded font-bold"
+                          title={`${v.associados.length} associado(s): ${v.associados.map(a => a.tipo_associacao).join(', ')}`}
+                        >
+                          +{v.associados.length} assoc.
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  {/* Data Reserva */}
+                  <td className="px-3 py-2 whitespace-nowrap text-xs" style={{ color: '#a1a1aa' }}>
+                    {v.data_reserva ? formatDate(v.data_reserva) : '-'}
+                  </td>
+                  {/* Data Venda */}
+                  <td className="px-3 py-2 whitespace-nowrap text-xs" style={{ color: '#10b981' }}>
+                    {v.data_venda ? formatDate(v.data_venda) : '-'}
+                  </td>
+                  {/* Empreendimento */}
+                  <td className="px-3 py-2 max-w-[140px] truncate" style={{ color: '#a1a1aa' }}>
+                    {v.empreendimento || '-'}
+                  </td>
+                  {/* Bloco / Unidade */}
+                  <td className="px-3 py-2 whitespace-nowrap text-xs" style={{ color: '#a1a1aa' }}>
+                    {[v.bloco, v.unidade].filter(Boolean).join(' / ') || '-'}
+                  </td>
+                  {/* Corretor */}
+                  <td className="px-3 py-2 whitespace-nowrap text-xs" style={{ color: '#a1a1aa' }}>
+                    {v.corretor || '-'}
+                  </td>
+                  {/* Imobiliária */}
+                  <td className="px-3 py-2 whitespace-nowrap text-xs" style={{ color: '#a1a1aa' }}>
+                    {v.imobiliaria || '-'}
+                  </td>
+                  {/* Valor Contrato */}
+                  <td
+                    className="px-3 py-2 whitespace-nowrap font-semibold"
+                    style={{ color: (v.valor_contrato ?? 0) > 0 ? '#10b981' : '#71717a' }}
                   >
-                    <td className="px-3 py-2 font-medium whitespace-nowrap" style={{ color: '#e4e4e7' }}>
-                      <div className="flex items-center gap-2">
-                        <span>{l.nome || '-'}</span>
-                        {l.qtde_reservas_associadas && l.qtde_reservas_associadas > 1 && (
-                          <span 
-                            className="text-[10px] bg-sky-500/10 text-sky-400 border border-sky-500/20 px-1.5 py-0.5 rounded font-bold" 
-                            title={`${l.qtde_reservas_associadas} unidades / reservas associadas`}
-                          >
-                            {l.qtde_reservas_associadas} un.
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap" style={{ color: '#a1a1aa' }}>
-                      {formatDate(getLeadDate(l))}
-                    </td>
-                    <td className="px-3 py-2 max-w-[160px] truncate" style={{ color: '#a1a1aa' }}>
-                      {l.empreendimento?.map(e => e.nome).join(', ') || '-'}
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap" style={{ color: '#a1a1aa' }}>
-                      {l.corretor?.nome || '-'}
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap" style={{ color: '#a1a1aa' }}>
-                      {l.imobiliaria?.nome || '-'}
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap" style={{ color: '#a1a1aa' }}>
-                      {l.gestor?.nome || '-'}
-                    </td>
-                    <td
-                      className="px-3 py-2 whitespace-nowrap font-semibold"
-                      style={{ color: v > 0 ? '#10b981' : '#71717a' }}
-                    >
-                      {v > 0 ? formatCurrency(v) : '-'}
-                    </td>
-                    <td className="px-3 py-2">
-                      <div className="flex flex-wrap gap-1">
-                        {tags.slice(0, 3).map(tag => (
-                          <span
-                            key={tag}
-                            className="text-xs px-1.5 py-0.5 rounded-full"
-                            style={{ backgroundColor: 'rgba(14,165,233,0.15)', color: '#38bdf8' }}
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                        {tags.length > 3 && (
-                          <span className="text-xs" style={{ color: '#71717a' }}>+{tags.length - 3}</span>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })
+                    {(v.valor_contrato ?? 0) > 0 ? formatCurrency(v.valor_contrato!) : '-'}
+                  </td>
+                  {/* Tipologia */}
+                  <td className="px-3 py-2 whitespace-nowrap text-xs" style={{ color: '#a1a1aa' }}>
+                    {[v.tipovenda, v.planta].filter(Boolean).join(' — ') || '-'}
+                  </td>
+                </tr>
+              ))
             )}
           </tbody>
         </table>
@@ -275,63 +261,111 @@ function SalesTable({ sales }: SalesTableProps) {
 export default function VendasView() {
   const { filteredLeads } = useData()
 
-  const sales = useMemo(() => filteredLeads.filter(isSale), [filteredLeads])
+  const [cvdwVendas, setCvdwVendas] = useState<CvdwVenda[]>([])
+  const [loadingVendas, setLoadingVendas] = useState(false)
+  const [vendaError, setVendaError] = useState<string | null>(null)
 
-  // KPIs
-  const qtd = sales.length
-  const vgvTotal = useMemo(() => sales.reduce((s, l) => s + getLeadValueNumber(l), 0), [sales])
+  // Busca vendas individuais do endpoint CVDW
+  const fetchVendas = async (force = false) => {
+    setLoadingVendas(true)
+    setVendaError(null)
+    try {
+      const url = force ? '/api/cv/vendas?refresh=true' : '/api/cv/vendas'
+      const res = await fetch(url)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      setCvdwVendas(data.vendas ?? [])
+    } catch (e: any) {
+      setVendaError(e.message)
+    } finally {
+      setLoadingVendas(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchVendas()
+  }, [])
+
+  // Fallback: usa leads do contexto para KPIs quando CVDW ainda não carregou
+  const salesFromLeads = useMemo(() => filteredLeads.filter(isSale), [filteredLeads])
+  const visitasTotal = useMemo(
+    () => filteredLeads.filter(l => (l.situacao?.nome || '').toLowerCase().includes('visita')).length,
+    [filteredLeads]
+  )
+
+  // KPIs baseados nos dados CVDW (mais precisos, por reserva individual)
+  const qtd = cvdwVendas.length > 0 ? cvdwVendas.length : salesFromLeads.length
+  const vgvTotal = cvdwVendas.length > 0
+    ? cvdwVendas.reduce((s, v) => s + (v.valor_contrato ?? 0), 0)
+    : salesFromLeads.reduce((s, l) => s + getLeadValueNumber(l), 0)
   const ticketMedio = qtd > 0 ? vgvTotal / qtd : 0
+  const visitaConvRate = visitasTotal > 0 ? ((salesFromLeads.length / visitasTotal) * 100).toFixed(1) : '0.0'
 
-  // Visitas que viraram venda — use allLeads for full picture but filter by date via filteredLeads
-  const visitasTotal = useMemo(() => filteredLeads.filter(hasVisitaStage).length, [filteredLeads])
-  const visitaConvRate = visitasTotal > 0 ? ((qtd / visitasTotal) * 100).toFixed(1) : '0.0'
+  // Rankings baseados em CVDW
+  const topCorretores = useMemo(() =>
+    topByVgv(groupBy(cvdwVendas, v => v.corretor || 'Sem Corretor')), [cvdwVendas])
+  const topImobiliarias = useMemo(() =>
+    topByVgv(groupBy(cvdwVendas, v => v.imobiliaria || 'Sem Imobiliária')), [cvdwVendas])
+  const topEmpreendimentos = useMemo(() =>
+    topByVgv(groupBy(cvdwVendas, v => v.empreendimento || 'Não Informado')), [cvdwVendas])
+  const topMidias = useMemo(() =>
+    topByVgv(groupBy(cvdwVendas, v => v.midia || 'Não Informada')), [cvdwVendas])
+  const topTipos = useMemo(() =>
+    topByVgv(groupBy(cvdwVendas, v => v.tipovenda || 'Não Informado')), [cvdwVendas])
 
-  // Rankings (from filteredLeads isSale)
-  const topCorretores = useMemo(() => topByVgv(groupBy(sales, l => l.corretor?.nome || 'Sem Corretor')), [sales])
-  const topImobiliarias = useMemo(
-    () => topByVgv(groupBy(sales, l => l.imobiliaria?.nome || 'Sem Imobiliária')),
-    [sales],
-  )
-  const topEmpreendimentos = useMemo(
-    () =>
-      topByVgv(
-        groupBy(
-          sales.flatMap(l =>
-            (l.empreendimento?.length ?? 0) > 0
-              ? (l.empreendimento ?? []).map(e => ({ ...l, _emp: e.nome }))
-              : [{ ...l, _emp: 'Não Informado' }],
-          ) as (Lead & { _emp: string })[],
-          l => (l as Lead & { _emp: string })._emp,
-        ) as unknown as Map<string, Lead[]>,
-      ),
-    [sales],
-  )
-  const topGestores = useMemo(() => topByVgv(groupBy(sales, l => l.gestor?.nome || 'Sem Gestor')), [sales])
-  const topTipologias = useMemo(() => {
-    // tipologia is not a direct field — use empreendimento nome as proxy grouped differently
-    // since Lead has no tipologia field, use "empreendimento + score bucket" or just empreendimento
-    return topByVgv(
-      groupBy(sales, l => {
-        const emp = l.empreendimento?.[0]?.nome
-        return emp ? `${emp}` : 'Não Informada'
-      }),
-    )
-  }, [sales])
+  const usandoCvdw = cvdwVendas.length > 0
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Banner de origem dos dados */}
+      {!loadingVendas && (
+        <div className={`flex items-center justify-between gap-3 px-4 py-2.5 rounded-lg text-xs border ${
+          usandoCvdw
+            ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+            : 'bg-amber-500/10 border-amber-500/20 text-amber-400'
+        }`}>
+          <span>
+            {usandoCvdw
+              ? `✓ Dados individuais por reserva carregados (${cvdwVendas.length} vendas do CVDW)`
+              : '⚠ Exibindo dados estimados dos leads. Clique em "Atualizar" para carregar dados por reserva.'}
+          </span>
+          <button
+            onClick={() => fetchVendas(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded border border-current opacity-80 hover:opacity-100 transition-opacity"
+          >
+            <RefreshCw size={12} />
+            Atualizar
+          </button>
+        </div>
+      )}
+
+      {loadingVendas && (
+        <div className="flex items-center justify-center gap-3 px-4 py-3 rounded-lg bg-sky-500/10 border border-sky-500/20 text-xs text-sky-400">
+          <div className="w-4 h-4 border-2 border-sky-400 border-t-transparent rounded-full animate-spin" />
+          Carregando vendas individuais do CVDW...
+        </div>
+      )}
+
+      {vendaError && (
+        <div className="px-4 py-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-xs text-red-400">
+          ⚠ Erro ao carregar CVDW: {vendaError}. Exibindo dados dos leads como fallback.
+        </div>
+      )}
+
       {/* KPI Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <KpiCard
           icon={ShoppingBag}
           label="Qtd. de Vendas"
           value={qtd}
+          subtitle={usandoCvdw ? 'por reserva (CVDW)' : 'por lead (estimado)'}
           color="#10b981"
         />
         <KpiCard
           icon={DollarSign}
           label="VGV Total"
           value={formatCurrency(vgvTotal)}
+          subtitle={usandoCvdw ? 'valor de contrato real' : 'valor negócio estimado'}
           color="#0ea5e9"
         />
         <KpiCard
@@ -344,24 +378,34 @@ export default function VendasView() {
           icon={MousePointerClick}
           label="Visitas → Venda"
           value={`${visitaConvRate}%`}
-          subtitle={`${qtd} vendas / ${visitasTotal} visitas`}
+          subtitle={`${salesFromLeads.length} vendas / ${visitasTotal} visitas`}
           color="#f59e0b"
         />
       </div>
 
       {/* Top 5 Rankings */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <RankingCard title="Top Corretores" items={topCorretores} />
-        <RankingCard title="Top Imobiliárias" items={topImobiliarias} />
-        <RankingCard title="Top Empreendimentos" items={topEmpreendimentos} />
-        <RankingCard title="Top Gestores" items={topGestores} />
-        <RankingCard title="Top Tipologias" items={topTipologias} />
-      </div>
+      {usandoCvdw && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <RankingCard title="Top Corretores" items={topCorretores} />
+          <RankingCard title="Top Imobiliárias" items={topImobiliarias} />
+          <RankingCard title="Top Empreendimentos" items={topEmpreendimentos} />
+          <RankingCard title="Top Mídias" items={topMidias} />
+          <RankingCard title="Top Tipo de Venda" items={topTipos} />
+        </div>
+      )}
 
-      {/* Sales table */}
-      <GlassCard title={`Tabela de Vendas (${sales.length} total)`}>
-        <SalesTable sales={sales} />
-      </GlassCard>
+      {/* Sales table — individual por reserva */}
+      {usandoCvdw ? (
+        <GlassCard title={`Tabela de Vendas — Detalhamento por Reserva (${cvdwVendas.length} registros)`}>
+          <SalesTable vendas={cvdwVendas} />
+        </GlassCard>
+      ) : (
+        <GlassCard title="Tabela de Vendas (dados dos leads — aguardando CVDW)">
+          <p className="text-sm text-zinc-500 py-6 text-center">
+            Aguardando carregamento dos dados individuais por reserva...
+          </p>
+        </GlassCard>
+      )}
     </div>
   )
 }

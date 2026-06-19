@@ -194,6 +194,65 @@ export interface DashboardApiResponse {
   _cached: boolean;
 }
 
+// ── CVDW Vendas ───────────────────────────────────────────────────────────────
+
+/** Estrutura de uma venda individual retornada pelo endpoint /api/v1/cvdw/vendas */
+export interface CvdwVenda {
+  referencia?: string;
+  referencia_data?: string;
+  ativo?: string;
+  idreserva?: number;
+  idlead?: string;
+  aprovada?: string;
+  data_reserva?: string;
+  data_venda?: string;
+  idhistorico?: number;
+  data_historico?: string;
+  empreendimento?: string;
+  idempreendimento?: number;
+  codigointerno_empreendimento?: string;
+  regiao?: string;
+  etapa?: string;
+  planta?: string;
+  bloco?: string;
+  unidade?: string;
+  idunidade?: number;
+  area_privativa?: number;
+  cliente?: string;
+  idcliente?: number;
+  documento_cliente?: string;
+  email?: string;
+  cidade?: string;
+  cep_cliente?: string;
+  renda?: number;
+  sexo?: string;
+  idade?: number;
+  estado_civil?: string;
+  idcorretor?: number;
+  corretor?: string;
+  idimobiliaria?: number;
+  imobiliaria?: string;
+  campanha?: string;
+  valor_contrato?: number;
+  contrato_interno?: string;
+  idpessoa_cv?: number;
+  idpessoa_int?: string;
+  idmidia?: number;
+  midia?: string;
+  idtabela?: string;
+  nometabela?: string;
+  codigointernotabela?: string;
+  idtipovenda?: number;
+  tipovenda?: string;
+  associados?: Array<{
+    ativo?: string;
+    idpessoa_cv?: number;
+    idtipo_associacao?: number;
+    tipo_associacao?: string;
+    percentagem_participacao?: number;
+  }>;
+}
+
 // ── UI helpers ────────────────────────────────────────────────────────────────
 
 export interface StatusColor {
