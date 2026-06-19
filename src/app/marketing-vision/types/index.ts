@@ -1,0 +1,217 @@
+export interface LeadSituacao {
+  nome: string;
+  cor?: string;
+}
+
+export interface LeadEmpreendimento {
+  nome: string;
+  id?: string;
+}
+
+export interface LeadPessoa {
+  nome: string;
+  id?: string;
+}
+
+export interface LeadMotivoCancelamento {
+  nome: string;
+}
+
+export interface LeadTag {
+  nome?: string;
+  id?: string;
+}
+
+export interface LeadInteracao {
+  data_cad?: string;
+  tipo?: string;
+}
+
+export interface Lead {
+  idlead?: string | number;
+  id?: string | number;
+  nome?: string;
+  email?: string;
+  telefone?: string;
+  celular?: string;
+  // datas — CV CRM usa qualquer um destes
+  data_cad?: string;
+  data_cadastro?: string;
+  data_cadastramento?: string;
+  ultima_data_conversao?: string;
+  situacao?: LeadSituacao;
+  origem?: string | { nome: string };
+  midia_principal?: string;
+  midia_visita?: string;
+  empreendimento?: LeadEmpreendimento[];
+  corretor?: LeadPessoa;
+  gestor?: LeadPessoa;
+  imobiliaria?: LeadPessoa;
+  temperatura?: string;
+  score?: number;
+  valor_negocio?: string | number;
+  qtde_reservas_associadas?: number;
+  qtde_simulacoes_associadas?: number;
+  motivo_cancelamento?: LeadMotivoCancelamento;
+  genero?: string;
+  cidade?: string;
+  estado_civil?: string;
+  tags?: Array<string | LeadTag>;
+  interacao?: LeadInteracao[];
+  bolsao?: boolean | string | number;
+}
+
+export interface LeadsApiResponse {
+  leads: Lead[];
+  total: number;
+  crmTotal: number;
+}
+
+// ── Meta Ads ─────────────────────────────────────────────────────────────────
+
+export interface MetaAction {
+  action_type: string;
+  value: string;
+}
+
+export interface MetaInsights {
+  spend?: string;
+  impressions?: string;
+  clicks?: string;
+  reach?: string;
+  frequency?: string;
+  cpc?: string;
+  cpm?: string;
+  ctr?: string;
+  cpp?: string;
+  actions?: MetaAction[];
+  cost_per_action_type?: MetaAction[];
+  date_start?: string;
+  date_stop?: string;
+}
+
+export interface MetaCampaignInsight extends MetaInsights {
+  campaign_id: string;
+  campaign_name: string;
+}
+
+export interface MetaCampaignDetail {
+  id: string;
+  name: string;
+  status: string;
+  objective?: string;
+  buying_type?: string;
+  daily_budget?: string;
+  lifetime_budget?: string;
+  spend_cap?: string;
+  created_time?: string;
+  start_time?: string;
+  stop_time?: string;
+}
+
+export interface MetaAdset extends MetaInsights {
+  campaign_id: string;
+  campaign_name: string;
+  adset_id: string;
+  adset_name: string;
+}
+
+export interface MetaDemographic extends MetaInsights {
+  gender: string;
+  age: string;
+}
+
+export interface MetaRegion extends MetaInsights {
+  region: string;
+}
+
+export interface MetaPlatform extends MetaInsights {
+  publisher_platform: string;
+}
+
+export interface MetaDevice extends MetaInsights {
+  device_platform: string;
+}
+
+export interface MetaDailyInsight extends MetaInsights {
+  date_start: string;
+  date_stop: string;
+}
+
+export interface MetaLeadForm {
+  id: string;
+  name: string;
+  status?: string;
+  leads_count?: number;
+  created_time?: string;
+}
+
+export interface MetaPageInfo {
+  id: string;
+  name?: string;
+  fan_count?: number;
+  followers_count?: number;
+  instagram_business_account?: { id: string };
+}
+
+export interface MetaData {
+  global: MetaInsights | null;
+  campaigns: MetaCampaignInsight[];
+  campaignDetails: MetaCampaignDetail[];
+  adsets: MetaAdset[];
+  demographics: MetaDemographic[];
+  regions: MetaRegion[];
+  platforms: MetaPlatform[];
+  devices: MetaDevice[];
+  daily: MetaDailyInsight[];
+  leadForms: MetaLeadForm[];
+  page: MetaPageInfo | null;
+}
+
+// ── Estoque ───────────────────────────────────────────────────────────────────
+
+export interface EstoqueProject {
+  idempreendimento?: string;
+  nome?: string;
+  [key: string]: unknown;
+}
+
+export interface EstoqueData {
+  [projectId: string]: unknown;
+}
+
+// ── API response ──────────────────────────────────────────────────────────────
+
+export interface DashboardApiResponse {
+  leads: LeadsApiResponse;
+  meta: MetaData;
+  estoque: EstoqueData;
+  leadForms: MetaLeadForm[];
+  page: MetaPageInfo | null;
+  updatedAt: string;
+  _cached: boolean;
+}
+
+// ── UI helpers ────────────────────────────────────────────────────────────────
+
+export interface StatusColor {
+  bg: string;
+  text: string;
+}
+
+export type ActiveView =
+  | 'dashboard'
+  | 'leads'
+  | 'oportunidades'
+  | 'empreendimentos'
+  | 'vendas'
+  | 'marketing'
+  | 'publicar'
+  | 'audiences'
+  | 'links'
+  | 'score';
+
+export interface DateRange {
+  start: string;
+  end: string;
+}
