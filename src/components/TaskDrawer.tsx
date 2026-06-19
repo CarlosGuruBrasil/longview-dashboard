@@ -113,8 +113,8 @@ export default function TaskDrawer({ taskId, onClose, onUpdate }: Props) {
 
   if (!taskId) return null;
 
-  const isEditable  = currentUser.role === 'Desenvolvedor' || currentUser.permissions?.manageProjects === true;
-  const isDeletable = currentUser.role === 'Desenvolvedor' || currentUser.role === 'Diretoria';
+  const isEditable  = currentUser.role === 'Desenvolvedor' || currentUser.role === 'Diretoria' || currentUser.role === 'Operador' || currentUser.permissions?.manageProjects === true;
+  const isDeletable = currentUser.role === 'Desenvolvedor' || currentUser.role === 'Diretoria' || currentUser.role === 'Operador';
 
   return (
     <>

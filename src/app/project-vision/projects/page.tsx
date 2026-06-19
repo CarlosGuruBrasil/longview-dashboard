@@ -169,7 +169,7 @@ export default function ProjectsPage() {
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           </button>
 
-          {(currentUser.role === 'Diretoria' || currentUser.role === 'Desenvolvedor' || currentUser.permissions?.manageProjects) && (
+          {(currentUser.role === 'Diretoria' || currentUser.role === 'Desenvolvedor' || currentUser.role === 'Operador' || currentUser.permissions?.manageProjects) && (
             <button 
               onClick={() => setCreateModalOpen(true)}
               className="bg-white hover:bg-zinc-200 text-black px-4.5 py-2.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all duration-200 shadow-md"
@@ -192,7 +192,7 @@ export default function ProjectsPage() {
           {projects.map((proj) => {
             const stats = getProjectStats(proj.name);
             const projectUrl = `/project-vision/projects/${proj.id}`;
-            const canEdit = currentUser.role === 'Diretoria' || currentUser.role === 'Desenvolvedor';
+            const canEdit = currentUser.role === 'Diretoria' || currentUser.role === 'Desenvolvedor' || currentUser.role === 'Operador';
 
             return (
               <div

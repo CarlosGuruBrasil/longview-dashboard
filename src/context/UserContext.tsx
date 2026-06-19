@@ -19,7 +19,7 @@ export interface UserPermissions {
 export interface User {
   id: string;
   name: string;
-  role: 'Desenvolvedor' | 'Diretoria' | 'Gestor' | 'Parceiro' | 'Corretor';
+  role: 'Desenvolvedor' | 'Diretoria' | 'Operador' | 'Gestor' | 'Parceiro' | 'Corretor' | 'Visualizador';
   email: string;
   permissions?: UserPermissions;
 }

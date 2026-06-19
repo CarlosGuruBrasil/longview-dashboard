@@ -43,7 +43,7 @@ export default function AdminUsersPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<'Desenvolvedor' | 'Diretoria' | 'Gestor' | 'Parceiro' | 'Corretor'>('Corretor');
+  const [role, setRole] = useState<'Desenvolvedor' | 'Diretoria' | 'Operador' | 'Gestor' | 'Parceiro' | 'Corretor' | 'Visualizador'>('Corretor');
   const [permissions, setPermissions] = useState<UserPermissions>(defaultPermissions);
 
   const fetchUsers = async () => {
@@ -67,8 +67,7 @@ export default function AdminUsersPage() {
   // Autofill permissões ao mudar o perfil base (atalho para facilidade de uso)
   const handleRoleChange = (selectedRole: typeof role) => {
     setRole(selectedRole);
-    
-    // Sugestão de permissões padrão para cada perfil
+
     let newPerms = { ...defaultPermissions };
     if (selectedRole === 'Desenvolvedor') {
       newPerms = {
@@ -98,6 +97,14 @@ export default function AdminUsersPage() {
         deleteTasks: true,
         isAdmin: true
       };
+    } else if (selectedRole === 'Operador') {
+      newPerms = {
+        ...defaultPermissions,
+        viewProjectVision: true,
+        manageProjects: true,
+        manageCommentsDocs: true,
+        deleteTasks: true
+      };
     } else if (selectedRole === 'Gestor') {
       newPerms = {
         ...defaultPermissions,
@@ -120,6 +127,11 @@ export default function AdminUsersPage() {
         viewMarketingDashboard: true,
         viewMarketingLeads: true,
         viewMarketingEstoque: true
+      };
+    } else if (selectedRole === 'Visualizador') {
+      newPerms = {
+        ...defaultPermissions,
+        viewProjectVision: true
       };
     }
     setPermissions(newPerms);
@@ -300,8 +312,10 @@ export default function AdminUsersPage() {
                             <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
                               u.role === 'Desenvolvedor' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' :
                               u.role === 'Diretoria' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
+                              u.role === 'Operador' ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' :
                               u.role === 'Gestor' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
                               u.role === 'Parceiro' ? 'bg-orange-500/10 text-orange-400 border border-orange-500/20' :
+                              u.role === 'Visualizador' ? 'bg-zinc-500/10 text-zinc-300 border border-zinc-500/20' :
                               'bg-zinc-500/10 text-zinc-400 border border-zinc-500/20'
                             }`}>
                               {u.role}
@@ -422,9 +436,11 @@ export default function AdminUsersPage() {
                 >
                   <option value="Desenvolvedor">Desenvolvedor (Acesso Total)</option>
                   <option value="Diretoria">Diretoria</option>
+                  <option value="Operador">Operador (Criar/Excluir Project Vision)</option>
                   <option value="Gestor">Gestor</option>
                   <option value="Parceiro">Parceiro</option>
                   <option value="Corretor">Corretor</option>
+                  <option value="Visualizador">Visualizador (Somente Leitura)</option>
                 </select>
               </div>
 

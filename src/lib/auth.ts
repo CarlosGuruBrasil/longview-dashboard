@@ -13,7 +13,7 @@ export interface AuthUser {
   userId:      string;
   name:        string;
   email:       string;
-  role:        'Desenvolvedor' | 'Diretoria' | 'Gestor' | 'Parceiro' | 'Corretor';
+  role:        'Desenvolvedor' | 'Diretoria' | 'Operador' | 'Gestor' | 'Parceiro' | 'Corretor' | 'Visualizador';
   permissions: Record<string, boolean>;
 }
 

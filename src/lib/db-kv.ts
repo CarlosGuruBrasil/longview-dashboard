@@ -23,7 +23,7 @@ export interface DbUser {
   name: string;
   email: string;
   passwordHash: string;
-  role: 'Desenvolvedor' | 'Diretoria' | 'Gestor' | 'Parceiro' | 'Corretor';
+  role: 'Desenvolvedor' | 'Diretoria' | 'Operador' | 'Gestor' | 'Parceiro' | 'Corretor' | 'Visualizador';
   permissions: UserPermissions;
   createdAt: string;
 }
