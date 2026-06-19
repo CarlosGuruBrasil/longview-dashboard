@@ -372,6 +372,42 @@ export default function MarketingVisionPage() {
               </div>
               <div className="leads-summary-row" id="leads-summary-container"></div>
 
+              {/* Gráfico de crescimento mês a mês / ano a ano */}
+              <div className="chart-card glass-card" style={{ marginBottom: '24px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+                  <h3 style={{ margin: 0 }}>Crescimento de Leads</h3>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      id="btn-growth-month"
+                      onClick={() => {
+                        (window as any).leadsGrowthMode = 'month';
+                        const btn1 = document.getElementById('btn-growth-month');
+                        const btn2 = document.getElementById('btn-growth-year');
+                        if (btn1) { btn1.style.background = '#0ea5e9'; btn1.style.color = '#fff'; btn1.style.borderColor = '#0ea5e9'; }
+                        if (btn2) { btn2.style.background = 'transparent'; btn2.style.color = 'var(--text-secondary)'; btn2.style.borderColor = 'rgba(255,255,255,0.15)'; }
+                        if ((window as any).allLeads) (window as any).renderLeadsGrowthChart((window as any).allLeads);
+                      }}
+                      style={{ padding: '5px 14px', fontSize: '12px', fontWeight: '600', borderRadius: '8px', border: '1px solid #0ea5e9', background: '#0ea5e9', color: '#fff', cursor: 'pointer' }}
+                    >Mês a Mês</button>
+                    <button
+                      id="btn-growth-year"
+                      onClick={() => {
+                        (window as any).leadsGrowthMode = 'year';
+                        const btn1 = document.getElementById('btn-growth-month');
+                        const btn2 = document.getElementById('btn-growth-year');
+                        if (btn2) { btn2.style.background = '#0ea5e9'; btn2.style.color = '#fff'; btn2.style.borderColor = '#0ea5e9'; }
+                        if (btn1) { btn1.style.background = 'transparent'; btn1.style.color = 'var(--text-secondary)'; btn1.style.borderColor = 'rgba(255,255,255,0.15)'; }
+                        if ((window as any).allLeads) (window as any).renderLeadsGrowthChart((window as any).allLeads);
+                      }}
+                      style={{ padding: '5px 14px', fontSize: '12px', fontWeight: '600', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer' }}
+                    >Ano a Ano</button>
+                  </div>
+                </div>
+                <div className="chart-container" style={{ height: '280px' }}>
+                  <canvas id="leadsGrowthChart"></canvas>
+                </div>
+              </div>
+
               <div className="charts-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', marginBottom: '24px' }}>
                 <div className="chart-card glass-card">
                   <h3>Gênero</h3>

@@ -769,6 +769,7 @@ function updateDashboard(leads) {
 
             // Resumos de Etapas
             try { renderLeadsSummary(leads); } catch(e) { console.error("Erro Leads Summary:", e); }
+            try { renderLeadsGrowthChart(leads); } catch(e) { console.error("Erro Growth Chart:", e); }
             try { renderSalesSummary(leads.filter(l => isSale(l))); } catch(e) { console.error("Erro Sales Summary:", e); }
             
         } catch (globalError) {
@@ -1241,6 +1242,7 @@ function applyTableFilters() {
 
     renderTable(finalLeads, "table-leads-body");
     renderLeadsSummary(finalLeads);
+    renderLeadsGrowthChart(finalLeads);
     renderDemographicCharts(finalLeads);
 }
 
@@ -1344,6 +1346,29 @@ function renderGenericPieChart(canvasId, dataObj, chartInstance, setInstanceCall
     setInstanceCallback(newInst);
 }
 
+// Ordem oficial das etapas no CV CRM Longview
+const CV_STAGE_ORDER = [
+    'aguardando atendimento',
+    'em atendimento sdr',
+    'aguardando atendimento corretor',
+    'sem conexão',
+    'sem conexao',
+    'em atendimento',
+    'visita agendada',
+    'visita realizada',
+    'simulação',
+    'simulacao',
+    'com reserva',
+    'com proposta',
+    'venda realizada',
+];
+
+function cvStageRank(name) {
+    const n = (name || '').toLowerCase().trim();
+    const idx = CV_STAGE_ORDER.indexOf(n);
+    return idx === -1 ? 999 : idx;
+}
+
 function renderLeadsSummary(leadsArray) {
     const container = document.getElementById("leads-summary-container");
     if (!container) return;
@@ -1357,8 +1382,6 @@ function renderLeadsSummary(leadsArray) {
         statuses[s] = (statuses[s] || 0) + 1;
     });
 
-    const priorityStatuses = ["Visita Agendada", "Com Reserva"];
-
     const makeBox = (name, count, colors) => {
         const hex = colors.bg.startsWith('#') ? colors.bg : colors.bg;
         const isLight = colors.text === "#000000";
@@ -1371,16 +1394,13 @@ function renderLeadsSummary(leadsArray) {
 
     let html = `<div class="summary-box total-box"><span class="title">Total de Leads</span><span class="count">${leadsArray.length}</span></div>`;
 
-    // Etapas prioritárias sempre em primeiro
-    priorityStatuses.forEach(name => {
-        html += makeBox(name, statuses[name] || 0, getStatusColor(name));
-    });
-
-    // Todas as demais etapas (sem limite), ordenadas por quantidade
-    const exclude = new Set(["Aguardando Atendimento Corretor", "Em Atendimento SDR", "Desconhecido", ...priorityStatuses]);
+    // Ordena todas as etapas pela ordem oficial do CV CRM; empates ordenados por quantidade
     Object.entries(statuses)
-        .filter(([name]) => !exclude.has(name) && statuses[name] > 0)
-        .sort((a, b) => b[1] - a[1])
+        .filter(([name]) => name !== "Desconhecido" && statuses[name] > 0)
+        .sort((a, b) => {
+            const rankDiff = cvStageRank(a[0]) - cvStageRank(b[0]);
+            return rankDiff !== 0 ? rankDiff : b[1] - a[1];
+        })
         .forEach(([name, count]) => {
             const sampleLead = leadsArray.find(l => (l.situacao?.nome || "Desconhecido") === name);
             const colors = sampleLead ? getStatusColor(sampleLead) : getStatusColor(name);
@@ -1388,6 +1408,88 @@ function renderLeadsSummary(leadsArray) {
         });
 
     container.innerHTML = html;
+}
+
+// ── Gráfico de crescimento de leads mês a mês ─────────────────────────────────
+let leadsGrowthChart = null;
+window.leadsGrowthMode = 'month'; // exposto para os botões do HTML
+
+function renderLeadsGrowthChart(leadsArray) {
+    window.renderLeadsGrowthChart = renderLeadsGrowthChart; // auto-expose
+    const canvas = document.getElementById('leadsGrowthChart');
+    if (!canvas || typeof Chart === 'undefined') return;
+
+    // Agrupa por ano → mês
+    const byYearMonth = {};
+    leadsArray.forEach(lead => {
+        const raw = lead.data_cad || lead.data_cadastro;
+        if (!raw) return;
+        const d = new Date(raw.split(' ')[0]);
+        if (isNaN(d.getTime())) return;
+        const y = d.getFullYear();
+        const m = d.getMonth(); // 0-11
+        if (!byYearMonth[y]) byYearMonth[y] = Array(12).fill(0);
+        byYearMonth[y][m]++;
+    });
+
+    const years = Object.keys(byYearMonth).map(Number).sort();
+    if (years.length === 0) return;
+
+    const MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    const PALETTE = ['#0ea5e9','#a855f7','#f59e0b','#10b981','#f43f5e','#64748b'];
+
+    let labels, datasets;
+
+    if (window.leadsGrowthMode === 'year') {
+        // Ano a ano: um ponto por ano com total
+        labels = years.map(String);
+        datasets = [{
+            label: 'Total de Leads por Ano',
+            data: years.map(y => byYearMonth[y].reduce((a, b) => a + b, 0)),
+            borderColor: PALETTE[0],
+            backgroundColor: PALETTE[0] + '22',
+            borderWidth: 2,
+            pointRadius: 4,
+            fill: true,
+            tension: 0.3,
+        }];
+    } else {
+        // Mês a mês: uma linha por ano
+        labels = MONTHS;
+        datasets = years.map((y, i) => ({
+            label: String(y),
+            data: byYearMonth[y],
+            borderColor: PALETTE[i % PALETTE.length],
+            backgroundColor: PALETTE[i % PALETTE.length] + '18',
+            borderWidth: 2,
+            pointRadius: 3,
+            fill: false,
+            tension: 0.3,
+        }));
+    }
+
+    if (leadsGrowthChart) leadsGrowthChart.destroy();
+    leadsGrowthChart = new Chart(canvas, {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { labels: { color: '#a1a1aa', font: { size: 11 } } },
+                tooltip: {
+                    callbacks: {
+                        label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y} leads`
+                    }
+                }
+            },
+            scales: {
+                x: { ticks: { color: '#71717a' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                y: { beginAtZero: true, ticks: { color: '#71717a' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+            }
+        }
+    });
 }
 
 function renderSalesSummary(salesArray) {
