@@ -40,10 +40,11 @@ async function fetchAllLeadsFromCRM(email: string, token: string): Promise<{ lea
   return { leads, total: totalInCRM };
 }
 
+import { parseCrmDate } from '@/lib/dateUtils';
+
 function parseDate(val: string | null | undefined): string | null {
-  if (!val) return null;
-  const d = new Date(val);
-  return isNaN(d.getTime()) ? null : d.toISOString();
+  const d = parseCrmDate(val);
+  return d ? d.toISOString() : null;
 }
 
 export async function GET(request: NextRequest) {

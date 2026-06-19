@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { parseCrmDate } from '@/lib/dateUtils';
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,8 +29,8 @@ export async function POST(request: NextRequest) {
         ${lead.empreendimento ?? lead.produto ?? null},
         ${lead.score ?? null},
         ${lead.temperatura ?? null},
-        ${lead.data_cadastro ? new Date(lead.data_cadastro) : null},
-        ${lead.data_atualizacao ? new Date(lead.data_atualizacao) : null},
+        ${parseCrmDate(lead.data_cadastro)},
+        ${parseCrmDate(lead.data_atualizacao)},
         ${JSON.stringify(lead)},
         NOW()
       )

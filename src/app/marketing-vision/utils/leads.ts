@@ -160,10 +160,13 @@ export function groupLeadsByYearMonth(leads: Lead[]): Record<number, number[]> {
   leads.forEach(lead => {
     const raw = getLeadDate(lead);
     if (!raw) return;
-    const d = new Date(String(raw).split(' ')[0].split('T')[0]);
-    if (isNaN(d.getTime())) return;
-    const y = d.getFullYear();
-    const m = d.getMonth();
+    const iso = toISODate(raw);
+    if (!iso) return;
+    const parts = iso.split('-');
+    if (parts.length < 3) return;
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10) - 1; // 0-indexed
+    if (isNaN(y) || isNaN(m) || m < 0 || m > 11) return;
     if (!byYearMonth[y]) byYearMonth[y] = Array(12).fill(0);
     byYearMonth[y][m]++;
   });
