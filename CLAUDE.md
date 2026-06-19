@@ -56,3 +56,7 @@ As seguintes variáveis estão ativas e configuradas no painel da aplicação no
 
 ### 6. Correção do Estoque de Empreendimentos
 - **O que foi feito:** Corrigida a função `parseUnitCounts` em `src/app/marketing-vision/components/views/EmpreendimentosView.tsx` para navegar na estrutura real aninhada de `etapas -> blocos -> unidades` retornada pelo detalhe do empreendimento do CV CRM, lendo o status de venda através do campo `situacao_para_venda`.
+
+### 7. Correção do Erro de Tipo no KV (Rate-Limiter)
+- **O que foi feito:** Corrigido o método `incr` no arquivo `src/lib/kv.ts` para serializar os inteiros em strings JSON (`JSON.stringify`) antes de inseri-los na coluna `JSONB` do Postgres, eliminando os erros de tipo na console de produção e no rate limit.
+

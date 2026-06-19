@@ -123,7 +123,7 @@ export const kv = {
           // Expirado - reinicia para 1
           await sql`
             UPDATE kv_store
-            SET value = 1, expires_at = NULL
+            SET value = ${JSON.stringify(1)}, expires_at = NULL
             WHERE key = ${key}
           `;
           return 1;
@@ -133,7 +133,7 @@ export const kv = {
           const newVal = currentVal + 1;
           await sql`
             UPDATE kv_store
-            SET value = ${newVal}
+            SET value = ${JSON.stringify(newVal)}
             WHERE key = ${key}
           `;
           return newVal;
@@ -142,8 +142,8 @@ export const kv = {
         // Não existe
         await sql`
           INSERT INTO kv_store (key, value, expires_at)
-          VALUES (${key}, 1, NULL)
-          ON CONFLICT (key) DO UPDATE SET value = 1, expires_at = NULL
+          VALUES (${key}, ${JSON.stringify(1)}, NULL)
+          ON CONFLICT (key) DO UPDATE SET value = ${JSON.stringify(1)}, expires_at = NULL
         `;
         return 1;
       }
