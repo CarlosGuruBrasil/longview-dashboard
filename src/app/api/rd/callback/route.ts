@@ -5,7 +5,7 @@
  * Troca o code por access_token + refresh_token e salva no KV
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { kv } from '@vercel/kv';
+import { kv } from '@/lib/kv';
 import axios from 'axios';
 
 const RD_TOKEN_URL = 'https://api.rd.services/auth/token';
@@ -28,11 +28,11 @@ export async function GET(request: NextRequest) {
 
   const clientId     = process.env.RD_CLIENT_ID;
   const clientSecret = process.env.RD_CLIENT_SECRET;
-  const redirectUri  = process.env.RD_REDIRECT_URI || 'https://longview-dashboard.vercel.app/api/rd/callback';
+  const redirectUri  = process.env.RD_REDIRECT_URI || 'https://app.guru.dev.br/api/rd/callback';
 
   if (!clientId || !clientSecret) {
     return NextResponse.json(
-      { error: 'RD_CLIENT_ID ou RD_CLIENT_SECRET não configurados no Vercel' },
+      { error: 'RD_CLIENT_ID ou RD_CLIENT_SECRET não configurados no Coolify' },
       { status: 500 }
     );
   }

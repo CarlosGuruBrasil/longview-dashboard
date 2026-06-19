@@ -41,7 +41,7 @@ function stageIndex(situacaoNome: string | undefined): number {
 
 interface TooltipProps {
   active?: boolean
-  payload?: Array<{ value: number; name: string }>
+  payload?: Array<{ value: number; name: string; payload: Record<string, unknown> }>
   label?: string
 }
 

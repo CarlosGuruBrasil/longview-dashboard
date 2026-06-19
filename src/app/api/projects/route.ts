@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { verifyAuth } from '@/lib/auth';
 import { readProjectData, mutateProjectData, Project } from '@/lib/db-kv';
 
 export async function GET(request: NextRequest) {
   try {
+    const user = await verifyAuth();
+    if (!user) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
+
     const db = await readProjectData();
     return NextResponse.json({ projects: db.projects || [] });
   } catch (error) {
@@ -13,6 +17,9 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
+    const user = await verifyAuth();
+    if (!user) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
+
     const body = await request.json();
     const { id, banner } = body;
     if (!id) return NextResponse.json({ error: 'ID obrigatório' }, { status: 400 });
@@ -35,6 +42,9 @@ export async function PATCH(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await verifyAuth();
+    if (!user) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
+
     const body = await request.json();
     const name = body.name?.trim();
     if (!name) return NextResponse.json({ error: 'Nome é obrigatório' }, { status: 400 });

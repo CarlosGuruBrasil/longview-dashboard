@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { verifyAuth } from '@/lib/auth';
 import { readProjectData, mutateProjectData, Task, ChangeLog } from '@/lib/db-kv';
 
 export async function GET(
@@ -6,6 +7,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const user = await verifyAuth();
+    if (!user) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
+
     const { id } = await params;
     const db = await readProjectData();
     const task = db.tasks.find(t => t.id === id);
@@ -26,6 +30,9 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const authUser = await verifyAuth();
+    if (!authUser) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
+
     const { id } = await params;
     const body = await request.json();
     let updatedTask: Task | undefined;
@@ -35,7 +42,7 @@ export async function PATCH(
       if (taskIndex === -1) return;
 
       const task = db.tasks[taskIndex];
-      const user = body.currentUser || { name: 'Sistema', role: 'Diretoria' };
+      const user = authUser || body.currentUser || { name: 'Sistema', role: 'Diretoria' };
 
       const fieldsToTrack: (keyof Task)[] = ['statusAndamento', 'urgencia', 'responsible', 'previsaoEntrega', 'statusContratacao'];
       const logs: ChangeLog[] = fieldsToTrack
@@ -79,6 +86,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const user = await verifyAuth();
+    if (!user) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
+
     const { id } = await params;
     let found = false;
 

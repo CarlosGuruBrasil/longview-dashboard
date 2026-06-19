@@ -18,7 +18,7 @@
  *   source_url?: string
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { kv } from '@vercel/kv';
+import { kv } from '@/lib/kv';
 import crypto from 'crypto';
 import axios from 'axios';
 

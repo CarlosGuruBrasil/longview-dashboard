@@ -12,14 +12,15 @@
  *   6. Registra resultado no KV
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { kv } from '@vercel/kv';
+import { kv } from '@/lib/kv';
 import axios from 'axios';
 import { sendCAPIEvents } from '@/app/api/meta/capi/route';
 
 function isCronRequest(request: NextRequest): boolean {
   const cronSecret = process.env.CRON_SECRET;
   const auth       = request.headers.get('Authorization') || '';
-  return !cronSecret || auth === `Bearer ${cronSecret}`;
+  if (!cronSecret) return false; // fail-safe
+  return auth === `Bearer ${cronSecret}`;
 }
 
 // ── Score engine (igual ao marketing-vision/page.tsx) ────────────────────────

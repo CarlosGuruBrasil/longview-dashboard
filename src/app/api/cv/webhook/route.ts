@@ -12,7 +12,7 @@
  * Outros eventos recebidos são logados no KV para auditoria.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { kv } from '@vercel/kv';
+import { kv } from '@/lib/kv';
 import axios from 'axios';
 
 // Possíveis nomes da etapa no CV CRM (case-insensitive)
@@ -182,7 +182,7 @@ export async function POST(request: NextRequest) {
 }
 
 // ─── GET: status e log do webhook ─────────────────────────────────────────────
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const [log, last, count] = await Promise.all([
       kv.get<any[]>('cv:webhook:log'),
@@ -191,7 +191,7 @@ export async function GET() {
     ]);
     return NextResponse.json({
       ok:              true,
-      webhookUrl:      'https://longview-dashboard.vercel.app/api/cv/webhook',
+      webhookUrl:      `${request.nextUrl.origin || 'https://app.guru.dev.br'}/api/cv/webhook`,
       lastReceived:    last,
       semConexaoTotal: count || 0,
       recentEvents:    (log || []).slice(0, 50),

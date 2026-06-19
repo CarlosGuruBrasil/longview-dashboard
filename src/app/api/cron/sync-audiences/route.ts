@@ -13,7 +13,7 @@
  *   7. Envia eventos CAPI de Purchase para os compradores (educa o algoritmo)
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { kv } from '@vercel/kv';
+import { kv } from '@/lib/kv';
 import axios from 'axios';
 import crypto from 'crypto';
 import { sendCAPIEvents } from '@/app/api/meta/capi/route';
@@ -40,7 +40,8 @@ function hashPhone(phone: string): string {
 function isCronRequest(request: NextRequest): boolean {
   const cronSecret = process.env.CRON_SECRET;
   const auth       = request.headers.get('Authorization') || '';
-  return !cronSecret || auth === `Bearer ${cronSecret}`;
+  if (!cronSecret) return false; // fail-safe
+  return auth === `Bearer ${cronSecret}`;
 }
 
 async function fetchCRMContacts(filter: 'compradores' | 'todos'): Promise<any[]> {

@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { verifyAuth } from '@/lib/auth';
 import { readProjectData, mutateProjectData, Responsible } from '@/lib/db-kv';
 
 export async function GET(request: NextRequest) {
   try {
+    const user = await verifyAuth();
+    if (!user) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
+
     const db = await readProjectData();
     return NextResponse.json({ responsibles: db.responsibles || [] });
   } catch (error) {
@@ -13,6 +17,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await verifyAuth();
+    if (!user) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
+
     const body = await request.json();
     let newResponsible: Responsible | undefined;
 

@@ -14,7 +14,8 @@ import { sql, ensureSchema } from '@/lib/pg';
 function isCron(request: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;
   const auth   = request.headers.get('Authorization') || '';
-  return !secret || auth === `Bearer ${secret}`;
+  if (!secret) return false; // fail-safe: exige CRON_SECRET em produção
+  return auth === `Bearer ${secret}`;
 }
 
 async function fetchAllLeadsFromCRM(email: string, token: string): Promise<{ leads: any[]; total: number }> {

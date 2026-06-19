@@ -9,7 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
 import { rateLimit, getClientIp } from '@/lib/rateLimit';
-import { kv } from '@vercel/kv';
+import { kv } from '@/lib/kv';
 import axios from 'axios';
 
 const META_BASE = 'https://graph.facebook.com/v21.0';

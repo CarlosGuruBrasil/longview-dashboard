@@ -6,7 +6,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
-import { kv } from '@vercel/kv';
+import { kv } from '@/lib/kv';
 import axios from 'axios';
 
 const META_BASE = 'https://graph.facebook.com/v21.0';
@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       semConexao: {
-        webhookUrl:    'https://longview-dashboard.vercel.app/api/cv/webhook',
+        webhookUrl:    `${request.nextUrl.origin || 'https://app.guru.dev.br'}/api/cv/webhook`,
         lastReceived:  get(cvWebhookLast),
         totalDisparos: get(cvSemConexaoCount) || 0,
         todayCount:    cvToday,

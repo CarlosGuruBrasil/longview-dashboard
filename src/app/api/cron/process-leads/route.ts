@@ -13,7 +13,7 @@
  *   4. Registra estatísticas no KV para monitoramento
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { kv } from '@vercel/kv';
+import { kv } from '@/lib/kv';
 import axios from 'axios';
 import { sendCAPIEvents } from '@/app/api/meta/capi/route';
 
@@ -28,7 +28,8 @@ function metaAuth() {
 function isCronRequest(request: NextRequest): boolean {
   const cronSecret = process.env.CRON_SECRET;
   const auth       = request.headers.get('Authorization') || '';
-  return !cronSecret || auth === `Bearer ${cronSecret}`;
+  if (!cronSecret) return false; // fail-safe
+  return auth === `Bearer ${cronSecret}`;
 }
 
 // Pega page token para ler leadgen

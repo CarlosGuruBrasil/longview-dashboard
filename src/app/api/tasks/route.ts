@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { verifyAuth } from '@/lib/auth';
 import { readProjectData, mutateProjectData, Task } from '@/lib/db-kv';
 
 export async function GET(request: NextRequest) {
   try {
+    const _user = await verifyAuth();
+    if (!_user) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
     const { searchParams } = new URL(request.url);
     const db = await readProjectData();
     
@@ -71,6 +74,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const _user = await verifyAuth();
+    if (!_user) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
     const body = await request.json();
     let newTask: Task;
 

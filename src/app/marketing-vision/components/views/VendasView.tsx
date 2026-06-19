@@ -263,10 +263,9 @@ function SalesTable({ sales }: SalesTableProps) {
 // ── main component ────────────────────────────────────────────────────────────
 
 export default function VendasView() {
-  const { filteredLeads, allLeads } = useData()
+  const { filteredLeads } = useData()
 
   const sales = useMemo(() => filteredLeads.filter(isSale), [filteredLeads])
-  const allSales = useMemo(() => allLeads.filter(isSale), [allLeads])
 
   // KPIs
   const qtd = sales.length
@@ -308,9 +307,6 @@ export default function VendasView() {
       }),
     )
   }, [sales])
-
-  // Suppress unused allSales warning — it's declared for growth calculations if needed later
-  void allSales
 
   return (
     <div className="flex flex-col gap-6">

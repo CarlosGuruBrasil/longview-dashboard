@@ -8,7 +8,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminAuth } from '@/lib/auth';
-import { kv } from '@vercel/kv';
+import { kv } from '@/lib/kv';
 import axios from 'axios';
 
 const RD_TOKEN_URL = 'https://api.rd.services/auth/token';
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
   const clientId = process.env.RD_CLIENT_ID;
 
   // Gerar URL de autorização para novo fluxo OAuth2
-  const redirectUri = process.env.RD_REDIRECT_URI || 'https://longview-dashboard.vercel.app/api/rd/callback';
+  const redirectUri = process.env.RD_REDIRECT_URI || 'https://app.guru.dev.br/api/rd/callback';
   const authUrl = clientId
     ? `https://api.rd.services/auth/dialog?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`
     : null;
@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
       RD_TOKEN_PUBLIC_ok:  !!process.env.RD_TOKEN_PUBLIC,
     },
     proximos_passos: !clientId
-      ? ['Configure RD_CLIENT_ID e RD_CLIENT_SECRET no Vercel']
+      ? ['Configure RD_CLIENT_ID e RD_CLIENT_SECRET no Coolify']
       : !accessToken
       ? ['Acesse auth_url para autorizar e gerar o access_token']
       : ['Token válido — tudo funcionando'],
