@@ -999,15 +999,33 @@ function renderGrowthChart() {
     const periodType = document.getElementById("growth-period").value; // 'month' ou 'year'
     const ctx = document.getElementById('growthChart').getContext('2d');
     
-    const salesOnly = filteredLeads.filter(l => isSale(l));
+    // Usa allLeads para mostrar histórico completo independente do filtro de data
+    const salesOnly = allLeads.filter(l => isSale(l));
     if (growthChartInstance) growthChartInstance.destroy();
+
+    if (salesOnly.length === 0) {
+        const el = document.getElementById('growthChart');
+        if (el && el.parentElement) {
+            el.style.display = 'none';
+            if (!el.parentElement.querySelector('.chart-no-data')) {
+                const msg = document.createElement('p');
+                msg.className = 'chart-no-data';
+                msg.style.cssText = 'color:var(--text-secondary);text-align:center;padding:40px 0;font-size:13px';
+                msg.textContent = 'Nenhuma venda registrada no período';
+                el.parentElement.appendChild(msg);
+            }
+        }
+        return;
+    }
+    const gEl = document.getElementById('growthChart');
+    if (gEl) { gEl.style.display = ''; const nd = gEl.parentElement?.querySelector('.chart-no-data'); if(nd) nd.remove(); }
 
     if (periodType === 'month') {
         const yearsData = {};
         salesOnly.forEach(lead => {
-            if (!lead.data_cad) return;
-            // The split ensures we get YYYY-MM-DD reliably if it's the standard format
-            const dateStr = lead.data_cad.split(' ')[0]; 
+            const rawDate = lead.data_cad || lead.data_cadastro || lead.data_cadastramento;
+            if (!rawDate) return;
+            const dateStr = String(rawDate).split(' ')[0].split('T')[0]; 
             const parts = dateStr.split('-');
             if(parts.length < 3) return;
             
@@ -1045,7 +1063,7 @@ function renderGrowthChart() {
                     legend: { display: true, labels: { color: '#e5e5e5' } }
                 },
                 scales: {
-                    y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } },
+                    y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: 'rgba(255,255,255,0.05)' } },
                     x: { grid: { display: false } }
                 }
             }
@@ -1074,7 +1092,7 @@ function renderGrowthChart() {
                 maintainAspectRatio: false,
                 plugins: { legend: { display: false } },
                 scales: {
-                    y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } },
+                    y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: 'rgba(255,255,255,0.05)' } },
                     x: { grid: { display: false } }
                 }
             }
@@ -1086,15 +1104,17 @@ function renderSalesGrowthChart() {
     const periodType = document.getElementById("sales-growth-period").value;
     const ctx = document.getElementById('salesGrowthChart').getContext('2d');
     
-    const salesOnly = filteredLeads.filter(l => isSale(l));
+    // Usa allLeads para mostrar histórico completo independente do filtro de data
+    const salesOnly = allLeads.filter(l => isSale(l));
 
     if (salesGrowthChartInstance) salesGrowthChartInstance.destroy();
 
     if (periodType === 'month') {
         const yearsData = {};
         salesOnly.forEach(lead => {
-            if (!lead.data_cad) return;
-            const dateStr = lead.data_cad.split(' ')[0]; 
+            const rawDate = lead.data_cad || lead.data_cadastro || lead.data_cadastramento;
+            if (!rawDate) return;
+            const dateStr = String(rawDate).split(' ')[0].split('T')[0];
             const parts = dateStr.split('-');
             if(parts.length < 3) return;
             
@@ -1132,7 +1152,7 @@ function renderSalesGrowthChart() {
                     legend: { display: true, labels: { color: '#e5e5e5' } }
                 },
                 scales: {
-                    y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } },
+                    y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: 'rgba(255,255,255,0.05)' } },
                     x: { grid: { display: false } }
                 }
             }
@@ -1158,7 +1178,7 @@ function renderSalesGrowthChart() {
                 maintainAspectRatio: false,
                 plugins: { legend: { display: false } },
                 scales: {
-                    y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } },
+                    y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: 'rgba(255,255,255,0.05)' } },
                     x: { grid: { display: false } }
                 }
             }
@@ -1422,7 +1442,7 @@ function renderLeadsGrowthChart(leadsArray) {
     // Agrupa por ano → mês
     const byYearMonth = {};
     leadsArray.forEach(lead => {
-        const raw = lead.data_cad || lead.data_cadastro;
+        const raw = lead.data_cad || lead.data_cadastro || lead.data_cadastramento;
         if (!raw) return;
         const d = new Date(raw.split(' ')[0]);
         if (isNaN(d.getTime())) return;
@@ -1486,7 +1506,7 @@ function renderLeadsGrowthChart(leadsArray) {
             },
             scales: {
                 x: { ticks: { color: '#71717a' }, grid: { color: 'rgba(255,255,255,0.05)' } },
-                y: { beginAtZero: true, ticks: { color: '#71717a' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                y: { beginAtZero: true, ticks: { color: '#71717a', precision: 0, stepSize: 1 }, grid: { color: 'rgba(255,255,255,0.05)' } },
             }
         }
     });
