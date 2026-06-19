@@ -13,38 +13,65 @@ interface UnitCounts {
 }
 
 function parseUnitCounts(raw: unknown): UnitCounts {
-  // CV CRM estoque structure varies; try common shapes
   const counts: UnitCounts = { total: 0, disponivel: 0, reservado: 0, vendido: 0 }
 
   if (!raw || typeof raw !== 'object') return counts
 
   const obj = raw as Record<string, unknown>
 
-  // Some APIs return summary fields directly
-  for (const key of Object.keys(obj)) {
-    const lower = key.toLowerCase()
-    const val = Number(obj[key] ?? 0)
-    if (!isNaN(val)) {
-      if (lower.includes('disponiv')) counts.disponivel += val
-      else if (lower.includes('reserv')) counts.reservado += val
-      else if (lower.includes('vendid') || lower.includes('venda')) counts.vendido += val
-      else if (lower === 'total' || lower === 'total_unidades') counts.total += val
+  // 1. Caso os dados venham estruturados em etapas -> blocos -> unidades (Padrão real do CV CRM detalhado)
+  if (Array.isArray(obj.etapas)) {
+    for (const etapa of obj.etapas) {
+      if (etapa && typeof etapa === 'object' && Array.isArray(etapa.blocos)) {
+        for (const bloco of etapa.blocos) {
+          if (bloco && typeof bloco === 'object' && Array.isArray(bloco.unidades)) {
+            for (const unidade of bloco.unidades) {
+              if (unidade && typeof unidade === 'object') {
+                counts.total++
+                const sit = (unidade.situacao || {}) as Record<string, unknown>
+                const statusVenda = Number(sit.situacao_para_venda ?? 0)
+
+                if (statusVenda === 1) {
+                  counts.disponivel++
+                } else if (statusVenda === 2 || statusVenda === 5 || sit.reservada != null) {
+                  counts.reservado++
+                } else if (statusVenda === 3 || sit.vendida != null || sit.vendida_idsituacao === 3) {
+                  counts.vendido++
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 
-  // If API returns array of units
-  const unitsKey = ['unidades', 'units', 'imoveis'].find(k => Array.isArray(obj[k]))
-  if (unitsKey) {
-    const units = obj[unitsKey] as Array<Record<string, unknown>>
-    counts.total = units.length
-    counts.disponivel = 0
-    counts.reservado = 0
-    counts.vendido = 0
-    for (const unit of units) {
-      const status = String(unit.status ?? unit.situacao ?? unit.situacao_nome ?? '').toLowerCase()
-      if (status.includes('disponiv')) counts.disponivel++
-      else if (status.includes('reserv')) counts.reservado++
-      else if (status.includes('vendid') || status.includes('venda')) counts.vendido++
+  // 2. Fallback caso venha em formato plano de chaves (como na lógica legada)
+  if (counts.total === 0) {
+    for (const key of Object.keys(obj)) {
+      const lower = key.toLowerCase()
+      const val = Number(obj[key] ?? 0)
+      if (!isNaN(val)) {
+        if (lower.includes('disponiv')) counts.disponivel += val
+        else if (lower.includes('reserv')) counts.reservado += val
+        else if (lower.includes('vendid') || lower.includes('venda')) counts.vendido += val
+        else if (lower === 'total' || lower === 'total_unidades') counts.total += val
+      }
+    }
+
+    const unitsKey = ['unidades', 'units', 'imoveis'].find(k => Array.isArray(obj[k]))
+    if (unitsKey) {
+      const units = obj[unitsKey] as Array<Record<string, unknown>>
+      counts.total = units.length
+      counts.disponivel = 0
+      counts.reservado = 0
+      counts.vendido = 0
+      for (const unit of units) {
+        const status = String(unit.status ?? unit.situacao ?? unit.situacao_nome ?? '').toLowerCase()
+        if (status.includes('disponiv')) counts.disponivel++
+        else if (status.includes('reserv')) counts.reservado++
+        else if (status.includes('vendid') || status.includes('venda')) counts.vendido++
+      }
     }
   }
 
