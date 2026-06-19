@@ -50,6 +50,8 @@ export interface Lead {
   temperatura?: string;
   score?: number;
   valor_negocio?: string | number;
+  data_venda?: string;
+  valor_venda?: string | number;
   qtde_reservas_associadas?: number;
   qtde_simulacoes_associadas?: number;
   motivo_cancelamento?: LeadMotivoCancelamento;

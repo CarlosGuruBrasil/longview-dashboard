@@ -88,6 +88,16 @@ export default function PieDonutChart({
 }: PieDonutChartProps) {
   const total = data.reduce((acc, d) => acc + d.value, 0)
 
+  const renderLegendText = (value: string, entry: any) => {
+    const itemVal = entry.payload?.value ?? 0
+    const pct = total > 0 ? ((itemVal / total) * 100).toFixed(1) : '0.0'
+    return (
+      <span className="text-zinc-400 pl-1">
+        {value}: <span className="font-semibold text-zinc-200">{itemVal.toLocaleString('pt-BR')}</span> <span className="text-zinc-500 text-[10px]">({pct}%)</span>
+      </span>
+    )
+  }
+
   return (
     <GlassCard title={title}>
       <ResponsiveContainer width="100%" height={height}>
@@ -115,6 +125,7 @@ export default function PieDonutChart({
             iconType="circle"
             iconSize={8}
             wrapperStyle={{ color: '#71717a', fontSize: 12 }}
+            formatter={renderLegendText}
           />
         </PieChart>
       </ResponsiveContainer>

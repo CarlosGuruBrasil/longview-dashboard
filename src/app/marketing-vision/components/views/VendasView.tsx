@@ -210,7 +210,17 @@ function SalesTable({ sales }: SalesTableProps) {
                     className="border-b border-white/5 hover:bg-white/5 transition-colors"
                   >
                     <td className="px-3 py-2 font-medium whitespace-nowrap" style={{ color: '#e4e4e7' }}>
-                      {l.nome || '-'}
+                      <div className="flex items-center gap-2">
+                        <span>{l.nome || '-'}</span>
+                        {l.qtde_reservas_associadas && l.qtde_reservas_associadas > 1 && (
+                          <span 
+                            className="text-[10px] bg-sky-500/10 text-sky-400 border border-sky-500/20 px-1.5 py-0.5 rounded font-bold" 
+                            title={`${l.qtde_reservas_associadas} unidades / reservas associadas`}
+                          >
+                            {l.qtde_reservas_associadas} un.
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap" style={{ color: '#a1a1aa' }}>
                       {formatDate(getLeadDate(l))}

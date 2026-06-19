@@ -321,7 +321,12 @@ export async function GET(request: NextRequest) {
       const headers = { email: CV_EMAIL, token: CV_TOKEN, Accept: 'application/json' };
       const projRes = await axios.get('https://longviewempreendimentos.cvcrm.com.br/api/v1/cadastros/empreendimentos', { headers, timeout: 12000 });
       const projects = Array.isArray(projRes.data) ? projRes.data : [];
-      const ids = projects.map((p: any) => p.idempreendimento).filter(Boolean);
+      // Filtra apenas os empreendimentos que têm tipo e situação comercial válidos (não nulos)
+      const validProjects = projects.filter((p: any) => 
+        p.tipo_empreendimento?.[0]?.nome !== null && 
+        p.situacao_comercial?.[0]?.nome !== null
+      );
+      const ids = validProjects.map((p: any) => p.idempreendimento).filter(Boolean);
       const estoqueItems = await Promise.allSettled(
         ids.map((id: string) =>
           axios.get(`https://longviewempreendimentos.cvcrm.com.br/api/v1/cadastros/empreendimentos/${id}`,
@@ -331,7 +336,7 @@ export async function GET(request: NextRequest) {
       );
       const estoqueMap: Record<string, any> = {};
       estoqueItems.forEach((r: any) => { if (r.status === 'fulfilled') estoqueMap[r.value.id] = r.value.data; });
-      return { projects, estoque: estoqueMap };
+      return { projects: validProjects, estoque: estoqueMap };
     })() : Promise.resolve(null),
     !pgLeads ? fetchAllCRMLeads(CV_EMAIL, CV_TOKEN) : Promise.resolve(null),
   ]);

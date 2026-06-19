@@ -33,7 +33,16 @@ export default function DashboardView() {
       const origin = getOrigin(lead)
       map.set(origin, (map.get(origin) ?? 0) + 1)
     }
-    return Array.from(map.entries()).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value)
+    const sorted = Array.from(map.entries())
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+    
+    if (sorted.length <= 6) return sorted
+    
+    const top = sorted.slice(0, 5)
+    const restSum = sorted.slice(5).reduce((sum, item) => sum + item.value, 0)
+    top.push({ name: 'Outros', value: restSum })
+    return top
   }, [salesLeads])
 
   const leadsByOrigin = useMemo(() => {
@@ -42,7 +51,16 @@ export default function DashboardView() {
       const origin = getOrigin(lead)
       map.set(origin, (map.get(origin) ?? 0) + 1)
     }
-    return Array.from(map.entries()).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value)
+    const sorted = Array.from(map.entries())
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+    
+    if (sorted.length <= 6) return sorted
+    
+    const top = sorted.slice(0, 5)
+    const restSum = sorted.slice(5).reduce((sum, item) => sum + item.value, 0)
+    top.push({ name: 'Outros', value: restSum })
+    return top
   }, [filteredLeads])
 
   const leadsByStatus = useMemo(() => {
@@ -51,7 +69,16 @@ export default function DashboardView() {
       const status = lead.situacao?.nome || 'Sem etapa'
       map.set(status, (map.get(status) ?? 0) + 1)
     }
-    return Array.from(map.entries()).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value)
+    const sorted = Array.from(map.entries())
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+    
+    if (sorted.length <= 8) return sorted
+    
+    const top = sorted.slice(0, 7)
+    const restSum = sorted.slice(7).reduce((sum, item) => sum + item.value, 0)
+    top.push({ name: 'Outros status', value: restSum })
+    return top
   }, [filteredLeads])
 
   // Early return AFTER all hooks

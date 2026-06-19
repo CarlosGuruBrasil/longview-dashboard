@@ -82,12 +82,16 @@ export function getOrigin(lead: Lead): string {
 }
 
 export function getLeadDate(lead: Lead): string {
+  if (isSale(lead) && lead.data_venda) {
+    return lead.data_venda;
+  }
   return lead.data_cad || lead.data_cadastro || lead.data_cadastramento || '';
 }
 
 export function getLeadValueNumber(lead: Lead): number {
-  if (!lead.valor_negocio) return 0;
-  const numStr = lead.valor_negocio
+  const val = (isSale(lead) && lead.valor_venda) ? lead.valor_venda : lead.valor_negocio;
+  if (!val) return 0;
+  const numStr = val
     .toString()
     .replace(/R\$\s*/g, '')
     .replace(/\./g, '')

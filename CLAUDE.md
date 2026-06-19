@@ -28,7 +28,8 @@ As seguintes variáveis estão ativas e configuradas no painel da aplicação no
 - O bug de parsing de datas brasileiras no gráfico de crescimento de leads foi corrigido.
 - O bug de parsing de estoque (unidades zeradas) na tela de Empreendimentos foi corrigido.
 - O mecanismo de sincronização forçada (`/api/data?sync=true`) foi implantado para atualizar retroativamente os leads salvos no banco.
-- A integração de corretores do CV CRM e a validação de leads órfãos do Meta Ads foram implementadas e a validação local (`npm run build` e `npx tsc`) passou com sucesso.
+- A integração de corretores do CV CRM e a validação de leads órfãos do Meta Ads foram implantadas.
+- O filtro de empreendimentos administrativos, os ajustes de datas/valores de vendas reais, o badge de múltiplas vendas por cliente e o layout das legendas dos gráficos (exibindo quantidade e porcentagem) foram finalizados e validados com sucesso.
 
 ---
 
@@ -72,4 +73,11 @@ As seguintes variáveis estão ativas e configuradas no painel da aplicação no
   - Atualizada a rota `src/app/api/data/route.ts` para buscar formulários de leads ativos e contatos do Meta Ads através da Graph API.
   - Criado mecanismo resiliente de cruzamento (comparando e-mail normalizado e telefone sem caracteres especiais/com tolerância a DDI) com a tabela local `leads` (Postgres) para identificar e-mails e telefones captados em anúncios mas que ainda não constam no CRM (leads órfãos).
   - Atualizado o frontend (`DataContext.tsx` e `LeadsView.tsx`) adicionando uma nova aba de "Validação Meta" com cartões de KPI (Ex. leads não integrados) e uma tabela com as informações dos leads não integrados no CRM (nome, e-mail, telefone, formulário de origem, e data de captação).
+
+### 10. Ajustes de Empreendimentos, Datas/Valores de Vendas e Layout de Gráficos
+- **O que foi feito:**
+  - **Filtro de Empreendimentos Administrativos:** Adicionado filtro no backend (`src/app/api/data/route.ts`) e no frontend (`EmpreendimentosView.tsx`) para ocultar cadastros administrativos e centros de custo (identificados por possuírem tipo ou situação comercial nulos). Economiza chamadas adicionais de API.
+  - **Datas e Valores Reais de Vendas:** Modificadas as funções `getLeadDate` e `getLeadValueNumber` em `src/app/marketing-vision/utils/leads.ts` para priorizar os campos `data_venda` e `valor_venda` (em vez de `data_cadastro` e `valor_negocio`) quando o lead for classificado como venda (`isSale(lead)`).
+  - **Identificação de Múltiplas Unidades:** Adicionado badge visual (`X un.`) ao lado do nome do cliente na tabela de vendas (`VendasView.tsx`) caso o lead tenha mais de 1 reserva associada (`l.qtde_reservas_associadas > 1`).
+  - **Exibição nos Gráficos e Correção de Legenda:** Modificada a legenda dos gráficos de rosca (`PieDonutChart.tsx`) para exibir a quantidade absoluta e porcentagem de cada fatia usando a propriedade `formatter`. Adicionado também agrupamento em "Outros" para mídias e status minoritários em `DashboardView.tsx`, impedindo que a legenda vertical quebre o layout da página.
 

@@ -123,8 +123,13 @@ function StatPill({ label, count, color }: StatPillProps) {
 
 export default function EmpreendimentosView() {
   const { estoque, filteredLeads } = useData()
-
-  const projects = useMemo(() => Object.entries(estoque), [estoque])
+  const projects = useMemo(() => {
+    return Object.entries(estoque).filter(([_, rawData]) => {
+      if (!rawData || typeof rawData !== 'object') return false
+      const obj = rawData as Record<string, any>
+      return obj.tipo_empreendimento?.[0]?.nome !== null && obj.situacao_comercial?.[0]?.nome !== null
+    })
+  }, [estoque])
 
   const leadCountByProject = useMemo(() => {
     const map = new Map<string, number>()
