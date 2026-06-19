@@ -54,7 +54,7 @@ async function fetchAllCRMLeads(email: string, token: string) {
   const base    = 'https://longviewempreendimentos.cvcrm.com.br/api/v1/comercial/leads';
   try {
     const initial = await axios.get(base, { params: { limit: 1 }, headers, timeout: 8000 });
-    const maxLeads   = Math.min(initial.data.total || 0, 3000);
+    const maxLeads   = initial.data.total || 0;
     const limit      = 500;
     const totalPages = Math.ceil(maxLeads / limit);
     const results = await Promise.allSettled(
@@ -132,6 +132,71 @@ export async function GET(request: NextRequest) {
   const endDate      = searchParams.get('end');
   const forceRefresh = searchParams.get('refresh') === 'true';
   const isFiltered   = !!(startDate || endDate);
+  const syncForce    = searchParams.get('sync') === 'true';
+
+  if (syncForce) {
+    try {
+      const email = process.env.CV_CRM_EMAIL;
+      const token = process.env.CV_CRM_TOKEN;
+      if (email && token) {
+        console.log('[api/data] Sincronização forçada iniciada...');
+        const { leads } = await fetchAllCRMLeads(email, token);
+        if (leads.length > 0) {
+          const { ensureSchema, sql } = await import('@/lib/pg');
+          await ensureSchema();
+          const { parseCrmDate } = await import('@/lib/dateUtils');
+          
+          let upserted = 0;
+          const BATCH = 100;
+          for (let i = 0; i < leads.length; i += BATCH) {
+            const batch = leads.slice(i, i + BATCH);
+            for (const lead of batch) {
+              const id = String(lead.idlead ?? lead.id ?? '');
+              if (!id) continue;
+
+              const nome = lead.nome || lead.name || null;
+              const email_lead = lead.email || null;
+              const telefone = lead.telefone || lead.celular || lead.phone || null;
+              const origem = lead.origem || lead.source || null;
+              const status = lead.status || null;
+              const empreend = lead.empreendimento?.nome || lead.empreendimento || null;
+              const score = lead.score != null ? Number(lead.score) : null;
+              const temperatura = lead.temperatura || lead.temperatura_lead || null;
+              const dataCad = parseCrmDate(lead.data_cadastro || lead.created_at || lead.createdAt);
+              const dataAtual = parseCrmDate(lead.data_atualizacao || lead.updated_at || lead.updatedAt);
+
+              await sql`
+                INSERT INTO leads
+                  (id, nome, email, telefone, origem, status, empreendimento,
+                   score, temperatura, data_cadastro, data_atualizacao, raw, synced_at)
+                VALUES
+                  (${id}, ${nome}, ${email_lead}, ${telefone}, ${origem}, ${status},
+                   ${empreend}, ${score}, ${temperatura}, ${dataCad}, ${dataAtual},
+                   ${JSON.stringify(lead)}, NOW())
+                ON CONFLICT (id) DO UPDATE SET
+                  nome             = EXCLUDED.nome,
+                  email            = EXCLUDED.email,
+                  telefone         = EXCLUDED.telefone,
+                  origem           = EXCLUDED.origem,
+                  status           = EXCLUDED.status,
+                  empreendimento   = EXCLUDED.empreendimento,
+                  score            = EXCLUDED.score,
+                  temperatura      = EXCLUDED.temperatura,
+                  data_cadastro    = EXCLUDED.data_cadastro,
+                  data_atualizacao = EXCLUDED.data_atualizacao,
+                  raw              = EXCLUDED.raw,
+                  synced_at        = EXCLUDED.synced_at
+              `;
+              upserted++;
+            }
+          }
+          console.log(`[api/data] Sincronização forçada concluída. ${upserted} leads atualizados.`);
+        }
+      }
+    } catch (e: any) {
+      console.error('[api/data] Erro na sincronização forçada:', e.message);
+    }
+  }
 
   // ---------- LEADS (sempre do Postgres, webhook mantém atualizado) ----------
   const pgLeads = await readLeadsFromPg();
