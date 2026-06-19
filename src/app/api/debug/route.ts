@@ -19,26 +19,29 @@ export async function GET(request: NextRequest) {
   try {
     await ensureSchema();
     
-    // Busca a linha inteira do primeiro lead do Postgres
-    const rows = await sql`
-      SELECT id, nome, status, raw
-      FROM leads
-      LIMIT 1
-    `;
+    // Busca todos os leads do Postgres
+    const rows = await sql`SELECT raw FROM leads`;
+    const leads = rows.map((r: any) => typeof r.raw === 'object' ? r.raw : JSON.parse(r.raw));
     
-    if (rows.length === 0) {
-      return NextResponse.json({ error: 'Nenhum lead encontrado no Postgres de produção' });
-    }
+    const sales = leads.filter(isSale);
     
-    const lead = rows[0];
-    const rawObj = typeof lead.raw === 'string' ? JSON.parse(lead.raw) : lead.raw;
+    const salesReport = sales.map((l: any) => ({
+      idlead: l.idlead,
+      nome: l.nome,
+      situacao: l.situacao?.nome,
+      data_cad: l.data_cad,
+      data_venda: l.data_venda,
+      has_data_venda: l.data_venda != null && l.data_venda !== '',
+      valor_venda: l.valor_venda,
+      valor_negocio: l.valor_negocio,
+      qtde_reservas: l.qtde_reservas_associadas
+    }));
     
     return NextResponse.json({
-      id: lead.id,
-      nome: lead.nome,
-      statusColumn: lead.status,
-      rawKeys: Object.keys(rawObj || {}),
-      rawSample: rawObj
+      postgresTotalCount: leads.length,
+      totalSalesFoundInDb: sales.length,
+      salesWithDataVendaCount: sales.filter(s => s.data_venda != null && s.data_venda !== '').length,
+      salesReport
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
