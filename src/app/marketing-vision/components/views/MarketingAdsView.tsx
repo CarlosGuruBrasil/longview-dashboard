@@ -38,15 +38,15 @@ function sumActions(actions: Array<{ action_type: string; value: string }> | und
 }
 
 export default function MarketingAdsView() {
-  const { metaData, allLeads } = useData()
+  const { metaData, filteredLeads } = useData()
   const [dailyMetric, setDailyMetric] = useState<DailyMetric>('spend')
   const [campaignSearch, setCampaignSearch] = useState('')
   const [sortField, setSortField] = useState<keyof MetaCampaignInsight>('spend')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
   const metaLeadsInCrm = useMemo(
-    () => allLeads.filter(l => isMeta(getOrigin(l))).length,
-    [allLeads]
+    () => filteredLeads.filter(l => isMeta(getOrigin(l))).length,
+    [filteredLeads]
   )
 
   const global = metaData?.global

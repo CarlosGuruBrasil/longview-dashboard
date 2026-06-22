@@ -23,7 +23,7 @@ interface AudienceSegment {
 }
 
 export default function AudienciasView() {
-  const { allLeads } = useData()
+  const { filteredLeads: allLeads } = useData()
   const [metaStatus, setMetaStatus] = useState<MetaStatusResponse | null>(null)
   const [statusLoading, setStatusLoading] = useState(true)
   const [syncingKey, setSyncingKey] = useState<string | null>(null)

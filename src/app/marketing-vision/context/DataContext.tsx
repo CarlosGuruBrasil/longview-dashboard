@@ -28,7 +28,7 @@ interface DataContextValue {
   setActiveView: (view: ActiveView) => void;
 
   // refresh
-  refresh: (force?: boolean) => Promise<void>;
+  refresh: (force?: boolean, rangeOverride?: DateRange) => Promise<void>;
 }
 
 const DataContext = createContext<DataContextValue | null>(null);
@@ -89,10 +89,16 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const refresh = useCallback(async (force = false) => {
+  const refresh = useCallback(async (force = false, rangeOverride?: DateRange) => {
     setLoading(true);
     try {
-      const url = force ? '/api/data?refresh=true' : '/api/data';
+      const r = rangeOverride ?? dateRange;
+      const params = new URLSearchParams();
+      if (force) params.set('refresh', 'true');
+      if (r.start) params.set('start', r.start);
+      if (r.end) params.set('end', r.end);
+      const qs = params.toString();
+      const url = `/api/data${qs ? '?' + qs : ''}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -110,7 +116,7 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [dateRange]);
 
   return (
     <DataContext.Provider value={{

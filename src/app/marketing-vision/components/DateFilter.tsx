@@ -32,17 +32,22 @@ export default function DateFilter() {
     updatedAt,
   } = useData();
 
+
   const [localStart, setLocalStart] = useState(dateRange.start);
   const [localEnd, setLocalEnd]     = useState(dateRange.end);
 
   function handleFilter() {
-    setDateRange({ start: localStart, end: localEnd });
+    const range = { start: localStart, end: localEnd };
+    setDateRange(range);
+    refresh(false, range);
   }
 
   function handleClear() {
+    const range = { start: '', end: '' };
     setLocalStart('');
     setLocalEnd('');
     clearFilters();
+    refresh(false, range);
   }
 
   return (

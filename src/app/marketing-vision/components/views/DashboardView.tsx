@@ -98,7 +98,7 @@ export default function DashboardView() {
 
       {/* Gráfico de Vendas Realizadas — largura total */}
       <div className="w-full">
-        <SalesGrowthChart allLeads={allLeads} mode={salesChartMode} onModeChange={setSalesChartMode} />
+        <SalesGrowthChart allLeads={filteredLeads} mode={salesChartMode} onModeChange={setSalesChartMode} />
       </div>
 
       {/* Vendas por Origem (quantidade + VGV) e Leads por Status (barras) */}
