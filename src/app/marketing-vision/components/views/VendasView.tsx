@@ -33,9 +33,52 @@ function topByVgv(map: Map<string, CvdwVenda[]>, limit = 5) {
     .slice(0, limit)
 }
 
-function hasVisitaStage(lead: any): boolean {
-  const s = (lead.situacao?.nome || '').toLowerCase()
-  return s.includes('visita')
+/**
+ * Calcula a diferença em dias entre data_reserva e data_venda.
+ * Retorna null se qualquer uma das datas estiver ausente.
+ */
+function calcDaysToSale(venda: CvdwVenda): number | null {
+  const start = venda.data_reserva
+  const end = venda.data_venda
+  if (!start || !end) return null
+  const a = new Date(start.replace(' ', 'T'))
+  const b = new Date(end.replace(' ', 'T'))
+  if (isNaN(a.getTime()) || isNaN(b.getTime())) return null
+  const diff = Math.round((b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24))
+  return diff < 0 ? 0 : diff
+}
+
+function DaysToSaleBadge({ days }: { days: number | null }) {
+  if (days === null) return <span style={{ color: '#52525b' }}>-</span>
+
+  let bg: string, color: string, label: string
+  if (days <= 30) {
+    bg = 'rgba(16,185,129,0.12)'
+    color = '#10b981'
+    label = '⚡ Rápido'
+  } else if (days <= 90) {
+    bg = 'rgba(245,158,11,0.12)'
+    color = '#f59e0b'
+    label = '⏱ Médio'
+  } else {
+    bg = 'rgba(168,85,247,0.12)'
+    color = '#a855f7'
+    label = '🕐 Longo'
+  }
+
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-xs font-semibold" style={{ color }}>
+        {days === 0 ? 'No mesmo dia' : `${days} dias`}
+      </span>
+      <span
+        className="text-[10px] px-1.5 py-0.5 rounded-full self-start whitespace-nowrap"
+        style={{ backgroundColor: bg, color }}
+      >
+        {label}
+      </span>
+    </div>
+  )
 }
 
 // ── ranking card ──────────────────────────────────────────────────────────────
@@ -114,13 +157,19 @@ function SalesTable({ vendas }: SalesTableProps) {
         if (empreendimento && v.empreendimento !== empreendimento) return false
         return true
       })
+      // Ordena pela data da venda mais recente primeiro
+      .sort((a, b) => {
+        const da = a.data_venda ? new Date(a.data_venda.replace(' ', 'T')).getTime() : 0
+        const db = b.data_venda ? new Date(b.data_venda.replace(' ', 'T')).getTime() : 0
+        return db - da
+      })
       .slice(0, 300)
   }, [vendas, search, corretor, imobiliaria, empreendimento])
 
   const selectClass =
     'bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-zinc-300 outline-none focus:border-sky-500/50 transition-colors'
 
-  const cols = ['Cliente', 'Data Reserva', 'Data Venda', 'Empreendimento', 'Bloco/Unidade', 'Corretor', 'Imobiliária', 'Valor Contrato', 'Tipologia']
+  const cols = ['Cliente', 'Cad. Reserva', 'Data Venda', 'Tempo p/ Compra', 'Empreendimento', 'Bloco/Unidade', 'Corretor', 'Imobiliária', 'Valor Contrato', 'Tipologia']
 
   return (
     <div className="flex flex-col gap-3">
@@ -211,13 +260,17 @@ function SalesTable({ vendas }: SalesTableProps) {
                       )}
                     </div>
                   </td>
-                  {/* Data Reserva */}
-                  <td className="px-3 py-2 whitespace-nowrap text-xs" style={{ color: '#a1a1aa' }}>
+                  {/* Cad. Reserva */}
+                  <td className="px-3 py-2 whitespace-nowrap text-xs" style={{ color: '#71717a' }}>
                     {v.data_reserva ? formatDate(v.data_reserva) : '-'}
                   </td>
                   {/* Data Venda */}
-                  <td className="px-3 py-2 whitespace-nowrap text-xs" style={{ color: '#10b981' }}>
+                  <td className="px-3 py-2 whitespace-nowrap text-xs font-medium" style={{ color: '#10b981' }}>
                     {v.data_venda ? formatDate(v.data_venda) : '-'}
+                  </td>
+                  {/* Tempo p/ Compra */}
+                  <td className="px-3 py-2 whitespace-nowrap">
+                    <DaysToSaleBadge days={calcDaysToSale(v)} />
                   </td>
                   {/* Empreendimento */}
                   <td className="px-3 py-2 max-w-[140px] truncate" style={{ color: '#a1a1aa' }}>

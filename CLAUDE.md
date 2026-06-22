@@ -74,6 +74,20 @@ As seguintes variáveis estão ativas e configuradas no painel da aplicação no
   - Criado mecanismo resiliente de cruzamento (comparando e-mail normalizado e telefone sem caracteres especiais/com tolerância a DDI) com a tabela local `leads` (Postgres) para identificar e-mails e telefones captados em anúncios mas que ainda não constam no CRM (leads órfãos).
   - Atualizado o frontend (`DataContext.tsx` e `LeadsView.tsx`) adicionando uma nova aba de "Validação Meta" com cartões de KPI (Ex. leads não integrados) e uma tabela com as informações dos leads não integrados no CRM (nome, e-mail, telefone, formulário de origem, e data de captação).
 
+### 12. Correção dos Gráficos — Separação Bar/Line
+- **O que foi feito:** Refatorado `src/app/marketing-vision/components/charts/SalesGrowthChart.tsx` para eliminar o `ComposedChart` (mistura de `Bar + Line`). O gráfico agora tem dois modos de métrica com tipos puros: `count` → `BarChart` (quantidade de vendas por mês/ano agrupado por ano), `vgv` → `LineChart` (evolução do VGV). Adiciona toggle de métrica (Quantidade / VGV) ao lado do toggle de período (Mês / Ano).
+
+### 13. Documento de Dados CV CRM
+- **O que foi feito:** Criado `docs/cv-crm-data-dictionary.md` com dicionário completo de variáveis (Lead, CVDW Venda, Empreendimento, Corretor), funil de vendas com SLAs por etapa, lógica de prioridade de datas/mídias, diagrama de fluxo completo, métricas-chave (VGV, ticket médio, ROI, velocidade de vendas), pontos de intervenção recomendados e backlog de melhorias.
+
+### 11. Coluna "Tempo p/ Compra" na Tabela de Vendas (não commitado)
+- **O que foi feito:**
+  - Adicionada função `calcDaysToSale` em `src/app/marketing-vision/components/views/VendasView.tsx` que calcula a diferença em dias entre `data_reserva` e `data_venda` de cada reserva CVDW.
+  - Criado componente `DaysToSaleBadge` com três faixas visuais: ⚡ Rápido (≤30 dias, verde), ⏱ Médio (≤90 dias, amarelo), 🕐 Longo (>90 dias, roxo).
+  - Adicionada nova coluna "Tempo p/ Compra" na tabela de vendas exibindo o badge para cada linha.
+  - Tabela agora é ordenada pela `data_venda` mais recente primeiro antes do slice de 300 registros.
+  - Substituída a função interna `hasVisitaStage` (removida junto ao refactor CVDW anterior).
+
 ### 10. Ajustes de Empreendimentos, Datas/Valores de Vendas e Layout de Gráficos
 - **O que foi feito:**
   - **Filtro de Empreendimentos Administrativos:** Adicionado filtro no backend (`src/app/api/data/route.ts`) e no frontend (`EmpreendimentosView.tsx`) para ocultar cadastros administrativos e centros de custo (identificados por possuírem tipo ou situação comercial nulos). Economiza chamadas adicionais de API.

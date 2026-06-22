@@ -11,7 +11,7 @@ import PieDonutChart from '../charts/PieDonutChart'
 type SubTab = 'crm' | 'meta-validation' | 'score'
 
 export default function LeadsView() {
-  const { filteredLeads, metaValidation } = useData()
+  const { filteredLeads, metaData, metaValidation } = useData()
   const [activeTab, setActiveTab] = useState<SubTab>('crm')
   const [growthMode, setGrowthMode] = useState<'month' | 'year'>('month')
 
@@ -79,6 +79,7 @@ export default function LeadsView() {
           {/* Growth line chart */}
           <GrowthLineChart
             leads={filteredLeads}
+            daily={metaData?.daily ?? []}
             mode={growthMode}
             onModeChange={setGrowthMode}
           />

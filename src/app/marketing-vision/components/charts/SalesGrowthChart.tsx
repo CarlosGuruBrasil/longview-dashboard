@@ -1,9 +1,7 @@
 'use client'
 
-import { useMemo, useState } from 'react'
 import {
-  ComposedChart,
-  Bar,
+  LineChart,
   Line,
   XAxis,
   YAxis,
@@ -13,7 +11,7 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import type { Lead } from '../../types'
-import { groupLeadsByYearMonth, isSale, getLeadValueNumber, getLeadDate, toISODate } from '../../utils/leads'
+import { isSale, getLeadValueNumber, getLeadDate, toISODate } from '../../utils/leads'
 import { MONTHS_PT, CHART_PALETTE, formatCurrency } from '../../utils/formatters'
 import GlassCard from '../ui/GlassCard'
 
@@ -26,56 +24,26 @@ interface SalesGrowthChartProps {
 const TICK_COLOR = '#71717a'
 const GRID_COLOR = 'rgba(255,255,255,0.05)'
 
-function groupSalesByYearMonthWithVgv(leads: Lead[]): Record<number, { count: number[]; vgv: number[] }> {
+function buildMonthData(leads: Lead[]) {
+  const sales = leads.filter(isSale)
   const byYM: Record<number, { count: number[]; vgv: number[] }> = {}
-  leads.forEach(lead => {
-    const raw = getLeadDate(lead)
-    if (!raw) return
-    const iso = toISODate(raw)
+
+  sales.forEach(lead => {
+    const iso = toISODate(getLeadDate(lead))
     if (!iso) return
-    const parts = iso.split('-')
-    if (parts.length < 3) return
-    const y = parseInt(parts[0], 10)
-    const m = parseInt(parts[1], 10) - 1
+    const [yStr, mStr] = iso.split('-')
+    const y = parseInt(yStr, 10)
+    const m = parseInt(mStr, 10) - 1
     if (isNaN(y) || isNaN(m) || m < 0 || m > 11) return
     if (!byYM[y]) byYM[y] = { count: Array(12).fill(0), vgv: Array(12).fill(0) }
     byYM[y].count[m]++
     byYM[y].vgv[m] += getLeadValueNumber(lead)
   })
-  return byYM
-}
 
-// Custom tooltip
-function CustomTooltip({ active, payload, label }: any) {
-  if (!active || !payload?.length) return null
-  return (
-    <div style={{
-      backgroundColor: '#18181b',
-      border: '1px solid rgba(255,255,255,0.1)',
-      borderRadius: 8,
-      padding: '10px 14px',
-      fontSize: 12,
-    }}>
-      <p style={{ color: '#e4e4e7', marginBottom: 6, fontWeight: 600 }}>{label}</p>
-      {payload.map((p: any) => (
-        <p key={p.dataKey} style={{ color: p.color, marginBottom: 2 }}>
-          {p.name}: {p.name?.includes('VGV')
-            ? formatCurrency(p.value)
-            : p.value?.toLocaleString('pt-BR')}
-        </p>
-      ))}
-    </div>
-  )
-}
-
-export default function SalesGrowthChart({ allLeads, mode, onModeChange }: SalesGrowthChartProps) {
-  const sales = allLeads.filter(isSale)
-  const byYM = groupSalesByYearMonthWithVgv(sales)
   const years = Object.keys(byYM).map(Number).sort()
 
-  // Month-by-month data: one bar per year (stacked) + VGV line per year
-  const monthData = MONTHS_PT.map((label, i) => {
-    const entry: Record<string, unknown> = { month: label }
+  const data = MONTHS_PT.map((label, i) => {
+    const entry: Record<string, unknown> = { label }
     years.forEach(y => {
       entry[`qty_${y}`] = byYM[y]?.count[i] ?? 0
       entry[`vgv_${y}`] = byYM[y]?.vgv[i] ?? 0
@@ -83,12 +51,86 @@ export default function SalesGrowthChart({ allLeads, mode, onModeChange }: Sales
     return entry
   })
 
-  // Year aggregated data
-  const yearData = years.map(y => ({
-    year: String(y),
-    quantidade: byYM[y].count.reduce((a, b) => a + b, 0),
-    vgv: byYM[y].vgv.reduce((a, b) => a + b, 0),
+  return { data, years }
+}
+
+function buildYearData(leads: Lead[]) {
+  const sales = leads.filter(isSale)
+  const byYear: Record<number, { qty: number; vgv: number }> = {}
+
+  sales.forEach(lead => {
+    const iso = toISODate(getLeadDate(lead))
+    if (!iso) return
+    const y = parseInt(iso.split('-')[0], 10)
+    if (isNaN(y)) return
+    if (!byYear[y]) byYear[y] = { qty: 0, vgv: 0 }
+    byYear[y].qty++
+    byYear[y].vgv += getLeadValueNumber(lead)
+  })
+
+  const years = Object.keys(byYear).map(Number).sort()
+  const data = years.map(y => ({
+    label: String(y),
+    qty: byYear[y].qty,
+    vgv: byYear[y].vgv,
   }))
+
+  return { data, years }
+}
+
+export default function SalesGrowthChart({ allLeads, mode, onModeChange }: SalesGrowthChartProps) {
+  const { data, years } = mode === 'month' ? buildMonthData(allLeads) : buildYearData(allLeads)
+
+  // CustomTooltip com closure sobre `data` para acessar VGV sem séries extras
+  function CustomTooltip({ active, payload, label }: any) {
+    if (!active || !payload?.length) return null
+    const point = data.find((d: any) => d.label === label)
+    if (!point) return null
+
+    return (
+      <div style={{
+        backgroundColor: '#18181b',
+        border: '1px solid rgba(255,255,255,0.1)',
+        borderRadius: 8,
+        padding: '10px 14px',
+        fontSize: 12,
+        minWidth: 180,
+      }}>
+        <p style={{ color: '#e4e4e7', marginBottom: 8, fontWeight: 600 }}>{label}</p>
+        {mode === 'month' ? (
+          years.map((y, i) => {
+            const qty = (point as any)[`qty_${y}`] as number
+            const vgv = (point as any)[`vgv_${y}`] as number
+            return (
+              <div key={y} style={{ marginBottom: 6 }}>
+                <p style={{ color: CHART_PALETTE[i % CHART_PALETTE.length], fontWeight: 600, marginBottom: 2 }}>
+                  {y}
+                </p>
+                <p style={{ color: '#a1a1aa', paddingLeft: 8 }}>
+                  Qtd: <strong style={{ color: '#e4e4e7' }}>{qty}</strong>
+                </p>
+                <p style={{ color: '#a1a1aa', paddingLeft: 8 }}>
+                  VGV: <strong style={{ color: '#e4e4e7' }}>{formatCurrency(vgv)}</strong>
+                </p>
+              </div>
+            )
+          })
+        ) : (
+          <>
+            <p style={{ color: '#a1a1aa', marginBottom: 2 }}>
+              Qtd: <strong style={{ color: '#e4e4e7' }}>{(point as any).qty}</strong> vendas
+            </p>
+            <p style={{ color: '#a1a1aa' }}>
+              VGV: <strong style={{ color: '#e4e4e7' }}>{formatCurrency((point as any).vgv)}</strong>
+            </p>
+          </>
+        )}
+      </div>
+    )
+  }
+
+  const vgvFormatter = (v: number) =>
+    v >= 1_000_000 ? `R$${(v / 1_000_000).toFixed(0)}M` : `R$${(v / 1_000).toFixed(0)}K`
 
   const action = (
     <div className="flex gap-1">
@@ -108,83 +150,67 @@ export default function SalesGrowthChart({ allLeads, mode, onModeChange }: Sales
     </div>
   )
 
-  if (mode === 'year') {
-    return (
-      <GlassCard title="Vendas Realizadas" action={action}>
-        <ResponsiveContainer width="100%" height={320}>
-          <ComposedChart data={yearData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
+  return (
+    <GlassCard title="Vendas Realizadas" action={action}>
+      <ResponsiveContainer width="100%" height={320}>
+        {mode === 'month' ? (
+          <LineChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} />
-            <XAxis dataKey="year" tick={{ fill: TICK_COLOR, fontSize: 12 }} axisLine={false} tickLine={false} />
-            <YAxis yAxisId="left" tick={{ fill: TICK_COLOR, fontSize: 12 }} axisLine={false} tickLine={false} />
+            <XAxis dataKey="label" tick={{ fill: TICK_COLOR, fontSize: 11 }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fill: TICK_COLOR, fontSize: 12 }} axisLine={false} tickLine={false} allowDecimals={false} />
+            <Tooltip content={<CustomTooltip />} />
+            <Legend wrapperStyle={{ color: TICK_COLOR, fontSize: 12 }} />
+            {years.map((y, i) => (
+              <Line
+                key={y}
+                type="monotone"
+                dataKey={`qty_${y}`}
+                name={String(y)}
+                stroke={CHART_PALETTE[i % CHART_PALETTE.length]}
+                strokeWidth={2.5}
+                dot={false}
+                activeDot={{ r: 5 }}
+              />
+            ))}
+          </LineChart>
+        ) : (
+          <LineChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} />
+            <XAxis dataKey="label" tick={{ fill: TICK_COLOR, fontSize: 12 }} axisLine={false} tickLine={false} />
+            <YAxis yAxisId="left" tick={{ fill: TICK_COLOR, fontSize: 12 }} axisLine={false} tickLine={false} allowDecimals={false} />
             <YAxis
               yAxisId="right"
               orientation="right"
               tick={{ fill: TICK_COLOR, fontSize: 10 }}
               axisLine={false}
               tickLine={false}
-              tickFormatter={(v) => v >= 1_000_000 ? `R$${(v / 1_000_000).toFixed(0)}M` : `R$${(v / 1_000).toFixed(0)}K`}
+              tickFormatter={vgvFormatter}
+              width={64}
             />
             <Tooltip content={<CustomTooltip />} />
             <Legend wrapperStyle={{ color: TICK_COLOR, fontSize: 12 }} />
-            <Bar yAxisId="left" dataKey="quantidade" name="Quantidade" fill={CHART_PALETTE[0]} radius={[4, 4, 0, 0]} />
+            <Line
+              yAxisId="left"
+              type="monotone"
+              dataKey="qty"
+              name="Quantidade"
+              stroke={CHART_PALETTE[0]}
+              strokeWidth={2.5}
+              dot={{ r: 5, fill: CHART_PALETTE[0] }}
+              activeDot={{ r: 7 }}
+            />
             <Line
               yAxisId="right"
               type="monotone"
               dataKey="vgv"
               name="VGV (R$)"
               stroke={CHART_PALETTE[2]}
-              strokeWidth={2}
-              dot={{ r: 4, fill: CHART_PALETTE[2] }}
-              activeDot={{ r: 6 }}
+              strokeWidth={2.5}
+              dot={{ r: 5, fill: CHART_PALETTE[2] }}
+              activeDot={{ r: 7 }}
             />
-          </ComposedChart>
-        </ResponsiveContainer>
-      </GlassCard>
-    )
-  }
-
-  // Month mode — one bar cluster per year + VGV lines
-  return (
-    <GlassCard title="Vendas Realizadas" action={action}>
-      <ResponsiveContainer width="100%" height={320}>
-        <ComposedChart data={monthData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} />
-          <XAxis dataKey="month" tick={{ fill: TICK_COLOR, fontSize: 11 }} axisLine={false} tickLine={false} />
-          <YAxis yAxisId="left" tick={{ fill: TICK_COLOR, fontSize: 12 }} axisLine={false} tickLine={false} />
-          <YAxis
-            yAxisId="right"
-            orientation="right"
-            tick={{ fill: TICK_COLOR, fontSize: 10 }}
-            axisLine={false}
-            tickLine={false}
-            tickFormatter={(v) => v >= 1_000_000 ? `R$${(v / 1_000_000).toFixed(0)}M` : `R$${(v / 1_000).toFixed(0)}K`}
-          />
-          <Tooltip content={<CustomTooltip />} />
-          <Legend wrapperStyle={{ color: TICK_COLOR, fontSize: 12 }} />
-          {years.map((y, i) => (
-            <Bar
-              key={`qty_${y}`}
-              yAxisId="left"
-              dataKey={`qty_${y}`}
-              name={`Qtd ${y}`}
-              fill={CHART_PALETTE[i % CHART_PALETTE.length]}
-              radius={[3, 3, 0, 0]}
-            />
-          ))}
-          {years.map((y, i) => (
-            <Line
-              key={`vgv_${y}`}
-              yAxisId="right"
-              type="monotone"
-              dataKey={`vgv_${y}`}
-              name={`VGV ${y}`}
-              stroke={CHART_PALETTE[(i + 3) % CHART_PALETTE.length]}
-              strokeWidth={2}
-              dot={false}
-              activeDot={{ r: 4 }}
-            />
-          ))}
-        </ComposedChart>
+          </LineChart>
+        )}
       </ResponsiveContainer>
     </GlassCard>
   )

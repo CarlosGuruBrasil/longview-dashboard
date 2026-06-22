@@ -17,6 +17,12 @@ export default function DashboardView() {
 
   const salesLeads = useMemo(() => filteredLeads.filter(isSale), [filteredLeads])
 
+  // Conta por reserva (qtde_reservas_associadas), não por lead único
+  const totalVendasCount = useMemo(
+    () => salesLeads.reduce((acc, l) => acc + (l.qtde_reservas_associadas || 1), 0),
+    [salesLeads]
+  )
+
   const visitCount = useMemo(
     () => filteredLeads.filter(l => l.situacao?.nome?.toLowerCase().includes('visita')).length,
     [filteredLeads]
@@ -85,7 +91,7 @@ export default function DashboardView() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard icon={Users} label="Total de Leads" value={filteredLeads.length}
           subtitle={`de ${crmTotal.toLocaleString('pt-BR')} na base`} color="#0ea5e9" />
-        <KpiCard icon={DollarSign} label="Total de Vendas" value={salesLeads.length} color="#10b981" />
+        <KpiCard icon={DollarSign} label="Total de Vendas" value={totalVendasCount} color="#10b981" />
         <KpiCard icon={MapPin} label="Visitas Realizadas" value={visitCount} color="#f59e0b" />
         <KpiCard icon={Banknote} label="Valor Total (Vendas)" value={formatCurrency(totalSalesValue)} color="#a855f7" />
       </div>
