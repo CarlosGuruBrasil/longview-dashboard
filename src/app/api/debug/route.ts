@@ -102,29 +102,3 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
-
-// ponytail: endpoint temporário de migração — remover após confirmar dados no banco
-export async function POST(request: NextRequest) {
-  try {
-    const { secret, state } = await request.json();
-    if (secret !== process.env.CV_CRM_TOKEN) {
-      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-    }
-    await ensureSchema();
-    // postgres.js serializa objetos JS diretamente para JSONB
-    await sql`
-      INSERT INTO project_state (key, data) VALUES ('state', ${sql.json(state)})
-      ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data
-    `;
-    const rows = await sql`SELECT data FROM project_state WHERE key = 'state'`;
-    const d = rows[0]?.data as any;
-    return NextResponse.json({
-      ok: true,
-      tasks: (d?.tasks || []).length,
-      projects: (d?.projects || []).map((p: any) => p.name),
-      responsibles: (d?.responsibles || []).length,
-    });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-}

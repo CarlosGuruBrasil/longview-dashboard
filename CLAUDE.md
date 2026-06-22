@@ -80,6 +80,9 @@ As seguintes variáveis estão ativas e configuradas no painel da aplicação no
 ### 13. Documento de Dados CV CRM
 - **O que foi feito:** Criado `docs/cv-crm-data-dictionary.md` com dicionário completo de variáveis (Lead, CVDW Venda, Empreendimento, Corretor), funil de vendas com SLAs por etapa, lógica de prioridade de datas/mídias, diagrama de fluxo completo, métricas-chave (VGV, ticket médio, ROI, velocidade de vendas), pontos de intervenção recomendados e backlog de melhorias.
 
+### 15. Migração do Project Vision para Postgres (dados recuperados)
+- **O que foi feito:** Descoberto que os dados do Project Vision (tasks, projects, responsibles) nunca foram migrados do Vercel KV para o Postgres ao mudar para Coolify. O arquivo `data/projects-kv-local.json` tinha o backup completo. Criado endpoint temporário de migração em `/api/debug` (POST) usando `sql.json()` para serialização JSONB correta. Migrados 501 tarefas, 6 projetos (Villa Alta, Varandas, Jerivá, Ride, Altana, Cacupé) e 46 responsáveis para a tabela `project_state` no Postgres de produção. Endpoint removido após confirmação.
+
 ### 14. Commit e deploy: Tempo p/ Compra + Dual-axis Meta + Vendas por Reserva (commit 82653e5)
 - **O que foi feito:**
   - Commitado e enviado ao GitHub tudo que estava pendente (antes em "não commitado").
