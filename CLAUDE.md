@@ -80,7 +80,13 @@ As seguintes variáveis estão ativas e configuradas no painel da aplicação no
 ### 13. Documento de Dados CV CRM
 - **O que foi feito:** Criado `docs/cv-crm-data-dictionary.md` com dicionário completo de variáveis (Lead, CVDW Venda, Empreendimento, Corretor), funil de vendas com SLAs por etapa, lógica de prioridade de datas/mídias, diagrama de fluxo completo, métricas-chave (VGV, ticket médio, ROI, velocidade de vendas), pontos de intervenção recomendados e backlog de melhorias.
 
-### 11. Coluna "Tempo p/ Compra" na Tabela de Vendas (não commitado)
+### 14. Commit e deploy: Tempo p/ Compra + Dual-axis Meta + Vendas por Reserva (commit 82653e5)
+- **O que foi feito:**
+  - Commitado e enviado ao GitHub tudo que estava pendente (antes em "não commitado").
+  - Banco verificado: 3.762 leads e 28 vendas intactos no Postgres de produção.
+  - Coolify faz auto-deploy via push no `main`.
+
+### 11. Coluna "Tempo p/ Compra" na Tabela de Vendas (commitado em 82653e5)
 - **O que foi feito:**
   - Adicionada função `calcDaysToSale` em `src/app/marketing-vision/components/views/VendasView.tsx` que calcula a diferença em dias entre `data_reserva` e `data_venda` de cada reserva CVDW.
   - Criado componente `DaysToSaleBadge` com três faixas visuais: ⚡ Rápido (≤30 dias, verde), ⏱ Médio (≤90 dias, amarelo), 🕐 Longo (>90 dias, roxo).
