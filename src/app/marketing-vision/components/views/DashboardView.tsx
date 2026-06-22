@@ -9,6 +9,7 @@ import KpiCard from '../ui/KpiCard'
 import SalesGrowthChart from '../charts/SalesGrowthChart'
 import StatusBarChart from '../charts/StatusBarChart'
 import OriginsBarChart from '../charts/OriginsBarChart'
+import TrendsChart from '../charts/TrendsChart'
 
 export default function DashboardView() {
   const { filteredLeads, allLeads, crmTotal, loading } = useData()
@@ -99,6 +100,11 @@ export default function DashboardView() {
       {/* Gráfico de Vendas Realizadas — largura total */}
       <div className="w-full">
         <SalesGrowthChart allLeads={filteredLeads} mode={salesChartMode} onModeChange={setSalesChartMode} />
+      </div>
+
+      {/* Tendência — Leads / Vendas / CPL por período com média móvel */}
+      <div className="w-full">
+        <TrendsChart />
       </div>
 
       {/* Vendas por Origem (quantidade + VGV) e Leads por Status (barras) */}
