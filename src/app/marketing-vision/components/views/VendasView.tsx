@@ -217,8 +217,33 @@ function SalesTable({ vendas }: SalesTableProps) {
         </span>
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto">
+      {/* Mobile cards */}
+      <div className="sm:hidden flex flex-col gap-3">
+        {filtered.length === 0 ? (
+          <p className="text-center text-sm py-8" style={{ color: '#71717a' }}>Nenhuma venda encontrada</p>
+        ) : filtered.map((v, i) => (
+          <div key={`m-${v.idreserva ?? i}`} className="rounded-xl border border-white/10 bg-white/5 p-3 flex flex-col gap-2">
+            <div className="flex items-start justify-between gap-2">
+              <span className="text-sm font-semibold" style={{ color: '#e4e4e7' }}>{v.cliente || '-'}</span>
+              <span className="text-xs font-bold shrink-0" style={{ color: (v.valor_contrato ?? 0) > 0 ? '#10b981' : '#71717a' }}>
+                {(v.valor_contrato ?? 0) > 0 ? formatCurrency(v.valor_contrato!) : '-'}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
+              <span className="text-xs" style={{ color: '#71717a' }}>{v.empreendimento || '-'}</span>
+              <span className="text-xs" style={{ color: '#71717a' }}>{[v.bloco, v.unidade].filter(Boolean).join(' / ') || '-'}</span>
+            </div>
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="text-xs" style={{ color: '#10b981' }}>{v.data_venda ? formatDate(v.data_venda) : '-'}</span>
+              <DaysToSaleBadge days={calcDaysToSale(v)} />
+              {v.corretor && <span className="text-xs" style={{ color: '#a1a1aa' }}>{v.corretor}</span>}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop table */}
+      <div className="hidden sm:block overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-white/10">
@@ -309,7 +334,7 @@ function SalesTable({ vendas }: SalesTableProps) {
   )
 }
 
-// ── main component ────────────────────────────────────────────────────────────
+// ── main component ─────────────────────────────────────────────────────────
 
 export default function VendasView() {
   const { filteredLeads } = useData()

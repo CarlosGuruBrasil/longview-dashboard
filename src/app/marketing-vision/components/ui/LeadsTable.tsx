@@ -222,8 +222,42 @@ export default function LeadsTable({ leads }: LeadsTableProps) {
         {filtered.length > MAX_ROWS && ` (mostrando ${MAX_ROWS})`}
       </p>
 
-      {/* Table */}
-      <div className="overflow-x-auto rounded-xl border border-white/10">
+      {/* Mobile cards */}
+      <div className="sm:hidden flex flex-col gap-2">
+        {displayed.length === 0 ? (
+          <p className="text-center py-8 text-sm" style={{ color: 'var(--text-secondary)' }}>Nenhum lead encontrado.</p>
+        ) : displayed.map((lead, idx) => {
+          const id = lead.idlead ?? lead.id;
+          const crmUrl = id ? `https://longviewempreendimentos.cvcrm.com.br/gestor/comercial/leads/${id}/detalhes` : undefined;
+          const sc = getStatusColor(lead);
+          const rawDate = lead.data_cad || lead.data_cadastro || lead.data_cadastramento;
+          return (
+            <div
+              key={id ?? idx}
+              onClick={() => crmUrl && window.open(crmUrl, '_blank', 'noopener,noreferrer')}
+              className={`rounded-xl border border-white/10 bg-white/5 p-3 flex flex-col gap-1.5 ${crmUrl ? 'cursor-pointer active:bg-white/10' : ''}`}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <span className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{lead.nome || '-'}</span>
+                {lead.situacao?.nome && (
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0" style={{ backgroundColor: sc.bg, color: sc.text }}>
+                    {lead.situacao.nome}
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                <span>{formatDate(toISODate(rawDate))}</span>
+                <span>{getOrigin(lead)}</span>
+                {lead.corretor?.nome && <span>{lead.corretor.nome}</span>}
+                {lead.empreendimento?.[0]?.nome && <span>{lead.empreendimento[0].nome}</span>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Desktop table */}
+      <div className="hidden sm:block overflow-x-auto rounded-xl border border-white/10">
         <table className="w-full text-xs border-collapse">
           <thead>
             <tr className="border-b border-white/10 bg-white/5">
@@ -339,7 +373,7 @@ export default function LeadsTable({ leads }: LeadsTableProps) {
             )}
           </tbody>
         </table>
-      </div>
+      </div>{/* end desktop table */}
     </div>
   );
 }

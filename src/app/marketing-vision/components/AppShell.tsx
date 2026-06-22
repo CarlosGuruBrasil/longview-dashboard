@@ -169,7 +169,7 @@ export default function AppShell({ children }: AppShellProps) {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto px-4 py-4">
+        <main className="flex-1 overflow-y-auto px-4 py-4 pb-24 md:pb-4">
           {children}
         </main>
       </div>

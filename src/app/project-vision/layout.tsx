@@ -11,7 +11,7 @@ export default function ProjectVisionLayout({
       <Sidebar />
 
       {/* Container Principal com espaçamento para a Sidebar */}
-      <main className="flex-1 lg:pl-64 flex flex-col min-h-screen relative overflow-x-hidden w-full">
+      <main className="flex-1 lg:pl-64 flex flex-col min-h-screen relative overflow-x-hidden w-full pt-14 lg:pt-0 pb-20 lg:pb-0">
         {children}
       </main>
     </div>
