@@ -80,12 +80,22 @@ export async function GET(request: NextRequest) {
       }));
     }
 
+    // ── Dados do Project Vision ────────────────────────────────────────────────
+    const pvRows = await sql`SELECT data FROM project_state WHERE key = 'state'`;
+    const pv = pvRows[0]?.data as any;
+    const projectVisionSummary = pv ? {
+      tasks:        (pv.tasks || []).length,
+      projects:     (pv.projects || []).map((p: any) => p.name),
+      responsibles: (pv.responsibles || []).length,
+    } : null;
+
     return NextResponse.json({
       postgresTotalLeads:   leads.length,
       totalSalesInDb:       sales.length,
       totalVendasByReserva: sales.reduce((s: number, l: any) => s + (l.qtde_reservas_associadas || 1), 0),
       salesWithDataVenda:   sales.filter((s: any) => s.data_venda).length,
       salesReport,
+      projectVision: projectVisionSummary,
       ...(idsParam ? { specificDiag } : {}),
     });
   } catch (error: any) {
