@@ -1,0 +1,14 @@
+{
+  "name": "LongView Manager",
+  "short_name": "LongView",
+  "description": "Gestão Operacional Imobiliária",
+  "start_url": "/select-app",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#09090b",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "/logolongview.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/logolongview.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
