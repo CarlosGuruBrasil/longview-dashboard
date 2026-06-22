@@ -111,8 +111,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
     await ensureSchema();
+    // postgres.js serializa objetos JS diretamente para JSONB
     await sql`
-      INSERT INTO project_state (key, data) VALUES ('state', ${JSON.stringify(state)})
+      INSERT INTO project_state (key, data) VALUES ('state', ${sql.json(state)})
       ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data
     `;
     const rows = await sql`SELECT data FROM project_state WHERE key = 'state'`;
