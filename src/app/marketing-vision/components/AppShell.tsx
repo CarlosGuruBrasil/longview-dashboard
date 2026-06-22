@@ -190,49 +190,60 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <nav
         className="md:hidden fixed inset-x-0 bottom-0 z-30 no-tap"
         style={{
-          background: 'rgba(9,9,11,0.92)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          borderTop: '1px solid rgba(255,255,255,0.07)',
+          background: 'rgba(8,8,10,0.97)',
+          backdropFilter: 'blur(28px)',
+          WebkitBackdropFilter: 'blur(28px)',
+          borderTop: '1px solid rgba(255,255,255,0.06)',
+          boxShadow: '0 -12px 40px rgba(0,0,0,0.5)',
           paddingBottom: 'var(--safe-bottom)',
         }}
       >
-        <div className="flex items-stretch h-14">
+        <div className="flex items-end h-[60px] px-1">
           {PRIMARY_NAV.map(({ icon: Icon, label, view }) => {
             const active = activeView === view;
             return (
               <button
                 key={view}
                 onClick={() => setActiveView(view)}
-                className="no-tap flex-1 flex flex-col items-center justify-center gap-0.5 relative transition-all active:scale-90"
+                className="no-tap flex-1 flex flex-col items-center justify-center pb-2 gap-1 relative transition-transform active:scale-90"
+                style={{ paddingTop: '6px' }}
               >
-                {/* Active indicator pill */}
+                {/* Active background capsule */}
                 {active && (
-                  <span className="absolute top-1.5 w-5 h-0.5 rounded-full bg-sky-400" />
+                  <span
+                    className="absolute inset-x-2"
+                    style={{
+                      top: '4px', bottom: '18px',
+                      borderRadius: '12px',
+                      background: 'rgba(14,165,233,0.12)',
+                      border: '1px solid rgba(14,165,233,0.18)',
+                    }}
+                  />
                 )}
                 <Icon
-                  size={22}
-                  strokeWidth={active ? 2.2 : 1.6}
-                  className={`transition-all ${active ? 'text-sky-400' : 'text-zinc-500'}`}
+                  size={active ? 22 : 20}
+                  strokeWidth={active ? 2.2 : 1.5}
+                  className={`relative z-10 transition-all duration-200 ${active ? 'text-sky-400' : 'text-zinc-600'}`}
                 />
-                <span className={`text-[10px] font-medium leading-none transition-all ${active ? 'text-sky-400' : 'text-zinc-600'}`}>
+                <span className={`relative z-10 text-[10px] leading-none font-semibold transition-all duration-200 ${active ? 'text-sky-400' : 'text-zinc-600'}`}>
                   {label}
                 </span>
               </button>
             );
           })}
 
-          {/* "Mais" opens drawer */}
+          {/* Mais */}
           <button
             onClick={() => setDrawerOpen(true)}
-            className="no-tap flex-1 flex flex-col items-center justify-center gap-0.5 active:scale-90 transition-all"
+            className="no-tap flex-1 flex flex-col items-center justify-center pb-2 gap-1 active:scale-90 transition-transform"
+            style={{ paddingTop: '6px' }}
           >
-            <div className="w-5 h-5 flex flex-col justify-center gap-[3px]">
-              <span className="block h-[2px] w-5 rounded-full bg-zinc-500" />
-              <span className="block h-[2px] w-3.5 rounded-full bg-zinc-500" />
-              <span className="block h-[2px] w-4 rounded-full bg-zinc-500" />
+            <div className="relative z-10 flex flex-col items-center gap-[3.5px]">
+              <span className="block h-[1.5px] w-[18px] rounded-full bg-zinc-600" />
+              <span className="block h-[1.5px] w-[13px] rounded-full bg-zinc-600" />
+              <span className="block h-[1.5px] w-[15px] rounded-full bg-zinc-600" />
             </div>
-            <span className="text-[10px] font-medium leading-none text-zinc-600 mt-0.5">Mais</span>
+            <span className="text-[10px] leading-none font-semibold text-zinc-600">Mais</span>
           </button>
         </div>
       </nav>

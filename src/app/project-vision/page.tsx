@@ -242,44 +242,43 @@ export default function Home() {
     .slice(0, 5);
 
   return (
-    <div className="flex-1 p-6 lg:p-10 space-y-8 max-w-7xl mx-auto w-full">
+    <div className="flex-1 p-4 md:p-6 lg:p-10 space-y-6 md:space-y-8 max-w-7xl mx-auto w-full">
       {/* Header Executivo */}
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-[#1C1C1E] pb-6">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-white/5 border border-white/10 text-zinc-400">
-              Acompanhamento Executivo
-            </span>
-            <span className="text-zinc-600 text-xs">•</span>
-            <span className="text-zinc-500 text-xs font-medium">Atualizado em tempo real</span>
-          </div>
-          <h2 className="text-3xl font-semibold tracking-tight text-white mt-1">LongView Manager</h2>
-          <p className="text-sm text-zinc-400 mt-0.5">Olá, {currentUser.name}. Visualização configurada para nível {currentUser.role}.</p>
+      <header className="flex flex-col gap-3 border-b border-[#1C1C1E] pb-4 md:pb-6">
+        {/* Badge + greeting — hidden on mobile (shell header already shows context) */}
+        <div className="hidden md:flex items-center gap-2">
+          <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-white/5 border border-white/10 text-zinc-400">
+            Acompanhamento Executivo
+          </span>
+          <span className="text-zinc-600 text-xs">•</span>
+          <span className="text-zinc-500 text-xs font-medium">Atualizado em tempo real</span>
         </div>
+        <h2 className="hidden md:block text-3xl font-semibold tracking-tight text-white">LongView Manager</h2>
+        <p className="hidden md:block text-sm text-zinc-400">Olá, {currentUser.name}. Visualização configurada para nível {currentUser.role}.</p>
 
-        {/* Filtro e Atualizar */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 bg-[#1b1b1f] border-2 border-zinc-700 hover:border-zinc-500 rounded-xl px-4 py-2.5 text-xs text-white shadow-[0_0_15px_rgba(255,255,255,0.03)] transition-all duration-200">
-            <SlidersHorizontal size={14} className="text-zinc-300 animate-pulse" />
-            <span className="font-bold">Filtrar Empreendimento:</span>
+        {/* Filtro e Atualizar — responsivo */}
+        <div className="flex items-center gap-2 w-full">
+          <div className="flex flex-1 min-w-0 items-center gap-2 bg-[#1b1b1f] border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white">
+            <SlidersHorizontal size={13} className="text-zinc-400 shrink-0" />
+            <span className="text-zinc-400 shrink-0 hidden sm:inline">Empreendimento:</span>
             <select
               value={selectedProjectFilter}
               onChange={(e) => setSelectedProjectFilter(e.target.value)}
-              className="bg-transparent text-white font-extrabold focus:outline-none cursor-pointer text-sm ml-1"
+              className="flex-1 min-w-0 bg-transparent text-white font-semibold focus:outline-none cursor-pointer text-xs"
             >
-              <option value="Todos" className="bg-[#121214] text-white">Todos os Empreendimentos</option>
+              <option value="Todos" className="bg-[#121214] text-white">Todos</option>
               {projects.map(p => (
                 <option key={p.id} value={p.name} className="bg-[#121214] text-white">{p.name}</option>
               ))}
             </select>
           </div>
-          <button 
+          <button
             onClick={fetchData}
-            className="p-3 bg-[#121214] hover:bg-[#18181B] border border-[#1E1E22] text-zinc-300 hover:text-white rounded-xl transition-all duration-200 flex items-center gap-1.5 text-xs"
+            className="no-tap shrink-0 p-2.5 bg-[#121214] border border-[#1E1E22] text-zinc-400 hover:text-white rounded-xl transition-all flex items-center gap-1.5 text-xs active:scale-95"
             title="Atualizar dados"
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-            <span className="font-bold">Atualizar</span>
+            <span className="hidden sm:inline font-semibold">Atualizar</span>
           </button>
         </div>
       </header>
