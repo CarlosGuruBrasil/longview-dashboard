@@ -102,3 +102,23 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+// Migração temporária Upstash → Postgres kv_store — remover após usar
+export async function POST(request: NextRequest) {
+  const { secret, kv_data } = await request.json();
+  if (secret !== process.env.CV_CRM_TOKEN) return NextResponse.json({ error: 'não autorizado' }, { status: 401 });
+  await ensureSchema();
+  let ok = 0, fail = 0;
+  for (const [key, value] of Object.entries(kv_data as Record<string, unknown>)) {
+    try {
+      await sql`
+        INSERT INTO kv_store (key, value, expires_at)
+        VALUES (${key}, ${JSON.stringify(value)}, NULL)
+        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, expires_at = NULL
+      `;
+      ok++;
+    } catch { fail++; }
+  }
+  const total = await sql`SELECT COUNT(*) as c FROM kv_store`;
+  return NextResponse.json({ ok, fail, total_kv: (total[0] as any).c });
+}
