@@ -99,7 +99,8 @@ export default function LeadsTable({ leads }: LeadsTableProps) {
     filterImobiliaria || filterEmpreendimento || filterEtapa || filterTag || filterBolsao;
 
   // ── Adidas-style chip classes ────────────────────────────────────────────
-  const chip = 'no-tap shrink-0 h-9 px-4 rounded-full text-[13px] font-medium transition-all [color-scheme:dark]';
+  // max-w-[140px] impede selects de expandirem com opções longas (ex: "Aguardando Atendimento Corretor")
+  const chip = 'no-tap shrink-0 h-9 px-3 rounded-full text-[13px] font-medium transition-all [color-scheme:dark] max-w-[140px]';
   const chipIdle    = `${chip} border border-white/12 bg-white/[0.03] text-zinc-400 focus:outline-none focus:border-white/30`;
   const chipActive  = `${chip} bg-white/90 text-zinc-900 border-transparent`;
 

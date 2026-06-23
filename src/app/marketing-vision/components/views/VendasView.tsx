@@ -166,7 +166,7 @@ function SalesTable({ vendas }: SalesTableProps) {
       .slice(0, 300)
   }, [vendas, search, corretor, imobiliaria, empreendimento])
 
-  const chip     = 'no-tap shrink-0 h-9 px-4 rounded-full text-[13px] font-medium transition-all outline-none [color-scheme:dark]'
+  const chip     = 'no-tap shrink-0 h-9 px-3 rounded-full text-[13px] font-medium transition-all outline-none [color-scheme:dark] max-w-[140px]'
   const chipIdle = `${chip} border border-white/12 bg-white/[0.03] text-zinc-400 focus:border-white/30`
   const chipActv = `${chip} bg-white/90 text-zinc-900 border-transparent`
 
