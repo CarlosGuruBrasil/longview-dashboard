@@ -309,7 +309,7 @@ export default function AdminUsersPage() {
                             <p className="text-zinc-500 text-xs mt-0.5">{u.email}</p>
                           </td>
                           <td className="py-4.5 px-2">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                            <span className={`px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider ${
                               u.role === 'Desenvolvedor' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' :
                               u.role === 'Diretoria' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
                               u.role === 'Operador' ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' :
@@ -324,15 +324,15 @@ export default function AdminUsersPage() {
                           <td className="py-4.5 px-2">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               {u.permissions.isAdmin && (
-                                <span className="bg-red-500/10 text-red-400 px-1.5 py-0.2 rounded text-[9px] border border-red-500/20 font-bold uppercase tracking-wide">Admin</span>
+                                <span className="bg-red-500/10 text-red-400 px-1.5 py-0.2 rounded text-[11px] border border-red-500/20 font-bold uppercase tracking-wide">Admin</span>
                               )}
                               {u.permissions.viewMarketingDashboard && (
-                                <span className="bg-blue-500/10 text-blue-400 px-1.5 py-0.2 rounded text-[9px] border border-blue-500/20 font-bold uppercase tracking-wide">Marketing</span>
+                                <span className="bg-blue-500/10 text-blue-400 px-1.5 py-0.2 rounded text-[11px] border border-blue-500/20 font-bold uppercase tracking-wide">Marketing</span>
                               )}
                               {u.permissions.viewProjectVision && (
-                                <span className="bg-orange-500/10 text-orange-400 px-1.5 py-0.2 rounded text-[9px] border border-orange-500/20 font-bold uppercase tracking-wide">Project</span>
+                                <span className="bg-orange-500/10 text-orange-400 px-1.5 py-0.2 rounded text-[11px] border border-orange-500/20 font-bold uppercase tracking-wide">Project</span>
                               )}
-                              <span className="text-[10px] text-zinc-500">({permissionsCount} ativas)</span>
+                              <span className="text-[11px] text-zinc-500">({permissionsCount} ativas)</span>
                             </div>
                           </td>
                           <td className="py-4.5 px-2 text-right">
@@ -414,7 +414,7 @@ export default function AdminUsersPage() {
               {/* Campo Senha */}
               <div className="space-y-1.5">
                 <label className="text-zinc-400 font-bold block">
-                  Senha {editingUserId && <span className="text-[10px] text-zinc-500 font-normal">(deixe em branco se não quiser alterar)</span>}
+                  Senha {editingUserId && <span className="text-[11px] text-zinc-500 font-normal">(deixe em branco se não quiser alterar)</span>}
                 </label>
                 <input
                   type="password"
@@ -450,7 +450,7 @@ export default function AdminUsersPage() {
                 
                 {/* Marketing Vision */}
                 <div className="space-y-2">
-                  <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block">Marketing Vision</span>
+                  <span className="text-[11px] text-zinc-500 font-bold uppercase tracking-wider block">Marketing Vision</span>
                   <div className="space-y-1.5 pl-1">
                     <label className="flex items-center gap-2 text-zinc-400 hover:text-white cursor-pointer select-none">
                       <input
@@ -502,7 +502,7 @@ export default function AdminUsersPage() {
 
                 {/* Project Vision */}
                 <div className="space-y-2 pt-1">
-                  <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block">Project Vision</span>
+                  <span className="text-[11px] text-zinc-500 font-bold uppercase tracking-wider block">Project Vision</span>
                   <div className="space-y-1.5 pl-1">
                     <label className="flex items-center gap-2 text-zinc-400 hover:text-white cursor-pointer select-none">
                       <input
@@ -545,7 +545,7 @@ export default function AdminUsersPage() {
 
                 {/* Painel Administrativo */}
                 <div className="space-y-2 pt-1">
-                  <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block">Administração Geral</span>
+                  <span className="text-[11px] text-zinc-500 font-bold uppercase tracking-wider block">Administração Geral</span>
                   <div className="pl-1">
                     <label className="flex items-center gap-2 text-zinc-400 hover:text-white cursor-pointer select-none">
                       <input

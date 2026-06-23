@@ -116,19 +116,19 @@ export default function ProjectDetailPage() {
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-[#121214]/40 border border-[#1E1E22] rounded-xl p-4">
-          <p className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">Total</p>
+          <p className="text-[11px] uppercase font-bold text-zinc-500 tracking-wider">Total</p>
           <p className="text-2xl font-bold text-white mt-1">{tasks.length}</p>
         </div>
         <div className="bg-[#121214]/40 border border-[#1E1E22] rounded-xl p-4">
-          <p className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">Concluídas</p>
+          <p className="text-[11px] uppercase font-bold text-zinc-500 tracking-wider">Concluídas</p>
           <p className="text-2xl font-bold text-emerald-400 mt-1">{tasks.filter(t => t.statusAndamento === 'Finalizado').length}</p>
         </div>
         <div className="bg-[#121214]/40 border border-[#1E1E22] rounded-xl p-4">
-          <p className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">Em Andamento</p>
+          <p className="text-[11px] uppercase font-bold text-zinc-500 tracking-wider">Em Andamento</p>
           <p className="text-2xl font-bold text-amber-400 mt-1">{tasks.filter(t => t.statusAndamento === 'Em andamento').length}</p>
         </div>
         <div className="bg-[#121214]/40 border border-[#1E1E22] rounded-xl p-4">
-          <p className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">Não Iniciadas</p>
+          <p className="text-[11px] uppercase font-bold text-zinc-500 tracking-wider">Não Iniciadas</p>
           <p className="text-2xl font-bold text-zinc-400 mt-1">{tasks.filter(t => t.statusAndamento === 'Não iniciado').length}</p>
         </div>
       </div>
@@ -144,7 +144,7 @@ export default function ProjectDetailPage() {
             )}
           </div>
           {hasFilters && (
-            <button onClick={clearFilters} className="flex items-center gap-1 text-[10px] text-zinc-500 hover:text-white transition-colors">
+            <button onClick={clearFilters} className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-white transition-colors">
               <X size={12} /> Limpar
             </button>
           )}
@@ -166,7 +166,7 @@ export default function ProjectDetailPage() {
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {/* Geral/Setor */}
           <div className="flex flex-col gap-1">
-            <span className="text-[9px] uppercase font-bold text-zinc-500 tracking-wider">Geral / Setor</span>
+            <span className="text-[11px] uppercase font-bold text-zinc-500 tracking-wider">Geral / Setor</span>
             <select value={filterSector} onChange={e => setFilterSector(e.target.value)}
               className="bg-[#0A0A0B] border border-[#1E1E22] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none">
               {sectors.map(s => <option key={s} value={s}>{s}</option>)}
@@ -175,7 +175,7 @@ export default function ProjectDetailPage() {
 
           {/* Responsável */}
           <div className="flex flex-col gap-1">
-            <span className="text-[9px] uppercase font-bold text-zinc-500 tracking-wider">Responsável pela Execução</span>
+            <span className="text-[11px] uppercase font-bold text-zinc-500 tracking-wider">Responsável pela Execução</span>
             <select value={filterResp} onChange={e => setFilterResp(e.target.value)}
               className="bg-[#0A0A0B] border border-[#1E1E22] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none">
               {responsibles.map(r => <option key={r} value={r}>{r}</option>)}
@@ -184,7 +184,7 @@ export default function ProjectDetailPage() {
 
           {/* Status Andamento */}
           <div className="flex flex-col gap-1">
-            <span className="text-[9px] uppercase font-bold text-zinc-500 tracking-wider">Status Andamento</span>
+            <span className="text-[11px] uppercase font-bold text-zinc-500 tracking-wider">Status Andamento</span>
             <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
               className="bg-[#0A0A0B] border border-[#1E1E22] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none">
               {['Todos', 'Não iniciado', 'Em andamento', 'Aguardando', 'Em análise', 'Finalizado'].map(s => <option key={s} value={s}>{s}</option>)}
@@ -193,7 +193,7 @@ export default function ProjectDetailPage() {
 
           {/* Urgência */}
           <div className="flex flex-col gap-1">
-            <span className="text-[9px] uppercase font-bold text-zinc-500 tracking-wider">Urgência ?!</span>
+            <span className="text-[11px] uppercase font-bold text-zinc-500 tracking-wider">Urgência ?!</span>
             <select value={filterUrgencia} onChange={e => setFilterUrgencia(e.target.value)}
               className="bg-[#0A0A0B] border border-[#1E1E22] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none">
               {['Todos', 'Baixa', 'Média', 'Alta', 'Crítica', 'Emergencial'].map(u => <option key={u} value={u}>{u}</option>)}
@@ -202,7 +202,7 @@ export default function ProjectDetailPage() {
 
           {/* Status Contratação */}
           <div className="flex flex-col gap-1">
-            <span className="text-[9px] uppercase font-bold text-zinc-500 tracking-wider">Status da Contratação</span>
+            <span className="text-[11px] uppercase font-bold text-zinc-500 tracking-wider">Status da Contratação</span>
             <select value={filterContratacao} onChange={e => setFilterContratacao(e.target.value)}
               className="bg-[#0A0A0B] border border-[#1E1E22] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none">
               {contratacoes.map(c => <option key={c} value={c}>{c}</option>)}
@@ -224,7 +224,7 @@ export default function ProjectDetailPage() {
           ) : (
             <table className="w-full text-left" style={{ minWidth: '1400px' }}>
               <thead className="sticky top-0 z-10">
-                <tr className="border-b border-[#1C1C1E] bg-[#0E0E10] text-[10px] uppercase font-bold text-zinc-300 tracking-wider">
+                <tr className="border-b border-[#1C1C1E] bg-[#0E0E10] text-[11px] uppercase font-bold text-zinc-300 tracking-wider">
                   <th className="py-3 px-4 whitespace-nowrap">ID</th>
                   <th className="py-3 px-4 whitespace-nowrap">Geral</th>
                   <th className="py-3 px-4 whitespace-nowrap">Assunto</th>
@@ -249,7 +249,7 @@ export default function ProjectDetailPage() {
                     </td>
                     <td className="py-3 px-4 text-xs text-zinc-300 whitespace-nowrap">{task.responsible || '—'}</td>
                     <td className="py-3 px-4 text-xs whitespace-nowrap">
-                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-semibold border ${
+                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
                         task.statusContratacao?.toLowerCase().includes('contratado') && !task.statusContratacao?.toLowerCase().includes('não')
                           ? 'text-blue-400 border-blue-500/20 bg-blue-500/10'
                           : task.statusContratacao?.toLowerCase().includes('não será')
@@ -261,7 +261,7 @@ export default function ProjectDetailPage() {
                     </td>
                     <td className="py-3 px-4 text-xs whitespace-nowrap">
                       {task.urgencia && task.urgencia !== 'Baixa' ? (
-                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-semibold border ${
+                        <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
                           task.urgencia === 'Emergencial' ? 'text-red-300 border-red-400/20 bg-red-500/10' :
                           task.urgencia === 'Crítica' ? 'text-red-400 border-red-500/20 bg-red-500/10' :
                           task.urgencia === 'Alta' ? 'text-orange-400 border-orange-500/20 bg-orange-500/10' :
@@ -273,7 +273,7 @@ export default function ProjectDetailPage() {
                       {task.situacao ? <span className="block truncate" title={task.situacao}>{task.situacao.split('\n')[0]}</span> : '—'}
                     </td>
                     <td className="py-3 px-4 text-xs whitespace-nowrap">
-                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-semibold border ${
+                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
                         task.statusAndamento === 'Finalizado' ? 'text-emerald-400 border-emerald-500/20 bg-emerald-500/10' :
                         task.statusAndamento === 'Em andamento' ? 'text-amber-400 border-amber-500/20 bg-amber-500/10' :
                         task.statusAndamento === 'Aguardando' ? 'text-blue-400 border-blue-500/20 bg-blue-500/10' :

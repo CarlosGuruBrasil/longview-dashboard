@@ -129,7 +129,7 @@ export default function Sidebar() {
             <p className="text-xs font-medium text-zinc-200 truncate leading-tight">
               {user?.name ?? 'Usuário'}
             </p>
-            <p className="text-[10px] text-zinc-500 truncate leading-tight">
+            <p className="text-[11px] text-zinc-500 truncate leading-tight">
               {user?.role ?? 'Conectado'}
             </p>
           </div>

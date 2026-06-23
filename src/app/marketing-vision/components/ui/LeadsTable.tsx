@@ -185,7 +185,7 @@ export default function LeadsTable({ leads }: LeadsTableProps) {
               <div className="flex items-start justify-between gap-2">
                 <span className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{lead.nome || '-'}</span>
                 {lead.situacao?.nome && (
-                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0" style={{ backgroundColor: sc.bg, color: sc.text }}>
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full shrink-0" style={{ backgroundColor: sc.bg, color: sc.text }}>
                     {lead.situacao.nome}
                   </span>
                 )}
@@ -246,7 +246,7 @@ export default function LeadsTable({ leads }: LeadsTableProps) {
                   <td className="px-3 py-2 whitespace-nowrap">
                     {lead.situacao?.nome ? (
                       <span
-                        className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                        className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold"
                         style={{ backgroundColor: sc.bg, color: sc.text }}
                       >
                         {lead.situacao.nome}
@@ -272,14 +272,14 @@ export default function LeadsTable({ leads }: LeadsTableProps) {
                       {tags.slice(0, 3).map((tag) => (
                         <span
                           key={tag}
-                          className="inline-block px-1.5 py-0.5 rounded text-[10px] bg-white/10"
+                          className="inline-block px-1.5 py-0.5 rounded text-[11px] bg-white/10"
                           style={{ color: 'var(--text-secondary)' }}
                         >
                           {tag}
                         </span>
                       ))}
                       {tags.length > 3 && (
-                        <span className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>
+                        <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
                           +{tags.length - 3}
                         </span>
                       )}

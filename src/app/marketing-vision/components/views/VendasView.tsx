@@ -72,7 +72,7 @@ function DaysToSaleBadge({ days }: { days: number | null }) {
         {days === 0 ? 'No mesmo dia' : `${days} dias`}
       </span>
       <span
-        className="text-[10px] px-1.5 py-0.5 rounded-full self-start whitespace-nowrap"
+        className="text-[11px] px-1.5 py-0.5 rounded-full self-start whitespace-nowrap"
         style={{ backgroundColor: bg, color }}
       >
         {label}
@@ -275,7 +275,7 @@ function SalesTable({ vendas }: SalesTableProps) {
                       <span>{v.cliente || '-'}</span>
                       {v.associados && v.associados.length > 0 && (
                         <span
-                          className="text-[10px] bg-purple-500/10 text-purple-400 border border-purple-500/20 px-1.5 py-0.5 rounded font-bold"
+                          className="text-[11px] bg-purple-500/10 text-purple-400 border border-purple-500/20 px-1.5 py-0.5 rounded font-bold"
                           title={`${v.associados.length} associado(s): ${v.associados.map(a => a.tipo_associacao).join(', ')}`}
                         >
                           +{v.associados.length} assoc.

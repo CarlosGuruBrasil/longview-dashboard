@@ -223,12 +223,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     }}
                   />
                 )}
+                {/* HIG: tab bar icons 25pt ≈ 24px; labels Caption 2 = 11px mínimo */}
                 <Icon
-                  size={active ? 22 : 20}
+                  size={active ? 24 : 22}
                   strokeWidth={active ? 2.2 : 1.5}
                   className={`relative z-10 transition-all duration-200 ${active ? 'text-sky-400' : 'text-zinc-600'}`}
                 />
-                <span className={`relative z-10 text-[10px] leading-none font-semibold transition-all duration-200 ${active ? 'text-sky-400' : 'text-zinc-600'}`}>
+                <span className={`relative z-10 text-[11px] leading-none font-semibold transition-all duration-200 ${active ? 'text-sky-400' : 'text-zinc-600'}`}>
                   {label}
                 </span>
               </button>
@@ -246,7 +247,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <span className="block h-[1.5px] w-[13px] rounded-full bg-zinc-600" />
               <span className="block h-[1.5px] w-[15px] rounded-full bg-zinc-600" />
             </div>
-            <span className="text-[10px] leading-none font-semibold text-zinc-600">Mais</span>
+            <span className="text-[11px] leading-none font-semibold text-zinc-600">Mais</span>
           </button>
         </div>
       </nav>

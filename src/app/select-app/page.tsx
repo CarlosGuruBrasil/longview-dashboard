@@ -81,7 +81,7 @@ export default async function SelectAppPage() {
       {/* Corpo Central */}
       <div className="flex-1 flex flex-col items-center justify-center max-w-5xl w-full mx-auto relative z-10 my-8">
         <div className="text-center mb-10 max-w-lg">
-          <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-1 rounded bg-white/5 border border-white/10 text-zinc-400">
+          <span className="text-[11px] uppercase font-bold tracking-wider px-2.5 py-1 rounded bg-white/5 border border-white/10 text-zinc-400">
             Ambiente Integrado
           </span>
           <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight mt-3">
@@ -130,7 +130,7 @@ export default async function SelectAppPage() {
                   <span>Acesso Restrito</span>
                 </div>
               )}
-              <span className="text-[10px] text-zinc-600 font-bold uppercase tracking-wider">
+              <span className="text-[11px] text-zinc-600 font-bold uppercase tracking-wider">
                 Gestão & Cronograma
               </span>
             </div>
@@ -171,7 +171,7 @@ export default async function SelectAppPage() {
                   <span>Acesso Restrito</span>
                 </div>
               )}
-              <span className="text-[10px] text-zinc-600 font-bold uppercase tracking-wider">
+              <span className="text-[11px] text-zinc-600 font-bold uppercase tracking-wider">
                 Vendas & Ads
               </span>
             </div>
@@ -182,7 +182,7 @@ export default async function SelectAppPage() {
 
       {/* Footer */}
       <footer className="text-center relative z-10">
-        <p className="text-[10px] text-zinc-600 tracking-wider uppercase font-semibold">
+        <p className="text-[11px] text-zinc-600 tracking-wider uppercase font-semibold">
           LongView Empreendimentos • Hauzi Tecnologia
         </p>
       </footer>

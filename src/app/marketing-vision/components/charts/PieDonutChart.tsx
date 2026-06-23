@@ -93,7 +93,7 @@ export default function PieDonutChart({
     const pct = total > 0 ? ((itemVal / total) * 100).toFixed(1) : '0.0'
     return (
       <span className="text-zinc-400 pl-1">
-        {value}: <span className="font-semibold text-zinc-200">{itemVal.toLocaleString('pt-BR')}</span> <span className="text-zinc-500 text-[10px]">({pct}%)</span>
+        {value}: <span className="font-semibold text-zinc-200">{itemVal.toLocaleString('pt-BR')}</span> <span className="text-zinc-500 text-[11px]">({pct}%)</span>
       </span>
     )
   }

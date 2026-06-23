@@ -133,14 +133,14 @@ export default function LeadsView() {
                   <span className="text-3xl font-black text-white">
                     {metaValidation?.totalMetaLeads ?? 0}
                   </span>
-                  <span className="text-[10px] text-zinc-500">Leads encontrados nos formulários ativos do Facebook</span>
+                  <span className="text-[11px] text-zinc-500">Leads encontrados nos formulários ativos do Facebook</span>
                 </div>
                 <div className="flex flex-col gap-1 p-4.5 rounded-xl bg-white/5 border border-white/10">
                   <span className="text-xs font-medium text-zinc-400">Leads Órfãos (Inconsistentes)</span>
                   <span className={`text-3xl font-black ${(metaValidation?.orphanedLeads?.length ?? 0) > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
                     {metaValidation?.orphanedLeads?.length ?? 0}
                   </span>
-                  <span className="text-[10px] text-zinc-500">Leads que estão no Meta mas NÃO estão no CV CRM</span>
+                  <span className="text-[11px] text-zinc-500">Leads que estão no Meta mas NÃO estão no CV CRM</span>
                 </div>
                 <div className="flex flex-col gap-1 p-4.5 rounded-xl bg-white/5 border border-white/10">
                   <span className="text-xs font-medium text-zinc-400">Taxa de Sincronização</span>
@@ -149,7 +149,7 @@ export default function LeadsView() {
                       ? `${Math.round(((metaValidation.totalMetaLeads - metaValidation.orphanedLeads.length) / metaValidation.totalMetaLeads) * 100)}%`
                       : '100%'}
                   </span>
-                  <span className="text-[10px] text-zinc-500">Porcentagem de leads integrados com sucesso</span>
+                  <span className="text-[11px] text-zinc-500">Porcentagem de leads integrados com sucesso</span>
                 </div>
               </div>
 
@@ -185,7 +185,7 @@ export default function LeadsView() {
                               {new Date(lead.createdTime).toLocaleString('pt-BR')}
                             </td>
                             <td className="py-2.5 px-3 text-right">
-                              <span className="bg-red-500/10 border border-red-500/20 text-red-400 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider">
+                              <span className="bg-red-500/10 border border-red-500/20 text-red-400 px-2 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wider">
                                 Não Integrado
                               </span>
                             </td>

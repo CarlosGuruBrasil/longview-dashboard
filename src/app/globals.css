@@ -18,9 +18,20 @@ body {
   background-color: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), Inter, system-ui, sans-serif;
-  /* prevent pull-to-refresh and bounce scroll on mobile */
   overscroll-behavior: none;
+  /* HIG: impede iOS Safari de redimensionar texto automaticamente */
+  -webkit-text-size-adjust: none;
+  text-size-adjust: none;
 }
+
+/* HIG: scroll com momentum nativo do iOS em containers */
+.scroll-momentum {
+  -webkit-overflow-scrolling: touch;
+  overflow-y: auto;
+}
+
+/* HIG: mínimo 11px (Caption 2) para qualquer texto legível */
+/* Exceção aceita pela HIG: badges/labels decorativos em contexto compacto */
 
 /* Full-screen app shell: use dynamic viewport height so content fills
    the screen without being clipped by the browser chrome */
