@@ -39,7 +39,9 @@ body {
   height: 100dvh;
   overflow: hidden;
   display: flex;
-  flex-direction: column;
+  /* flex-direction: row (default) — sidebar esquerda | conteúdo direita no desktop.
+     No mobile o sidebar é md:hidden, então o conteúdo ocupa 100% da largura.
+     A div interna de conteúdo usa flex-col para empilhar header + scroll + bottom-nav. */
 }
 
 /* Safe area helpers */

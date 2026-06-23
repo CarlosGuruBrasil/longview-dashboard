@@ -113,7 +113,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="app-shell bg-[#09090b]">
+    <div className="flex bg-[#09090b] overflow-hidden" style={{ height: '100dvh' }}>
       {/* ── Desktop sidebar (unchanged) ─────────────────────── */}
       <div className="hidden md:block">
         <Sidebar />
