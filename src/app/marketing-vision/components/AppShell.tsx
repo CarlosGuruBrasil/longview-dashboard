@@ -176,12 +176,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* Scrollable content */}
         <main className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain">
-          {/* Mobile DateFilter — inside content, compact */}
-          <div className="md:hidden px-4 pt-3 pb-1">
+          {/* Mobile DateFilter — sticky abaixo do header, compacto */}
+          <div className="md:hidden sticky top-0 z-20 px-4 pt-2.5 pb-2 bg-[#09090b]/96 backdrop-blur-md border-b border-white/[0.05]">
             <DateFilter />
           </div>
           <div
-            className="px-4 py-3 md:px-6 md:py-4 min-w-0"
+            className="px-4 pt-3 pb-3 md:px-6 md:py-4 min-w-0"
             style={{ paddingBottom: 'calc(max(env(safe-area-inset-bottom), 16px) + 76px)' }}
           >
             {children}

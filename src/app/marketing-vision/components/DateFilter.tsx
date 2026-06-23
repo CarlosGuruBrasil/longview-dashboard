@@ -34,72 +34,97 @@ export default function DateFilter() {
     setExpanded(false);
   }
 
-  // Adidas-style pill base
-  const chip = 'no-tap shrink-0 h-9 px-4 rounded-full text-[13px] font-medium transition-all';
-  const dateInput = `${chip} border border-white/12 bg-white/[0.03] text-zinc-100 [color-scheme:dark] focus:outline-none focus:border-white/30 w-full sm:w-auto`;
+  const dateInput = [
+    'h-9 flex-1 min-w-0 rounded-full px-3 text-[13px] font-medium',
+    'border border-white/12 bg-white/[0.04] text-zinc-200',
+    '[color-scheme:dark] focus:outline-none focus:border-white/30 transition-all',
+  ].join(' ');
+
+  const pill = 'no-tap h-9 px-4 rounded-full text-[13px] font-medium transition-all shrink-0';
 
   return (
     <div className="flex flex-col gap-2 w-full">
-      {/* Linha principal: contagem + toggle mobile + refresh */}
+
+      {/* Linha 1: contagem + botão filtrar mobile + refresh */}
       <div className="flex items-center gap-2 w-full">
-        {/* Contagem */}
-        <div className="flex flex-col flex-1 min-w-0">
+        <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
           <span className="text-[13px] font-semibold text-zinc-100 truncate">
-            {filteredLeads.length.toLocaleString('pt-BR')} <span className="font-normal text-zinc-400">leads</span>
+            <span className="font-bold">{filteredLeads.length.toLocaleString('pt-BR')}</span>
+            {' '}<span className="font-normal text-zinc-400">leads</span>
             <span className="text-zinc-600 mx-1.5">·</span>
-            <span className="text-zinc-400 font-normal">de {crmTotal.toLocaleString('pt-BR')}</span>
+            <span className="text-zinc-400">de {crmTotal.toLocaleString('pt-BR')}</span>
           </span>
           {updatedAt && (
-            <span className="text-[11px] text-zinc-500 hidden sm:block">{formatUpdatedAt(updatedAt)}</span>
+            <span className="text-[11px] text-zinc-600 hidden sm:block truncate">
+              {formatUpdatedAt(updatedAt)}
+            </span>
           )}
         </div>
 
-        {/* Mobile: pill toggle */}
+        {/* Mobile: toggle Filtrar */}
         <button
           onClick={() => setExpanded(v => !v)}
-          className={`sm:hidden no-tap flex items-center gap-1.5 h-9 px-4 rounded-full text-[13px] font-medium shrink-0 transition-all ${
+          className={`sm:hidden ${pill} flex items-center gap-1.5 ${
             hasFilter
-              ? 'bg-sky-500/20 text-sky-400 border border-sky-500/25'
-              : 'border border-white/12 bg-white/[0.03] text-zinc-400'
+              ? 'bg-sky-500/15 text-sky-400 border border-sky-500/25'
+              : 'border border-white/12 bg-white/[0.04] text-zinc-400'
           }`}
         >
           <SlidersHorizontal size={14} />
-          {hasFilter ? 'Filtrado' : 'Filtrar'}
+          {hasFilter ? 'Ativo' : 'Filtrar'}
         </button>
 
         {/* Refresh */}
         <button
           onClick={() => refresh(true)}
           disabled={loading}
-          className={`no-tap flex items-center gap-1.5 h-9 px-3 sm:px-4 rounded-full text-[13px] font-medium shrink-0 border border-white/12 bg-white/[0.03] text-zinc-400 hover:text-zinc-100 transition-all disabled:opacity-40`}
+          className={`${pill} flex items-center gap-1.5 border border-white/12 bg-white/[0.04] text-zinc-400 hover:text-zinc-100 disabled:opacity-40 px-3`}
+          title="Atualizar dados"
         >
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           <span className="hidden sm:inline">Atualizar</span>
         </button>
       </div>
 
-      {/* Filtros de data: expansível no mobile, sempre visível no desktop */}
-      <div className={`${expanded ? 'flex' : 'hidden'} sm:flex items-center gap-2 flex-wrap`}>
-        <label className="flex items-center gap-2 text-[13px] text-zinc-400 flex-1 sm:flex-none">
-          De
-          <input type="date" value={localStart} onChange={e => setLocalStart(e.target.value)} className={dateInput} />
+      {/* Linha 2: inputs de data — DE + ATÉ em linha única */}
+      <div className={`${expanded ? 'flex' : 'hidden'} sm:flex items-center gap-2`}>
+        {/* DE */}
+        <label className="flex items-center gap-1.5 flex-1 min-w-0">
+          <span className="text-[12px] text-zinc-500 shrink-0 w-5 text-right">De</span>
+          <input
+            type="date"
+            value={localStart}
+            onChange={e => setLocalStart(e.target.value)}
+            className={dateInput}
+          />
         </label>
 
-        <label className="flex items-center gap-2 text-[13px] text-zinc-400 flex-1 sm:flex-none">
-          Até
-          <input type="date" value={localEnd} onChange={e => setLocalEnd(e.target.value)} className={dateInput} />
+        {/* ATÉ */}
+        <label className="flex items-center gap-1.5 flex-1 min-w-0">
+          <span className="text-[12px] text-zinc-500 shrink-0 w-6 text-right">Até</span>
+          <input
+            type="date"
+            value={localEnd}
+            onChange={e => setLocalEnd(e.target.value)}
+            className={dateInput}
+          />
         </label>
 
+        {/* Aplicar */}
         <button
           onClick={handleFilter}
-          className={`no-tap ${chip} bg-sky-500/15 text-sky-400 border border-sky-500/25 hover:bg-sky-500/25`}
+          className={`${pill} bg-sky-500/15 text-sky-400 border border-sky-500/25 hover:bg-sky-500/25 px-3`}
         >
-          Aplicar
+          OK
         </button>
 
+        {/* Limpar */}
         {hasFilter && (
-          <button onClick={handleClear} className={`no-tap ${chip} border border-white/12 text-zinc-500 hover:text-zinc-200`}>
-            Limpar
+          <button
+            onClick={handleClear}
+            className={`${pill} border border-white/12 text-zinc-500 hover:text-zinc-200 px-3`}
+          >
+            ✕
           </button>
         )}
       </div>

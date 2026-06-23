@@ -47,6 +47,13 @@ body {
   touch-action: manipulation;
 }
 
+/* Oculta scrollbar mantendo scroll funcional (horizontal chips/filtros) */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-none::-webkit-scrollbar { display: none; }
+
 /* Drawer slide animation */
 .drawer-enter  { transform: translateX(-100%); }
 .drawer-active { transform: translateX(0);    transition: transform 240ms cubic-bezier(0.32,0,0.67,0); }

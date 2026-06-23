@@ -129,7 +129,7 @@ export default function LeadsTable({ leads }: LeadsTableProps) {
       </div>
 
       {/* Linha 2: selects horizontais scrolláveis — estilo Adidas */}
-      <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-none">
+      <div className="flex gap-2 overflow-x-auto pb-0.5 scrollbar-none" style={{ WebkitOverflowScrolling: 'touch' }}>
         {[
           { value: filterEtapa,          setter: setFilterEtapa,          opts: options.etapas,          label: 'Etapa' },
           { value: filterOrigem,         setter: setFilterOrigem,         opts: options.origens,         label: 'Origem' },

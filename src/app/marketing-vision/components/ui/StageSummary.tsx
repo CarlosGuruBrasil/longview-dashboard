@@ -46,27 +46,23 @@ export default function StageSummary({ leads }: StageSummaryProps) {
   }, [leads]);
 
   return (
-    <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10">
+    <div className="flex gap-2 overflow-x-auto pb-0.5 scrollbar-none" style={{ WebkitOverflowScrolling: 'touch' }}>
       {/* Total card */}
-      <div className="flex-shrink-0 bg-white/5 backdrop-blur border border-white/10 rounded-xl px-4 py-3 min-w-[100px] border-b-2 border-b-white/30">
-        <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
-          {leads.length}
-        </p>
-        <p className="text-xs mt-1 whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>
-          Total
-        </p>
+      <div className="shrink-0 bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 min-w-[72px]"
+           style={{ borderBottom: '2px solid rgba(255,255,255,0.25)' }}>
+        <p className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>{leads.length}</p>
+        <p className="text-[11px] mt-0.5 whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>Total</p>
       </div>
 
       {groups.map((group) => (
         <div
           key={group.name}
-          className="flex-shrink-0 bg-white/5 backdrop-blur border border-white/10 rounded-xl px-4 py-3 min-w-[120px]"
+          className="shrink-0 bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 min-w-[88px]"
           style={{ borderBottom: `2px solid ${group.color}` }}
         >
-          <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
-            {group.count}
-          </p>
-          <p className="text-xs mt-1 whitespace-nowrap leading-tight" style={{ color: 'var(--text-secondary)' }}>
+          <p className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>{group.count}</p>
+          <p className="text-[11px] mt-0.5 whitespace-nowrap leading-tight max-w-[110px] truncate"
+             style={{ color: 'var(--text-secondary)' }}>
             {group.name}
           </p>
         </div>

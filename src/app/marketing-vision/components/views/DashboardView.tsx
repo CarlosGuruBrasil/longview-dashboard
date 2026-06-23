@@ -87,9 +87,9 @@ export default function DashboardView() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* KPI Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="flex flex-col gap-4 sm:gap-6">
+      {/* KPI Row — gap menor no mobile para cards não ficarem espaçados demais */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
         <KpiCard icon={Users} label="Total de Leads" value={filteredLeads.length}
           subtitle={`de ${crmTotal.toLocaleString('pt-BR')} na base`} color="#0ea5e9" />
         <KpiCard icon={DollarSign} label="Total de Vendas" value={totalVendasCount} color="#10b981" />
