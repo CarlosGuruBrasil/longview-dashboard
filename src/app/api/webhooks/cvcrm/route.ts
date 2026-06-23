@@ -50,6 +50,26 @@ export async function POST(request: NextRequest) {
     `;
 
     console.log(`[webhook/cvcrm] lead ${lead.id} upserted`);
+
+    // ── Notificação FCM: nova venda realizada ────────────────────────────
+    const statusNome = (lead.situacao?.nome ?? lead.status ?? '').toLowerCase();
+    const isVenda = statusNome === 'venda realizada' || statusNome.includes('negócio ganho') || statusNome.includes('negocio ganho');
+    if (isVenda) {
+      try {
+        const baseUrl = process.env.NEXTAUTH_URL ?? 'https://app.guru.dev.br';
+        fetch(`${baseUrl}/api/notifications/send`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.CRON_SECRET}` },
+          body: JSON.stringify({
+            title: '🏆 Nova Venda Realizada!',
+            body: `${lead.nome ?? 'Cliente'} • ${lead.empreendimento ?? ''}`.trim(),
+            roles: ['Desenvolvedor', 'Diretoria', 'Gestor'],
+            data: { url: '/marketing-vision', type: 'venda' },
+          }),
+        }).catch(() => {});
+      } catch { /* não bloqueia o webhook */ }
+    }
+
     return NextResponse.json({ ok: true });
 
   } catch (e: any) {

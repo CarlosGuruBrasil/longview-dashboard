@@ -11,6 +11,7 @@ import { useData } from '../context/DataContext';
 import type { ActiveView } from '../types';
 import Sidebar from './Sidebar';
 import DateFilter from './DateFilter';
+import NotificationBanner from '@/components/NotificationBanner';
 
 // ── Pull-to-refresh hook (HIG: padrão obrigatório para conteúdo atualizável) ─
 function usePullToRefresh(onRefresh: () => Promise<void>) {
@@ -256,6 +257,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </main>
       </div>
+
+      {/* ── Banner de permissão de notificação (FCM) ──────────── */}
+      <NotificationBanner />
 
       {/* ── Mobile bottom tab bar ─────────────────────────────── */}
       <nav

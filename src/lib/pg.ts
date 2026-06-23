@@ -85,5 +85,20 @@ export async function ensureSchema(): Promise<void> {
   await sql`CREATE INDEX IF NOT EXISTS leads_status ON leads (status)`;
   await sql`CREATE INDEX IF NOT EXISTS leads_empreendimento ON leads (empreendimento)`;
 
+  // FCM push notification tokens — um registro por usuário/dispositivo
+  await sql`
+    CREATE TABLE IF NOT EXISTS fcm_tokens (
+      id         BIGSERIAL PRIMARY KEY,
+      user_id    TEXT NOT NULL,
+      user_email TEXT NOT NULL,
+      user_role  TEXT NOT NULL DEFAULT '',
+      token      TEXT NOT NULL UNIQUE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS fcm_tokens_user_id ON fcm_tokens (user_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS fcm_tokens_user_role ON fcm_tokens (user_role)`;
+
   schemaReady = true;
 }
