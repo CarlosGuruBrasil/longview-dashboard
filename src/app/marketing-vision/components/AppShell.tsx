@@ -181,7 +181,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* ── Main area ────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-x-hidden md:pl-[220px]">
+      {/* md:pl-[220px] removido: sidebar é static no flex, já ocupa os 220px */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-x-hidden">
 
         {/* Mobile top bar */}
         <header
