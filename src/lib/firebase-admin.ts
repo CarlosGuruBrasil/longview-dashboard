@@ -1,6 +1,7 @@
-import * as admin from 'firebase-admin';
+// firebase-admin está em serverExternalPackages no next.config.ts
+// — não é bundado pelo Turbopack, usa require() nativo do Node.js
 import { App, getApps, initializeApp, cert } from 'firebase-admin/app';
-import { getMessaging as getAdminMessaging } from 'firebase-admin/messaging';
+import { getMessaging as _getMessaging, Message, MulticastMessage } from 'firebase-admin/messaging';
 
 let _app: App | undefined;
 
@@ -27,26 +28,31 @@ function getApp(): App {
 }
 
 export function getMessaging() {
-  return getAdminMessaging(getApp());
+  return _getMessaging(getApp());
 }
 
-/** Envia notificação FCM para um token específico */
-export async function sendFCM(token: string, title: string, body: string, data?: Record<string, string>) {
+export async function sendFCM(
+  token: string,
+  title: string,
+  body: string,
+  data?: Record<string, string>
+): Promise<{ ok: boolean; invalid?: boolean }> {
+  const msg: Message = {
+    token,
+    notification: { title, body },
+    data,
+    webpush: { notification: { icon: '/icon-192.png', badge: '/icon-192.png' } },
+  };
   try {
-    await getMessaging().send({
-      token,
-      notification: { title, body },
-      data,
-      webpush: { notification: { icon: '/icon-192.png', badge: '/icon-192.png' } },
-    });
+    await getMessaging().send(msg);
     return { ok: true };
-  } catch (e: any) {
-    if (e?.code === 'messaging/registration-token-not-registered') return { ok: false, invalid: true };
+  } catch (e: unknown) {
+    const code = (e as { code?: string })?.code;
+    if (code === 'messaging/registration-token-not-registered') return { ok: false, invalid: true };
     throw e;
   }
 }
 
-/** Envia para múltiplos tokens, remove os inválidos */
 export async function sendFCMMulticast(
   tokens: string[],
   title: string,
@@ -54,16 +60,20 @@ export async function sendFCMMulticast(
   data?: Record<string, string>
 ) {
   if (!tokens.length) return { successCount: 0, failureCount: 0, invalidTokens: [] };
-  const res = await getMessaging().sendEachForMulticast({
+
+  const msg: MulticastMessage = {
     tokens,
     notification: { title, body },
     data,
     webpush: { notification: { icon: '/icon-192.png', badge: '/icon-192.png' } },
-  });
+  };
+
+  const res = await getMessaging().sendEachForMulticast(msg);
   const invalid = res.responses
     .map((r, i) =>
       (!r.success && r.error?.code === 'messaging/registration-token-not-registered') ? tokens[i] : null
     )
     .filter((t): t is string => t !== null);
+
   return { successCount: res.successCount, failureCount: res.failureCount, invalidTokens: invalid };
 }
