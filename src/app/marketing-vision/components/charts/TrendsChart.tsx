@@ -205,63 +205,65 @@ export default function TrendsChart() {
     { key: 'cpl', label: 'CPL' },
   ]
 
-  const action = (
-    <div className="flex items-center gap-3">
-      <div className="flex gap-1">
-        {metricButtons.map(m => (
-          <button
-            key={m.key}
-            onClick={() => setMetric(m.key)}
-            className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-              metric === m.key
-                ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30'
-                : 'text-zinc-400 hover:text-zinc-200'
-            }`}
-          >
-            {m.label}
-          </button>
-        ))}
-      </div>
-      <div className="h-4 w-px bg-white/10" />
-      <div className="flex gap-1">
-        {periodButtons.map(p => (
-          <button
-            key={p.key}
-            onClick={() => setPeriod(p.key)}
-            className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-              period === p.key
-                ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
-                : 'text-zinc-400 hover:text-zinc-200'
-            }`}
-          >
-            {p.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  )
-
   return (
-    <GlassCard title={`Tendência — ${metricLabel[metric]}`} action={action}>
-      <div className="grid grid-cols-3 gap-3 mb-5">
+    <GlassCard title="Tendência">
+      {/* Controls — ficam no corpo do card, nunca overflow */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        {/* Grupo métrica */}
+        <div className="flex gap-1 bg-white/5 rounded-lg p-0.5">
+          {metricButtons.map(m => (
+            <button
+              key={m.key}
+              onClick={() => setMetric(m.key)}
+              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all no-tap ${
+                metric === m.key
+                  ? 'bg-sky-500/20 text-sky-400'
+                  : 'text-zinc-500 hover:text-zinc-200'
+              }`}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+        {/* Grupo período */}
+        <div className="flex gap-1 bg-white/5 rounded-lg p-0.5">
+          {periodButtons.map(p => (
+            <button
+              key={p.key}
+              onClick={() => setPeriod(p.key)}
+              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all no-tap ${
+                period === p.key
+                  ? 'bg-purple-500/20 text-purple-400'
+                  : 'text-zinc-500 hover:text-zinc-200'
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+        <span className="text-xs text-zinc-600 ml-auto">{metricLabel[metric]}</span>
+      </div>
+
+      {/* KPI mini-cards — 2 cols mobile, 3 cols sm+ */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
         <div className="bg-white/5 rounded-xl p-3 border border-white/5">
-          <p className="text-xs text-zinc-500 mb-1">Últimos 4 períodos</p>
-          <p className="text-xl font-semibold text-zinc-100">{formatVal(periodTotal)}</p>
-          <p className={`text-xs mt-1 ${pctChange >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-            {pctChange >= 0 ? '↑' : '↓'} {Math.abs(pctChange)}% vs ano anterior
+          <p className="text-[11px] text-zinc-500 mb-1">Últ. 4 períodos</p>
+          <p className="text-lg font-semibold text-zinc-100">{formatVal(periodTotal)}</p>
+          <p className={`text-[11px] mt-1 ${pctChange >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+            {pctChange >= 0 ? '↑' : '↓'} {Math.abs(pctChange)}% vs ant.
           </p>
         </div>
         <div className="bg-white/5 rounded-xl p-3 border border-white/5">
-          <p className="text-xs text-zinc-500 mb-1">Média móvel atual</p>
-          <p className="text-xl font-semibold text-zinc-100">
+          <p className="text-[11px] text-zinc-500 mb-1">Média móvel</p>
+          <p className="text-lg font-semibold text-zinc-100">
             {formatVal(Math.round(last4.reduce((s, d) => s + d.thisYear, 0) / 4))}
           </p>
-          <p className="text-xs text-zinc-500 mt-1">média dos últimos 4 períodos</p>
+          <p className="text-[11px] text-zinc-500 mt-1">últimos 4 per.</p>
         </div>
-        <div className="bg-white/5 rounded-xl p-3 border border-white/5">
-          <p className="text-xs text-zinc-500 mb-1">Melhor período</p>
-          <p className="text-xl font-semibold text-zinc-100">{activeData[bestIdx]?.label ?? '-'}</p>
-          <p className="text-xs text-zinc-500 mt-1">{formatVal(activeData[bestIdx]?.thisYear ?? 0)} registros</p>
+        <div className="bg-white/5 rounded-xl p-3 border border-white/5 col-span-2 sm:col-span-1">
+          <p className="text-[11px] text-zinc-500 mb-1">Melhor período</p>
+          <p className="text-lg font-semibold text-zinc-100">{activeData[bestIdx]?.label ?? '-'}</p>
+          <p className="text-[11px] text-zinc-500 mt-1">{formatVal(activeData[bestIdx]?.thisYear ?? 0)} registros</p>
         </div>
       </div>
 
@@ -328,23 +330,23 @@ export default function TrendsChart() {
         </LineChart>
       </ResponsiveContainer>
 
-      <div className="flex items-center gap-4 mt-3 pt-3 border-t border-white/5">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-3 pt-3 border-t border-white/5">
         <div className="flex items-center gap-1.5">
-          <div className="w-5 h-0.5 rounded" style={{ background: CHART_PALETTE[0] }} />
-          <span className="text-xs text-zinc-500">Este ano</span>
+          <div className="w-4 h-0.5 rounded" style={{ background: CHART_PALETTE[0] }} />
+          <span className="text-[11px] text-zinc-500">Este ano</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <div className="w-5 h-0 border-t-2 border-dashed border-zinc-600" />
-          <span className="text-xs text-zinc-500">Ano anterior</span>
+          <div className="w-4 h-0 border-t-2 border-dashed border-zinc-600" />
+          <span className="text-[11px] text-zinc-500">Ano anterior</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <div className="w-5 h-0.5 rounded" style={{ background: MA_COLOR }} />
-          <span className="text-xs text-zinc-500">Média móvel (4 períodos)</span>
+          <div className="w-4 h-0.5 rounded" style={{ background: MA_COLOR }} />
+          <span className="text-[11px] text-zinc-500">Média móvel</span>
         </div>
         {metric === 'cpl' && (
-          <div className="flex items-center gap-1.5 ml-auto">
-            <div className="w-5 h-0 border-t-2 border-dashed border-amber-500" />
-            <span className="text-xs text-amber-500">Meta CPL R${CPL_META}</span>
+          <div className="flex items-center gap-1.5">
+            <div className="w-4 h-0 border-t-2 border-dashed border-amber-500" />
+            <span className="text-[11px] text-amber-500">Meta R${CPL_META}</span>
           </div>
         )}
       </div>

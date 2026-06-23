@@ -121,15 +121,15 @@ export default function GrowthLineChart({ leads, daily = [], mode, onModeChange 
     v >= 1_000_000 ? `R$${(v / 1_000_000).toFixed(1)}M` : `R$${(v / 1_000).toFixed(0)}K`
 
   const action = (
-    <div className="flex gap-1">
+    <div className="flex gap-1 bg-white/5 rounded-lg p-0.5">
       {(['month', 'year'] as const).map(m => (
         <button
           key={m}
           onClick={() => onModeChange(m)}
-          className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+          className={`no-tap px-3 py-1 rounded-md text-xs font-medium transition-all shrink-0 ${
             mode === m
-              ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30'
-              : 'text-zinc-400 hover:text-zinc-200'
+              ? 'bg-sky-500/20 text-sky-400'
+              : 'text-zinc-500 hover:text-zinc-200'
           }`}
         >
           {m === 'month' ? 'Mês a Mês' : 'Ano a Ano'}
