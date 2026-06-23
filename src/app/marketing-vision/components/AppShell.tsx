@@ -1,16 +1,61 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import {
   LayoutDashboard, Users, TrendingUp, Building2, DollarSign,
   Megaphone, Send, UsersRound, Link as LinkIcon, X,
-  BarChart2, Target, ChevronRight,
+  BarChart2, Target, ChevronRight, RefreshCw,
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import type { ActiveView } from '../types';
 import Sidebar from './Sidebar';
 import DateFilter from './DateFilter';
+
+// ── Pull-to-refresh hook (HIG: padrão obrigatório para conteúdo atualizável) ─
+function usePullToRefresh(onRefresh: () => Promise<void>) {
+  const scrollRef = useRef<HTMLElement>(null);
+  const [pullY, setPullY] = useState(0);        // 0-80px
+  const [refreshing, setRefreshing] = useState(false);
+  const startY = useRef(0);
+  const THRESHOLD = 64;
+
+  const doRefresh = useCallback(async () => {
+    setRefreshing(true);
+    setPullY(0);
+    try { await onRefresh(); } finally { setRefreshing(false); }
+  }, [onRefresh]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    const onStart = (e: TouchEvent) => {
+      if (el.scrollTop > 2) return;
+      startY.current = e.touches[0].clientY;
+    };
+    const onMove = (e: TouchEvent) => {
+      if (el.scrollTop > 2) { setPullY(0); return; }
+      const dy = e.touches[0].clientY - startY.current;
+      if (dy > 0) setPullY(Math.min(dy * 0.45, THRESHOLD + 8));
+    };
+    const onEnd = () => {
+      if (pullY >= THRESHOLD) doRefresh();
+      else setPullY(0);
+    };
+
+    el.addEventListener('touchstart', onStart, { passive: true });
+    el.addEventListener('touchmove',  onMove,  { passive: true });
+    el.addEventListener('touchend',   onEnd);
+    return () => {
+      el.removeEventListener('touchstart', onStart);
+      el.removeEventListener('touchmove',  onMove);
+      el.removeEventListener('touchend',   onEnd);
+    };
+  }, [pullY, doRefresh]);
+
+  return { scrollRef, pullY, refreshing, THRESHOLD };
+}
 
 const VIEW_TITLES: Record<ActiveView, string> = {
   dashboard:       'Dashboard',
@@ -56,11 +101,16 @@ function useCurrentUser() {
 }
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
-  const { activeView, setActiveView } = useData();
+  const { activeView, setActiveView, refresh } = useData();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const user = useCurrentUser();
 
   const title = VIEW_TITLES[activeView] ?? 'Dashboard';
+
+  // HIG: pull-to-refresh para conteúdo atualizável
+  const { scrollRef, pullY, refreshing, THRESHOLD } = usePullToRefresh(
+    useCallback(() => refresh(true), [refresh])
+  );
 
   return (
     <div className="app-shell bg-[#09090b]">
@@ -175,7 +225,25 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Scrollable content */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain">
+        <main
+          ref={scrollRef as React.RefObject<HTMLElement>}
+          className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain"
+        >
+          {/* Pull-to-refresh indicator (HIG: aparece ao puxar, gira quando ativo) */}
+          <div
+            className="md:hidden flex items-center justify-center transition-all duration-150 overflow-hidden"
+            style={{
+              height: `${pullY}px`,
+              opacity: pullY > 16 ? Math.min(pullY / THRESHOLD, 1) : 0,
+            }}
+          >
+            <RefreshCw
+              size={20}
+              className={`text-zinc-400 transition-transform ${refreshing ? 'animate-spin' : ''}`}
+              style={{ transform: `rotate(${(pullY / THRESHOLD) * 360}deg)` }}
+            />
+          </div>
+
           {/* Mobile DateFilter — sticky abaixo do header, compacto */}
           <div className="md:hidden sticky top-0 z-20 px-4 pt-2.5 pb-2 bg-[#09090b]/96 backdrop-blur-md border-b border-white/[0.05]">
             <DateFilter />

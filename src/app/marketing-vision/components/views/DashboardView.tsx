@@ -78,10 +78,17 @@ export default function DashboardView() {
   }, [filteredLeads])
 
   if (loading && allLeads.length === 0) {
+    // HIG: loading state com spinner + contexto (>1s de espera)
     return (
-      <div className="flex flex-col items-center justify-center h-64 gap-3">
-        <div className="w-8 h-8 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" />
-        <p className="text-sm text-zinc-400">Carregando dados...</p>
+      <div className="flex flex-col items-center justify-center gap-4" style={{ minHeight: '60vh' }}>
+        <div className="relative w-12 h-12">
+          <div className="absolute inset-0 rounded-full border-2 border-white/10" />
+          <div className="absolute inset-0 rounded-full border-2 border-t-sky-500 border-r-transparent border-b-transparent border-l-transparent animate-spin" />
+        </div>
+        <div className="text-center">
+          <p className="text-[15px] font-medium text-zinc-300">Carregando dados</p>
+          <p className="text-[13px] text-zinc-500 mt-1">Buscando leads e vendas do CRM…</p>
+        </div>
       </div>
     )
   }

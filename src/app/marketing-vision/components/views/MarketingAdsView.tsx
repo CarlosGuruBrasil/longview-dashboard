@@ -111,15 +111,19 @@ export default function MarketingAdsView() {
   }
 
   if (!metaData || !global) {
+    // HIG: empty state com ícone + título + descrição + ação clara
     return (
-      <div className="flex flex-col items-center justify-center py-24 gap-4">
-        <BarChart2 size={48} className="opacity-20" style={{ color: 'var(--text-secondary)' }} />
-        <p className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
-          Meta Ads não configurado
-        </p>
-        <p className="text-sm text-center max-w-xs" style={{ color: 'var(--text-secondary)' }}>
-          Configure as credenciais do Meta Ads nas variáveis de ambiente para visualizar os dados de campanha.
-        </p>
+      <div className="flex flex-col items-center justify-center gap-5 px-6 text-center" style={{ minHeight: '60vh' }}>
+        <div className="w-16 h-16 rounded-2xl flex items-center justify-center"
+             style={{ background: 'rgba(249,115,22,0.1)', border: '1px solid rgba(249,115,22,0.15)' }}>
+          <BarChart2 size={28} style={{ color: '#f97316' }} />
+        </div>
+        <div>
+          <p className="text-[17px] font-semibold text-zinc-100">Meta Ads não conectado</p>
+          <p className="text-[15px] text-zinc-400 mt-2 max-w-[260px] leading-snug">
+            Configure META_TOKEN e META_ACT_ID nas variáveis de ambiente do servidor.
+          </p>
+        </div>
       </div>
     )
   }
