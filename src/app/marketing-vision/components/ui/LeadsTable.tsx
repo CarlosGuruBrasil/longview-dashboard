@@ -98,126 +98,70 @@ export default function LeadsTable({ leads }: LeadsTableProps) {
     filterNome || filterDate || filterOrigem || filterCorretor || filterGestor ||
     filterImobiliaria || filterEmpreendimento || filterEtapa || filterTag || filterBolsao;
 
-  const selectCls =
-    'bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-white/30 min-w-[110px]';
-  const inputCls =
-    'bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-white/30';
+  // ── Adidas-style chip classes ────────────────────────────────────────────
+  const chip = 'no-tap shrink-0 h-9 px-4 rounded-full text-[13px] font-medium transition-all [color-scheme:dark]';
+  const chipIdle    = `${chip} border border-white/12 bg-white/[0.03] text-zinc-400 focus:outline-none focus:border-white/30`;
+  const chipActive  = `${chip} bg-white/90 text-zinc-900 border-transparent`;
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Filter bar */}
-      <div className="flex flex-wrap gap-2 items-end">
+      {/* Linha 1: busca textual */}
+      <div className="flex gap-2">
         <input
           type="text"
-          placeholder="Nome..."
+          placeholder="Buscar por nome..."
           value={filterNome}
           onChange={(e) => setFilterNome(e.target.value)}
-          className={`${inputCls} min-w-[140px]`}
-          style={{ color: 'var(--text-primary)' }}
+          className={`${chipIdle} flex-1 min-w-0 placeholder:text-zinc-600`}
         />
         <input
           type="text"
-          placeholder="Data (dd/mm)..."
+          placeholder="dd/mm..."
           value={filterDate}
           onChange={(e) => setFilterDate(e.target.value)}
-          className={`${inputCls} min-w-[130px]`}
-          style={{ color: 'var(--text-primary)' }}
+          className={`${chipIdle} w-24`}
         />
+        {hasActiveFilters && (
+          <button onClick={clearFilters} className={`${chipActive} !bg-zinc-700/60 !text-zinc-300 !border-white/10`}>
+            ✕
+          </button>
+        )}
+      </div>
 
-        <select
-          value={filterOrigem}
-          onChange={(e) => setFilterOrigem(e.target.value)}
-          className={selectCls}
-          style={{ color: 'var(--text-primary)' }}
-        >
-          <option value="">Origem</option>
-          {options.origens.map((o) => <option key={o} value={o}>{o}</option>)}
-        </select>
-
-        <select
-          value={filterEtapa}
-          onChange={(e) => setFilterEtapa(e.target.value)}
-          className={selectCls}
-          style={{ color: 'var(--text-primary)' }}
-        >
-          <option value="">Etapa</option>
-          {options.etapas.map((o) => <option key={o} value={o}>{o}</option>)}
-        </select>
-
-        <select
-          value={filterCorretor}
-          onChange={(e) => setFilterCorretor(e.target.value)}
-          className={selectCls}
-          style={{ color: 'var(--text-primary)' }}
-        >
-          <option value="">Corretor</option>
-          {options.corretores.map((o) => <option key={o} value={o}>{o}</option>)}
-        </select>
-
-        <select
-          value={filterGestor}
-          onChange={(e) => setFilterGestor(e.target.value)}
-          className={selectCls}
-          style={{ color: 'var(--text-primary)' }}
-        >
-          <option value="">Gestor</option>
-          {options.gestores.map((o) => <option key={o} value={o}>{o}</option>)}
-        </select>
-
-        <select
-          value={filterImobiliaria}
-          onChange={(e) => setFilterImobiliaria(e.target.value)}
-          className={selectCls}
-          style={{ color: 'var(--text-primary)' }}
-        >
-          <option value="">Imobiliária</option>
-          {options.imobiliarias.map((o) => <option key={o} value={o}>{o}</option>)}
-        </select>
-
-        <select
-          value={filterEmpreendimento}
-          onChange={(e) => setFilterEmpreendimento(e.target.value)}
-          className={selectCls}
-          style={{ color: 'var(--text-primary)' }}
-        >
-          <option value="">Empreendimento</option>
-          {options.empreendimentos.map((o) => <option key={o} value={o}>{o}</option>)}
-        </select>
-
-        <select
-          value={filterTag}
-          onChange={(e) => setFilterTag(e.target.value)}
-          className={selectCls}
-          style={{ color: 'var(--text-primary)' }}
-        >
-          <option value="">Tag</option>
-          {options.tags.map((o) => <option key={o} value={o}>{o}</option>)}
-        </select>
-
+      {/* Linha 2: selects horizontais scrolláveis — estilo Adidas */}
+      <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-none">
+        {[
+          { value: filterEtapa,          setter: setFilterEtapa,          opts: options.etapas,          label: 'Etapa' },
+          { value: filterOrigem,         setter: setFilterOrigem,         opts: options.origens,         label: 'Origem' },
+          { value: filterCorretor,       setter: setFilterCorretor,       opts: options.corretores,      label: 'Corretor' },
+          { value: filterEmpreendimento, setter: setFilterEmpreendimento, opts: options.empreendimentos, label: 'Empreendimento' },
+          { value: filterGestor,         setter: setFilterGestor,         opts: options.gestores,        label: 'Gestor' },
+          { value: filterImobiliaria,    setter: setFilterImobiliaria,    opts: options.imobiliarias,    label: 'Imobiliária' },
+          { value: filterTag,            setter: setFilterTag,            opts: options.tags,            label: 'Tag' },
+        ].map(({ value, setter, opts, label }) => (
+          <select
+            key={label}
+            value={value}
+            onChange={(e) => setter(e.target.value)}
+            className={value ? chipActive : chipIdle}
+          >
+            <option value="">{label}</option>
+            {opts.map((o) => <option key={o} value={o}>{o}</option>)}
+          </select>
+        ))}
         <select
           value={filterBolsao}
           onChange={(e) => setFilterBolsao(e.target.value)}
-          className={selectCls}
-          style={{ color: 'var(--text-primary)' }}
+          className={filterBolsao ? chipActive : chipIdle}
         >
           <option value="">Bolsão</option>
           <option value="sim">Sim</option>
           <option value="nao">Não</option>
         </select>
-
-        {hasActiveFilters && (
-          <button
-            onClick={clearFilters}
-            className="px-3 py-1.5 text-xs rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
-            style={{ color: 'var(--text-secondary)' }}
-          >
-            Limpar filtros
-          </button>
-        )}
       </div>
 
       {/* Count */}
-      <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+      <p className="text-[13px]" style={{ color: 'var(--text-secondary)' }}>
         {filtered.length} leads
         {filtered.length > MAX_ROWS && ` (mostrando ${MAX_ROWS})`}
       </p>

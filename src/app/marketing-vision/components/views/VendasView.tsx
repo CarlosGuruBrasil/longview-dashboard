@@ -166,53 +166,51 @@ function SalesTable({ vendas }: SalesTableProps) {
       .slice(0, 300)
   }, [vendas, search, corretor, imobiliaria, empreendimento])
 
-  const selectClass =
-    'bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-zinc-300 outline-none focus:border-sky-500/50 transition-colors'
+  const chip     = 'no-tap shrink-0 h-9 px-4 rounded-full text-[13px] font-medium transition-all outline-none [color-scheme:dark]'
+  const chipIdle = `${chip} border border-white/12 bg-white/[0.03] text-zinc-400 focus:border-white/30`
+  const chipActv = `${chip} bg-white/90 text-zinc-900 border-transparent`
+
+  const hasFilters = !!(search || corretor || imobiliaria || empreendimento)
 
   const cols = ['Cliente', 'Cad. Reserva', 'Data Venda', 'Tempo p/ Compra', 'Empreendimento', 'Bloco/Unidade', 'Corretor', 'Imobiliária', 'Valor Contrato', 'Tipologia']
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Filters */}
-      <div className="flex flex-wrap gap-2">
+      {/* Filtros — estilo Adidas */}
+      <div className="flex gap-2">
         <input
           type="text"
           placeholder="Buscar cliente..."
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-zinc-300 placeholder-zinc-600 outline-none focus:border-sky-500/50 transition-colors min-w-[140px]"
+          className={`${chipIdle} flex-1 min-w-0 placeholder:text-zinc-600`}
         />
+        {hasFilters && (
+          <button
+            onClick={() => { setSearch(''); setCorretor(''); setImobiliaria(''); setEmpreendimento(''); }}
+            className={`${chipActv} !bg-zinc-700/60 !text-zinc-300 !border-white/10`}
+          >✕</button>
+        )}
+      </div>
+
+      {/* Selects horizontais scrolláveis */}
+      <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-none">
         {([
-          ['Corretor', corretores, corretor, setCorretor],
-          ['Imobiliária', imobiliarias, imobiliaria, setImobiliaria],
-          ['Empreendimento', empreendimentos, empreendimento, setEmpreendimento],
+          ['Corretor',       corretores,      corretor,      setCorretor],
+          ['Imobiliária',    imobiliarias,    imobiliaria,   setImobiliaria],
+          ['Empreendimento', empreendimentos, empreendimento,setEmpreendimento],
         ] as const).map(([label, opts, val, setter]) => (
           <select
             key={label}
             value={val}
             onChange={e => setter(e.target.value)}
-            className={selectClass}
+            className={val ? chipActv : chipIdle}
           >
             <option value="">{label}</option>
-            {opts.map(o => (
-              <option key={o} value={o}>{o}</option>
-            ))}
+            {opts.map(o => <option key={o} value={o}>{o}</option>)}
           </select>
         ))}
-        {(search || corretor || imobiliaria || empreendimento) && (
-          <button
-            onClick={() => {
-              setSearch('')
-              setCorretor('')
-              setImobiliaria('')
-              setEmpreendimento('')
-            }}
-            className="px-3 py-1.5 text-xs rounded-lg border border-white/10 text-zinc-400 hover:text-zinc-200 hover:border-white/20 transition-colors"
-          >
-            Limpar
-          </button>
-        )}
-        <span className="ml-auto text-xs self-center" style={{ color: '#71717a' }}>
+        <span className="ml-auto self-center text-[13px] text-zinc-500 shrink-0 pl-2">
           {filtered.length} resultados
         </span>
       </div>

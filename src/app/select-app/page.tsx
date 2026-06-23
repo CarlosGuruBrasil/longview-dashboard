@@ -38,7 +38,10 @@ export default async function SelectAppPage() {
   const isAdmin = isDeveloper || permissions?.isAdmin === true;
 
   return (
-    <main className="min-h-screen bg-[#09090b] flex flex-col justify-between p-6 relative overflow-hidden">
+    <main
+      className="min-h-screen bg-[#09090b] flex flex-col justify-between px-5 pb-8 relative overflow-hidden"
+      style={{ paddingTop: 'max(env(safe-area-inset-top), 16px)' }}
+    >
       {/* Background Glows */}
       <div className="absolute top-[-30%] left-[-20%] w-[800px] h-[800px] rounded-full bg-orange-500/5 blur-[160px] pointer-events-none" />
       <div className="absolute bottom-[-30%] right-[-20%] w-[800px] h-[800px] rounded-full bg-blue-500/5 blur-[160px] pointer-events-none" />
