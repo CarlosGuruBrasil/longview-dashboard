@@ -206,7 +206,7 @@ export default function OportunidadesView() {
         />
         <KpiCard
           icon={UserX}
-          label="Leads sem Corretor"
+          label="Sem Corretor"
           value={leadsNaoBatidos}
           color="#f59e0b"
         />

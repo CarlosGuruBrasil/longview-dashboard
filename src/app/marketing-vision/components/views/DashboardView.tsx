@@ -94,7 +94,7 @@ export default function DashboardView() {
           subtitle={`de ${crmTotal.toLocaleString('pt-BR')} na base`} color="#0ea5e9" />
         <KpiCard icon={DollarSign} label="Total de Vendas" value={totalVendasCount} color="#10b981" />
         <KpiCard icon={MapPin} label="Visitas Realizadas" value={visitCount} color="#f59e0b" />
-        <KpiCard icon={Banknote} label="Valor Total (Vendas)" value={formatCurrency(totalSalesValue)} color="#a855f7" />
+        <KpiCard icon={Banknote} label="VGV Total" value={formatCurrency(totalSalesValue)} color="#a855f7" />
       </div>
 
       {/* Gráfico de Vendas Realizadas — largura total */}
