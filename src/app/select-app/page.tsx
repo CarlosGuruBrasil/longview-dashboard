@@ -3,11 +3,12 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { redirect } from 'next/navigation';
 import jwt from 'jsonwebtoken';
-import { 
-  Building2, 
-  TrendingUp, 
-  Settings, 
-  Lock, 
+import {
+  Building2,
+  TrendingUp,
+  Users,
+  Settings,
+  Lock,
   ArrowRight,
   LogOut
 } from 'lucide-react';
@@ -33,9 +34,10 @@ export default async function SelectAppPage() {
 
   // Verificar permissões
   const isDeveloper = role === 'Desenvolvedor';
-  const hasProjectAccess = isDeveloper || permissions?.viewProjectVision === true;
+  const hasProjectAccess   = isDeveloper || permissions?.viewProjectVision === true;
   const hasMarketingAccess = isDeveloper || permissions?.viewMarketingDashboard === true;
-  const isAdmin = isDeveloper || permissions?.isAdmin === true;
+  const hasRHAccess        = isDeveloper || permissions?.isAdmin === true || ['Diretoria', 'Gestor'].includes(role);
+  const isAdmin            = isDeveloper || permissions?.isAdmin === true;
 
   return (
     <main
@@ -93,7 +95,7 @@ export default async function SelectAppPage() {
         </div>
 
         {/* Grid dos Cards de Aplicativos */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-[840px]">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full max-w-[1100px]">
           
           {/* Card: Project Vision */}
           <div className={`
@@ -173,6 +175,47 @@ export default async function SelectAppPage() {
               )}
               <span className="text-[11px] text-zinc-600 font-bold uppercase tracking-wider">
                 Vendas & Ads
+              </span>
+            </div>
+          </div>
+
+          {/* Card: RH Vision */}
+          <div className={`
+            bg-[#121214]/40 border border-[#1e1e22] rounded-2xl p-6.5 flex flex-col justify-between min-h-[260px] relative transition-all duration-300 group
+            ${hasRHAccess
+              ? 'hover:border-zinc-500 hover:shadow-[0_4px_24px_rgba(255,255,255,0.02)]'
+              : 'opacity-50'
+            }
+          `}>
+            <div>
+              <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mb-5">
+                <Users size={24} />
+              </div>
+              <h3 className="text-lg font-bold text-white group-hover:text-emerald-400 transition-colors">
+                RH Vision
+              </h3>
+              <p className="text-xs leading-relaxed text-zinc-400 mt-2">
+                Gestão de colaboradores, perfis RH completos, cadastro via convite com fluxo de aprovação, notificações push e controle de acesso ao sistema.
+              </p>
+            </div>
+
+            <div className="mt-6 flex items-center justify-between">
+              {hasRHAccess ? (
+                <Link
+                  href="/rh-vision"
+                  className="flex items-center gap-1.5 text-xs font-bold bg-white text-black hover:bg-zinc-200 px-4.5 py-2.5 rounded-xl transition-all duration-200 cursor-pointer"
+                >
+                  <span>Entrar no App</span>
+                  <ArrowRight size={14} />
+                </Link>
+              ) : (
+                <div className="flex items-center gap-1.5 text-xs text-zinc-500 font-semibold bg-white/5 border border-white/5 px-4.5 py-2.5 rounded-xl">
+                  <Lock size={14} />
+                  <span>Acesso Restrito</span>
+                </div>
+              )}
+              <span className="text-[11px] text-zinc-600 font-bold uppercase tracking-wider">
+                Pessoas & Acesso
               </span>
             </div>
           </div>

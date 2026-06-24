@@ -18,6 +18,41 @@ export interface UserPermissions {
   isAdmin: boolean;
 }
 
+export interface UserAddress {
+  street?: string;
+  number?: string;
+  complement?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  country?: string;
+}
+
+export interface UserEmergencyContact {
+  name?: string;
+  phone?: string;
+  relationship?: string;
+}
+
+/** Campos de perfil RH — armazenados em data JSONB via writeUsers */
+export interface UserProfileData {
+  phone?: string;
+  whatsapp?: string;
+  position?: string;         // cargo
+  department?: string;       // departamento
+  company?: string;          // empresa
+  activatedAt?: string;      // data de entrada na empresa (ISO date)
+  birthDate?: string;        // data de nascimento
+  address?: UserAddress;
+  linkedIn?: string;
+  emergencyContact?: UserEmergencyContact;
+  avatarUrl?: string;
+  theme?: 'dark' | 'light' | 'system';
+  language?: 'pt-BR' | 'en';
+  notes?: string;            // observações internas (visível só para admin)
+  status?: 'ativo' | 'inativo' | 'ferias' | 'afastado';
+}
+
 export interface DbUser {
   id: string;
   name: string;
@@ -26,6 +61,23 @@ export interface DbUser {
   role: 'Desenvolvedor' | 'Diretoria' | 'Operador' | 'Gestor' | 'Parceiro' | 'Corretor' | 'Visualizador';
   permissions: UserPermissions;
   createdAt: string;
+  profile?: UserProfileData;
+}
+
+/** Registro pendente de auto-cadastro via link de convite */
+export interface PendingRegistration {
+  id: string;
+  name: string;
+  email: string;
+  passwordHash: string;
+  profile: Partial<UserProfileData>;
+  approverId: string;   // userId do aprovador escolhido
+  approverName: string;
+  approverEmail: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+  processedAt?: string;
+  processedBy?: string;
 }
 
 export interface Subtask { id: string; title: string; completed: boolean; }
@@ -328,4 +380,37 @@ export async function delClick(slug: string): Promise<void> {
   const d = readJson<{ links: ShortLink[]; clicks: Record<string, number> }>(LOCAL_LINKS_FILE, { links: [], clicks: {} });
   delete d.clicks[slug];
   writeJson(LOCAL_LINKS_FILE, d);
+}
+
+// ─── 6. GENERIC KEY-VALUE (project_state table) ───────────────────────────────
+
+const LOCAL_KV_FILE = path.join(DATA_DIR, 'kv-local.json');
+
+export async function readKv<T>(key: string, fallback: T): Promise<T> {
+  if (isPg()) {
+    try {
+      const db   = await getPg();
+      const rows = await db<{ data: T }[]>`SELECT data FROM project_state WHERE key = ${key}`;
+      if (rows.length > 0) return rows[0].data as T;
+      return fallback;
+    } catch (e) { console.error(`[db-kv] readKv(${key}) error:`, e); }
+  }
+  const store = readJson<Record<string, unknown>>(LOCAL_KV_FILE, {});
+  return (key in store ? store[key] : fallback) as T;
+}
+
+export async function writeKv<T>(key: string, value: T): Promise<void> {
+  if (isPg()) {
+    try {
+      const db = await getPg();
+      await db`
+        INSERT INTO project_state (key, data) VALUES (${key}, ${JSON.stringify(value)})
+        ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data
+      `;
+      return;
+    } catch (e) { console.error(`[db-kv] writeKv(${key}) error:`, e); }
+  }
+  const store = readJson<Record<string, unknown>>(LOCAL_KV_FILE, {});
+  store[key]  = value;
+  writeJson(LOCAL_KV_FILE, store);
 }

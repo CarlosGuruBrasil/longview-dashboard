@@ -170,10 +170,24 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </nav>
 
         {/* Drawer footer */}
-        <div className="px-4 pb-safe border-t border-white/[0.06] pt-4" style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 16px)' }}>
+        <div className="px-4 pb-safe border-t border-white/[0.06] pt-4 space-y-1" style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 16px)' }}>
+          <a
+            href="/project-vision"
+            className="no-tap flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm text-orange-400 hover:bg-orange-500/10 transition-all"
+          >
+            <BarChart2 size={15} className="text-orange-400" />
+            Project Vision
+          </a>
+          <a
+            href="/rh-vision"
+            className="no-tap flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm text-emerald-400 hover:bg-emerald-500/10 transition-all"
+          >
+            <UsersRound size={15} className="text-emerald-400" />
+            RH Vision
+          </a>
           <a
             href="/select-app"
-            className="no-tap flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-zinc-400 hover:text-zinc-100 hover:bg-white/[0.04] transition-all"
+            className="no-tap flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm text-zinc-400 hover:text-zinc-100 hover:bg-white/[0.04] transition-all"
           >
             <Target size={16} className="text-zinc-600" />
             Trocar de aplicativo
