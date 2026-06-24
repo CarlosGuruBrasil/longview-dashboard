@@ -71,32 +71,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Vercel Blob disponível → usar CDN
-    if (process.env.BLOB_READ_WRITE_TOKEN) {
-      try {
-        const { put } = await import('@vercel/blob');
-        const buffer   = Buffer.from(await file.arrayBuffer());
-        // Sanitizar nome do arquivo
-        const safeName = originalName.replace(/[^a-zA-Z0-9._-]/g, '_');
-        const pathname = `uploads/${Date.now()}_${safeName}`;
-
-        const blob = await put(pathname, buffer, {
-          access:      'public',
-          contentType: mimeType,
-        });
-
-        return NextResponse.json({
-          url:  blob.url,
-          name: originalName,
-          size: `${(file.size / 1024).toFixed(1)} KB`,
-          via:  'blob',
-        });
-      } catch (blobErr: any) {
-        console.warn('[/api/upload] Blob falhou, usando fallback base64:', blobErr.message);
-      }
-    }
-
-    // Fallback: base64 data URL (funciona sem BLOB_READ_WRITE_TOKEN)
+    // Usar base64 data URL (funciona em qualquer ambiente)
     const buffer  = Buffer.from(await file.arrayBuffer());
     const base64  = buffer.toString('base64');
     const dataUrl = `data:${mimeType};base64,${base64}`;

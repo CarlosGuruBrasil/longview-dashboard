@@ -7,6 +7,7 @@ import {
   Building2,
   TrendingUp,
   Users,
+  ClipboardCheck,
   Settings,
   Lock,
   ArrowRight,
@@ -216,6 +217,37 @@ export default async function SelectAppPage() {
               )}
               <span className="text-[11px] text-zinc-600 font-bold uppercase tracking-wider">
                 Pessoas & Acesso
+              </span>
+            </div>
+          </div>
+
+          {/* Card: Qualidade Vision */}
+          <div className="
+            bg-[#121214]/40 border border-[#1e1e22] rounded-2xl p-6.5 flex flex-col justify-between min-h-[260px] relative transition-all duration-300 group
+            hover:border-zinc-500 hover:shadow-[0_4px_24px_rgba(255,255,255,0.02)]
+          ">
+            <div>
+              <div className="w-12 h-12 rounded-xl bg-teal-500/10 border border-teal-500/20 text-teal-400 flex items-center justify-center mb-5">
+                <ClipboardCheck size={24} />
+              </div>
+              <h3 className="text-lg font-bold text-white group-hover:text-teal-400 transition-colors">
+                Qualidade Vision
+              </h3>
+              <p className="text-xs leading-relaxed text-zinc-400 mt-2">
+                Painel de inspeções e verificações integrado ao Construpoint. Acompanhe fichas FVS, FVM, CHK, SEG, MA e EDU com série histórica, taxas de aprovação e relatórios por obra.
+              </p>
+            </div>
+
+            <div className="mt-6 flex items-center justify-between">
+              <Link
+                href="/qualidade-vision"
+                className="flex items-center gap-1.5 text-xs font-bold bg-white text-black hover:bg-zinc-200 px-4.5 py-2.5 rounded-xl transition-all duration-200 cursor-pointer"
+              >
+                <span>Entrar no App</span>
+                <ArrowRight size={14} />
+              </Link>
+              <span className="text-[11px] text-zinc-600 font-bold uppercase tracking-wider">
+                Qualidade & Obras
               </span>
             </div>
           </div>
