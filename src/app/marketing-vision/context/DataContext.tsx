@@ -55,6 +55,15 @@ interface DataProviderProps {
 
 const DEFAULT_DATE: DateRange = { start: '', end: '' };
 
+/** Mês atual até hoje (MTD), em ISO local (YYYY-MM-DD) para não dar erro de fuso. */
+function monthToDate(): DateRange {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return { start: `${y}-${m}-01`, end: `${y}-${m}-${d}` };
+}
+
 export function DataProvider({ children, initialData }: DataProviderProps) {
   const [allLeads, setAllLeads] = useState<Lead[]>(initialData?.leads ?? []);
   const [metaData, setMetaData] = useState<MetaData | null>(initialData?.meta ?? null);
@@ -65,7 +74,7 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
   const [crmTotal, setCrmTotal] = useState(initialData?.crmTotal ?? 0);
   const [updatedAt, setUpdatedAt] = useState(initialData?.updatedAt ?? '');
   const [loading, setLoading] = useState(false);
-  const [dateRange, setDateRange] = useState<DateRange>(DEFAULT_DATE);
+  const [dateRange, setDateRange] = useState<DateRange>(monthToDate());
   const [activeView, setActiveView] = useState<ActiveView>('dashboard');
 
   const filteredLeads = useMemo(() => {
