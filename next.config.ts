@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  output: 'standalone',
   // firebase-admin é Node.js puro — não pode ser bundado pelo Turbopack/Webpack
   // Isso faz o Next.js usar o require() nativo em vez de fazer bundle
   serverExternalPackages: ['firebase-admin'],

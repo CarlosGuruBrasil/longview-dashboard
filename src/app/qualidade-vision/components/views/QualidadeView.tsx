@@ -245,7 +245,7 @@ export default function QualidadeView() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-lg font-bold text-zinc-100">Painel Qualidade</h1>
+          <h1 className="text-lg font-bold text-zinc-100">Quality Vision</h1>
           <p className="text-xs text-zinc-500">Construpoint — Inspeções e Verificações</p>
         </div>
         {/* Filtro de período */}

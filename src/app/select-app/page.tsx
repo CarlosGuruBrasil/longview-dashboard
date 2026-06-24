@@ -221,7 +221,7 @@ export default async function SelectAppPage() {
             </div>
           </div>
 
-          {/* Card: Qualidade Vision */}
+          {/* Card: Quality Vision */}
           <div className="
             bg-[#121214]/40 border border-[#1e1e22] rounded-2xl p-6.5 flex flex-col justify-between min-h-[260px] relative transition-all duration-300 group
             hover:border-zinc-500 hover:shadow-[0_4px_24px_rgba(255,255,255,0.02)]
@@ -231,7 +231,7 @@ export default async function SelectAppPage() {
                 <ClipboardCheck size={24} />
               </div>
               <h3 className="text-lg font-bold text-white group-hover:text-teal-400 transition-colors">
-                Qualidade Vision
+                Quality Vision
               </h3>
               <p className="text-xs leading-relaxed text-zinc-400 mt-2">
                 Painel de inspeções e verificações integrado ao Construpoint. Acompanhe fichas FVS, FVM, CHK, SEG, MA e EDU com série histórica, taxas de aprovação e relatórios por obra.

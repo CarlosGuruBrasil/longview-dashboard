@@ -22,7 +22,7 @@ export default function QualidadeSidebar() {
       {/* Mobile top bar */}
       <header className="lg:hidden fixed top-0 left-0 right-0 z-50 flex items-center justify-between
         px-4 h-[52px] border-b border-white/10 bg-[#09090b]/95 backdrop-blur">
-        <span className="text-sm font-semibold text-zinc-100">Qualidade Vision</span>
+        <span className="text-sm font-semibold text-zinc-100">Quality Vision</span>
         <button onClick={() => setMobileOpen(v => !v)} className="p-2 text-zinc-400">
           {mobileOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
@@ -46,7 +46,7 @@ export default function QualidadeSidebar() {
             <ClipboardCheck size={16} className="text-emerald-400" />
           </div>
           <div>
-            <p className="text-[13px] font-semibold text-zinc-100 leading-tight">Qualidade Vision</p>
+            <p className="text-[13px] font-semibold text-zinc-100 leading-tight">Quality Vision</p>
             <p className="text-[11px] text-zinc-500">Construpoint</p>
           </div>
         </div>

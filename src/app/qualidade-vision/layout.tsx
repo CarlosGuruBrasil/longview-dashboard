@@ -2,7 +2,7 @@ import QualidadeSidebar from './components/Sidebar'
 import NotificationBanner from '@/components/NotificationBanner'
 
 export const metadata = {
-  title: 'Qualidade Vision — LongView',
+  title: 'Quality Vision — LongView',
 }
 
 export default function QualidadeVisionLayout({ children }: { children: React.ReactNode }) {

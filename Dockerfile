@@ -1,36 +1,55 @@
-# Build stage
-FROM node:20-alpine AS builder
+# syntax=docker.io/docker/dockerfile:1
 
+FROM node:20-alpine AS base
+
+# Install dependencies only when needed
+FROM base AS deps
+RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-# Copiar dependencies
-COPY package*.json ./
-RUN npm ci --only=production && npm install --save-dev typescript @types/node @types/react @types/react-dom next eslint-config-next tailwindcss @tailwindcss/postcss
+# Install dependencies based on the preferred package manager
+COPY package.json package-lock.json* ./
+RUN npm ci
 
-# Copiar código
+# Rebuild the source code only when needed
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Build
+# Next.js telemetry is disabled by default in Next.js 15, but let's disable it to be sure
+ENV NEXT_TELEMETRY_DISABLED=1
+
 RUN npm run build
 
-# Runtime stage
-FROM node:20-alpine
-
+# Production image, copy all the files and run next
+FROM base AS runner
 WORKDIR /app
 
-# Instalar apenas deps de produção
-COPY package*.json ./
-RUN npm ci --only=production
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
 
-# Copiar build do stage anterior
-COPY --from=builder /app/.next ./.next
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/next.config.ts ./
 
-# User não-root
-RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
+# Set the correct permission for prerender cache
+RUN mkdir .next
+RUN chown nextjs:nodejs .next
+
+# Automatically leverage output traces to reduce image size
+# https://nextjs.org/docs/advanced-features/output-file-tracing
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
 USER nextjs
 
 EXPOSE 3000
 
-CMD ["npm", "start"]
+ENV PORT=3000
+# set hostname to 0.0.0.0 for external access in Coolify
+ENV HOSTNAME="0.0.0.0"
+
+# server.js is created by next build from the standalone output
+CMD ["node", "server.js"]
