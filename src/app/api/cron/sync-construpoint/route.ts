@@ -23,21 +23,27 @@ export async function POST(request: NextRequest) {
   try {
     // 1. Sync Inspecoes
     for (const key of modelKeys) {
-      const res = await getInspectionsByRange({
-        StartYear: startYear,
-        EndYear: endYear,
-        ModelType: MODEL_TYPES[key],
-        OnlyActiveWorks: true,
-        PageSize: 1000,
-      });
+      for (let y = startYear; y <= endYear; y++) {
+        const beginDate = `${y}-01-01`;
+        const endDate = `${y}-12-31`;
+        
+        const res = await getInspections({
+          BeginDate: beginDate,
+          EndDate: endDate,
+          ModelTypeId: MODEL_TYPES[key],
+          HistoricoCompleto: false,
+          CamposPersonalizados: false,
+        });
 
-      if (!res.Items || res.Items.length === 0) continue;
+        if (!Array.isArray(res) || res.length === 0) continue;
 
-      for (const insp of res.Items) {
+      if (!Array.isArray(res) || res.length === 0) continue;
+
+      for (const insp of res) {
         if (!insp.Id) continue;
-        const dCriacao = insp.CreateDate ? new Date(insp.CreateDate) : null;
-        const dAgend = insp.ScheduleDate ? new Date(insp.ScheduleDate) : null;
-        const dAtualiz = insp.UpdateDate ? new Date(insp.UpdateDate) : null;
+        const dCriacao = insp.Criacao ? new Date(insp.Criacao) : null;
+        const dAgend = insp.PrimeiraVistoria ? new Date(insp.PrimeiraVistoria) : null;
+        const dAtualiz = insp.DataReinspecao ? new Date(insp.DataReinspecao) : null;
 
         await sql`
           INSERT INTO construpoint_inspecoes (
@@ -45,16 +51,16 @@ export async function POST(request: NextRequest) {
             data_agendamento, data_atualizacao, nota, raw, synced_at
           ) VALUES (
             ${insp.Id},
-            ${insp.Code ?? null},
-            ${insp.Model?.Name ?? key},
-            ${insp.Work?.Name ?? null},
-            ${insp.Location?.Name ?? null},
-            ${insp.Inspector?.Name ?? null},
-            ${insp.Status?.Name ?? null},
+            ${insp.Codigo ?? null},
+            ${insp.Modelo?.Nome ?? key},
+            ${insp.Obra?.Nome ?? null},
+            ${insp.Local?.Nome ?? null},
+            ${insp.Inspetor?.Nome ?? null},
+            ${insp.Status?.Nome ?? null},
             ${dCriacao},
             ${dAgend},
             ${dAtualiz},
-            ${insp.WeightedGrade ?? null},
+            null,
             ${JSON.stringify(insp)},
             NOW()
           ) ON CONFLICT (id) DO UPDATE SET
@@ -74,24 +80,31 @@ export async function POST(request: NextRequest) {
         upsertedInspections++;
       }
     }
+  }
 
     // 2. Sync Verificacoes
     await sql`TRUNCATE TABLE construpoint_verificacoes`;
 
     const today = new Date();
-    const begin = `${startYear}-01-01`;
-    const end   = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
-
+    
     for (const key of modelKeys) {
-      const items = await getVerifications({
-        BeginDate: begin,
-        EndDate: end,
-        ModelTypeId: MODEL_TYPES[key],
-        HistoricoCompleto: false,
-        CamposPersonalizados: false,
-      });
+      for (let y = startYear; y <= endYear; y++) {
+        const begin = `${y}-01-01`;
+        let end = `${y}-12-31`;
+        
+        if (y === today.getFullYear()) {
+          end = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+        }
+        
+        const items = await getVerifications({
+          BeginDate: begin,
+          EndDate: end,
+          ModelTypeId: MODEL_TYPES[key],
+          HistoricoCompleto: false,
+          CamposPersonalizados: false,
+        });
 
-      if (!items || items.length === 0) continue;
+        if (!Array.isArray(items) || items.length === 0) continue;
 
       for (const v of items) {
         const d = v.Verificacao ? new Date(v.Verificacao) : null;
@@ -119,6 +132,7 @@ export async function POST(request: NextRequest) {
         upsertedVerifications++;
       }
     }
+  }
 
     return NextResponse.json({
       ok: true,
