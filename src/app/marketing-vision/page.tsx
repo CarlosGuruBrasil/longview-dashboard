@@ -43,9 +43,9 @@ async function fetchDashboardData(): Promise<DashboardApiResponse | null> {
     }
 
     // ── Meta + Estoque from cache ─────────────────────────────────────────────
-    const CACHE_MAX_AGE_MS = 4 * 60 * 60 * 1000;
-    const now = Date.now();
-
+    // Sempre serve do Postgres independente da idade — o cron é responsável por
+    // manter o cache fresco. Não expiramos aqui para evitar chamadas ao vivo
+    // durante o carregamento de página (isso travava o dashboard por 15-30s).
     const cacheRows = await sql<{ key: string; data: unknown }[]>`
       SELECT key, data FROM project_state WHERE key IN ('meta_cache', 'estoque_cache')
     `;
@@ -55,8 +55,6 @@ async function fetchDashboardData(): Promise<DashboardApiResponse | null> {
 
     for (const row of cacheRows) {
       const d = row.data as { updatedAt?: string; data?: unknown; estoque?: unknown };
-      const age = d?.updatedAt ? now - new Date(d.updatedAt).getTime() : Infinity;
-      if (age > CACHE_MAX_AGE_MS) continue;
       if (row.key === 'meta_cache' && d?.data) metaData = d.data;
       if (row.key === 'estoque_cache' && d?.estoque) estoqueData = d as typeof estoqueData;
     }

@@ -6,7 +6,7 @@ import { rateLimit, getClientIp } from '@/lib/rateLimit';
 
 const JWT_SECRET   = process.env.JWT_SECRET || 'secret-longview-key';
 const META_PAGE_ID = '259079394232614';
-const CACHE_MAX_AGE_MS = 4 * 60 * 60 * 1000; // 4h — força re-sync se muito antigo
+// Cache nunca expira no caminho de leitura — cron ou ?refresh=true renovam.
 
 async function verifyAuth(): Promise<any | null> {
   try {
@@ -24,10 +24,7 @@ async function readPgCache(key: string): Promise<any | null> {
     await ensureSchema();
     const rows = await sql`SELECT data FROM project_state WHERE key = ${key} LIMIT 1`;
     if (!rows[0]) return null;
-    const d = rows[0].data as any;
-    // Se mais antigo que CACHE_MAX_AGE_MS, ignora (força re-sync)
-    if (d?.updatedAt && Date.now() - new Date(d.updatedAt).getTime() > CACHE_MAX_AGE_MS) return null;
-    return d;
+    return rows[0].data;
   } catch { return null; }
 }
 
