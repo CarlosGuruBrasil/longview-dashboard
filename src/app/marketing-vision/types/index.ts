@@ -47,6 +47,8 @@ export interface Lead {
   corretor?: LeadPessoa;
   gestor?: LeadPessoa;
   imobiliaria?: LeadPessoa;
+  /** Email de quem fez a última alteração (≈ quem cadastrou, nos leads manuais) */
+  autor_ultima_alteracao?: string;
   temperatura?: string;
   score?: number;
   valor_negocio?: string | number;

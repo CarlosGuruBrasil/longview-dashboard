@@ -70,15 +70,44 @@ export function isOpportunity(lead: Lead): boolean {
   );
 }
 
+/** Macro de template do Meta não substituída (ex: "{{adset.name}}", "{{campaign.name}}"). */
+function isTemplateVar(v?: string | null): boolean {
+  return !!v && /\{\{.*\}\}/.test(String(v));
+}
+
 export function getOrigin(lead: Lead): string {
-  if (lead.midia_visita) return String(lead.midia_visita);
-  if (lead.midia_principal) return String(lead.midia_principal);
+  if (lead.midia_visita && !isTemplateVar(lead.midia_visita)) return String(lead.midia_visita);
+  if (lead.midia_principal && !isTemplateVar(lead.midia_principal)) return String(lead.midia_principal);
   if (lead.origem) {
     return typeof lead.origem === 'object' && lead.origem.nome
       ? String(lead.origem.nome)
       : String(lead.origem);
   }
   return 'Desconhecido';
+}
+
+export interface LeadSource {
+  type: 'manual' | 'integração';
+  channel: string;
+  by: string | null;
+  /** true quando a mídia veio como macro não substituída (ex: {{adset.name}}) */
+  mediaBroken: boolean;
+}
+
+/** Diz se o lead foi cadastrado manualmente (painel) ou veio de integração, e por quem. */
+export function getLeadSource(lead: Lead): LeadSource {
+  const origemRaw = typeof lead.origem === 'object' ? lead.origem?.nome : lead.origem;
+  const channel = String(origemRaw ?? '').trim() || 'Desconhecido';
+  const isManual = /^painel/i.test(channel);
+  const by = isManual
+    ? (lead.autor_ultima_alteracao || lead.corretor?.nome || lead.gestor?.nome || null)
+    : null;
+  return {
+    type: isManual ? 'manual' : 'integração',
+    channel,
+    by,
+    mediaBroken: isTemplateVar(lead.midia_principal) || isTemplateVar(lead.midia_visita),
+  };
 }
 
 export function getLeadDate(lead: Lead): string {

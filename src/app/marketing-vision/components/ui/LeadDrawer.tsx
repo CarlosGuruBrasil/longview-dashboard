@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { Lead } from '../../types';
-import { getOrigin, getStatusColor, getLeadTags } from '../../utils/leads';
+import { getOrigin, getStatusColor, getLeadTags, getLeadSource } from '../../utils/leads';
 import { formatDate } from '../../utils/formatters';
 
 interface StageChange {
@@ -58,6 +58,7 @@ export default function LeadDrawer({ lead, onClose }: Props) {
   const sc = getStatusColor(lead);
   const tags = getLeadTags(lead);
   const interacoes = lead.interacao ?? [];
+  const source = getLeadSource(lead);
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }} onClick={onClose}>
@@ -93,6 +94,31 @@ export default function LeadDrawer({ lead, onClose }: Props) {
           <Field label="Score" value={lead.score} />
           <Field label="Cadastro" value={formatDate(lead.data_cad || lead.data_cadastro || lead.data_cadastramento)} />
           <Field label="Reservas" value={lead.qtde_reservas_associadas} />
+        </section>
+
+        {/* Origem do cadastro */}
+        <section className="flex flex-col gap-1.5 rounded-lg border border-white/10 p-3">
+          <div className="flex items-center gap-2">
+            <span
+              className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
+              style={source.type === 'manual'
+                ? { backgroundColor: 'rgba(245,158,11,0.15)', color: '#fbbf24' }
+                : { backgroundColor: 'rgba(14,165,233,0.15)', color: '#38bdf8' }}
+            >
+              {source.type === 'manual' ? 'Cadastro manual' : 'Integração'}
+            </span>
+            <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{source.channel}</span>
+          </div>
+          {source.type === 'manual' && (
+            <span className="text-xs" style={{ color: 'var(--text-primary)' }}>
+              Cadastrado por: <strong>{source.by ?? 'não identificado'}</strong>
+            </span>
+          )}
+          {source.mediaBroken && (
+            <span className="text-[11px]" style={{ color: '#f87171' }}>
+              ⚠ Mídia veio como macro não substituída (ex: {'{{adset.name}}'}) — corrigir na integração Meta→CV CRM.
+            </span>
+          )}
         </section>
 
         {/* Tags */}
