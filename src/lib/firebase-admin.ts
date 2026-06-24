@@ -8,5 +8,9 @@ export async function sendFCMMulticast(
   data?: Record<string, string>
 ) {
   console.log('[FCM] Notificações desabilitadas em Coolify:', { tokens, title, body, data });
-  return { successCount: 0 };
+  return { 
+    successCount: 0,
+    failureCount: tokens.length,
+    invalidTokens: tokens // todos considerados inválidos (FCM offline)
+  };
 }
