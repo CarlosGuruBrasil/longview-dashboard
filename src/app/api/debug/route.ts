@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql, ensureSchema } from '@/lib/pg';
+import { verifyAdminAuth } from '@/lib/auth';
 import axios from 'axios';
 
 function isSale(lead: any): boolean {
@@ -15,6 +16,9 @@ function isSale(lead: any): boolean {
 }
 
 export async function GET(request: NextRequest) {
+  // Rota de debug expõe PII de todos os leads — restrita a admin/dev.
+  const admin = await verifyAdminAuth();
+  if (!admin) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
   try {
     await ensureSchema();
 
