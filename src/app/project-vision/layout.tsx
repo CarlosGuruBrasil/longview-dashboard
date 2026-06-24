@@ -1,4 +1,5 @@
 import Sidebar from './components/Sidebar';
+import NotificationBanner from '@/components/NotificationBanner';
 
 export default function ProjectVisionLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -16,6 +17,9 @@ export default function ProjectVisionLayout({ children }: { children: React.Reac
         <style>{`@media(min-width:1024px){main{padding-top:0!important;padding-bottom:0!important}}`}</style>
         {children}
       </main>
+
+      {/* Banner de permissão FCM (mobile, só aparece se não concedido) */}
+      <NotificationBanner />
     </div>
   );
 }

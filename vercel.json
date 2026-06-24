@@ -7,7 +7,8 @@
     { "path": "/api/cron/sync-audiences", "schedule": "0 6 * * 0" },
     { "path": "/api/cron/process-leads",  "schedule": "0 10 * * *" },
     { "path": "/api/cron/recalc-scores",  "schedule": "0 7 * * *" },
-    { "path": "/api/cron/check-alerts",   "schedule": "0 */1 * * *" }
+    { "path": "/api/cron/check-alerts",   "schedule": "0 */1 * * *" },
+    { "path": "/api/cron/check-tasks",    "schedule": "0 */1 * * *" }
   ],
   "functions": {
     "src/app/api/meta/create-lead-ad/route.ts": {

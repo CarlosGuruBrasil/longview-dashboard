@@ -20,6 +20,7 @@ const ALL_ITEMS = [
   { name: 'Responsáveis',    href: '/project-vision/responsibles',  icon: Users },
   { name: 'Documentos',      href: '/project-vision/documents',     icon: FolderArchive },
   { name: 'Relatórios',      href: '/project-vision/reports',       icon: BarChart3 },
+  { name: 'Configurações',   href: '/project-vision/settings',      icon: Settings },
 ];
 
 const BOTTOM_NAV = [
