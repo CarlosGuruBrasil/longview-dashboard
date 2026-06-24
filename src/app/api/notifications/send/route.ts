@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
   }
 
-  const { title, body, roles, userIds, data } = await request.json();
+  const { title, body, roles, userIds, emails, data } = await request.json();
   if (!title || !body) return NextResponse.json({ error: 'title e body obrigatórios' }, { status: 400 });
 
   await ensureSchema();
@@ -18,7 +18,12 @@ export async function POST(request: NextRequest) {
   // Busca tokens pelos critérios
   let tokens: { token: string }[] = [];
 
-  if (userIds?.length) {
+  if (emails?.length) {
+    const lower = (emails as string[]).map(e => e.toLowerCase().trim());
+    tokens = await sql<{ token: string }[]>`
+      SELECT token FROM fcm_tokens WHERE LOWER(user_email) = ANY(${lower}::text[])
+    `;
+  } else if (userIds?.length) {
     tokens = await sql<{ token: string }[]>`
       SELECT token FROM fcm_tokens WHERE user_id = ANY(${userIds}::text[])
     `;

@@ -10,7 +10,8 @@ export interface LeadEmpreendimento {
 
 export interface LeadPessoa {
   nome: string;
-  id?: string;
+  id?: string | number;
+  email?: string;
 }
 
 export interface LeadMotivoCancelamento {
@@ -38,6 +39,7 @@ export interface Lead {
   data_cad?: string;
   data_cadastro?: string;
   data_cadastramento?: string;
+  data_atualizacao?: string;
   ultima_data_conversao?: string;
   situacao?: LeadSituacao;
   origem?: string | { nome: string };

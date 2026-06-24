@@ -99,7 +99,7 @@ export async function GET(req: NextRequest) {
   }).slice(0, MAX_PUSH_PER_RUN);
 
   let pushSent = 0;
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? '';
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXTAUTH_URL || 'https://app.guru.dev.br';
 
   for (const alert of toNotify) {
     try {
@@ -112,7 +112,7 @@ export async function GET(req: NextRequest) {
         body: JSON.stringify({
           title: alert.title,
           body: alert.suggestion,
-          roles: ['admin', 'gestor'],
+          roles: ['Diretoria', 'Gestor', 'Desenvolvedor'],
           data: {
             alertId: alert.id,
             category: alert.category,
