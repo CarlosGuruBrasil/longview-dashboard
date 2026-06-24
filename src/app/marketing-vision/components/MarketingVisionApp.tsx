@@ -11,6 +11,7 @@ const LeadsView          = lazy(() => import('./views/LeadsView'));
 const OportunidadesView  = lazy(() => import('./views/OportunidadesView'));
 const EmpreendimentosView = lazy(() => import('./views/EmpreendimentosView'));
 const VendasView         = lazy(() => import('./views/VendasView'));
+const MetricsView        = lazy(() => import('./views/MetricsView'));
 const MarketingAdsView   = lazy(() => import('./views/MarketingAdsView'));
 const PublicarView       = lazy(() => import('./views/PublicarView'));
 const AudienciasView     = lazy(() => import('./views/AudienciasView'));
@@ -26,6 +27,7 @@ function ViewRouter() {
     oportunidades:   <OportunidadesView />,
     empreendimentos: <EmpreendimentosView />,
     vendas:          <VendasView />,
+    metrics:         <MetricsView />,
     marketing:       <MarketingAdsView />,
     publicar:        <PublicarView />,
     audiences:       <AudienciasView />,
