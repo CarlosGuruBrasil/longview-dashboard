@@ -58,7 +58,7 @@ const DEFAULT_DATE: DateRange = { start: '', end: '' };
 export function DataProvider({ children, initialData }: DataProviderProps) {
   const [allLeads, setAllLeads] = useState<Lead[]>(initialData?.leads ?? []);
   const [metaData, setMetaData] = useState<MetaData | null>(initialData?.meta ?? null);
-  const [estoque, setEstoque] = useState<EstoqueData>(initialData?.estoque ?? {});
+  const [estoque, setEstoque] = useState<EstoqueData>(initialData?.estoque ?? { empreendimentos: [], resumo: [], unidades: [] });
   const [leadForms, setLeadForms] = useState<MetaLeadForm[]>(initialData?.leadForms ?? []);
   const [metaPage, setMetaPage] = useState<MetaPageInfo | null>(initialData?.page ?? null);
   const [metaValidation, setMetaValidation] = useState<{ orphanedLeads: any[]; totalMetaLeads: number; error: string | null } | null>(initialData?.metaValidation ?? null);
@@ -108,7 +108,7 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
       setAllLeads(Array.isArray(leads) ? leads : []);
       setCrmTotal(data.leads?.crmTotal ?? leads.length);
       setMetaData(data.meta ?? null);
-      setEstoque(data.estoque ?? {});
+      setEstoque(data.estoque ?? { empreendimentos: [], resumo: [], unidades: [] });
       setLeadForms(data.leadForms ?? []);
       setMetaPage(data.page ?? null);
       setMetaValidation(data.metaValidation ?? null);
