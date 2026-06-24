@@ -10,6 +10,9 @@ interface StageChange {
   para: string;
   autor: string | null;
   changed_at: string;
+  corretor: string | null;
+  gestor: string | null;
+  origem: string | null;
 }
 
 interface Props {
@@ -143,8 +146,16 @@ export default function LeadDrawer({ lead, onClose }: Props) {
                 <li key={i} className="text-xs flex flex-col gap-0.5 border-l-2 border-white/15 pl-3">
                   <span style={{ color: 'var(--text-primary)' }}>{h.de ? `${h.de} → ` : ''}<strong>{h.para}</strong></span>
                   <span style={{ color: 'var(--text-secondary)' }}>
-                    {new Date(h.changed_at).toLocaleString('pt-BR')}{h.autor ? ` • ${h.autor}` : ''}
+                    {new Date(h.changed_at).toLocaleString('pt-BR')}
                   </span>
+                  {(h.corretor || h.gestor) && (
+                    <span style={{ color: 'var(--text-secondary)' }}>
+                      Atendido por: {h.corretor ?? '—'}{h.gestor ? ` (gestor: ${h.gestor})` : ''}
+                    </span>
+                  )}
+                  {h.autor && (
+                    <span style={{ color: 'var(--text-secondary)' }}>Alterado por: {h.autor}</span>
+                  )}
                 </li>
               ))}
             </ol>

@@ -6,8 +6,14 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     const { id } = await params;
     const { sql, ensureSchema } = await import('@/lib/pg');
     await ensureSchema();
+    // corretor/gestor são extraídos do raw guardado no momento da transição
+    // (responsável daquela etapa, no momento em que ela aconteceu).
     const rows = await sql`
-      SELECT de, para, autor, changed_at
+      SELECT
+        de, para, autor, changed_at,
+        raw->'corretor'->>'nome' AS corretor,
+        raw->'gestor'->>'nome'   AS gestor,
+        COALESCE(raw->'origem'->>'nome', raw->>'origem') AS origem
       FROM lead_stage_history
       WHERE lead_id = ${id}
       ORDER BY changed_at DESC
