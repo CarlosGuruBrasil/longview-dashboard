@@ -81,9 +81,11 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
 
   const clearFilters = useCallback(() => setDateRange(DEFAULT_DATE), []);
 
-  // Auto-fetch se o SSR não trouxe dados (fallback de segurança)
+  // Auto-fetch se SSR não trouxe leads (Postgres vazio, cold start, falha de conexão…)
+  // Não depende de !initialData: SSR pode retornar initialData com leads [] se
+  // a tabela ainda está vazia (ex: primeiro deploy antes do sync rodar).
   useEffect(() => {
-    if (allLeads.length === 0 && !initialData) {
+    if (allLeads.length === 0) {
       refresh();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
