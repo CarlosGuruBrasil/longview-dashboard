@@ -5,9 +5,9 @@ import KpiGaugeHistoryCard from '../metrics/KpiGaugeHistoryCard'
 import CostPerLeadCard from '../metrics/CostPerLeadCard'
 
 export default function MetricsView() {
-  const { allLeads, filteredLeads, metaData, loading } = useData()
+  const { filteredLeads, metaData, loading } = useData()
 
-  if (loading && allLeads.length === 0) {
+  if (loading && filteredLeads.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-4" style={{ minHeight: '60vh' }}>
         <div className="relative w-12 h-12">
@@ -31,10 +31,10 @@ export default function MetricsView() {
           Funil de Conversão
         </h2>
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          <KpiGaugeHistoryCard metric="novos_leads"  allLeads={allLeads} loading={loading} />
-          <KpiGaugeHistoryCard metric="atendimento"  allLeads={allLeads} loading={loading} />
-          <KpiGaugeHistoryCard metric="agendamento"  allLeads={allLeads} loading={loading} />
-          <KpiGaugeHistoryCard metric="visitas"      allLeads={allLeads} loading={loading} />
+          <KpiGaugeHistoryCard metric="novos_leads"  leads={filteredLeads} loading={loading} />
+          <KpiGaugeHistoryCard metric="atendimento"  leads={filteredLeads} loading={loading} />
+          <KpiGaugeHistoryCard metric="agendamento"  leads={filteredLeads} loading={loading} />
+          <KpiGaugeHistoryCard metric="visitas"      leads={filteredLeads} loading={loading} />
         </div>
       </section>
 
@@ -44,8 +44,8 @@ export default function MetricsView() {
           Resultados Comerciais
         </h2>
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          <KpiGaugeHistoryCard metric="proposta" allLeads={allLeads} loading={loading} />
-          <KpiGaugeHistoryCard metric="vendas"   allLeads={allLeads} loading={loading} />
+          <KpiGaugeHistoryCard metric="proposta" leads={filteredLeads} loading={loading} />
+          <KpiGaugeHistoryCard metric="vendas"   leads={filteredLeads} loading={loading} />
         </div>
       </section>
 

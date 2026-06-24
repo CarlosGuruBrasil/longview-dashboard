@@ -295,13 +295,13 @@ function CustomTooltip({
 
 interface KpiGaugeHistoryCardProps {
   metric: MetricType
-  allLeads: Lead[]
+  leads: Lead[]  // use filteredLeads from DataContext — global date filter applies
   loading?: boolean
 }
 
 export default function KpiGaugeHistoryCard({
   metric,
-  allLeads,
+  leads,
   loading = false,
 }: KpiGaugeHistoryCardProps) {
   const config = METRIC_CONFIGS[metric]
@@ -320,10 +320,10 @@ export default function KpiGaugeHistoryCard({
 
   const valueKey = effectiveMode === 'taxa' ? config.rateKey : config.bruteKey
 
-  // Compute period data
+  // Compute period data — already date-filtered by the caller
   const periodData = useMemo(
-    () => calculateMetricsByPeriod(allLeads, granularity),
-    [allLeads, granularity]
+    () => calculateMetricsByPeriod(leads, granularity),
+    [leads, granularity]
   )
 
   // Build chart data with moving average
