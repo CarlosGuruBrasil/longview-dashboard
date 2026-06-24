@@ -22,18 +22,21 @@ export function useNotifications() {
   // Listener de mensagens em foreground (app aberto)
   useEffect(() => {
     if (status !== 'granted') return;
-    const unsub = onForegroundMessage((payload) => {
-      const { title = 'LongView', body = '' } = payload.notification ?? {};
-      // Mostra notificação nativa mesmo com app aberto
-      if (Notification.permission === 'granted') {
-        new Notification(title, {
-          body,
-          icon: '/icon-192.png',
-          badge: '/icon-192.png',
-        });
-      }
-    });
-    return unsub;
+    
+    (async () => {
+      const unsub = await onForegroundMessage((payload) => {
+        const { title = 'LongView', body = '' } = payload.notification ?? {};
+        // Mostra notificação nativa mesmo com app aberto
+        if (Notification.permission === 'granted') {
+          new Notification(title, {
+            body,
+            icon: '/icon-192.png',
+            badge: '/icon-192.png',
+          });
+        }
+      });
+      return unsub;
+    })();
   }, [status]);
 
   const requestPermission = useCallback(async () => {
