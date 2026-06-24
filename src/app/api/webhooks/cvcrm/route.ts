@@ -1,6 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parseCrmDate } from '@/lib/dateUtils';
 
+/**
+ * Busca o lead completo no CV CRM. Necessário porque os webhooks estão
+ * configurados com forma_envio="id" — o CV manda só o id, não o objeto.
+ */
+async function fetchLeadById(id: string | number): Promise<any | null> {
+  const email = process.env.CV_CRM_EMAIL, token = process.env.CV_CRM_TOKEN;
+  if (!email || !token) return null;
+  try {
+    const res = await fetch(
+      `https://longviewempreendimentos.cvcrm.com.br/api/v1/comercial/leads?limit=1&idlead=${encodeURIComponent(String(id))}`,
+      { headers: { email, token, Accept: 'application/json' } as any }
+    );
+    const data = await res.json();
+    const leads = data?.leads ?? [];
+    return Array.isArray(leads) && leads[0] ? leads[0] : null;
+  } catch { return null; }
+}
+
+/** empreendimento pode vir como array de objetos — normaliza pra texto */
+function empreendimentoText(emp: any): string | null {
+  if (!emp) return null;
+  if (Array.isArray(emp)) return emp.map((e: any) => e?.nome ?? e).filter(Boolean).join(', ') || null;
+  if (typeof emp === 'object') return emp.nome ?? null;
+  return String(emp);
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -52,24 +78,33 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    // -- Tratar Evento de Lead (Legado) --
-    if (!lead?.id) {
+    // -- Tratar Evento de Lead --
+    // O id pode vir como objeto completo OU só id (forma_envio="id" no CV CRM).
+    const leadId = lead?.idlead ?? lead?.id ?? body?.idlead ?? body?.referencia ?? null;
+    if (leadId == null) {
       return NextResponse.json({ ok: false, error: 'payload sem id' }, { status: 400 });
     }
-    await ensureSchema();
+
+    // Se veio sem os campos (só id), busca o lead completo na API do CV.
+    let full = lead;
+    if (!full?.nome && !full?.situacao && !full?.email) {
+      const fetched = await fetchLeadById(leadId);
+      if (fetched) full = fetched;
+    }
+
+    const id          = String(full.idlead ?? full.id ?? leadId);
+    const statusNomeV = full.situacao?.nome ?? full.status ?? null;
 
     // Histórico de etapa: detecta mudança comparando com o status já salvo
-    const novaEtapa = lead.situacao?.nome ?? lead.etapa?.nome ?? lead.etapa ?? lead.status ?? null;
-    if (novaEtapa) {
-      const [prev] = await sql`SELECT status FROM leads WHERE id = ${String(lead.id)}`;
-      if (!prev || prev.status !== novaEtapa) {
-        // autor: campos prováveis do CV CRM; raw guardado pra recuperar o que faltar
-        const autor = lead.responsavel?.nome ?? lead.responsavel ?? lead.corretor?.nome
-          ?? lead.corretor ?? lead.usuario?.nome ?? lead.usuario ?? null;
+    if (statusNomeV) {
+      const [prev] = await sql`SELECT status FROM leads WHERE id = ${id}`;
+      if (!prev || prev.status !== statusNomeV) {
+        const autor = full.responsavel?.nome ?? full.autor_ultima_alteracao ?? full.corretor?.nome
+          ?? full.gestor?.nome ?? null;
         await sql`
           INSERT INTO lead_stage_history (lead_id, lead_nome, de, para, autor, raw)
-          VALUES (${String(lead.id)}, ${lead.nome ?? null}, ${prev?.status ?? null}, ${novaEtapa},
-                  ${autor ? String(autor) : null}, ${JSON.stringify(lead)})
+          VALUES (${id}, ${full.nome ?? null}, ${prev?.status ?? null}, ${statusNomeV},
+                  ${autor ? String(autor) : null}, ${JSON.stringify(full)})
         `;
       }
     }
@@ -80,18 +115,18 @@ export async function POST(request: NextRequest) {
         empreendimento, score, temperatura,
         data_cadastro, data_atualizacao, raw, synced_at
       ) VALUES (
-        ${String(lead.id)},
-        ${lead.nome ?? lead.name ?? null},
-        ${lead.email ?? null},
-        ${lead.telefone ?? lead.phone ?? null},
-        ${lead.origem ?? lead.origin ?? null},
-        ${lead.status ?? null},
-        ${lead.empreendimento ?? lead.produto ?? null},
-        ${lead.score ?? null},
-        ${lead.temperatura ?? null},
-        ${parseCrmDate(lead.data_cadastro)},
-        ${parseCrmDate(lead.data_atualizacao)},
-        ${JSON.stringify(lead)},
+        ${id},
+        ${full.nome ?? full.name ?? null},
+        ${full.email ?? null},
+        ${full.telefone ?? full.celular ?? full.phone ?? null},
+        ${typeof full.origem === 'object' ? full.origem?.nome : (full.origem ?? full.origin ?? null)},
+        ${statusNomeV},
+        ${empreendimentoText(full.empreendimento ?? full.produto)},
+        ${full.score ?? null},
+        ${full.temperatura ?? null},
+        ${parseCrmDate(full.data_cad ?? full.data_cadastro)},
+        ${parseCrmDate(full.data_atualizacao)},
+        ${JSON.stringify(full)},
         NOW()
       )
       ON CONFLICT (id) DO UPDATE SET
@@ -109,10 +144,10 @@ export async function POST(request: NextRequest) {
         synced_at        = NOW()
     `;
 
-    console.log(`[webhook/cvcrm] lead ${lead.id} upserted`);
+    console.log(`[webhook/cvcrm] lead ${id} upserted (${statusNomeV ?? '?'})`);
 
     // ── Notificação FCM: nova venda realizada ────────────────────────────
-    const statusNome = (lead.situacao?.nome ?? lead.status ?? '').toLowerCase();
+    const statusNome = (statusNomeV ?? '').toLowerCase();
     const isVenda = statusNome === 'venda realizada' || statusNome.includes('negócio ganho') || statusNome.includes('negocio ganho');
     if (isVenda) {
       try {
@@ -122,7 +157,7 @@ export async function POST(request: NextRequest) {
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.CRON_SECRET}` },
           body: JSON.stringify({
             title: '🏆 Nova Venda Realizada!',
-            body: `${lead.nome ?? 'Cliente'} • ${lead.empreendimento ?? ''}`.trim(),
+            body: `${full.nome ?? 'Cliente'} • ${empreendimentoText(full.empreendimento) ?? ''}`.trim(),
             roles: ['Desenvolvedor', 'Diretoria', 'Gestor'],
             data: { url: '/marketing-vision', type: 'venda' },
           }),
