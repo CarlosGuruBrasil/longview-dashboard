@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql, ensureSchema } from '@/lib/pg';
-import { getInspectionsByRange, getVerifications, MODEL_TYPES, type ModelTypeKey } from '@/lib/construpoint';
+import { getInspections, getVerifications, MODEL_TYPES, type ModelTypeKey } from '@/lib/construpoint';
 
 export const maxDuration = 300; // 5 minutes
 export const runtime = 'nodejs';
