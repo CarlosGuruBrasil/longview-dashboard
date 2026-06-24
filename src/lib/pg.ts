@@ -85,6 +85,21 @@ export async function ensureSchema(): Promise<void> {
   await sql`CREATE INDEX IF NOT EXISTS leads_status ON leads (status)`;
   await sql`CREATE INDEX IF NOT EXISTS leads_empreendimento ON leads (empreendimento)`;
 
+  // Histórico de movimentação de etapa do lead — uma linha por mudança
+  await sql`
+    CREATE TABLE IF NOT EXISTS lead_stage_history (
+      id          BIGSERIAL PRIMARY KEY,
+      lead_id     TEXT NOT NULL,
+      lead_nome   TEXT,
+      de          TEXT,
+      para        TEXT NOT NULL,
+      autor       TEXT,
+      changed_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      raw         JSONB NOT NULL DEFAULT '{}'
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS lead_stage_history_lead ON lead_stage_history (lead_id, changed_at DESC)`;
+
   // FCM push notification tokens — um registro por usuário/dispositivo
   await sql`
     CREATE TABLE IF NOT EXISTS fcm_tokens (

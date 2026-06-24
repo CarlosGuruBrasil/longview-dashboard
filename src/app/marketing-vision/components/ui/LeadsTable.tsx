@@ -10,6 +10,7 @@ import {
   toISODate,
 } from '../../utils/leads';
 import { formatDate } from '../../utils/formatters';
+import LeadDrawer from './LeadDrawer';
 
 interface LeadsTableProps {
   leads: Lead[];
@@ -42,6 +43,7 @@ export default function LeadsTable({ leads }: LeadsTableProps) {
   // ── UI state ─────────────────────────────────────────────────────────────
   const [showAdvanced, setShowAdvanced]   = useState(false); // desktop expanded panel
   const [showBottomSheet, setShowBottomSheet] = useState(false); // mobile bottom sheet
+  const [selected, setSelected] = useState<Lead | null>(null); // drawer de detalhes
   const sheetRef = useRef<HTMLDivElement>(null);
 
   // Close bottom sheet on outside tap
@@ -304,14 +306,13 @@ export default function LeadsTable({ leads }: LeadsTableProps) {
           </p>
         ) : displayed.map((lead, idx) => {
           const id     = lead.idlead ?? lead.id;
-          const crmUrl = id ? `https://longviewempreendimentos.cvcrm.com.br/gestor/comercial/leads/${id}/detalhes` : undefined;
           const sc     = getStatusColor(lead);
           const rawDate = lead.data_cad || lead.data_cadastro || lead.data_cadastramento;
           return (
             <div
               key={id ?? idx}
-              onClick={() => crmUrl && window.open(crmUrl, '_blank', 'noopener,noreferrer')}
-              className={`rounded-xl border border-white/10 bg-white/5 p-3 flex flex-col gap-1.5 ${crmUrl ? 'cursor-pointer active:bg-white/10' : ''}`}
+              onClick={() => setSelected(lead)}
+              className="rounded-xl border border-white/10 bg-white/5 p-3 flex flex-col gap-1.5 cursor-pointer active:bg-white/10"
             >
               <div className="flex items-start justify-between gap-2">
                 <span className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
@@ -356,7 +357,6 @@ export default function LeadsTable({ leads }: LeadsTableProps) {
           <tbody>
             {displayed.map((lead, idx) => {
               const id     = lead.idlead ?? lead.id;
-              const crmUrl = id ? `https://longviewempreendimentos.cvcrm.com.br/gestor/comercial/leads/${id}/detalhes` : undefined;
               const tags   = getLeadTags(lead);
               const sc     = getStatusColor(lead);
               const rawDate = lead.data_cad || lead.data_cadastro || lead.data_cadastramento;
@@ -403,16 +403,12 @@ export default function LeadsTable({ leads }: LeadsTableProps) {
                 </>
               );
 
-              return crmUrl ? (
+              return (
                 <tr
                   key={id ?? idx}
                   className="border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer"
-                  onClick={() => window.open(crmUrl, '_blank', 'noopener,noreferrer')}
+                  onClick={() => setSelected(lead)}
                 >
-                  {RowContent}
-                </tr>
-              ) : (
-                <tr key={idx} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                   {RowContent}
                 </tr>
               );
@@ -427,6 +423,9 @@ export default function LeadsTable({ leads }: LeadsTableProps) {
           </tbody>
         </table>
       </div>
+
+      {/* ── Drawer de detalhes do lead ───────────────────────────────────── */}
+      <LeadDrawer lead={selected} onClose={() => setSelected(null)} />
     </div>
   );
 }

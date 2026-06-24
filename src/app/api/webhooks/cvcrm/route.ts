@@ -58,6 +58,22 @@ export async function POST(request: NextRequest) {
     }
     await ensureSchema();
 
+    // Histórico de etapa: detecta mudança comparando com o status já salvo
+    const novaEtapa = lead.situacao?.nome ?? lead.etapa?.nome ?? lead.etapa ?? lead.status ?? null;
+    if (novaEtapa) {
+      const [prev] = await sql`SELECT status FROM leads WHERE id = ${String(lead.id)}`;
+      if (!prev || prev.status !== novaEtapa) {
+        // autor: campos prováveis do CV CRM; raw guardado pra recuperar o que faltar
+        const autor = lead.responsavel?.nome ?? lead.responsavel ?? lead.corretor?.nome
+          ?? lead.corretor ?? lead.usuario?.nome ?? lead.usuario ?? null;
+        await sql`
+          INSERT INTO lead_stage_history (lead_id, lead_nome, de, para, autor, raw)
+          VALUES (${String(lead.id)}, ${lead.nome ?? null}, ${prev?.status ?? null}, ${novaEtapa},
+                  ${autor ? String(autor) : null}, ${JSON.stringify(lead)})
+        `;
+      }
+    }
+
     await sql`
       INSERT INTO leads (
         id, nome, email, telefone, origem, status,
