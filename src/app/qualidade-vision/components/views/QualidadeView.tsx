@@ -199,7 +199,7 @@ export default function QualidadeView() {
   // Dados para pie de resultado
   const pieData = useMemo(() => {
     if (!data) return []
-    const { aprovadas, reprovadas, naoAplica } = data.kpis
+    const { aprovadas = 0, reprovadas = 0, naoAplica = 0 } = data.kpis || {}
     return [
       { name: 'Aprovadas',     value: aprovadas,  color: APROVADA_COLOR  },
       { name: 'Reprovadas',    value: reprovadas, color: REPROVADA_COLOR },
@@ -238,7 +238,18 @@ export default function QualidadeView() {
   if (!data) return null
 
   const { kpis, serieMensal, ultimasInspecoes } = data
-  const totalVerifStr = kpis.totalVerificacoes.toLocaleString('pt-BR')
+  
+  const safeKpis = {
+    totalInspections: Number(kpis?.totalInspections || 0),
+    taxaAprovacao: Number(kpis?.taxaAprovacao || 0),
+    taxaReprovacao: Number(kpis?.taxaReprovacao || 0),
+    totalVerificacoes: Number(kpis?.totalVerificacoes || 0),
+    aprovadas: Number(kpis?.aprovadas || 0),
+    reprovadas: Number(kpis?.reprovadas || 0),
+    naoAplica: Number(kpis?.naoAplica || 0),
+  }
+  
+  const totalVerifStr = safeKpis.totalVerificacoes.toLocaleString('pt-BR')
 
   return (
     <div className="p-4 sm:p-6 flex flex-col gap-5">
@@ -278,29 +289,29 @@ export default function QualidadeView() {
         <KpiCard
           icon={ClipboardCheck}
           label="Total de Inspeções"
-          value={kpis.totalInspections.toLocaleString('pt-BR')}
+          value={safeKpis.totalInspections.toLocaleString('pt-BR')}
           sub={`${startYear}–${endYear}`}
           color="#0ea5e9"
         />
         <KpiCard
           icon={CheckCircle2}
           label="Taxa de Aprovação"
-          value={`${kpis.taxaAprovacao}%`}
-          sub={`${kpis.aprovadas.toLocaleString('pt-BR')} aprovadas de ${totalVerifStr}`}
+          value={`${safeKpis.taxaAprovacao}%`}
+          sub={`${safeKpis.aprovadas.toLocaleString('pt-BR')} aprovadas de ${totalVerifStr}`}
           color="#10b981"
         />
         <KpiCard
           icon={XCircle}
           label="Taxa de Reprovação"
-          value={`${kpis.taxaReprovacao}%`}
-          sub={`${kpis.reprovadas.toLocaleString('pt-BR')} reprovadas`}
+          value={`${safeKpis.taxaReprovacao}%`}
+          sub={`${safeKpis.reprovadas.toLocaleString('pt-BR')} reprovadas`}
           color="#f43f5e"
         />
         <KpiCard
           icon={TrendingUp}
           label="Verificações Totais"
           value={totalVerifStr}
-          sub={`${kpis.naoAplica.toLocaleString('pt-BR')} não se aplica`}
+          sub={`${safeKpis.naoAplica.toLocaleString('pt-BR')} não se aplica`}
           color="#a855f7"
         />
       </div>
@@ -309,21 +320,21 @@ export default function QualidadeView() {
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <GlassCard className="flex flex-col items-center">
           <p className="text-xs text-zinc-500 mb-2">Aprovação Geral</p>
-          <Gauge value={kpis.taxaAprovacao} color="#10b981" />
-          <p className="text-[11px] text-zinc-600 mt-1">{kpis.aprovadas} aprovadas</p>
+          <Gauge value={safeKpis.taxaAprovacao} color="#10b981" />
+          <p className="text-[11px] text-zinc-600 mt-1">{safeKpis.aprovadas} aprovadas</p>
         </GlassCard>
         <GlassCard className="flex flex-col items-center">
           <p className="text-xs text-zinc-500 mb-2">Reprovação</p>
-          <Gauge value={kpis.taxaReprovacao} color="#f43f5e" />
-          <p className="text-[11px] text-zinc-600 mt-1">{kpis.reprovadas} reprovadas</p>
+          <Gauge value={safeKpis.taxaReprovacao} color="#f43f5e" />
+          <p className="text-[11px] text-zinc-600 mt-1">{safeKpis.reprovadas} reprovadas</p>
         </GlassCard>
         <GlassCard className="flex flex-col items-center col-span-2 sm:col-span-1">
           <p className="text-xs text-zinc-500 mb-2">Não se Aplica</p>
           <Gauge
-            value={pct(kpis.naoAplica, kpis.totalVerificacoes)}
+            value={pct(safeKpis.naoAplica, safeKpis.totalVerificacoes)}
             color="#64748b"
           />
-          <p className="text-[11px] text-zinc-600 mt-1">{kpis.naoAplica} itens</p>
+          <p className="text-[11px] text-zinc-600 mt-1">{safeKpis.naoAplica} itens</p>
         </GlassCard>
       </div>
 

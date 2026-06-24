@@ -148,6 +148,6 @@ export async function GET(req: Request) {
     });
   } catch (error: any) {
     console.error('[API/construpoint]', error);
-    return NextResponse.json({ error: 'Erro ao buscar dados do Construpoint no Banco Local' }, { status: 500 });
+    return NextResponse.json({ error: `Erro ao buscar dados no SQL: ${error.message}` }, { status: 500 });
   }
 }
