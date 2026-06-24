@@ -1,17 +1,44 @@
 import type { Lead } from '../types';
-import { toISODate, getLeadDate } from './leads';
+import { toISODate, getLeadDate, isSale } from './leads';
 
 /**
- * Identifies which conversion funnel stage a lead is at
+ * Identifies which conversion funnel stage a lead is at.
+ *
+ * CV CRM stage order (source: CV_STAGE_ORDER in leads.ts):
+ *   aguardando atendimento → em atendimento (SDR/corretor) → visita agendada
+ *   → visita realizada → simulação → com reserva → com proposta → venda realizada
+ *
+ * Leads at ADVANCED stages (post-visita) count as 'visited' so they are
+ * correctly included in attendance, scheduling, and visit rates.
  */
 export function getLeadStage(lead: Lead): 'new' | 'attended' | 'scheduled' | 'visited' | 'none' {
   if (!lead.situacao?.nome) return 'none';
   const s = lead.situacao.nome.toLowerCase().trim();
 
+  // ── Estágios pós-visita (simulação, reserva, proposta, venda) ─────────────
+  // Um lead nesses estágios passou por todo o funil — conta como 'visited'
+  if (
+    isSale(lead) ||                     // venda realizada / negócio ganho
+    s.includes('com proposta') ||
+    s === 'proposta' ||
+    s.includes('com reserva') ||
+    s.includes('reserva') ||
+    s.includes('simula')               // simulação / simulacao
+  ) return 'visited';
+
+  // ── Visita realizada ──────────────────────────────────────────────────────
   if (s.includes('visita realizada') || s.includes('visita realizado')) return 'visited';
+
+  // ── Visita agendada ───────────────────────────────────────────────────────
   if (s.includes('visita agendada') || s.includes('visita agendado')) return 'scheduled';
-  if (s.includes('em atendimento') || s.includes('atendimento sdr')) return 'attended';
-  if (s.includes('aguardando atendimento')) return 'attended';
+
+  // ── Em atendimento (SDR, corretor, aguardando) ────────────────────────────
+  if (
+    s.includes('em atendimento') ||
+    s.includes('atendimento sdr') ||
+    s.includes('atendimento corretor') ||
+    s.includes('aguardando atendimento')
+  ) return 'attended';
 
   return 'new';
 }
@@ -181,11 +208,17 @@ export function calculateMetricsByPeriod(
       const attendedCount = attendance.numerator;
       const scheduledCount = scheduling.numerator;
       const visitedCount = visit.numerator;
-      const proposalCount = periodLeads.filter(l => isComProposta(l)).length;
-      const salesCount = periodLeads.filter(l => {
-        const s = l.situacao?.nome?.toLowerCase() ?? '';
-        return s === 'venda realizada' || s.includes('negócio ganho') || s.includes('negocio ganho');
-      }).length;
+
+      // proposalCount: situacao.nome OU qtde_simulacoes_associadas (consistente
+      // com a lógica original de ProposalVsSalesCard)
+      const proposalCount = periodLeads.filter(l =>
+        isComProposta(l) ||
+        (l.qtde_simulacoes_associadas != null && l.qtde_simulacoes_associadas > 0)
+      ).length;
+
+      // salesCount: usa isSale() de leads.ts (cobre 'venda realizada', 'negócio
+      // ganho', 'vendid', 'venda real') para manter consistência com o restante do app
+      const salesCount = periodLeads.filter(l => isSale(l)).length;
 
       return {
         period,
