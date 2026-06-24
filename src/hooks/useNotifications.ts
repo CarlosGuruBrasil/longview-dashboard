@@ -44,21 +44,22 @@ export function useNotifications() {
     setStatus('requesting');
     try {
       const fcmToken = await requestNotificationToken();
-      if (!fcmToken) {
-        setStatus(Notification.permission === 'denied' ? 'denied' : 'idle');
-        return;
+      if (fcmToken) {
+        setToken(fcmToken);
+        // Salva token no servidor
+        await fetch('/api/notifications/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: fcmToken }),
+        });
       }
-      setToken(fcmToken);
-      setStatus('granted');
-      // Salva token no servidor
-      await fetch('/api/notifications/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: fcmToken }),
-      });
     } catch {
-      setStatus('idle');
+      /* token falhou — ainda assim refletimos a escolha de permissão abaixo */
     }
+    // Reflete a decisão real do usuário: granted/denied fazem o banner sair da tela.
+    // Só volta pra 'idle' se ele fechou o prompt do SO sem escolher.
+    const perm = Notification.permission;
+    setStatus(perm === 'granted' ? 'granted' : perm === 'denied' ? 'denied' : 'idle');
   }, [status]);
 
   return { status, token, requestPermission };
