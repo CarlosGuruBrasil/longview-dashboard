@@ -7,6 +7,7 @@ import StageSummary from '../ui/StageSummary'
 import LeadsTable from '../ui/LeadsTable'
 import GrowthLineChart from '../charts/GrowthLineChart'
 import PieDonutChart from '../charts/PieDonutChart'
+import { getOrigin } from '../../utils/leads'
 
 type SubTab = 'crm' | 'meta-validation' | 'score'
 
@@ -15,24 +16,25 @@ export default function LeadsView() {
   const [activeTab, setActiveTab] = useState<SubTab>('crm')
   const [growthMode, setGrowthMode] = useState<'month' | 'year'>('month')
 
-  // Chart: Gênero
-  const generoData = useMemo(() => {
+  // Chart: Top 7 Origens (dados reais — campo midia_principal/origem da API)
+  const origensData = useMemo(() => {
     const map = new Map<string, number>()
     for (const lead of filteredLeads) {
-      const genero = lead.genero?.trim() || 'Não informado'
-      map.set(genero, (map.get(genero) ?? 0) + 1)
+      const origem = getOrigin(lead)
+      map.set(origem, (map.get(origem) ?? 0) + 1)
     }
     return Array.from(map.entries())
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value)
+      .slice(0, 7)
   }, [filteredLeads])
 
-  // Chart: Top 5 Cidades
+  // Chart: Top 5 Cidades (campo cidade da API — mais preenchido que gênero/estado civil)
   const cidadesData = useMemo(() => {
     const map = new Map<string, number>()
     for (const lead of filteredLeads) {
-      const cidade = lead.cidade?.trim() || 'Não informado'
-      map.set(cidade, (map.get(cidade) ?? 0) + 1)
+      const cidade = lead.cidade?.trim()
+      if (cidade) map.set(cidade, (map.get(cidade) ?? 0) + 1)
     }
     return Array.from(map.entries())
       .map(([name, value]) => ({ name, value }))
@@ -40,15 +42,16 @@ export default function LeadsView() {
       .slice(0, 5)
   }, [filteredLeads])
 
-  // Chart: Estado Civil
-  const estadoCivilData = useMemo(() => {
+  // Chart: Temperatura dos leads (quente/morno/frio — dado qualitativo do corretor)
+  const temperaturaData = useMemo(() => {
     const map = new Map<string, number>()
     for (const lead of filteredLeads) {
-      const estadoCivil = lead.estado_civil?.trim() || 'Não informado'
-      map.set(estadoCivil, (map.get(estadoCivil) ?? 0) + 1)
+      const temp = lead.temperatura?.trim() || 'Não informado'
+      map.set(temp, (map.get(temp) ?? 0) + 1)
     }
     return Array.from(map.entries())
       .map(([name, value]) => ({ name, value }))
+      .filter(d => d.name !== 'Não informado' || d.value > 0)
       .sort((a, b) => b.value - a.value)
   }, [filteredLeads])
 
@@ -84,21 +87,22 @@ export default function LeadsView() {
             onModeChange={setGrowthMode}
           />
 
-          {/* Demographic pie charts */}
+          {/* Charts de perfil — origens, cidades, temperatura */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <PieDonutChart
-              title="Gênero"
-              data={generoData}
+              title="Origem dos Leads"
+              data={origensData.length > 0 ? origensData : [{ name: 'Sem dados', value: 1 }]}
               height={260}
             />
             <PieDonutChart
               title="Top 5 Cidades"
-              data={cidadesData}
+              data={cidadesData.length > 0 ? cidadesData : [{ name: 'Sem dados', value: 1 }]}
               height={260}
             />
             <PieDonutChart
-              title="Estado Civil"
-              data={estadoCivilData}
+              title="Temperatura dos Leads"
+              data={temperaturaData.length > 0 ? temperaturaData : [{ name: 'Sem dados', value: 1 }]}
+              colors={['#f43f5e', '#f97316', '#f59e0b', '#3b82f6', '#6b7280']}
               height={260}
             />
           </div>

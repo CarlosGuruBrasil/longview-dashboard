@@ -37,10 +37,20 @@ export default function CostPerLeadCard({ leads, metaData, loading = false }: Co
     if (!metaData?.campaigns || metaData.campaigns.length === 0) return []
 
     return metaData.campaigns
-      .map(camp => ({
-        name: camp.campaign_name || 'Sem nome',
-        spend: parseFloat(camp.spend || '0') || 0,
-      }))
+      .map(camp => {
+        const spend = parseFloat(camp.spend || '0') || 0
+        // Leads reais da campanha via actions (action_type='lead')
+        const leadAction = camp.actions?.find(
+          a => a.action_type === 'lead' || a.action_type === 'omni_lead'
+        )
+        const leads = leadAction ? (parseInt(leadAction.value, 10) || 0) : 0
+        return {
+          name: camp.campaign_name || 'Sem nome',
+          spend,
+          leads,
+          cpl: leads > 0 ? spend / leads : 0,
+        }
+      })
       .filter(c => c.spend > 0)
       .sort((a, b) => b.spend - a.spend)
   }, [metaData])
@@ -98,7 +108,9 @@ export default function CostPerLeadCard({ leads, metaData, loading = false }: Co
               <thead>
                 <tr className="border-b border-white/10">
                   <th className="text-left py-2 px-3 font-semibold text-zinc-300">Campanha</th>
+                  <th className="text-right py-2 px-3 font-semibold text-zinc-300">Leads</th>
                   <th className="text-right py-2 px-3 font-semibold text-zinc-300">Gasto</th>
+                  <th className="text-right py-2 px-3 font-semibold text-zinc-300">CPL</th>
                 </tr>
               </thead>
               <tbody>
@@ -106,7 +118,11 @@ export default function CostPerLeadCard({ leads, metaData, loading = false }: Co
                   campaignCPL.map((camp, i) => (
                     <tr key={i} className="border-b border-white/[0.05] hover:bg-white/5 transition">
                       <td className="py-3 px-3 text-zinc-200 truncate">{camp.name}</td>
+                      <td className="py-3 px-3 text-right text-zinc-400">{camp.leads || '—'}</td>
                       <td className="py-3 px-3 text-right text-zinc-300">{formatCurrency(camp.spend)}</td>
+                      <td className="py-3 px-3 text-right font-semibold text-emerald-400">
+                        {camp.cpl > 0 ? formatCurrency(camp.cpl) : '—'}
+                      </td>
                     </tr>
                   ))
                 ) : (
@@ -124,15 +140,16 @@ export default function CostPerLeadCard({ leads, metaData, loading = false }: Co
           <div className="space-y-2">
             {campaignCPL.length > 0 ? (
               campaignCPL.map((camp, i) => {
-                const cpl = cplMetric.totalLeads > 0 ? camp.spend / (cplMetric.totalLeads / campaignCPL.length) : 0
                 return (
                   <div key={i} className="flex items-center justify-between bg-white/5 border border-white/10 rounded p-3">
                     <div className="flex-1">
                       <p className="text-sm font-medium text-zinc-200 truncate">{camp.name}</p>
-                      <p className="text-xs text-zinc-500">Gasto: {formatCurrency(camp.spend)}</p>
+                      <p className="text-xs text-zinc-500">Gasto: {formatCurrency(camp.spend)} · {camp.leads} leads</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-bold text-emerald-400">R$ {(cpl || 0).toFixed(2).replace('.', ',')}</p>
+                      <p className="text-sm font-bold text-emerald-400">
+                        {camp.cpl > 0 ? `R$ ${camp.cpl.toFixed(2).replace('.', ',')}` : '—'}
+                      </p>
                     </div>
                   </div>
                 )

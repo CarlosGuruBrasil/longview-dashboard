@@ -37,6 +37,8 @@ export function isLoss(lead: Lead): boolean {
   if (lead.motivo_cancelamento?.nome) return true;
   if (!lead.situacao?.nome) return false;
   const s = lead.situacao.nome.toLowerCase();
+  // "Sem Conexão" é estágio de atendimento no CV CRM (corretor tentou contato
+  // sem sucesso), NÃO uma perda. Leads sem conexão permanecem no pipeline ativo.
   return (
     s.includes('perdido') ||
     s.includes('descartado') ||
@@ -44,9 +46,7 @@ export function isLoss(lead: Lead): boolean {
     s.includes('cancelado') ||
     s.includes('lixeira') ||
     s.includes('desist') ||
-    s.includes('reprovado') ||
-    s.includes('sem conexão') ||
-    s.includes('sem conexao')
+    s.includes('reprovado')
   );
 }
 

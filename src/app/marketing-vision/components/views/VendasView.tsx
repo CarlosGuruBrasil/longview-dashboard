@@ -4,6 +4,7 @@ import { useMemo, useState, useEffect } from 'react'
 import { ShoppingBag, DollarSign, TrendingUp, MousePointerClick, RefreshCw } from 'lucide-react'
 import { useData } from '../../context/DataContext'
 import { isSale, getLeadValueNumber } from '../../utils/leads'
+import { getLeadStage } from '../../utils/metrics'
 import { formatCurrency, formatDate, CHART_PALETTE } from '../../utils/formatters'
 import GlassCard from '../ui/GlassCard'
 import KpiCard from '../ui/KpiCard'
@@ -364,8 +365,11 @@ export default function VendasView() {
 
   // Fallback: usa leads do contexto para KPIs quando CVDW ainda não carregou
   const salesFromLeads = useMemo(() => filteredLeads.filter(isSale), [filteredLeads])
+
+  // Denominador correto: todos os leads que JÁ PASSARAM pela visita
+  // (inclui leads em reserva, proposta, venda — não só os que ainda estão no estágio visita)
   const visitasTotal = useMemo(
-    () => filteredLeads.filter(l => (l.situacao?.nome || '').toLowerCase().includes('visita')).length,
+    () => filteredLeads.filter(l => getLeadStage(l) === 'visited').length,
     [filteredLeads]
   )
 
@@ -454,7 +458,7 @@ export default function VendasView() {
           icon={MousePointerClick}
           label="Visitas → Venda"
           value={`${visitaConvRate}%`}
-          subtitle={`${salesFromLeads.length} vendas / ${visitasTotal} visitas`}
+          subtitle={`${salesFromLeads.length} vendas / ${visitasTotal} visitaram`}
           color="#f59e0b"
         />
       </div>

@@ -209,12 +209,9 @@ export function calculateMetricsByPeriod(
       const scheduledCount = scheduling.numerator;
       const visitedCount = visit.numerator;
 
-      // proposalCount: situacao.nome OU qtde_simulacoes_associadas (consistente
-      // com a lógica original de ProposalVsSalesCard)
-      const proposalCount = periodLeads.filter(l =>
-        isComProposta(l) ||
-        (l.qtde_simulacoes_associadas != null && l.qtde_simulacoes_associadas > 0)
-      ).length;
+      // proposalCount: apenas leads em estágio "Com Proposta" (situacao.nome)
+      // Simulações (qtde_simulacoes_associadas) são cálculos financeiros, não propostas comerciais
+      const proposalCount = periodLeads.filter(l => isComProposta(l)).length;
 
       // salesCount: usa isSale() de leads.ts (cobre 'venda realizada', 'negócio
       // ganho', 'vendid', 'venda real') para manter consistência com o restante do app
@@ -288,8 +285,9 @@ export function calculateProposalVsSales(leads: Lead[]): ProposalVsSalesMetric {
   const currentMonthLeads = monthMap.get(currentMonth) ?? [];
   const previousMonthLeads = monthMap.get(previousMonth) ?? [];
 
-  const comPropostaCount = currentMonthLeads.filter(l => isComProposta(l) || l.qtde_simulacoes_associadas && l.qtde_simulacoes_associadas > 0).length;
-  const comPropostaPrevMonth = previousMonthLeads.filter(l => isComProposta(l) || l.qtde_simulacoes_associadas && l.qtde_simulacoes_associadas > 0).length;
+  // Apenas "Com Proposta" (situacao) — simulações são cálculos financeiros, não propostas comerciais
+  const comPropostaCount = currentMonthLeads.filter(l => isComProposta(l)).length;
+  const comPropostaPrevMonth = previousMonthLeads.filter(l => isComProposta(l)).length;
 
   const vendasCount = currentMonthLeads.filter(l => {
     const s = l.situacao?.nome?.toLowerCase() ?? '';

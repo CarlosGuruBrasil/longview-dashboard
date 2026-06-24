@@ -107,12 +107,17 @@ export default function TrendsChart() {
         : getYearWeek(day.date_start).week.toString()
       if (!dailyMap[key]) dailyMap[key] = { spend: 0, leads: 0 }
       dailyMap[key].spend += parseFloat(day.spend ?? '0') || 0
-      dailyMap[key].leads += parseInt(day.clicks ?? '0', 10) || 0
+      // Usar leads reais do Meta (action_type='lead'), não cliques no link
+      const leadAction = day.actions?.find(
+        a => a.action_type === 'lead' || a.action_type === 'omni_lead'
+      )
+      dailyMap[key].leads += leadAction ? (parseInt(leadAction.value, 10) || 0) : 0
     })
     return chartData.map((d, i) => {
       const entry = dailyMap[String(i)] ?? { spend: 0, leads: 0 }
       const cpl = entry.leads > 0 ? Math.round(entry.spend / entry.leads) : 0
-      return { ...d, thisYear: cpl, lastYear: Math.round(cpl * 1.3) }
+      // Não fabricar dado do ano anterior (era 1.3× hardcoded — dado fictício)
+      return { ...d, thisYear: cpl, lastYear: 0 }
     })
   }, [chartData, metaData, period])
 
