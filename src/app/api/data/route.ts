@@ -354,7 +354,25 @@ export async function GET(request: NextRequest) {
 
   const pgEstoque = await readEstoqueFromPg();
 
-  const leadsResult = pgLeads ?? (liveCRMLeads.status === 'fulfilled' ? liveCRMLeads.value : { leads: [], total: 0, crmTotal: 0 });
+  const leadsResultRaw = (pgLeads ?? (liveCRMLeads.status === 'fulfilled' ? liveCRMLeads.value : null)) ?? { leads: [], total: 0, crmTotal: 0 };
+
+  // ── Escopo por papel ────────────────────────────────────────────────────────
+  // Gestor / Diretoria / Desenvolvedor veem tudo. Demais veem só os leads
+  // ligados a eles (corretor.email ou gestor.email == email do usuário).
+  // Filtro no servidor — não envia leads de terceiros pro navegador.
+  const PRIVILEGED = ['Gestor', 'Diretoria', 'Desenvolvedor'];
+  let leadsResult = leadsResultRaw;
+  if (!PRIVILEGED.includes(authUser.role)) {
+    const myEmail = String(authUser.email || '').toLowerCase().trim();
+    const myName  = String(authUser.name  || '').toLowerCase().trim();
+    const mine = (leadsResultRaw.leads as any[]).filter(l => {
+      const emails = [l.corretor?.email, l.gestor?.email].filter(Boolean).map((e: string) => e.toLowerCase().trim());
+      if (myEmail && emails.includes(myEmail)) return true;
+      const names = [l.corretor?.nome, l.gestor?.nome].filter(Boolean).map((n: string) => n.toLowerCase().trim());
+      return !!myName && names.includes(myName);
+    });
+    leadsResult = { leads: mine, total: mine.length, crmTotal: mine.length };
+  }
 
   const metaFinal = metaData ?? {
     global: null, campaigns: [], campaignDetails: [], adsets: [],
