@@ -28,7 +28,11 @@ export function proxy(request: NextRequest) {
     pathname === '/api/rd/callback'        || // OAuth2 callback — deve ser público
     pathname === '/api/rd/token'           || // status do token — acesso interno
     pathname === '/api/rd/webhook'         || // webhooks do RD — acesso externo
-    pathname === '/api/cv/webhook'         || // webhooks do CV CRM — acesso externo
+    pathname === '/api/cv/webhook'         || // webhooks do CV CRM (legado) — acesso externo
+    pathname === '/api/webhooks/cvcrm'     || // webhooks do CV CRM (grava leads) — acesso externo
+    pathname === '/api/meta/webhook'       || // webhooks do Meta Lead Ads — acesso externo
+    pathname === '/api/webhooks/construpoint' || // webhooks do Construpoint — acesso externo
+    pathname === '/api/notifications/send'  || // envio interno de push — auth via CRON_SECRET
     pathname.startsWith('/api/cron/')              || // cron jobs — autenticados pelo CRON_SECRET
     pathname === '/api/meta/create-lead-ad'        || // lead ad creation — auth via CRON_SECRET
     pathname.startsWith('/l/')                     || // links públicos de rastreio (encurtador)
