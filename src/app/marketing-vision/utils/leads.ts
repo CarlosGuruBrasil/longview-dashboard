@@ -89,15 +89,34 @@ export function getLeadDate(lead: Lead): string {
 }
 
 export function getLeadValueNumber(lead: Lead): number {
-  const val = (isSale(lead) && lead.valor_venda) ? lead.valor_venda : lead.valor_negocio;
-  if (!val) return 0;
-  const numStr = val
-    .toString()
-    .replace(/R\$\s*/g, '')
-    .replace(/\./g, '')
-    .replace(',', '.');
-  const num = parseFloat(numStr);
-  return isNaN(num) ? 0 : num;
+  // Para vendas confirmadas, usa valor_venda (valor real do contrato)
+  // Para demais stages, usa valor_negocio (estimativa manual do corretor)
+  const raw = (isSale(lead) && lead.valor_venda != null && lead.valor_venda !== '')
+    ? lead.valor_venda
+    : lead.valor_negocio;
+  if (!raw) return 0;
+  if (typeof raw === 'number') return raw;
+  const s = String(raw).replace(/R\$\s*/g, '').trim();
+  if (!s) return 0;
+  // Formato brasileiro com vírgula decimal (ex: "500.000,00")
+  if (s.includes(',')) {
+    return parseFloat(s.replace(/\./g, '').replace(',', '.')) || 0;
+  }
+  // Formato americano — ponto é decimal (ex: "793518.00")
+  return parseFloat(s.replace(/,/g, '')) || 0;
+}
+
+/** Valor da reserva/pipeline — usa valor_venda independente do stage */
+export function getReservaValueNumber(lead: Lead): number {
+  const raw = lead.valor_venda;
+  if (!raw) return 0;
+  if (typeof raw === 'number') return raw;
+  const s = String(raw).replace(/R\$\s*/g, '').trim();
+  if (!s) return 0;
+  if (s.includes(',')) {
+    return parseFloat(s.replace(/\./g, '').replace(',', '.')) || 0;
+  }
+  return parseFloat(s.replace(/,/g, '')) || 0;
 }
 
 export function getStatusColor(lead: Lead | string): StatusColor {

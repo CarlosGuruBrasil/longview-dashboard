@@ -26,13 +26,18 @@ export function formatNumber(n: number): string {
 }
 
 export function parseLeadValue(val: string | number | undefined | null): number {
-  if (!val) return 0;
-  const numStr = String(val)
-    .replace(/R\$\s*/g, '')
-    .replace(/\./g, '')
-    .replace(',', '.');
-  const num = parseFloat(numStr);
-  return isNaN(num) ? 0 : num;
+  if (val == null || val === '') return 0;
+  // Se já é número, usa diretamente (ex: valor_venda retorna float da API)
+  if (typeof val === 'number') return val;
+  const s = String(val).replace(/R\$\s*/g, '').trim();
+  if (!s) return 0;
+  // Formato brasileiro: tem vírgula como separador decimal (ex: "1.234,56")
+  if (s.includes(',')) {
+    return parseFloat(s.replace(/\./g, '').replace(',', '.')) || 0;
+  }
+  // Formato americano ou inteiro: ponto é decimal (ex: "793518.00" ou "793518")
+  // Não remover o ponto — é o separador decimal da API do CV CRM
+  return parseFloat(s.replace(/,/g, '')) || 0;
 }
 
 export function toDateInputValue(date: Date): string {

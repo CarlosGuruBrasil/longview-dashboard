@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { Users, DollarSign, MapPin, Banknote } from 'lucide-react'
 import { useData } from '../../context/DataContext'
-import { isSale, getOrigin, getLeadValueNumber } from '../../utils/leads'
+import { isSale, getOrigin, getLeadValueNumber, getReservaValueNumber } from '../../utils/leads'
 import { formatCurrency } from '../../utils/formatters'
 import KpiCard from '../ui/KpiCard'
 import SalesGrowthChart from '../charts/SalesGrowthChart'
@@ -18,20 +18,31 @@ export default function DashboardView() {
 
   const salesLeads = useMemo(() => filteredLeads.filter(isSale), [filteredLeads])
 
-  // Conta por reserva (qtde_reservas_associadas), não por lead único
-  const totalVendasCount = useMemo(
-    () => salesLeads.reduce((acc, l) => acc + (l.qtde_reservas_associadas || 1), 0),
-    [salesLeads]
+  // Leads com reserva ativa (ainda não confirmada como venda)
+  const reservaLeads = useMemo(
+    () => filteredLeads.filter(l => l.situacao?.nome?.toLowerCase() === 'com reserva'),
+    [filteredLeads]
   )
+
+  // Contagem correta: número de leads em "Venda Realizada" (1 lead = 1 negócio fechado)
+  // Não usar qtde_reservas_associadas — reservas ≠ vendas no CV CRM
+  const totalVendasCount = salesLeads.length
 
   const visitCount = useMemo(
     () => filteredLeads.filter(l => l.situacao?.nome?.toLowerCase().includes('visita')).length,
     [filteredLeads]
   )
 
+  // VGV de vendas confirmadas (usa valor_venda, formato americano da API)
   const totalSalesValue = useMemo(
     () => salesLeads.reduce((acc, l) => acc + getLeadValueNumber(l), 0),
     [salesLeads]
+  )
+
+  // VGV em pipeline (reservas ainda não convertidas)
+  const totalReservaValue = useMemo(
+    () => reservaLeads.reduce((acc, l) => acc + getReservaValueNumber(l), 0),
+    [reservaLeads]
   )
 
   // Vendas por Origem — mostra quantidade e VGV das vendas realizadas
@@ -95,13 +106,17 @@ export default function DashboardView() {
 
   return (
     <div className="flex flex-col gap-4 sm:gap-6">
-      {/* KPI Row — gap menor no mobile para cards não ficarem espaçados demais */}
+      {/* KPI Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
         <KpiCard icon={Users} label="Total de Leads" value={filteredLeads.length}
           subtitle={`de ${crmTotal.toLocaleString('pt-BR')} na base`} color="#0ea5e9" />
-        <KpiCard icon={DollarSign} label="Total de Vendas" value={totalVendasCount} color="#10b981" />
+        <KpiCard icon={DollarSign} label="Vendas Realizadas" value={totalVendasCount}
+          subtitle={`VGV ${formatCurrency(totalSalesValue)}`} color="#10b981" />
         <KpiCard icon={MapPin} label="Visitas Realizadas" value={visitCount} color="#f59e0b" />
-        <KpiCard icon={Banknote} label="VGV Total" value={formatCurrency(totalSalesValue)} color="#a855f7" />
+        <KpiCard icon={Banknote} label="VGV em Reserva"
+          value={formatCurrency(totalReservaValue)}
+          subtitle={`${reservaLeads.length} reserva${reservaLeads.length !== 1 ? 's' : ''} ativas`}
+          color="#a855f7" />
       </div>
 
       {/* Gráfico de Vendas Realizadas — largura total */}
