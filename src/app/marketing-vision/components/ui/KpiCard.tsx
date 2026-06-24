@@ -1,16 +1,17 @@
 'use client';
 
-import { ComponentType } from 'react';
+import { ComponentType, ReactNode } from 'react';
 
 interface KpiCardProps {
   icon: ComponentType<{ size?: number; className?: string; style?: React.CSSProperties }>;
   label: string;
   value: string | number;
   subtitle?: string;
+  subtitleNode?: ReactNode;
   color?: string;
 }
 
-export default function KpiCard({ icon: Icon, label, value, subtitle, color = '#0ea5e9' }: KpiCardProps) {
+export default function KpiCard({ icon: Icon, label, value, subtitle, subtitleNode, color = '#0ea5e9' }: KpiCardProps) {
   return (
     <div className="bg-white/5 border border-white/10 rounded-2xl p-3.5 sm:p-5 flex flex-col gap-2 sm:gap-3">
       {/* Icon + label — label truncada para nunca quebrar em 2 linhas */}
@@ -38,7 +39,11 @@ export default function KpiCard({ icon: Icon, label, value, subtitle, color = '#
         >
           {value}
         </p>
-        {subtitle && (
+        {subtitleNode ? (
+          <p className="text-[11px] mt-0.5 flex flex-wrap items-center gap-1" style={{ color: 'var(--text-secondary)' }}>
+            {subtitleNode}
+          </p>
+        ) : subtitle && (
           <p className="text-[11px] mt-0.5 truncate" style={{ color: 'var(--text-secondary)' }}>
             {subtitle}
           </p>

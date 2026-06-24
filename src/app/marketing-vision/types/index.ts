@@ -170,6 +170,7 @@ export interface MetaData {
   platforms: MetaPlatform[];
   devices: MetaDevice[];
   daily: MetaDailyInsight[];
+  monthly?: MetaDailyInsight[];
   leadForms: MetaLeadForm[];
   page: MetaPageInfo | null;
 }
@@ -287,6 +288,7 @@ export type ActiveView =
   | 'audiences'
   | 'links'
   | 'score'
+  | 'trafego'
   | 'metrics';
 export interface DateRange {
   start: string;

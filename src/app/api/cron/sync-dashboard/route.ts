@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     const auth     = { access_token: META_TOKEN };
     const params   = { date_preset: 'maximum' };
 
-    const [global, camps, campDetails, adsets, demo, region, platform, device, daily, forms, page] =
+    const [global, camps, campDetails, adsets, demo, region, platform, device, daily, monthly, forms, page] =
       await Promise.allSettled([
         axios.get(`${metaBase}/insights`, { params: { level: 'account', fields: 'spend,impressions,clicks,reach,frequency,cpc,cpm,ctr,cpp,actions,cost_per_action_type', ...params, ...auth }, timeout: 20000 }),
         axios.get(`${metaBase}/insights`, { params: { level: 'campaign', fields: 'campaign_id,campaign_name,spend,impressions,clicks,reach,frequency,cpc,cpm,ctr,actions,cost_per_action_type,date_start,date_stop', ...params, limit: 500, ...auth }, timeout: 20000 }),
@@ -34,9 +34,10 @@ export async function GET(request: NextRequest) {
         axios.get(`${metaBase}/insights`, { params: { level: 'adset', fields: 'campaign_id,campaign_name,adset_id,adset_name,spend,impressions,clicks,reach,cpc,cpm,ctr,actions,cost_per_action_type', ...params, limit: 500, ...auth }, timeout: 20000 }),
         axios.get(`${metaBase}/insights`, { params: { level: 'account', fields: 'clicks,impressions,spend,reach', breakdowns: 'gender,age', ...params, ...auth }, timeout: 20000 }),
         axios.get(`${metaBase}/insights`, { params: { level: 'account', fields: 'clicks,impressions,spend,reach', breakdowns: 'region', ...params, ...auth }, timeout: 20000 }),
-        axios.get(`${metaBase}/insights`, { params: { level: 'account', fields: 'clicks,impressions,spend,reach', breakdowns: 'publisher_platform', ...params, ...auth }, timeout: 20000 }),
+        axios.get(`${metaBase}/insights`, { params: { level: 'account', fields: 'clicks,impressions,spend,reach,actions', breakdowns: 'publisher_platform', ...params, ...auth }, timeout: 20000 }),
         axios.get(`${metaBase}/insights`, { params: { level: 'account', fields: 'clicks,impressions,spend,reach', breakdowns: 'device_platform', ...params, ...auth }, timeout: 20000 }),
         axios.get(`${metaBase}/insights`, { params: { level: 'account', fields: 'spend,impressions,clicks,reach,actions', time_increment: 1, date_preset: 'last_90d', limit: 90, ...auth }, timeout: 20000 }),
+        axios.get(`${metaBase}/insights`, { params: { level: 'account', fields: 'spend,impressions,clicks,reach,actions', time_increment: 'monthly', date_preset: 'maximum', limit: 60, ...auth }, timeout: 20000 }),
         axios.get(`https://graph.facebook.com/${META_API_VERSION}/${META_PAGE_ID}/leadgen_forms`, { params: { fields: 'id,name,status,leads_count,created_time', limit: 50, ...auth }, timeout: 15000 }),
         axios.get(`https://graph.facebook.com/${META_API_VERSION}/${META_PAGE_ID}`, { params: { fields: 'id,name,fan_count,followers_count,instagram_business_account', ...auth }, timeout: 10000 }),
       ]);
@@ -53,6 +54,7 @@ export async function GET(request: NextRequest) {
       platforms:       get(platform)?.data ?? [],
       devices:         get(device)?.data ?? [],
       daily:           get(daily)?.data ?? [],
+      monthly:         get(monthly)?.data ?? [],
       leadForms:       get(forms)?.data ?? [],
       page:            get(page) ?? null,
     };

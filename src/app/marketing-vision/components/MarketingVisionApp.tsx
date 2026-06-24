@@ -13,6 +13,7 @@ const EmpreendimentosView = lazy(() => import('./views/EmpreendimentosView'));
 const VendasView         = lazy(() => import('./views/VendasView'));
 const MetricsView        = lazy(() => import('./views/MetricsView'));
 const MarketingAdsView   = lazy(() => import('./views/MarketingAdsView'));
+const TrafegoView        = lazy(() => import('./views/TrafegoView'));
 const PublicarView       = lazy(() => import('./views/PublicarView'));
 const AudienciasView     = lazy(() => import('./views/AudienciasView'));
 const ScoreView          = lazy(() => import('./views/ScoreView'));
@@ -29,6 +30,7 @@ function ViewRouter() {
     vendas:          <VendasView />,
     metrics:         <MetricsView />,
     marketing:       <MarketingAdsView />,
+    trafego:         <TrafegoView />,
     publicar:        <PublicarView />,
     audiences:       <AudienciasView />,
     links:           <LinksView />,

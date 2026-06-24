@@ -5,7 +5,7 @@ import Image from 'next/image';
 import {
   LayoutDashboard, Users, TrendingUp, Building2, DollarSign,
   Megaphone, Send, UsersRound, Link as LinkIcon, X,
-  BarChart2, Target, ChevronRight, RefreshCw,
+  BarChart2, Target, ChevronRight, RefreshCw, Gauge,
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import type { ActiveView } from '../types';
@@ -65,6 +65,7 @@ const VIEW_TITLES: Record<ActiveView, string> = {
   empreendimentos: 'Empreendimentos',
   vendas:          'Vendas',
   metrics:         'Métricas',
+  trafego:         'Tráfego',
   marketing:       'Marketing ADS',
   publicar:        'Publicar',
   audiences:       'Audiências CRM',
@@ -88,6 +89,7 @@ const DRAWER_NAV = [
   { icon: Building2,       label: 'Empreendimentos', view: 'empreendimentos' as ActiveView },
   { icon: DollarSign,      label: 'Vendas',          view: 'vendas'          as ActiveView },
   { icon: Megaphone,       label: 'Marketing ADS',   view: 'marketing'       as ActiveView },
+  { icon: Gauge,           label: 'Tráfego',         view: 'trafego'         as ActiveView },
   { icon: BarChart2,       label: 'Score de Leads',  view: 'score'           as ActiveView },
   { icon: Send,            label: 'Publicar',        view: 'publicar'        as ActiveView },
   { icon: UsersRound,      label: 'Audiências CRM',  view: 'audiences'       as ActiveView },
