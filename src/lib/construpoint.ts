@@ -94,7 +94,7 @@ async function getToken(): Promise<string> {
   if (_cachedToken && Date.now() < _tokenExpiry) return _cachedToken;
 
   const basicAuth = process.env.CONSTRUPOINT_BASIC_AUTH
-    ?? 'YTMyYjVlMmVkZGRhNGJmN2I2YjE4ZjE0ZDFhY2xOWE6TG9uZ3ZpZXdATG9uZ3ZpZXc=';
+    ?? 'YTMyYjVlMmVkZGRhNGJmN2I2YmY4ZjE0ZDFhY2QxOWE6TG9uZ3ZpZXdATG9uZ3ZpZXc=';
   const username  = process.env.CONSTRUPOINT_USERNAME ?? 'adminapi_longview@e-construmarket.com.br';
   const password  = process.env.CONSTRUPOINT_PASSWORD ?? '*GSuG8U8';
 
