@@ -3,6 +3,7 @@
 import { useData } from '../../context/DataContext'
 import KpiGaugeHistoryCard from '../metrics/KpiGaugeHistoryCard'
 import CostPerLeadCard from '../metrics/CostPerLeadCard'
+import AlertsPanel from '../ui/AlertsPanel'
 
 export default function MetricsView() {
   const { filteredLeads, metaData, loading } = useData()
@@ -24,6 +25,14 @@ export default function MetricsView() {
 
   return (
     <div className="flex flex-col gap-5">
+
+      {/* ── Alertas e sugestões ── */}
+      <section>
+        <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest mb-3 px-0.5">
+          Alertas &amp; Sugestões
+        </h2>
+        <AlertsPanel />
+      </section>
 
       {/* ── Funil de conversão: 4 KPIs ── */}
       <section>
