@@ -5,13 +5,57 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    // CV CRM envia o lead diretamente ou dentro de { lead: {...} }
+    // CV CRM envia payload em várias chaves (lead, venda, unidade) dependendo do evento
     const lead = body?.lead ?? body;
+    const venda = body?.venda;
+    const unidade = body?.unidade;
+
+    const { sql, ensureSchema } = await import('@/lib/pg');
+    await ensureSchema();
+
+    // -- Tratar Evento de Venda --
+    if (venda?.idvenda || body?.idvenda) {
+      const v = venda || body;
+      const dVenda = v.data_venda ? new Date(v.data_venda) : null;
+      const valor = v.valor_venda ? parseFloat(v.valor_venda) : null;
+      await sql`
+        INSERT INTO cv_vendas (id, id_empreendimento, id_unidade, valor, data_venda, status, raw, synced_at)
+        VALUES (${v.idvenda}, ${v.idempreendimento ?? null}, ${v.idunidade ?? null}, ${valor}, ${dVenda}, ${v.situacao ?? null}, ${JSON.stringify(v)}, NOW())
+        ON CONFLICT (id) DO UPDATE SET
+          id_empreendimento = EXCLUDED.id_empreendimento, id_unidade = EXCLUDED.id_unidade, valor = EXCLUDED.valor,
+          data_venda = EXCLUDED.data_venda, status = EXCLUDED.status, raw = EXCLUDED.raw, synced_at = EXCLUDED.synced_at
+      `;
+      console.log(`[webhook/cvcrm] Venda ${v.idvenda} upserted`);
+      return NextResponse.json({ ok: true });
+    }
+
+    // -- Tratar Evento de Unidade --
+    if (unidade?.idunidade || body?.idunidade) {
+      const u = unidade || body;
+      const sitObj = u.situacao || {};
+      const statusVenda = Number(sitObj.situacao_para_venda ?? u.status_venda ?? 0);
+      let statusText = 'Desconhecido';
+      if (statusVenda === 1) statusText = 'Disponivel';
+      else if (statusVenda === 2 || statusVenda === 5 || sitObj.reservada != null) statusText = 'Reservado';
+      else if (statusVenda === 3 || sitObj.vendida != null || sitObj.vendida_idsituacao === 3) statusText = 'Vendido';
+
+      const valor = parseFloat(u.valor) || null;
+      const metragem = parseFloat(u.metragem_real) || null;
+
+      await sql`
+        INSERT INTO cv_unidades (id, id_empreendimento, bloco, numero, status, status_venda, valor, metragem, raw, synced_at)
+        VALUES (${u.idunidade}, ${u.idempreendimento ?? null}, ${u.bloco_nome ?? u.bloco ?? null}, ${u.nome ?? u.numero ?? null}, ${statusText}, ${statusVenda}, ${valor}, ${metragem}, ${JSON.stringify(u)}, NOW())
+        ON CONFLICT (id) DO UPDATE SET
+          status = EXCLUDED.status, status_venda = EXCLUDED.status_venda, valor = EXCLUDED.valor, raw = EXCLUDED.raw, synced_at = EXCLUDED.synced_at
+      `;
+      console.log(`[webhook/cvcrm] Unidade ${u.idunidade} upserted`);
+      return NextResponse.json({ ok: true });
+    }
+
+    // -- Tratar Evento de Lead (Legado) --
     if (!lead?.id) {
       return NextResponse.json({ ok: false, error: 'payload sem id' }, { status: 400 });
     }
-
-    const { sql, ensureSchema } = await import('@/lib/pg');
     await ensureSchema();
 
     await sql`

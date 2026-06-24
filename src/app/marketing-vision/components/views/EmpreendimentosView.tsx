@@ -1,118 +1,34 @@
 'use client'
 
-import { useMemo } from 'react'
-import { Building2, Users } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Building2, Users, DollarSign, ChevronDown, ChevronUp } from 'lucide-react'
 import { useData } from '../../context/DataContext'
 import GlassCard from '../ui/GlassCard'
 
-interface UnitCounts {
-  total: number
-  disponivel: number
-  reservado: number
-  vendido: number
+function formatCurrency(val: number) {
+  return new Intl.NumberFormat('pt-BR', { 
+    style: 'currency', 
+    currency: 'BRL', 
+    maximumFractionDigits: 0 
+  }).format(val || 0);
 }
 
-function parseUnitCounts(raw: unknown): UnitCounts {
-  const counts: UnitCounts = { total: 0, disponivel: 0, reservado: 0, vendido: 0 }
-
-  if (!raw || typeof raw !== 'object') return counts
-
-  const obj = raw as Record<string, unknown>
-
-  // 1. Caso os dados venham estruturados em etapas -> blocos -> unidades (Padrão real do CV CRM detalhado)
-  if (Array.isArray(obj.etapas)) {
-    for (const etapa of obj.etapas) {
-      if (etapa && typeof etapa === 'object' && Array.isArray(etapa.blocos)) {
-        for (const bloco of etapa.blocos) {
-          if (bloco && typeof bloco === 'object' && Array.isArray(bloco.unidades)) {
-            for (const unidade of bloco.unidades) {
-              if (unidade && typeof unidade === 'object') {
-                counts.total++
-                const sit = (unidade.situacao || {}) as Record<string, unknown>
-                const statusVenda = Number(sit.situacao_para_venda ?? 0)
-
-                if (statusVenda === 1) {
-                  counts.disponivel++
-                } else if (statusVenda === 2 || statusVenda === 5 || sit.reservada != null) {
-                  counts.reservado++
-                } else if (statusVenda === 3 || sit.vendida != null || sit.vendida_idsituacao === 3) {
-                  counts.vendido++
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-
-  // 2. Fallback caso venha em formato plano de chaves (como na lógica legada)
-  if (counts.total === 0) {
-    for (const key of Object.keys(obj)) {
-      const lower = key.toLowerCase()
-      const val = Number(obj[key] ?? 0)
-      if (!isNaN(val)) {
-        if (lower.includes('disponiv')) counts.disponivel += val
-        else if (lower.includes('reserv')) counts.reservado += val
-        else if (lower.includes('vendid') || lower.includes('venda')) counts.vendido += val
-        else if (lower === 'total' || lower === 'total_unidades') counts.total += val
-      }
-    }
-
-    const unitsKey = ['unidades', 'units', 'imoveis'].find(k => Array.isArray(obj[k]))
-    if (unitsKey) {
-      const units = obj[unitsKey] as Array<Record<string, unknown>>
-      counts.total = units.length
-      counts.disponivel = 0
-      counts.reservado = 0
-      counts.vendido = 0
-      for (const unit of units) {
-        const status = String(unit.status ?? unit.situacao ?? unit.situacao_nome ?? '').toLowerCase()
-        if (status.includes('disponiv')) counts.disponivel++
-        else if (status.includes('reserv')) counts.reservado++
-        else if (status.includes('vendid') || status.includes('venda')) counts.vendido++
-      }
-    }
-  }
-
-  if (counts.total === 0) {
-    counts.total = counts.disponivel + counts.reservado + counts.vendido
-  }
-
-  return counts
-}
-
-function AvailabilityBar({ counts }: { counts: UnitCounts }) {
-  const total = counts.total || 1
-  const dispPct = (counts.disponivel / total) * 100
-  const resPct = (counts.reservado / total) * 100
-  const vendPct = (counts.vendido / total) * 100
+function AvailabilityBar({ disponivel, reservado, vendido, total }: { disponivel: number, reservado: number, vendido: number, total: number }) {
+  const t = total || 1;
+  const dispPct = (disponivel / t) * 100;
+  const resPct = (reservado / t) * 100;
+  const vendPct = (vendido / t) * 100;
 
   return (
-    <div className="flex h-2 w-full rounded-full overflow-hidden gap-0.5">
-      <div
-        className="rounded-l-full transition-all"
-        style={{ width: `${dispPct}%`, backgroundColor: '#10b981', minWidth: dispPct > 0 ? 4 : 0 }}
-      />
-      <div
-        className="transition-all"
-        style={{ width: `${resPct}%`, backgroundColor: '#f59e0b', minWidth: resPct > 0 ? 4 : 0 }}
-      />
-      <div
-        className="rounded-r-full transition-all"
-        style={{ width: `${vendPct}%`, backgroundColor: '#0ea5e9', minWidth: vendPct > 0 ? 4 : 0 }}
-      />
+    <div className="flex h-2 w-full rounded-full overflow-hidden gap-0.5 mt-2">
+      <div className="transition-all" style={{ width: `${dispPct}%`, backgroundColor: '#10b981', minWidth: dispPct > 0 ? 4 : 0 }} />
+      <div className="transition-all" style={{ width: `${resPct}%`, backgroundColor: '#f59e0b', minWidth: resPct > 0 ? 4 : 0 }} />
+      <div className="transition-all" style={{ width: `${vendPct}%`, backgroundColor: '#0ea5e9', minWidth: vendPct > 0 ? 4 : 0 }} />
     </div>
   )
 }
 
-interface StatPillProps {
-  label: string
-  count: number
-  color: string
-}
-
-function StatPill({ label, count, color }: StatPillProps) {
+function StatPill({ label, count, color }: { label: string, count: number, color: string }) {
   return (
     <div className="flex flex-col items-center gap-0.5">
       <span className="text-lg font-bold" style={{ color }}>{count}</span>
@@ -122,14 +38,12 @@ function StatPill({ label, count, color }: StatPillProps) {
 }
 
 export default function EmpreendimentosView() {
-  const { estoque, filteredLeads } = useData()
-  const projects = useMemo(() => {
-    return Object.entries(estoque).filter(([_, rawData]) => {
-      if (!rawData || typeof rawData !== 'object') return false
-      const obj = rawData as Record<string, any>
-      return obj.tipo_empreendimento?.[0]?.nome !== null && obj.situacao_comercial?.[0]?.nome !== null
-    })
-  }, [estoque])
+  const { estoque, filteredLeads } = useData();
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+
+  const empreendimentos = Array.isArray(estoque?.empreendimentos) ? estoque.empreendimentos : [];
+  const resumo = Array.isArray(estoque?.resumo) ? estoque.resumo : [];
+  const unidades = Array.isArray(estoque?.unidades) ? estoque.unidades : [];
 
   const leadCountByProject = useMemo(() => {
     const map = new Map<string, number>()
@@ -143,15 +57,15 @@ export default function EmpreendimentosView() {
     return map
   }, [filteredLeads])
 
-  if (projects.length === 0) {
+  if (empreendimentos.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-24 gap-4">
         <Building2 size={48} className="opacity-20" style={{ color: 'var(--text-secondary)' }} />
         <p className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
           Nenhum empreendimento encontrado
         </p>
-        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-          Os dados de estoque serão exibidos aqui quando disponíveis.
+        <p className="text-sm text-center max-w-md" style={{ color: 'var(--text-secondary)' }}>
+          A sincronização com o banco de dados local pode estar em andamento ou a tabela ainda está vazia. Aguarde alguns instantes.
         </p>
       </div>
     )
@@ -159,82 +73,142 @@ export default function EmpreendimentosView() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {projects.map(([projectId, rawData]) => {
-          const counts = parseUnitCounts(rawData)
-
-          // Try to get project name from the raw data
-          let projectName = projectId
-          if (rawData && typeof rawData === 'object') {
-            const obj = rawData as Record<string, unknown>
-            const nameKey = ['nome', 'name', 'empreendimento', 'titulo'].find(k => typeof obj[k] === 'string')
-            if (nameKey) projectName = String(obj[nameKey])
-          }
-
-          const leadCount = leadCountByProject.get(projectName) ?? leadCountByProject.get(projectId) ?? 0
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        {empreendimentos.map((emp) => {
+          const stats = resumo.find(r => r.id_empreendimento === emp.id) || {
+            total: 0, disponivel: 0, reservado: 0, vendido: 0, vgv_disponivel: 0, vgv_vendido: 0
+          };
+          const leadCount = leadCountByProject.get(emp.nome) ?? 0;
+          const isExpanded = expandedId === emp.id;
+          const unidadesProjeto = unidades.filter(u => u.id_empreendimento === emp.id && u.status === 'Disponivel');
 
           return (
-            <GlassCard key={projectId}>
+            <GlassCard key={emp.id}>
               <div className="flex flex-col gap-4">
                 {/* Header */}
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <div
-                      className="flex items-center justify-center w-10 h-10 rounded-xl flex-shrink-0"
+                      className="flex items-center justify-center w-12 h-12 rounded-xl flex-shrink-0"
                       style={{ backgroundColor: '#0ea5e922' }}
                     >
-                      <Building2 size={18} style={{ color: '#0ea5e9' }} />
+                      <Building2 size={24} style={{ color: '#0ea5e9' }} />
                     </div>
                     <div>
-                      <h3 className="text-sm font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>
-                        {projectName}
+                      <h3 className="text-lg font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>
+                        {emp.nome}
                       </h3>
-                      <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-                        ID: {projectId}
-                      </p>
+                      <div className="flex items-center gap-2 mt-1 text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
+                        <span className="px-2 py-0.5 rounded bg-white/5">{emp.situacao || 'Desconhecido'}</span>
+                        <span className="px-2 py-0.5 rounded bg-white/5">{emp.tipo || 'Desconhecido'}</span>
+                      </div>
                     </div>
                   </div>
                   {leadCount > 0 && (
-                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 flex-shrink-0">
-                      <Users size={12} style={{ color: '#a855f7' }} />
-                      <span className="text-xs font-medium" style={{ color: '#a855f7' }}>{leadCount}</span>
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 flex-shrink-0">
+                      <Users size={14} style={{ color: '#a855f7' }} />
+                      <span className="text-sm font-bold" style={{ color: '#a855f7' }}>{leadCount} Leads</span>
                     </div>
                   )}
                 </div>
 
+                {/* VGV and Financial Metrics */}
+                <div className="grid grid-cols-2 gap-4 py-4 mt-2 border-y border-white/10">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>VGV Disponível</span>
+                    <span className="text-2xl font-bold" style={{ color: '#10b981' }}>{formatCurrency(stats.vgv_disponivel)}</span>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>VGV Vendido / Res.</span>
+                    <span className="text-2xl font-bold" style={{ color: '#0ea5e9' }}>{formatCurrency(stats.vgv_vendido)}</span>
+                  </div>
+                </div>
+
                 {/* Unit counts */}
-                <div className="grid grid-cols-4 gap-2 py-3 border-y border-white/10">
-                  <StatPill label="Total" count={counts.total} color="var(--text-primary)" />
-                  <StatPill label="Disponível" count={counts.disponivel} color="#10b981" />
-                  <StatPill label="Reservado" count={counts.reservado} color="#f59e0b" />
-                  <StatPill label="Vendido" count={counts.vendido} color="#0ea5e9" />
+                <div className="grid grid-cols-4 gap-2 pt-2">
+                  <StatPill label="Total" count={stats.total} color="var(--text-primary)" />
+                  <StatPill label="Disponível" count={stats.disponivel} color="#10b981" />
+                  <StatPill label="Reservado" count={stats.reservado} color="#f59e0b" />
+                  <StatPill label="Vendido" count={stats.vendido} color="#0ea5e9" />
                 </div>
 
                 {/* Availability bar */}
-                {counts.total > 0 && (
-                  <div className="flex flex-col gap-2">
-                    <AvailabilityBar counts={counts} />
-                    <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--text-secondary)' }}>
-                      <span className="flex items-center gap-1">
-                        <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: '#10b981' }} />
-                        {counts.total > 0 ? ((counts.disponivel / counts.total) * 100).toFixed(0) : 0}% disp.
+                {stats.total > 0 ? (
+                  <div className="flex flex-col gap-2 mt-2">
+                    <AvailabilityBar 
+                      disponivel={stats.disponivel} 
+                      reservado={stats.reservado} 
+                      vendido={stats.vendido} 
+                      total={stats.total} 
+                    />
+                    <div className="flex items-center justify-between text-xs font-medium mt-1" style={{ color: 'var(--text-secondary)' }}>
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: '#10b981' }} />
+                        {((stats.disponivel / stats.total) * 100).toFixed(1)}% disp.
                       </span>
-                      <span className="flex items-center gap-1">
-                        <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: '#f59e0b' }} />
-                        {counts.total > 0 ? ((counts.reservado / counts.total) * 100).toFixed(0) : 0}% res.
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: '#f59e0b' }} />
+                        {((stats.reservado / stats.total) * 100).toFixed(1)}% res.
                       </span>
-                      <span className="flex items-center gap-1">
-                        <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: '#0ea5e9' }} />
-                        {counts.total > 0 ? ((counts.vendido / counts.total) * 100).toFixed(0) : 0}% vend.
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: '#0ea5e9' }} />
+                        {((stats.vendido / stats.total) * 100).toFixed(1)}% vend.
                       </span>
                     </div>
                   </div>
+                ) : (
+                  <p className="text-xs text-center py-2 opacity-40" style={{ color: 'var(--text-secondary)' }}>
+                    Dados de unidades não contabilizados
+                  </p>
                 )}
 
-                {counts.total === 0 && (
-                  <p className="text-xs text-center py-2 opacity-40" style={{ color: 'var(--text-secondary)' }}>
-                    Dados de unidades não disponíveis
-                  </p>
+                {/* Expand / Collapse Units Table */}
+                {stats.disponivel > 0 && (
+                  <div className="mt-2">
+                    <button 
+                      onClick={() => setExpandedId(isExpanded ? null : emp.id)}
+                      className="flex items-center justify-center w-full gap-2 py-2 text-xs font-medium transition-colors rounded-lg hover:bg-white/5"
+                      style={{ color: 'var(--text-primary)' }}
+                    >
+                      {isExpanded ? 'Ocultar Disponibilidade' : 'Ver Unidades Disponíveis'}
+                      {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                    </button>
+                    
+                    {isExpanded && (
+                      <div className="mt-4 overflow-hidden rounded-lg border border-white/10 bg-black/20">
+                        <div className="max-h-60 overflow-y-auto custom-scrollbar">
+                          <table className="w-full text-left text-xs">
+                            <thead className="sticky top-0 bg-[#1e293b] text-white/70">
+                              <tr>
+                                <th className="p-3 font-medium">Bloco/Unid.</th>
+                                <th className="p-3 font-medium">Metragem</th>
+                                <th className="p-3 font-medium text-right">Valor</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-white/5">
+                              {unidadesProjeto.length > 0 ? unidadesProjeto.map(u => (
+                                <tr key={u.id} className="hover:bg-white/5 transition-colors">
+                                  <td className="p-3" style={{ color: 'var(--text-primary)' }}>
+                                    {u.bloco ? `${u.bloco} - ` : ''}{u.numero}
+                                  </td>
+                                  <td className="p-3" style={{ color: 'var(--text-secondary)' }}>
+                                    {u.metragem ? `${u.metragem} m²` : '-'}
+                                  </td>
+                                  <td className="p-3 text-right font-medium text-[#10b981]">
+                                    {u.valor ? formatCurrency(u.valor) : 'Consulte'}
+                                  </td>
+                                </tr>
+                              )) : (
+                                <tr>
+                                  <td colSpan={3} className="p-4 text-center opacity-50">Nenhuma unidade disponível mapeada</td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             </GlassCard>

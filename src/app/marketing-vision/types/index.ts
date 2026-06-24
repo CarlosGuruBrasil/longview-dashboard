@@ -172,14 +172,26 @@ export interface MetaData {
 
 // ── Estoque ───────────────────────────────────────────────────────────────────
 
-export interface EstoqueProject {
-  idempreendimento?: string;
-  nome?: string;
-  [key: string]: unknown;
-}
-
 export interface EstoqueData {
-  [projectId: string]: unknown;
+  empreendimentos: { id: number; nome: string; situacao: string; tipo: string }[];
+  resumo: {
+    id_empreendimento: number;
+    total: number;
+    disponivel: number;
+    reservado: number;
+    vendido: number;
+    vgv_disponivel: number;
+    vgv_vendido: number;
+  }[];
+  unidades: {
+    id: number;
+    id_empreendimento: number;
+    bloco: string;
+    numero: string;
+    status: string;
+    valor: number;
+    metragem: number;
+  }[];
 }
 
 // ── API response ──────────────────────────────────────────────────────────────

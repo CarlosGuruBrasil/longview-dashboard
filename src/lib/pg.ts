@@ -100,5 +100,84 @@ export async function ensureSchema(): Promise<void> {
   await sql`CREATE INDEX IF NOT EXISTS fcm_tokens_user_id ON fcm_tokens (user_id)`;
   await sql`CREATE INDEX IF NOT EXISTS fcm_tokens_user_role ON fcm_tokens (user_role)`;
 
+  // --- Novas tabelas Arquitetura Webhook ---
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS construpoint_inspecoes (
+      id               BIGINT PRIMARY KEY,
+      code             TEXT,
+      modelo           TEXT,
+      obra             TEXT,
+      local            TEXT,
+      inspetor         TEXT,
+      status           TEXT,
+      data_criacao     TIMESTAMPTZ,
+      data_agendamento TIMESTAMPTZ,
+      data_atualizacao TIMESTAMPTZ,
+      nota             NUMERIC,
+      raw              JSONB NOT NULL DEFAULT '{}',
+      synced_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS construpoint_verificacoes (
+      id_serial        BIGSERIAL PRIMARY KEY,
+      codigo           TEXT,
+      modelo           TEXT,
+      verificacao      TEXT,
+      resultado        TEXT,
+      obra             TEXT,
+      local            TEXT,
+      inspetor         TEXT,
+      problema         TEXT,
+      solucao          TEXT,
+      data             TIMESTAMPTZ,
+      nota_inspecao    NUMERIC,
+      nota_item        NUMERIC,
+      raw              JSONB NOT NULL DEFAULT '{}',
+      synced_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS cv_empreendimentos (
+      id               BIGINT PRIMARY KEY,
+      nome             TEXT,
+      situacao         TEXT,
+      tipo             TEXT,
+      raw              JSONB NOT NULL DEFAULT '{}',
+      synced_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS cv_unidades (
+      id                BIGINT PRIMARY KEY,
+      id_empreendimento BIGINT REFERENCES cv_empreendimentos(id) ON DELETE CASCADE,
+      bloco             TEXT,
+      numero            TEXT,
+      status            TEXT,
+      status_venda      INTEGER,
+      valor             NUMERIC,
+      metragem          NUMERIC,
+      raw               JSONB NOT NULL DEFAULT '{}',
+      synced_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS cv_vendas (
+      id                BIGINT PRIMARY KEY,
+      id_empreendimento BIGINT,
+      id_unidade        BIGINT,
+      valor             NUMERIC,
+      data_venda        TIMESTAMPTZ,
+      status            TEXT,
+      raw               JSONB NOT NULL DEFAULT '{}',
+      synced_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+
   schemaReady = true;
 }

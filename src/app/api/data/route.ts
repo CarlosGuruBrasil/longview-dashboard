@@ -45,6 +45,34 @@ async function readLeadsFromPg(): Promise<{ leads: any[]; total: number; crmTota
   }
 }
 
+async function readEstoqueFromPg() {
+  if (!process.env.DATABASE_URL) return null;
+  try {
+    const { sql, ensureSchema } = await import('@/lib/pg');
+    await ensureSchema();
+    const empreendimentos = await sql`SELECT id, nome, situacao, tipo FROM cv_empreendimentos`;
+    const resumo = await sql`
+      SELECT 
+        id_empreendimento,
+        COUNT(*)::int as total,
+        COUNT(*) FILTER (WHERE status = 'Disponivel')::int as disponivel,
+        COUNT(*) FILTER (WHERE status = 'Reservado')::int as reservado,
+        COUNT(*) FILTER (WHERE status = 'Vendido')::int as vendido,
+        COALESCE(SUM(valor) FILTER (WHERE status = 'Disponivel'), 0)::float as vgv_disponivel,
+        COALESCE(SUM(valor) FILTER (WHERE status = 'Vendido' OR status = 'Reservado'), 0)::float as vgv_vendido
+      FROM cv_unidades
+      GROUP BY id_empreendimento
+    `;
+    const unidades = await sql`SELECT id, id_empreendimento, bloco, numero, status, valor, metragem FROM cv_unidades`;
+    
+    if (empreendimentos.length === 0) return null;
+    return { empreendimentos, resumo, unidades };
+  } catch(e: any) {
+    console.warn('[/api/data] Postgres estoque falhou:', e.message);
+    return null;
+  }
+}
+
 // Fallback: busca ao vivo do CRM (quando Postgres vazio)
 async function fetchAllCRMLeads(email: string, token: string) {
   const headers = { email, token, Accept: 'application/json' };
@@ -294,47 +322,22 @@ export async function GET(request: NextRequest) {
   // ---------- LEADS (sempre do Postgres, webhook mantém atualizado) ----------
   const pgLeads = await readLeadsFromPg();
 
-  // ---------- META + ESTOQUE (do cache Postgres, a menos que filtrado por data ou forceRefresh) ----------
+  // ---------- META (do cache Postgres, a menos que filtrado por data ou forceRefresh) ----------
   let metaData: any  = null;
-  let estoqueData: any = null;
 
   if (!isFiltered && !forceRefresh) {
     const metaCache    = await readPgCache('meta_cache');
-    const estoqueCache = await readPgCache('estoque_cache');
     if (metaCache?.data)    metaData    = metaCache.data;
-    if (estoqueCache?.estoque) estoqueData = estoqueCache;
   }
 
   // Se cache vazio/filtrado, busca ao vivo
   const needMetaLive    = !metaData;
-  const needEstoqueLive = !estoqueData;
 
   const CV_EMAIL = process.env.CV_CRM_EMAIL!;
   const CV_TOKEN = process.env.CV_CRM_TOKEN!;
 
-  const [liveMetaResult, liveEstoqueResult, liveCRMLeads] = await Promise.allSettled([
+  const [liveMetaResult, liveCRMLeads] = await Promise.allSettled([
     needMetaLive    ? fetchMetaLive(startDate, endDate) : Promise.resolve(null),
-    needEstoqueLive ? (async () => {
-      const headers = { email: CV_EMAIL, token: CV_TOKEN, Accept: 'application/json' };
-      const projRes = await axios.get('https://longviewempreendimentos.cvcrm.com.br/api/v1/cadastros/empreendimentos', { headers, timeout: 12000 });
-      const projects = Array.isArray(projRes.data) ? projRes.data : [];
-      // Filtra apenas os empreendimentos que têm tipo e situação comercial válidos (não nulos)
-      const validProjects = projects.filter((p: any) => 
-        p.tipo_empreendimento?.[0]?.nome !== null && 
-        p.situacao_comercial?.[0]?.nome !== null
-      );
-      const ids = validProjects.map((p: any) => p.idempreendimento).filter(Boolean);
-      const estoqueItems = await Promise.allSettled(
-        ids.map((id: string) =>
-          axios.get(`https://longviewempreendimentos.cvcrm.com.br/api/v1/cadastros/empreendimentos/${id}`,
-            { params: { limite_dados_unidade: 1000 }, headers, timeout: 12000 }
-          ).then(r => ({ id, data: r.data }))
-        )
-      );
-      const estoqueMap: Record<string, any> = {};
-      estoqueItems.forEach((r: any) => { if (r.status === 'fulfilled') estoqueMap[r.value.id] = r.value.data; });
-      return { projects: validProjects, estoque: estoqueMap };
-    })() : Promise.resolve(null),
     !pgLeads ? fetchAllCRMLeads(CV_EMAIL, CV_TOKEN) : Promise.resolve(null),
   ]);
 
@@ -349,15 +352,7 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  if (needEstoqueLive && liveEstoqueResult.status === 'fulfilled' && liveEstoqueResult.value) {
-    estoqueData = liveEstoqueResult.value as any;
-    if (!isFiltered) {
-      import('@/lib/pg').then(({ sql }) =>
-        sql`INSERT INTO project_state (key, data) VALUES ('estoque_cache', ${JSON.stringify({ ...estoqueData, updatedAt: new Date().toISOString() })})
-            ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data`.catch(() => {})
-      );
-    }
-  }
+  const pgEstoque = await readEstoqueFromPg();
 
   const leadsResult = pgLeads ?? (liveCRMLeads.status === 'fulfilled' ? liveCRMLeads.value : { leads: [], total: 0, crmTotal: 0 });
 
@@ -378,11 +373,11 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     leads:     leadsResult,
     meta:      metaFinal,
-    estoque:   estoqueData?.estoque ?? {},
+    estoque:   pgEstoque ?? { empreendimentos: [], resumo: [], unidades: [] },
     leadForms: metaFinal.leadForms,
     page:      metaFinal.page,
     metaValidation,
     updatedAt: new Date().toISOString(),
-    _cached:   !needMetaLive && !needEstoqueLive && !!pgLeads,
+    _cached:   !needMetaLive && !!pgLeads,
   });
 }
