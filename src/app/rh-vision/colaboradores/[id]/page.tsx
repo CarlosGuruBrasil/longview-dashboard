@@ -282,7 +282,7 @@ export default function ColaboradorPage() {
             <img src={avatarUrl} alt={user.name} className="w-16 h-16 rounded-full object-cover border border-white/10" />
           ) : (
             <div className="w-16 h-16 rounded-full bg-emerald-800/30 border border-emerald-700/20 flex items-center justify-center text-xl font-bold text-emerald-300">
-              {user.name.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase()}
+              {(user.name || '').split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase() || '?'}
             </div>
           )}
           <div className="flex-1">

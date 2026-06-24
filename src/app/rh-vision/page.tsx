@@ -59,7 +59,8 @@ function KpiCard({
   return href ? <Link href={href}>{inner}</Link> : inner;
 }
 
-function getInitials(name: string) {
+function getInitials(name?: string) {
+  if (!name) return '?';
   return name.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase();
 }
 

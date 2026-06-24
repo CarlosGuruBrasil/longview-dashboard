@@ -28,14 +28,16 @@ const STATUS_LABEL: Record<string, { label: string; color: string }> = {
   afastado:  { label: 'Afastado',  color: 'text-amber-400 bg-amber-500/10' },
 };
 
-function getInitials(name: string) {
+function getInitials(name?: string) {
+  if (!name) return '?';
   return name.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase();
 }
 
-function avatarBg(name: string) {
+function avatarBg(name?: string) {
   const colors = ['bg-emerald-800/40 text-emerald-300', 'bg-sky-800/40 text-sky-300', 'bg-violet-800/40 text-violet-300', 'bg-orange-800/40 text-orange-300', 'bg-rose-800/40 text-rose-300'];
+  if (!name) return colors[0];
   const idx = name.charCodeAt(0) % colors.length;
-  return colors[idx];
+  return colors[idx] ?? colors[0];
 }
 
 export default function ColaboradoresPage() {
