@@ -322,34 +322,33 @@ export async function GET(request: NextRequest) {
   // ---------- LEADS (sempre do Postgres, webhook mantém atualizado) ----------
   const pgLeads = await readLeadsFromPg();
 
-  // ---------- META (do cache Postgres, a menos que filtrado por data ou forceRefresh) ----------
-  let metaData: any  = null;
+  // ---------- META (SEMPRE do Postgres; API externa só nos crons/webhook) ----------
+  // O cron sync-dashboard mantém 'meta_cache' fresco a cada 2h. O carregamento da
+  // tela nunca depende da API do Meta — leitura instantânea do nosso banco.
+  // O filtro por data é aplicado no cliente sobre os dados em cache (daily etc.).
+  let metaData: any = null;
+  const metaCache = await readPgCache('meta_cache');
+  if (metaCache?.data) metaData = metaCache.data;
 
-  if (!isFiltered && !forceRefresh) {
-    const metaCache    = await readPgCache('meta_cache');
-    if (metaCache?.data)    metaData    = metaCache.data;
-  }
-
-  // Se cache vazio/filtrado, busca ao vivo
-  const needMetaLive    = !metaData;
+  // Live SÓ em dois casos: refresh manual explícito (botão) ou cold-start
+  // (cache ainda não criado pelo cron) — auto-cura e segue servindo do banco.
+  const needMetaLive = forceRefresh || !metaData;
 
   const CV_EMAIL = process.env.CV_CRM_EMAIL!;
   const CV_TOKEN = process.env.CV_CRM_TOKEN!;
 
   const [liveMetaResult, liveCRMLeads] = await Promise.allSettled([
-    needMetaLive    ? fetchMetaLive(startDate, endDate) : Promise.resolve(null),
+    needMetaLive ? fetchMetaLive(startDate, endDate) : Promise.resolve(null),
     !pgLeads ? fetchAllCRMLeads(CV_EMAIL, CV_TOKEN) : Promise.resolve(null),
   ]);
 
   if (needMetaLive && liveMetaResult.status === 'fulfilled' && liveMetaResult.value) {
     metaData = liveMetaResult.value;
-    // Salva no cache em background (sem await)
-    if (!isFiltered) {
-      import('@/lib/pg').then(({ sql }) =>
-        sql`INSERT INTO project_state (key, data) VALUES ('meta_cache', ${JSON.stringify({ data: metaData, updatedAt: new Date().toISOString() })})
-            ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data`.catch(() => {})
-      );
-    }
+    // Persiste no banco (sem await) — próximos loads já vêm do Postgres
+    import('@/lib/pg').then(({ sql }) =>
+      sql`INSERT INTO project_state (key, data) VALUES ('meta_cache', ${JSON.stringify({ data: metaData, updatedAt: new Date().toISOString() })})
+          ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data`.catch(() => {})
+    );
   }
 
   const pgEstoque = await readEstoqueFromPg();
