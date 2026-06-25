@@ -1,22 +1,11 @@
 import fs from 'fs';
 import path from 'path';
 import bcrypt from 'bcryptjs';
+import { createDefaultPermissions, normalizePermissions, type UserPermissions } from './permissions';
+
+export type { UserPermissions } from './permissions';
 
 // ─── Interfaces (mantidas idênticas para não quebrar importadores) ────────────
-
-export interface UserPermissions {
-  viewMarketingDashboard: boolean;
-  viewMarketingLeads: boolean;
-  viewMarketingOportunidades: boolean;
-  viewMarketingEstoque: boolean;
-  viewMarketingAds: boolean;
-  viewMarketingVendas: boolean;
-  viewProjectVision: boolean;
-  manageProjects: boolean;
-  manageCommentsDocs: boolean;
-  deleteTasks: boolean;
-  isAdmin: boolean;
-}
 
 export interface UserAddress {
   street?: string;
@@ -128,6 +117,41 @@ function writeJson(file: string, data: unknown): void {
   fs.writeFileSync(file, JSON.stringify(data, null, 2), 'utf-8');
 }
 
+function normalizeProjectState(state: Partial<ProjectDatabaseState> | null | undefined): ProjectDatabaseState {
+  return {
+    tasks: Array.isArray(state?.tasks) ? state.tasks : [],
+    projects: Array.isArray(state?.projects) ? state.projects : [],
+    responsibles: Array.isArray(state?.responsibles) ? state.responsibles : [],
+  };
+}
+
+export function hasProjectVisionData(state: ProjectDatabaseState): boolean {
+  return state.tasks.length > 0;
+}
+
+export function readLocalProjectData(): ProjectDatabaseState {
+  const local = normalizeProjectState(readJson<Partial<ProjectDatabaseState> | null>(LOCAL_PROJ_FILE, null));
+  if (hasProjectVisionData(local)) return local;
+
+  // migrate from legacy db.json / CSV-backed initializer
+  const legacy = path.join(DATA_DIR, 'db.json');
+  if (fs.existsSync(legacy)) {
+    try {
+      const d = JSON.parse(fs.readFileSync(legacy, 'utf-8'));
+      return normalizeProjectState({ tasks: d.tasks, projects: d.projects, responsibles: d.responsibles });
+    } catch { /* ignore */ }
+  }
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { readDatabase } = require('./db');
+    const leg = readDatabase();
+    return normalizeProjectState({ tasks: leg.tasks, projects: leg.projects, responsibles: leg.responsibles });
+  } catch { /* no CSV, no problem */ }
+
+  return { tasks: [], projects: [], responsibles: [] };
+}
+
 // ─── Postgres lazy import (only when DATABASE_URL is set) ────────────────────
 
 async function getPg() {
@@ -139,27 +163,37 @@ async function getPg() {
 // ─── 1. USUÁRIOS ─────────────────────────────────────────────────────────────
 
 export async function readUsers(): Promise<DbUser[]> {
+  const normalizeUser = (user: DbUser): DbUser => ({
+    ...user,
+    permissions: normalizePermissions(user.permissions),
+  });
+
   if (isPg()) {
     try {
       const db = await getPg();
       const rows = await db<{ data: DbUser }[]>`SELECT data FROM app_users ORDER BY created_at`;
       // `data` column stores the full DbUser JSON
-      return rows.map(r => (typeof r.data === 'object' ? r.data : JSON.parse(r.data as unknown as string)));
+      return rows.map(r => normalizeUser(typeof r.data === 'object' ? r.data : JSON.parse(r.data as unknown as string)));
     } catch (e) { console.error('[db-kv] readUsers PG error:', e); }
   }
-  return readJson<DbUser[]>(LOCAL_USERS_FILE, []);
+  return readJson<DbUser[]>(LOCAL_USERS_FILE, []).map(normalizeUser);
 }
 
 export async function writeUsers(users: DbUser[]): Promise<void> {
+  const normalizedUsers = users.map(user => ({
+    ...user,
+    permissions: normalizePermissions(user.permissions),
+  }));
+
   if (isPg()) {
     try {
       const db = await getPg();
       // upsert all — delete orphans via NOT IN
-      if (users.length === 0) {
+      if (normalizedUsers.length === 0) {
         await db`DELETE FROM app_users`;
         return;
       }
-      for (const u of users) {
+      for (const u of normalizedUsers) {
         await db`
           INSERT INTO app_users (id, email, password_hash, name, role, permissions, data, created_at)
           VALUES (${u.id}, ${u.email}, ${u.passwordHash}, ${u.name}, ${u.role},
@@ -173,12 +207,12 @@ export async function writeUsers(users: DbUser[]): Promise<void> {
             data          = EXCLUDED.data
         `;
       }
-      const ids = users.map(u => u.id);
+      const ids = normalizedUsers.map(u => u.id);
       await db`DELETE FROM app_users WHERE id <> ALL(${ids}::text[])`;
       return;
     } catch (e) { console.error('[db-kv] writeUsers PG error:', e); }
   }
-  writeJson(LOCAL_USERS_FILE, users);
+  writeJson(LOCAL_USERS_FILE, normalizedUsers);
 }
 
 // ─── 2. PROJECT VISION (tasks + projetos) ────────────────────────────────────
@@ -190,22 +224,21 @@ export async function readProjectData(): Promise<ProjectDatabaseState> {
       const rows = await db<{ data: ProjectDatabaseState }[]>`
         SELECT data FROM project_state WHERE key = 'state'
       `;
-      if (rows.length > 0) return rows[0].data;
+      const pgState = normalizeProjectState(rows[0]?.data);
+      if (hasProjectVisionData(pgState)) return pgState;
+
+      const seededState = readLocalProjectData();
+      if (hasProjectVisionData(seededState)) {
+        await db`
+          INSERT INTO project_state (key, data) VALUES ('state', ${JSON.stringify(seededState)})
+          ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data
+        `;
+        return seededState;
+      }
     } catch (e) { console.error('[db-kv] readProjectData PG error:', e); }
   }
 
-  const local = readJson<ProjectDatabaseState | null>(LOCAL_PROJ_FILE, null);
-  if (local) return local;
-
-  // migrate from legacy db.json
-  const legacy = path.join(DATA_DIR, 'db.json');
-  if (fs.existsSync(legacy)) {
-    try {
-      const d = JSON.parse(fs.readFileSync(legacy, 'utf-8'));
-      return { tasks: d.tasks || [], projects: d.projects || [], responsibles: d.responsibles || [] };
-    } catch { /* ignore */ }
-  }
-  return { tasks: [], projects: [], responsibles: [] };
+  return readLocalProjectData();
 }
 
 export async function writeProjectData(state: ProjectDatabaseState): Promise<void> {
@@ -234,7 +267,10 @@ export async function mutateProjectData(
       const rows = await tx<{ data: ProjectDatabaseState }[]>`
         SELECT data FROM project_state WHERE key = 'state' FOR UPDATE
       `;
-      const state: ProjectDatabaseState = rows[0]?.data ?? { tasks: [], projects: [], responsibles: [] };
+      let state: ProjectDatabaseState = normalizeProjectState(rows[0]?.data);
+      if (!hasProjectVisionData(state)) {
+        state = readLocalProjectData();
+      }
       await fn(state);
       await tx`
         INSERT INTO project_state (key, data) VALUES ('state', ${JSON.stringify(state)})
@@ -254,35 +290,33 @@ export async function mutateProjectData(
 
 export async function seedDatabaseIfEmpty(): Promise<void> {
   const users = await readUsers();
-  if (users.length > 0) return;
+  if (users.length === 0) {
+    console.log('[db-kv] Semeando usuários padrão...');
+    const [developerHash, diretoriaHash] = await Promise.all([
+      bcrypt.hash('Guru$2026', 10),
+      bcrypt.hash('Longview$2026', 10),
+    ]);
 
-  console.log('[db-kv] Semeando usuários padrão...');
-  const [developerHash, diretoriaHash] = await Promise.all([
-    bcrypt.hash('Guru$2026', 10),
-    bcrypt.hash('Longview$2026', 10),
-  ]);
+    const allPerms = createDefaultPermissions({
+      viewMarketingDashboard: true, viewMarketingLeads: true, viewMarketingOportunidades: true,
+      viewMarketingEstoque: true, viewMarketingAds: true, viewMarketingVendas: true,
+      viewProjectVision: true, manageProjects: true, manageCommentsDocs: true,
+      deleteTasks: true, viewRHVision: true, viewQualityVision: true, isAdmin: true,
+    });
 
-  const allPerms: UserPermissions = {
-    viewMarketingDashboard: true, viewMarketingLeads: true, viewMarketingOportunidades: true,
-    viewMarketingEstoque: true, viewMarketingAds: true, viewMarketingVendas: true,
-    viewProjectVision: true, manageProjects: true, manageCommentsDocs: true,
-    deleteTasks: true, isAdmin: true,
-  };
-
-  await writeUsers([
-    { id: 'usr-dev',   name: 'Carlos Santos (Desenvolvedor)', email: 'carlos@longview.com.br',   passwordHash: developerHash, role: 'Desenvolvedor', permissions: allPerms, createdAt: new Date().toISOString() },
-    { id: 'usr-admin', name: 'Diretoria Executiva',           email: 'diretoria@longview.com.br', passwordHash: diretoriaHash, role: 'Diretoria',    permissions: allPerms, createdAt: new Date().toISOString() },
-  ]);
+    await writeUsers([
+      { id: 'usr-dev',   name: 'Carlos Santos (Desenvolvedor)', email: 'carlos@longview.com.br',   passwordHash: developerHash, role: 'Desenvolvedor', permissions: allPerms, createdAt: new Date().toISOString() },
+      { id: 'usr-admin', name: 'Diretoria Executiva',           email: 'diretoria@longview.com.br', passwordHash: diretoriaHash, role: 'Diretoria',    permissions: allPerms, createdAt: new Date().toISOString() },
+    ]);
+  }
 
   // import tasks from legacy CSV if nothing in project state
   const proj = await readProjectData();
-  if (proj.tasks.length === 0) {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { readDatabase } = require('./db');
-      const leg = readDatabase();
-      await writeProjectData({ tasks: leg.tasks || [], projects: leg.projects || [], responsibles: leg.responsibles || [] });
-    } catch { /* no CSV, no problem */ }
+  if (!hasProjectVisionData(proj)) {
+    const local = readLocalProjectData();
+    if (hasProjectVisionData(local)) {
+      await writeProjectData(local);
+    }
   }
 }
 

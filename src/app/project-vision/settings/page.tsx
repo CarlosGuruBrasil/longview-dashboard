@@ -2,6 +2,7 @@
 
 import NotificationPrefsPanel from '@/components/NotificationPrefsPanel';
 import { Bell } from 'lucide-react';
+import ProjectSheetImportPanel from './ProjectSheetImportPanel';
 
 export default function SettingsPage() {
   return (
@@ -24,6 +25,8 @@ export default function SettingsPage() {
 
         <NotificationPrefsPanel />
       </section>
+
+      <ProjectSheetImportPanel />
 
     </div>
   );
