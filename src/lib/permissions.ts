@@ -9,8 +9,8 @@ export interface UserPermissions {
   manageProjects: boolean;
   manageCommentsDocs: boolean;
   deleteTasks: boolean;
-  viewRHVision: boolean;
-  viewQualityVision: boolean;
+  viewRHVision?: boolean;
+  viewQualityVision?: boolean;
   isAdmin: boolean;
 }
 
