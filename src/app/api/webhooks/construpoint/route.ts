@@ -1,8 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql, ensureSchema } from '@/lib/pg';
+import { getBearerToken } from '@/lib/internal-auth';
 
 export async function POST(request: NextRequest) {
   try {
+    const secret = process.env.CONSTRUPOINT_WEBHOOK_SECRET;
+    const incomingSecret =
+      request.headers.get('x-webhook-secret') ||
+      request.headers.get('x-construpoint-secret') ||
+      getBearerToken(request);
+    if (!secret || incomingSecret !== secret) {
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    }
+
     const rawBody = await request.text();
     let body: any;
     try {

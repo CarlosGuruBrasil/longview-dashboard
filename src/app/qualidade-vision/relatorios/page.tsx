@@ -5,9 +5,7 @@ import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell,
 } from 'recharts'
-import {
-  BarChart3, RefreshCw, AlertCircle, Calendar,
-} from 'lucide-react'
+import { AlertCircle, Calendar } from 'lucide-react'
 
 // ---------- tipos ----------
 interface MonthlyPoint {
@@ -47,7 +45,7 @@ const NAOAPLICA_COLOR  = '#64748b'
 
 function GlassCard({ title, children }: { title?: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] backdrop-blur p-5">
+    <div className="rounded-xl border border-[#1E1E22] bg-[#121214]/60 p-5">
       {title && <h3 className="text-sm font-semibold text-zinc-300 mb-4">{title}</h3>}
       {children}
     </div>
@@ -57,7 +55,7 @@ function GlassCard({ title, children }: { title?: string; children: React.ReactN
 function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
   return (
-    <div className="bg-zinc-900 border border-white/10 rounded-xl p-3 text-xs min-w-[140px]">
+    <div className="rounded-xl border border-[#1E1E22] bg-[#121214] p-3 text-xs min-w-[140px]">
       <p className="text-zinc-300 font-semibold mb-2">{label}</p>
       {payload.map((p: any, i: number) => (
         <p key={i} style={{ color: p.color }} className="mb-1">
@@ -107,16 +105,9 @@ export default function RelatoriosPage() {
   }, [data])
 
   return (
-    <div className="p-4 sm:p-6 flex flex-col gap-5">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-lg font-bold text-zinc-100 flex items-center gap-2">
-            <BarChart3 size={20} className="text-emerald-400" />
-            Relatórios e Estatísticas
-          </h1>
-          <p className="text-xs text-zinc-500">Métricas analíticas do Construpoint</p>
-        </div>
-        <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-4 py-2">
+    <div className="w-full space-y-6 p-4 md:p-6 lg:px-6 lg:py-4">
+      <div className="flex justify-end">
+        <div className="flex items-center gap-2 rounded-xl border border-[#1E1E22] bg-[#121214]/60 px-4 py-2">
           <Calendar size={14} className="text-zinc-500" />
           <select
             value={startYear}
@@ -127,7 +118,7 @@ export default function RelatoriosPage() {
               <option key={y} value={y} className="bg-zinc-900">{y}</option>
             ))}
           </select>
-          <span className="text-zinc-600 text-xs">→</span>
+          <span className="text-zinc-600 text-xs">-</span>
           <select
             value={endYear}
             onChange={e => setEndYear(Number(e.target.value))}
@@ -214,7 +205,7 @@ export default function RelatoriosPage() {
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
-                  <div className="flex flex-col gap-6 bg-white/5 border border-white/10 rounded-2xl p-6 min-w-[240px]">
+                  <div className="flex flex-col gap-6 bg-[#121214]/60 border border-[#1E1E22] rounded-xl p-6 min-w-[240px]">
                     {pieData.map(d => (
                       <div key={d.name}>
                         <div className="flex items-center gap-2 mb-1">

@@ -4,16 +4,8 @@ import React, { useState } from 'react';
 import { RefreshCw, SlidersHorizontal } from 'lucide-react';
 import { useData } from '../context/DataContext';
 
-function formatUpdatedAt(iso: string): string {
-  if (!iso) return '';
-  try {
-    const d = new Date(iso);
-    return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-  } catch { return iso; }
-}
-
 export default function DateFilter() {
-  const { dateRange, setDateRange, clearFilters, loading, refresh, filteredLeads, crmTotal, updatedAt } = useData();
+  const { dateRange, setDateRange, clearFilters, loading, refresh, filteredLeads, crmTotal } = useData();
   const [localStart, setLocalStart] = useState(dateRange.start);
   const [localEnd, setLocalEnd]     = useState(dateRange.end);
   const [expanded, setExpanded]     = useState(false);   // mobile only
@@ -40,29 +32,13 @@ export default function DateFilter() {
     <>
       {/* ── DESKTOP: tudo em uma única linha ─────────────────────── */}
       <div className="hidden md:flex items-center gap-2">
-        {/* Contagem + timestamp */}
-        <div className="mr-1 text-right">
-          <div className="text-[13px] font-semibold text-zinc-100">
-            <span className="font-bold">{filteredLeads.length.toLocaleString('pt-BR')}</span>
-            {' '}<span className="font-normal text-zinc-400">leads</span>
-            <span className="text-zinc-600 mx-1.5">·</span>
-            <span className="text-zinc-400">de {crmTotal.toLocaleString('pt-BR')}</span>
-          </div>
-          {updatedAt && (
-            <div className="text-[11px] text-zinc-600 text-right">{formatUpdatedAt(updatedAt)}</div>
-          )}
-        </div>
-
-        {/* Separador */}
-        <div className="w-px h-5 bg-white/10 shrink-0" />
-
         {/* De */}
         <input type="date" value={localStart} onChange={e => setLocalStart(e.target.value)} className={dateInput} />
         {/* Até */}
         <input type="date" value={localEnd}   onChange={e => setLocalEnd(e.target.value)}   className={dateInput} />
 
         {/* OK */}
-        <button onClick={handleFilter} className={`${pill} bg-sky-500/15 text-sky-400 border border-sky-500/25 hover:bg-sky-500/25`}>
+        <button onClick={handleFilter} className={`${pill} bg-orange-500/15 text-orange-300 border border-orange-400/25 hover:bg-orange-500/25`}>
           Filtrar
         </button>
 
@@ -103,7 +79,7 @@ export default function DateFilter() {
             onClick={() => setExpanded(v => !v)}
             className={`no-tap ${pill} flex items-center gap-1.5 ${
               hasFilter
-                ? 'bg-sky-500/15 text-sky-400 border border-sky-500/25'
+                ? 'bg-orange-500/15 text-orange-300 border border-orange-400/25'
                 : 'border border-white/12 bg-white/[0.04] text-zinc-400'
             }`}
           >
@@ -133,7 +109,7 @@ export default function DateFilter() {
               <input type="date" value={localEnd} onChange={e => setLocalEnd(e.target.value)}
                 className="h-9 flex-1 min-w-0 rounded-full px-3 text-[13px] border border-white/12 bg-white/[0.04] text-zinc-200 [color-scheme:dark] focus:outline-none" />
             </label>
-            <button onClick={handleFilter} className="no-tap h-9 px-3 rounded-full text-[13px] bg-sky-500/15 text-sky-400 border border-sky-500/25 shrink-0">OK</button>
+            <button onClick={handleFilter} className="no-tap h-9 px-3 rounded-full text-[13px] bg-orange-500/15 text-orange-300 border border-orange-400/25 shrink-0">OK</button>
             {hasFilter && <button onClick={handleClear} className="no-tap h-9 px-3 rounded-full text-[13px] border border-white/12 text-zinc-500 shrink-0">✕</button>}
           </div>
         )}

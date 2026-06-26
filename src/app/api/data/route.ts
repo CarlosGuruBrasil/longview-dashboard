@@ -256,6 +256,11 @@ export async function GET(request: NextRequest) {
   const syncForce    = searchParams.get('sync') === 'true';
 
   if (syncForce) {
+    const canForceSync = authUser.role === 'Desenvolvedor' || authUser.permissions?.isAdmin === true;
+    if (!canForceSync) {
+      return NextResponse.json({ error: 'Apenas administradores podem forçar sincronização.' }, { status: 403 });
+    }
+
     try {
       const email = process.env.CV_CRM_EMAIL;
       const token = process.env.CV_CRM_TOKEN;

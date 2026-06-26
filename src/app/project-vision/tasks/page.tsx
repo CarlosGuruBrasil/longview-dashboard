@@ -187,20 +187,8 @@ export default function TasksPage() {
   };
 
   return (
-    <div className="flex-1 p-6 lg:p-10 space-y-6 max-w-7xl mx-auto w-full">
-      {/* Header */}
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-[#1C1C1E] pb-6">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-white/5 border border-white/10 text-zinc-400">
-              Dashboard Operacional
-            </span>
-          </div>
-          <h2 className="text-3xl font-semibold tracking-tight text-white mt-1">Gestão de Tarefas</h2>
-          <p className="text-sm text-zinc-400 mt-0.5">Visão tabular consolidada de todas as operações.</p>
-        </div>
-
-        <div className="flex items-center gap-3">
+    <div className="flex-1 w-full space-y-6 p-4 md:p-6 lg:px-6 lg:py-4">
+      <header className="flex justify-end gap-3 border-b border-[#1C1C1E] pb-4">
           <button 
             onClick={fetchData}
             className="p-2.5 bg-[#121214] hover:bg-[#18181B] border border-[#1E1E22] text-zinc-400 hover:text-white rounded-lg transition-colors flex items-center gap-1.5 text-xs"
@@ -218,7 +206,6 @@ export default function TasksPage() {
               <span>Nova Tarefa</span>
             </button>
           )}
-        </div>
       </header>
 
       {/* Painel de Filtros e Busca */}
@@ -385,7 +372,7 @@ export default function TasksPage() {
                     <tr
                       key={task.id}
                       onClick={() => setSelectedTaskId(task.id)}
-                      className="hover:bg-white/[0.02] cursor-pointer transition-colors duration-150 group"
+                      className="hover:bg-[#17171A] cursor-pointer transition-colors duration-150 group"
                     >
                       <td className="py-3 px-4 font-mono text-xs font-bold text-zinc-400 whitespace-nowrap group-hover:text-zinc-200">{task.id}</td>
                       <td className="py-3 px-4 text-xs font-bold text-white whitespace-nowrap">{task.project}</td>
@@ -462,11 +449,11 @@ export default function TasksPage() {
         <>
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 animate-in fade-in" onClick={() => setCreateModalOpen(false)} />
           <div className="fixed inset-0 flex items-center justify-center p-4 z-50 animate-in zoom-in-95 duration-200">
-            <div className="bg-[#09090B] border border-[#1E1E22] rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden flex flex-col justify-between">
+            <div className="bg-[#09090B] border border-[#1E1E22] rounded-xl w-full max-w-xl shadow-2xl overflow-hidden flex flex-col justify-between">
               
               <div className="p-5 border-b border-[#1C1C1E] flex justify-between items-center bg-[#121214]/60">
                 <h3 className="text-base font-bold text-white">Criar Nova Tarefa Operacional</h3>
-                <button onClick={() => setCreateModalOpen(false)} className="p-1 hover:bg-white/5 text-zinc-400 hover:text-white rounded-lg">
+                <button onClick={() => setCreateModalOpen(false)} className="p-1 hover:bg-[#18181B] text-zinc-400 hover:text-white rounded-lg">
                   <X size={16} />
                 </button>
               </div>
@@ -583,7 +570,7 @@ export default function TasksPage() {
                   <button 
                     type="button" 
                     onClick={() => setCreateModalOpen(false)}
-                    className="bg-transparent hover:bg-white/5 border border-zinc-700 text-zinc-300 px-4 py-2 rounded-lg text-xs font-semibold"
+                    className="bg-transparent hover:bg-[#18181B] border border-zinc-700 text-zinc-300 px-4 py-2 rounded-lg text-xs font-semibold"
                   >
                     Cancelar
                   </button>

@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { UserPlus, AlertCircle, Check, Loader2, ChevronDown } from 'lucide-react';
+import PasswordInput from '@/components/app/PasswordInput';
 
 interface Approver {
   id: string;
@@ -25,9 +26,23 @@ function Input({ value, onChange, placeholder, type = 'text', required }: {
   value: string; onChange: (v: string) => void;
   placeholder?: string; type?: string; required?: boolean;
 }) {
+  if (type === 'password') {
+    return (
+      <PasswordInput
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        required={required}
+        autoComplete="new-password"
+        inputClassName="w-full h-11 px-4 pr-10 rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 transition-colors"
+      />
+    );
+  }
+
   return (
     <input
       type={type}
+      autoComplete={type === 'email' ? 'email' : 'off'}
       value={value}
       onChange={e => onChange(e.target.value)}
       placeholder={placeholder}
@@ -221,7 +236,7 @@ function CadastroContent() {
           <div className="relative w-36 h-10 mb-4">
             <Image src="/logolongview.png" alt="LongView" fill style={{ objectFit: 'contain' }} />
           </div>
-          <span className="text-[9px] uppercase font-bold tracking-[0.25em] text-emerald-400/70">RH Vision</span>
+          <span className="text-[9px] uppercase font-bold tracking-[0.25em] text-emerald-400/70">People Vision</span>
         </div>
 
         {/* Card */}

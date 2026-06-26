@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Lock, Mail, Loader2, AlertCircle } from 'lucide-react';
+import PasswordInput from '@/components/app/PasswordInput';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -86,6 +87,8 @@ export default function LoginPage() {
               </div>
               <input
                 type="email"
+                name="email"
+                autoComplete="username"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -103,12 +106,13 @@ export default function LoginPage() {
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-zinc-500">
                 <Lock size={16} />
               </div>
-              <input
-                type="password"
+              <PasswordInput
+                name="password"
+                autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full bg-[#1b1b1f] border border-[#2e2e34] rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-400 focus:ring-1 focus:ring-zinc-400 transition-all duration-200"
+                inputClassName="w-full bg-[#1b1b1f] border border-[#2e2e34] rounded-xl pl-10 pr-10 py-3 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-400 focus:ring-1 focus:ring-zinc-400 transition-all duration-200"
                 placeholder="••••••••"
               />
             </div>

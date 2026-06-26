@@ -43,8 +43,7 @@ function KpiCard({
   href?: string;
 }) {
   const inner = (
-    <div className={`rounded-2xl border bg-white/[0.02] p-5 flex items-start gap-4 hover:bg-white/[0.04] transition-colors ${href ? 'cursor-pointer' : ''}`}
-      style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+    <div className={`rounded-xl border border-[#1E1E22] bg-[#121214]/60 p-5 min-h-[88px] h-full flex items-start gap-4 hover:border-zinc-700 transition-colors ${href ? 'cursor-pointer' : ''}`}>
       <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${color}`}>
         <Icon size={18} />
       </div>
@@ -56,7 +55,7 @@ function KpiCard({
       {href && <ChevronRight size={14} className="text-zinc-600 mt-1 shrink-0" />}
     </div>
   );
-  return href ? <Link href={href}>{inner}</Link> : inner;
+  return href ? <Link href={href} className="h-full block">{inner}</Link> : inner;
 }
 
 function getInitials(name?: string) {
@@ -129,13 +128,7 @@ export default function RHDashboard() {
   const monthName = now.toLocaleString('pt-BR', { month: 'long' });
 
   return (
-    <div className="px-4 pt-6 pb-12 max-w-5xl mx-auto lg:px-8 lg:pt-10 space-y-8">
-
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-white tracking-tight">RH Vision</h1>
-        <p className="text-sm text-zinc-500 mt-1">Visão geral dos colaboradores</p>
-      </div>
+    <div className="w-full space-y-6 p-4 md:p-6 lg:px-6 lg:py-4">
 
       {/* KPI Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -155,7 +148,7 @@ export default function RHDashboard() {
 
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Por departamento */}
-        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
+        <div className="rounded-xl border border-[#1E1E22] bg-[#121214]/60 p-5">
           <h2 className="text-sm font-semibold text-zinc-300 mb-4 flex items-center gap-2">
             <Building2 size={14} className="text-emerald-400" />
             Por Departamento
@@ -185,7 +178,7 @@ export default function RHDashboard() {
         </div>
 
         {/* Aniversariantes do mês */}
-        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
+        <div className="rounded-xl border border-[#1E1E22] bg-[#121214]/60 p-5">
           <h2 className="text-sm font-semibold text-zinc-300 mb-4 flex items-center gap-2">
             <Gift size={14} className="text-pink-400" />
             Aniversariantes — {monthName.charAt(0).toUpperCase() + monthName.slice(1)}
@@ -195,7 +188,7 @@ export default function RHDashboard() {
           ) : (
             <div className="space-y-2">
               {stats.birthdays.map(u => (
-                <Link key={u.id} href={`/rh-vision/colaboradores/${u.id}`} className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/[0.04] transition-colors">
+                <Link key={u.id} href={`/rh-vision/colaboradores/${u.id}`} className="flex items-center gap-3 p-2 rounded-xl hover:bg-[#17171A] transition-colors">
                   <div className="w-8 h-8 rounded-full bg-pink-500/20 border border-pink-500/20 flex items-center justify-center text-xs font-bold text-pink-300">
                     {getInitials(u.name)}
                   </div>
@@ -214,14 +207,14 @@ export default function RHDashboard() {
 
       {/* Aprovações pendentes */}
       {pending.length > 0 && (
-        <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-5">
+        <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-5">
           <h2 className="text-sm font-semibold text-amber-300 mb-4 flex items-center gap-2">
             <AlertCircle size={14} />
             Aprovações Pendentes ({pending.length})
           </h2>
           <div className="space-y-2">
             {pending.slice(0, 5).map(reg => (
-              <div key={reg.id} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/[0.04]">
+              <div key={reg.id} className="flex items-center gap-3 p-3 rounded-xl bg-[#121214]/60 border border-[#1E1E22]">
                 <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center text-xs font-bold text-amber-300">
                   {getInitials(reg.name)}
                 </div>
@@ -239,7 +232,7 @@ export default function RHDashboard() {
       )}
 
       {/* Lista rápida de colaboradores recentes */}
-      <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
+      <div className="rounded-xl border border-[#1E1E22] bg-[#121214]/60 p-5">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-semibold text-zinc-300 flex items-center gap-2">
             <Users size={14} className="text-emerald-400" />
@@ -251,10 +244,10 @@ export default function RHDashboard() {
         </div>
         <div className="space-y-1">
           {users.slice(0, 8).map(u => (
-            <Link key={u.id} href={`/rh-vision/colaboradores/${u.id}`} className="flex items-center gap-3 px-2 py-2.5 rounded-xl hover:bg-white/[0.04] transition-colors group">
+            <Link key={u.id} href={`/rh-vision/colaboradores/${u.id}`} className="flex items-center gap-3 px-2 py-2.5 rounded-xl hover:bg-[#17171A] transition-colors group">
               {u.profile?.avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={u.profile.avatarUrl} alt={u.name} className="w-8 h-8 rounded-full object-cover border border-white/10" />
+                <img src={u.profile.avatarUrl} alt={u.name} className="w-8 h-8 rounded-full object-cover border border-[#1E1E22]" />
               ) : (
                 <div className="w-8 h-8 rounded-full bg-emerald-800/30 border border-emerald-700/20 flex items-center justify-center text-xs font-bold text-emerald-300">
                   {getInitials(u.name)}

@@ -14,6 +14,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { kv } from '@/lib/kv';
 import axios from 'axios';
+import { getBearerToken } from '@/lib/internal-auth';
 
 // Possíveis nomes da etapa no CV CRM (case-insensitive)
 const SEM_CONEXAO_PATTERNS = [
@@ -100,17 +101,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'JSON inválido' }, { status: 400 });
   }
 
-  // Validação de segurança opcional (CV CRM pode enviar um token no header)
   const cvSecret = process.env.CV_WEBHOOK_SECRET;
-  if (cvSecret) {
-    const incomingSecret =
-      request.headers.get('x-webhook-secret') ||
-      request.headers.get('x-cv-secret')      ||
-      request.headers.get('authorization')?.replace('Bearer ', '') || '';
-    if (incomingSecret !== cvSecret) {
-      console.warn('[cv/webhook] Secret inválido');
-      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-    }
+  const incomingSecret =
+    request.headers.get('x-webhook-secret') ||
+    request.headers.get('x-cv-secret') ||
+    getBearerToken(request);
+  if (!cvSecret || incomingSecret !== cvSecret) {
+    console.warn('[cv/webhook] Secret ausente ou inválido');
+    return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
   }
 
   console.log('[cv/webhook] Evento recebido:', JSON.stringify(body).slice(0, 300));

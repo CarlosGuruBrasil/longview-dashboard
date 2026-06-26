@@ -92,15 +92,9 @@ export default function CadastroPage() {
   const inviteUrl = invite ? `${typeof window !== 'undefined' ? window.location.origin : ''}/cadastro?token=${invite.token}` : '';
 
   return (
-    <div className="px-4 pt-6 pb-12 max-w-3xl mx-auto lg:px-8 lg:pt-10 space-y-8">
-
-      <div>
-        <h1 className="text-xl font-bold text-white">Cadastro de Colaboradores</h1>
-        <p className="text-sm text-zinc-500 mt-1">Gerencie convites e aprovações de acesso</p>
-      </div>
-
+    <div className="w-full space-y-6 p-4 md:p-6 lg:px-6 lg:py-4">
       {/* Link de convite */}
-      <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 space-y-4">
+      <div className="rounded-xl border border-[#1E1E22] bg-[#121214]/60 p-5 space-y-4">
         <div className="flex items-center gap-2">
           <Link2 size={15} className="text-emerald-400" />
           <h2 className="text-sm font-semibold text-zinc-200">Link de Convite</h2>
@@ -112,10 +106,10 @@ export default function CadastroPage() {
         </p>
 
         {loadingInvite ? (
-          <div className="h-10 rounded-xl bg-white/[0.04] animate-pulse" />
+          <div className="h-10 rounded-xl bg-[#18181B] animate-pulse" />
         ) : invite ? (
           <div className="space-y-3">
-            <div className="flex items-center gap-2 p-3 rounded-xl bg-white/[0.04] border border-white/[0.06]">
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-[#121214]/60 border border-[#1E1E22]">
               <p className="flex-1 text-xs text-zinc-300 font-mono truncate">{inviteUrl}</p>
               <button
                 onClick={copyLink}
@@ -134,7 +128,7 @@ export default function CadastroPage() {
               <button
                 onClick={generateLink}
                 disabled={generatingLink}
-                className="flex items-center gap-1.5 h-7 px-3 rounded-lg text-xs font-medium bg-white/[0.04] text-zinc-400 hover:text-zinc-100 hover:bg-white/[0.08] transition-all"
+                className="flex items-center gap-1.5 h-7 px-3 rounded-lg border border-[#1E1E22] bg-[#18181B] text-xs font-medium text-zinc-400 hover:text-zinc-100 hover:bg-[#202024] transition-all"
               >
                 {generatingLink ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
                 Rotacionar link
@@ -186,7 +180,7 @@ export default function CadastroPage() {
 
         {loadingRegs ? (
           <div className="space-y-2">
-            {[1, 2].map(i => <div key={i} className="h-20 rounded-2xl bg-white/[0.03] animate-pulse" />)}
+            {[1, 2].map(i => <div key={i} className="h-20 rounded-xl bg-white/[0.03] animate-pulse" />)}
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-12 text-zinc-600 text-sm">
@@ -198,12 +192,12 @@ export default function CadastroPage() {
             {filtered.map(reg => (
               <div
                 key={reg.id}
-                className={`p-4 rounded-2xl border transition-colors ${
+                className={`p-4 rounded-xl border transition-colors ${
                   reg.status === 'pending'
                     ? 'border-amber-500/20 bg-amber-500/4'
                     : reg.status === 'approved'
                     ? 'border-emerald-500/15 bg-emerald-500/3'
-                    : 'border-white/[0.06] bg-white/[0.02]'
+                    : 'border-[#1E1E22] bg-[#121214]/60'
                 }`}
               >
                 <div className="flex items-start gap-3">

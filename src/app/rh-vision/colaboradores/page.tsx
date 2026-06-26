@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Search, Filter, ChevronRight, UserPlus, Phone, Mail } from 'lucide-react';
 
@@ -41,6 +42,7 @@ function avatarBg(name?: string) {
 }
 
 export default function ColaboradoresPage() {
+  const router = useRouter();
   const [users, setUsers]   = useState<SafeUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -80,13 +82,10 @@ export default function ColaboradoresPage() {
   }, [users, search, filterDept, filterRole, filterStatus]);
 
   return (
-    <div className="px-4 pt-6 pb-12 max-w-4xl mx-auto lg:px-8 lg:pt-10">
+    <div className="w-full space-y-6 p-4 md:p-6 lg:px-6 lg:py-4">
 
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-bold text-white tracking-tight">Colaboradores</h1>
-          <p className="text-sm text-zinc-500 mt-0.5">{users.length} registros</p>
-        </div>
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-zinc-500">{users.length} registros</p>
         <Link href="/rh-vision/cadastro" className="flex items-center gap-2 h-9 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-semibold transition-colors">
           <UserPlus size={15} />
           <span className="hidden sm:inline">Convidar</span>
@@ -94,28 +93,28 @@ export default function ColaboradoresPage() {
       </div>
 
       {/* Filtros */}
-      <div className="flex flex-wrap gap-2 mb-5">
+      <div className="flex flex-wrap gap-2">
         <div className="relative flex-1 min-w-[180px]">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Buscar nome, email, cargo..."
-            className="w-full pl-8 pr-3 h-9 rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50"
+            className="w-full pl-8 pr-3 h-9 rounded-xl bg-[#121214]/60 border border-[#1E1E22] text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50"
           />
         </div>
         <select value={filterDept} onChange={e => setFilterDept(e.target.value)}
-          className="h-9 px-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm text-zinc-300 focus:outline-none focus:border-emerald-500/50">
+          className="h-9 px-3 rounded-xl bg-[#121214]/60 border border-[#1E1E22] text-sm text-zinc-300 focus:outline-none focus:border-emerald-500/50">
           <option value="">Todos depts.</option>
           {departments.map(d => <option key={d} value={d}>{d}</option>)}
         </select>
         <select value={filterRole} onChange={e => setFilterRole(e.target.value)}
-          className="h-9 px-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm text-zinc-300 focus:outline-none focus:border-emerald-500/50">
+          className="h-9 px-3 rounded-xl bg-[#121214]/60 border border-[#1E1E22] text-sm text-zinc-300 focus:outline-none focus:border-emerald-500/50">
           <option value="">Todos perfis</option>
           {roles.map(r => <option key={r} value={r}>{r}</option>)}
         </select>
         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-          className="h-9 px-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm text-zinc-300 focus:outline-none focus:border-emerald-500/50">
+          className="h-9 px-3 rounded-xl bg-[#121214]/60 border border-[#1E1E22] text-sm text-zinc-300 focus:outline-none focus:border-emerald-500/50">
           <option value="">Todos status</option>
           <option value="ativo">Ativo</option>
           <option value="ferias">Férias</option>
@@ -138,14 +137,14 @@ export default function ColaboradoresPage() {
           {filtered.map(u => {
             const st = STATUS_LABEL[u.profile?.status ?? 'ativo'] ?? STATUS_LABEL.ativo;
             return (
-              <Link
+              <div
                 key={u.id}
-                href={`/rh-vision/colaboradores/${u.id}`}
-                className="flex items-center gap-4 p-4 rounded-2xl border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/[0.10] transition-all group"
+                onClick={() => router.push(`/rh-vision/colaboradores/${u.id}`)}
+                className="flex items-center gap-4 p-4 rounded-xl border border-[#1E1E22] bg-[#121214]/60 hover:bg-[#17171A] hover:border-zinc-700 transition-all group cursor-pointer"
               >
                 {u.profile?.avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={u.profile.avatarUrl} alt={u.name} className="w-11 h-11 rounded-full object-cover border border-white/10 shrink-0" />
+                  <img src={u.profile.avatarUrl} alt={u.name} className="w-11 h-11 rounded-full object-cover border border-[#1E1E22] shrink-0" />
                 ) : (
                   <div className={`w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${avatarBg(u.name)}`}>
                     {getInitials(u.name)}
@@ -171,7 +170,7 @@ export default function ColaboradoresPage() {
                     <a
                       href={`tel:${u.profile.whatsapp ?? u.profile.phone}`}
                       onClick={e => e.stopPropagation()}
-                      className="w-8 h-8 rounded-xl bg-white/[0.04] flex items-center justify-center text-zinc-500 hover:text-emerald-400 hover:bg-emerald-500/10 transition-all"
+                      className="w-8 h-8 rounded-xl border border-[#1E1E22] bg-[#18181B] flex items-center justify-center text-zinc-500 hover:text-emerald-400 hover:bg-emerald-500/10 transition-all"
                     >
                       <Phone size={13} />
                     </a>
@@ -179,13 +178,13 @@ export default function ColaboradoresPage() {
                   <a
                     href={`mailto:${u.email}`}
                     onClick={e => e.stopPropagation()}
-                    className="w-8 h-8 rounded-xl bg-white/[0.04] hidden sm:flex items-center justify-center text-zinc-500 hover:text-sky-400 hover:bg-sky-500/10 transition-all"
+                    className="w-8 h-8 rounded-xl border border-[#1E1E22] bg-[#18181B] hidden sm:flex items-center justify-center text-zinc-500 hover:text-sky-400 hover:bg-sky-500/10 transition-all"
                   >
                     <Mail size={13} />
                   </a>
                   <ChevronRight size={14} className="text-zinc-700 group-hover:text-zinc-400 transition-colors" />
                 </div>
-              </Link>
+              </div>
             );
           })}
         </div>

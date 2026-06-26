@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql, ensureSchema } from '@/lib/pg';
 import { sendFCMMulticast } from '@/lib/firebase-admin';
+import { isCronAuthorized, unauthorizedJson } from '@/lib/internal-auth';
 
 // POST /api/notifications/send — envia notificação por role ou user_id
 // Protegido por CRON_SECRET (uso interno)
 export async function POST(request: NextRequest) {
-  const secret = request.headers.get('Authorization')?.replace('Bearer ', '');
-  if (secret !== process.env.CRON_SECRET) {
-    return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-  }
+  if (!isCronAuthorized(request)) return unauthorizedJson();
 
   const { title, body, roles, userIds, emails, data } = await request.json();
   if (!title || !body) return NextResponse.json({ error: 'title e body obrigatórios' }, { status: 400 });

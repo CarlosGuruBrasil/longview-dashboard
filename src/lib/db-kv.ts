@@ -40,6 +40,30 @@ export interface UserProfileData {
   language?: 'pt-BR' | 'en';
   notes?: string;            // observações internas (visível só para admin)
   status?: 'ativo' | 'inativo' | 'ferias' | 'afastado';
+  // Documentos pessoais
+  cpf?: string;
+  rg?: string;
+  rgOrgao?: string;          // órgão emissor do RG
+  rgEstado?: string;         // estado emissor do RG
+  // Registro profissional (condicional por cargo)
+  professionalId?: string;        // CRECI / CREA / CRM / OAB / CRC
+  professionalIdType?: string;    // 'CRECI' | 'CREA' | 'CRM' | 'OAB' | 'CRC' | 'outro'
+  professionalIdState?: string;   // estado do registro (SC, SP, ...)
+  professionalIdExpiry?: string;  // data de vencimento ISO
+}
+
+/** Documento/contrato de colaborador — armazenado na tabela user_documents */
+export interface UserDocument {
+  id: string;
+  userId: string;
+  name: string;
+  category: 'contrato_clt' | 'contrato_pj' | 'identificacao' | 'habilitacao' | 'outro';
+  url: string;
+  contentType?: string;
+  sizeBytes?: number;
+  expiresAt?: string;        // ISO date — validade do documento
+  uploadedBy: string;        // userId
+  uploadedAt: string;        // ISO datetime
 }
 
 export interface DbUser {
@@ -160,6 +184,12 @@ async function getPg() {
   return sql;
 }
 
+function throwPgWriteError(operation: string, error: unknown): never {
+  console.error(`[db-kv] ${operation} PG error:`, error);
+  const message = error instanceof Error ? error.message : String(error);
+  throw new Error(`${operation} falhou no Postgres; escrita local bloqueada para evitar divergência de dados. ${message}`);
+}
+
 // ─── 1. USUÁRIOS ─────────────────────────────────────────────────────────────
 
 export async function readUsers(): Promise<DbUser[]> {
@@ -210,7 +240,7 @@ export async function writeUsers(users: DbUser[]): Promise<void> {
       const ids = normalizedUsers.map(u => u.id);
       await db`DELETE FROM app_users WHERE id <> ALL(${ids}::text[])`;
       return;
-    } catch (e) { console.error('[db-kv] writeUsers PG error:', e); }
+    } catch (e) { throwPgWriteError('writeUsers', e); }
   }
   writeJson(LOCAL_USERS_FILE, normalizedUsers);
 }
@@ -250,7 +280,7 @@ export async function writeProjectData(state: ProjectDatabaseState): Promise<voi
         ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data
       `;
       return;
-    } catch (e) { console.error('[db-kv] writeProjectData PG error:', e); }
+    } catch (e) { throwPgWriteError('writeProjectData', e); }
   }
   writeJson(LOCAL_PROJ_FILE, state);
 }
@@ -320,7 +350,65 @@ export async function seedDatabaseIfEmpty(): Promise<void> {
   }
 }
 
-// ─── 4. LINKS ────────────────────────────────────────────────────────────────
+// ─── 4. DOCUMENTOS DE COLABORADORES ──────────────────────────────────────────
+
+const LOCAL_DOCS_FILE = path.join(DATA_DIR, 'user-docs-local.json');
+
+export async function readUserDocuments(userId: string): Promise<UserDocument[]> {
+  if (isPg()) {
+    try {
+      const db = await getPg();
+      const rows = await db<UserDocument[]>`
+        SELECT id, user_id AS "userId", name, category, url,
+               content_type AS "contentType", size_bytes AS "sizeBytes",
+               expires_at::text AS "expiresAt",
+               uploaded_by AS "uploadedBy", uploaded_at::text AS "uploadedAt"
+        FROM user_documents WHERE user_id = ${userId} ORDER BY uploaded_at DESC
+      `;
+      return rows;
+    } catch (e) { console.error('[db-kv] readUserDocuments PG error:', e); }
+  }
+  const store = readJson<Record<string, UserDocument[]>>(LOCAL_DOCS_FILE, {});
+  return store[userId] ?? [];
+}
+
+export async function addUserDocument(doc: UserDocument): Promise<void> {
+  if (isPg()) {
+    try {
+      const db = await getPg();
+      await db`
+        INSERT INTO user_documents (id, user_id, name, category, url, content_type, size_bytes, expires_at, uploaded_by, uploaded_at)
+        VALUES (${doc.id}, ${doc.userId}, ${doc.name}, ${doc.category}, ${doc.url},
+                ${doc.contentType ?? null}, ${doc.sizeBytes ?? null},
+                ${doc.expiresAt ?? null}, ${doc.uploadedBy}, ${doc.uploadedAt})
+      `;
+      return;
+    } catch (e) { throwPgWriteError('addUserDocument', e); }
+  }
+  const store = readJson<Record<string, UserDocument[]>>(LOCAL_DOCS_FILE, {});
+  store[doc.userId] = [...(store[doc.userId] ?? []), doc];
+  writeJson(LOCAL_DOCS_FILE, store);
+}
+
+export async function deleteUserDocument(userId: string, docId: string): Promise<void> {
+  if (isPg()) {
+    try {
+      const db = await getPg();
+      await db`DELETE FROM user_documents WHERE id = ${docId} AND user_id = ${userId}`;
+      return;
+    } catch (e) { throwPgWriteError('deleteUserDocument', e); }
+  }
+  const store = readJson<Record<string, UserDocument[]>>(LOCAL_DOCS_FILE, {});
+  store[userId] = (store[userId] ?? []).filter(d => d.id !== docId);
+  writeJson(LOCAL_DOCS_FILE, store);
+}
+
+export async function hasUserDocuments(userId: string): Promise<boolean> {
+  const docs = await readUserDocuments(userId);
+  return docs.length > 0;
+}
+
+// ─── 5. LINKS (antes seção 4) ────────────────────────────────────────────────
 
 export async function readLinks(): Promise<ShortLink[]> {
   if (isPg()) {
@@ -359,7 +447,7 @@ export async function writeLinks(links: ShortLink[]): Promise<void> {
       const slugs = links.map(l => l.slug);
       await db`DELETE FROM short_links WHERE slug <> ALL(${slugs}::text[])`;
       return;
-    } catch (e) { console.error('[db-kv] writeLinks PG error:', e); }
+    } catch (e) { throwPgWriteError('writeLinks', e); }
   }
   const d = readJson<{ links: ShortLink[]; clicks: Record<string, number> }>(LOCAL_LINKS_FILE, { links: [], clicks: {} });
   writeJson(LOCAL_LINKS_FILE, { ...d, links });
@@ -376,7 +464,7 @@ export async function incrClick(slug: string): Promise<void> {
         ON CONFLICT (slug) DO UPDATE SET count = link_clicks.count + 1
       `;
       return;
-    } catch (e) { console.error('[db-kv] incrClick PG error:', e); }
+    } catch (e) { throwPgWriteError('incrClick', e); }
   }
   const d = readJson<{ links: ShortLink[]; clicks: Record<string, number> }>(LOCAL_LINKS_FILE, { links: [], clicks: {} });
   d.clicks[slug] = (d.clicks[slug] || 0) + 1;
@@ -409,7 +497,7 @@ export async function delClick(slug: string): Promise<void> {
       const db = await getPg();
       await db`DELETE FROM link_clicks WHERE slug = ${slug}`;
       return;
-    } catch (e) { console.error('[db-kv] delClick PG error:', e); }
+    } catch (e) { throwPgWriteError('delClick', e); }
   }
   const d = readJson<{ links: ShortLink[]; clicks: Record<string, number> }>(LOCAL_LINKS_FILE, { links: [], clicks: {} });
   delete d.clicks[slug];
@@ -442,7 +530,7 @@ export async function writeKv<T>(key: string, value: T): Promise<void> {
         ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data
       `;
       return;
-    } catch (e) { console.error(`[db-kv] writeKv(${key}) error:`, e); }
+    } catch (e) { throwPgWriteError(`writeKv(${key})`, e); }
   }
   const store = readJson<Record<string, unknown>>(LOCAL_KV_FILE, {});
   store[key]  = value;

@@ -5,13 +5,15 @@ import Image from 'next/image';
 import {
   LayoutDashboard, Users, TrendingUp, Building2, DollarSign,
   Megaphone, Send, UsersRound, Link as LinkIcon, X,
-  BarChart2, Target, ChevronRight, RefreshCw, Gauge,
+  BarChart2, ChevronRight, RefreshCw, Gauge,
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import type { ActiveView } from '../types';
 import Sidebar from './Sidebar';
 import DateFilter from './DateFilter';
 import NotificationBanner from '@/components/NotificationBanner';
+import AppHeader from '@/components/app/AppHeader';
+import SidebarFooter from '@/components/app/SidebarFooter';
 
 // ── Pull-to-refresh hook (HIG: padrão obrigatório para conteúdo atualizável) ─
 function usePullToRefresh(onRefresh: () => Promise<void>) {
@@ -104,6 +106,20 @@ function useCurrentUser() {
   return user;
 }
 
+function MarketingHeaderMetrics() {
+  const { filteredLeads, crmTotal } = useData();
+
+  return (
+    <div className="flex items-center gap-2 rounded-xl border border-orange-400/15 bg-orange-500/[0.055] px-4 py-2 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-xl">
+      <span className="font-bold text-zinc-100">{filteredLeads.length.toLocaleString('pt-BR')}</span>
+      <span className="text-zinc-400">leads</span>
+      <span className="text-zinc-600">·</span>
+      <span className="text-zinc-400">de</span>
+      <span className="font-semibold text-zinc-200">{crmTotal.toLocaleString('pt-BR')}</span>
+    </div>
+  );
+}
+
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { activeView, setActiveView, refresh } = useData();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -119,26 +135,26 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex bg-[#09090b] overflow-hidden" style={{ height: '100dvh' }}>
       {/* ── Desktop sidebar (unchanged) ─────────────────────── */}
-      <div className="hidden md:block">
+      <div className="hidden lg:block">
         <Sidebar />
       </div>
 
       {/* ── Mobile drawer overlay ────────────────────────────── */}
       <div
-        className={`md:hidden fixed inset-0 z-50 transition-opacity duration-200 ${drawerOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+        className={`lg:hidden fixed inset-0 z-50 transition-opacity duration-200 ${drawerOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
         style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)' }}
         onClick={() => setDrawerOpen(false)}
       />
 
       {/* ── Mobile drawer panel ──────────────────────────────── */}
       <aside
-        className={`md:hidden fixed inset-y-0 left-0 z-50 w-[280px] flex flex-col bg-[#0d0d0f] transition-transform duration-[240ms] ${drawerOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        className={`lg:hidden fixed inset-y-0 left-0 z-50 w-[280px] flex flex-col bg-[#0d0d0f] transition-transform duration-[240ms] ${drawerOpen ? 'translate-x-0' : '-translate-x-full'}`}
         style={{ borderRight: '1px solid rgba(255,255,255,0.06)' }}
       >
         {/* Drawer header */}
         <div className="flex items-center justify-between px-5 pt-safe pb-3 border-b border-white/[0.06]" style={{ paddingTop: 'max(env(safe-area-inset-top), 52px)' }}>
           <div>
-            <p className="text-[11px] font-bold tracking-[0.15em] uppercase text-sky-400">Marketing Vision</p>
+            <p className="text-[11px] font-bold tracking-[0.15em] uppercase text-orange-400">Marketing Vision</p>
             {user && <p className="text-xs text-zinc-500 mt-0.5">{user.name}</p>}
           </div>
           <button
@@ -159,41 +175,21 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 onClick={() => { setActiveView(view); setDrawerOpen(false); }}
                 className={`no-tap w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-medium transition-all active:scale-[0.98] text-left ${
                   active
-                    ? 'bg-sky-500/12 text-sky-400'
+                    ? 'bg-orange-500/12 text-orange-400'
                     : 'text-zinc-400 hover:text-zinc-100 hover:bg-white/[0.04]'
                 }`}
               >
-                <Icon size={18} className={active ? 'text-sky-400' : 'text-zinc-600'} />
+                <Icon size={18} className={active ? 'text-orange-400' : 'text-zinc-600'} />
                 <span className="flex-1">{label}</span>
-                {active && <ChevronRight size={14} className="text-sky-500/60" />}
+                {active && <ChevronRight size={14} className="text-orange-500/60" />}
               </button>
             );
           })}
         </nav>
 
         {/* Drawer footer */}
-        <div className="px-4 pb-safe border-t border-white/[0.06] pt-4 space-y-1" style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 16px)' }}>
-          <a
-            href="/project-vision"
-            className="no-tap flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm text-orange-400 hover:bg-orange-500/10 transition-all"
-          >
-            <BarChart2 size={15} className="text-orange-400" />
-            Project Vision
-          </a>
-          <a
-            href="/rh-vision"
-            className="no-tap flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm text-emerald-400 hover:bg-emerald-500/10 transition-all"
-          >
-            <UsersRound size={15} className="text-emerald-400" />
-            RH Vision
-          </a>
-          <a
-            href="/select-app"
-            className="no-tap flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm text-zinc-400 hover:text-zinc-100 hover:bg-white/[0.04] transition-all"
-          >
-            <Target size={16} className="text-zinc-600" />
-            Trocar de aplicativo
-          </a>
+        <div className="px-4 pb-safe border-t border-white/[0.06] pt-4" style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 16px)' }}>
+          <SidebarFooter currentModule="marketing" mobile onNavigate={() => setDrawerOpen(false)} />
         </div>
       </aside>
 
@@ -203,7 +199,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* Mobile top bar */}
         <header
-          className="md:hidden shrink-0 flex items-center gap-3 px-4 bg-[#09090b]/95"
+          className="lg:hidden shrink-0 flex items-center gap-3 px-4 bg-[#09090b]/95"
           style={{
             paddingTop: 'max(env(safe-area-inset-top), 10px)',
             paddingBottom: '10px',
@@ -226,22 +222,19 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           {/* User avatar — opens drawer */}
           <button
             onClick={() => setDrawerOpen(true)}
-            className="no-tap w-8 h-8 rounded-full bg-sky-500/20 border border-sky-500/30 flex items-center justify-center text-sky-400 text-xs font-bold shrink-0 active:scale-95 transition-transform"
+            className="no-tap w-8 h-8 rounded-full bg-orange-500/20 border border-orange-500/30 flex items-center justify-center text-orange-400 text-xs font-bold shrink-0 active:scale-95 transition-transform"
           >
             {user?.name?.charAt(0) ?? 'U'}
           </button>
         </header>
 
-        {/* Desktop top bar */}
-        <header className="hidden md:flex shrink-0 items-center gap-3 px-6 py-3 border-b border-zinc-800 bg-zinc-900/80 backdrop-blur-sm">
-          <div className="shrink-0">
-            <h1 className="text-base font-semibold text-zinc-100">{title}</h1>
-            <p className="text-xs text-zinc-500">Análise de clientes e negociações</p>
-          </div>
-          <div className="ml-auto">
-            <DateFilter />
-          </div>
-        </header>
+        <AppHeader
+          module="marketing"
+          fallbackTitle={title}
+          accent="orange"
+          centerContent={<MarketingHeaderMetrics />}
+          actions={<DateFilter />}
+        />
 
         {/* Scrollable content */}
         <main
@@ -250,7 +243,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         >
           {/* Pull-to-refresh indicator (HIG: aparece ao puxar, gira quando ativo) */}
           <div
-            className="md:hidden flex items-center justify-center transition-all duration-150 overflow-hidden"
+            className="lg:hidden flex items-center justify-center transition-all duration-150 overflow-hidden"
             style={{
               height: `${pullY}px`,
               opacity: pullY > 16 ? Math.min(pullY / THRESHOLD, 1) : 0,
@@ -264,11 +257,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </div>
 
           {/* Mobile DateFilter — sticky abaixo do header, compacto */}
-          <div className="md:hidden sticky top-0 z-20 px-4 pt-2.5 pb-2 bg-[#09090b]/96 backdrop-blur-md border-b border-white/[0.05]">
+          <div className="lg:hidden sticky top-0 z-20 px-4 pt-2.5 pb-2 bg-[#09090b]/96 backdrop-blur-md border-b border-white/[0.05]">
             <DateFilter />
           </div>
           <div
-            className="px-4 pt-3 pb-3 md:px-6 md:py-4 min-w-0"
+            className="px-4 pt-3 pb-3 lg:px-6 lg:py-4 min-w-0"
             style={{ paddingBottom: 'calc(max(env(safe-area-inset-bottom), 16px) + 76px)' }}
           >
             {children}
@@ -281,7 +274,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* ── Mobile bottom tab bar ─────────────────────────────── */}
       <nav
-        className="md:hidden fixed inset-x-0 bottom-0 z-30 no-tap"
+        className="lg:hidden fixed inset-x-0 bottom-0 z-30 no-tap"
         style={{
           background: 'rgba(8,8,10,0.97)',
           backdropFilter: 'blur(28px)',
@@ -317,9 +310,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 <Icon
                   size={active ? 24 : 22}
                   strokeWidth={active ? 2.2 : 1.5}
-                  className={`relative z-10 transition-all duration-200 ${active ? 'text-sky-400' : 'text-zinc-600'}`}
+                  className={`relative z-10 transition-all duration-200 ${active ? 'text-orange-400' : 'text-zinc-600'}`}
                 />
-                <span className={`relative z-10 text-[11px] leading-none font-semibold transition-all duration-200 ${active ? 'text-sky-400' : 'text-zinc-600'}`}>
+                <span className={`relative z-10 text-[11px] leading-none font-semibold transition-all duration-200 ${active ? 'text-orange-400' : 'text-zinc-600'}`}>
                   {label}
                 </span>
               </button>

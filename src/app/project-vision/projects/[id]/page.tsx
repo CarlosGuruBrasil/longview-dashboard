@@ -77,7 +77,7 @@ export default function ProjectDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex-1 p-6 lg:p-10 max-w-7xl mx-auto w-full">
+      <div className="flex-1 w-full p-4 md:p-6 lg:px-6 lg:py-4">
         <div className="py-20 text-center text-zinc-500">Carregando...</div>
       </div>
     );
@@ -85,7 +85,7 @@ export default function ProjectDetailPage() {
 
   if (!project) {
     return (
-      <div className="flex-1 p-6 lg:p-10 max-w-7xl mx-auto w-full">
+      <div className="flex-1 w-full p-4 md:p-6 lg:px-6 lg:py-4">
         <div className="py-20 text-center text-zinc-500">
           <p className="text-lg font-semibold">Empreendimento não encontrado</p>
           <Link href="/project-vision/projects" className="text-sm text-zinc-400 hover:text-white mt-2 inline-block underline">Voltar</Link>
@@ -95,17 +95,12 @@ export default function ProjectDetailPage() {
   }
 
   return (
-    <div className="flex-1 p-6 lg:p-10 space-y-6 max-w-7xl mx-auto w-full">
+    <div className="flex-1 w-full space-y-6 p-4 md:p-6 lg:px-6 lg:py-4">
 
-      {/* Header */}
-      <header className="flex items-center gap-4 border-b border-[#1C1C1E] pb-6">
+      <header className="flex items-center gap-3 border-b border-[#1C1C1E] pb-4">
         <Link href="/project-vision/projects" className="text-zinc-400 hover:text-white transition-colors">
           <ArrowLeft size={20} />
         </Link>
-        <div>
-          <h2 className="text-3xl font-semibold tracking-tight text-white">{project.name}</h2>
-          <p className="text-sm text-zinc-400 mt-0.5">{project.status} • {project.progress}% concluído • {tasks.length} tarefas</p>
-        </div>
         <div className="ml-auto">
           <button onClick={fetchData} className="p-2.5 bg-[#121214] hover:bg-[#18181B] border border-[#1E1E22] text-zinc-400 hover:text-white rounded-lg transition-colors">
             <RefreshCw size={14} />
@@ -241,7 +236,7 @@ export default function ProjectDetailPage() {
               </thead>
               <tbody className="divide-y divide-[#1C1C1E]">
                 {filteredTasks.map(task => (
-                  <tr key={task.id} onClick={() => setSelectedTaskId(task.id)} className="hover:bg-white/[0.02] cursor-pointer transition-colors">
+                  <tr key={task.id} onClick={() => setSelectedTaskId(task.id)} className="hover:bg-[#17171A] cursor-pointer transition-colors">
                     <td className="py-3 px-4 font-mono text-xs text-zinc-400 whitespace-nowrap">{task.id}</td>
                     <td className="py-3 px-4 text-xs text-zinc-300 whitespace-nowrap">{task.sector}</td>
                     <td className="py-3 px-4 text-xs text-white font-medium" style={{ maxWidth: '240px' }}>

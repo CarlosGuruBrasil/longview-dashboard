@@ -194,5 +194,21 @@ export async function ensureSchema(): Promise<void> {
     )
   `;
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS user_documents (
+      id           TEXT PRIMARY KEY,
+      user_id      TEXT NOT NULL,
+      name         TEXT NOT NULL,
+      category     TEXT NOT NULL DEFAULT 'outro',
+      url          TEXT NOT NULL,
+      content_type TEXT,
+      size_bytes   BIGINT,
+      expires_at   DATE,
+      uploaded_by  TEXT NOT NULL,
+      uploaded_at  TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS user_docs_user_id ON user_documents (user_id)`;
+
   schemaReady = true;
 }

@@ -5,13 +5,7 @@ import { Bell, Megaphone, Users } from 'lucide-react';
 
 export default function NotificacoesPage() {
   return (
-    <div className="px-4 pt-6 pb-12 max-w-lg mx-auto lg:px-8 lg:pt-10 space-y-8">
-
-      <div>
-        <h1 className="text-xl font-bold text-white tracking-tight">Notificações</h1>
-        <p className="text-sm text-zinc-500 mt-1">Controle o que você recebe, em cada módulo</p>
-      </div>
-
+    <div className="w-full space-y-6 p-4 md:p-6 lg:px-6 lg:py-4">
       {/* Dispositivo + Project Vision */}
       <section>
         <div className="flex items-center gap-2 mb-4">
@@ -27,13 +21,13 @@ export default function NotificacoesPage() {
           <Megaphone size={14} className="text-sky-400" />
           <h2 className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Marketing Vision</h2>
         </div>
-        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 space-y-2">
+        <div className="rounded-xl border border-[#1E1E22] bg-[#121214]/60 p-4 space-y-2">
           {[
             { icon: '📊', label: 'Alertas de Campanhas', desc: 'Campanhas pausadas ou sem gasto recente' },
             { icon: '👥', label: 'Leads sem Atendimento', desc: 'Leads aguardando há mais de 24h' },
             { icon: '💰', label: 'CPL Elevado', desc: 'Custo por lead acima do limite configurado' },
           ].map(item => (
-            <div key={item.label} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] opacity-60">
+            <div key={item.label} className="flex items-center gap-3 p-3 rounded-xl bg-[#121214]/60 border border-[#1E1E22] opacity-60">
               <span className="text-base shrink-0">{item.icon}</span>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-zinc-300">{item.label}</p>
@@ -51,12 +45,12 @@ export default function NotificacoesPage() {
           <Bell size={14} className="text-orange-400" />
           <h2 className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Sistema</h2>
         </div>
-        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 space-y-2">
+        <div className="rounded-xl border border-[#1E1E22] bg-[#121214]/60 p-4 space-y-2">
           {[
             { icon: '🔔', label: 'Aprovações de Cadastro',   desc: 'Notificado quando um usuário solicita acesso' },
             { icon: '🔐', label: 'Login em novo dispositivo', desc: 'Alerta quando sua conta é acessada de outro local' },
           ].map(item => (
-            <div key={item.label} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] opacity-60">
+            <div key={item.label} className="flex items-center gap-3 p-3 rounded-xl bg-[#121214]/60 border border-[#1E1E22] opacity-60">
               <span className="text-base shrink-0">{item.icon}</span>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-zinc-300">{item.label}</p>

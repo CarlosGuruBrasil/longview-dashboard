@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { readUsers, writeUsers, DbUser, UserPermissions } from '@/lib/db-kv';
+import { readUsers, writeUsers, DbUser } from '@/lib/db-kv';
+import { normalizePermissions } from '@/lib/permissions';
 import { rateLimit, getClientIp } from '@/lib/rateLimit';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -88,7 +89,7 @@ export async function POST(request: NextRequest) {
       email: emailLower,
       passwordHash,
       role,
-      permissions,
+      permissions: normalizePermissions(permissions),
       createdAt: new Date().toISOString()
     };
 
@@ -136,7 +137,7 @@ export async function PUT(request: NextRequest) {
     if (name) targetUser.name = name.trim();
     if (email) targetUser.email = email.toLowerCase().trim();
     if (role) targetUser.role = role;
-    if (permissions) targetUser.permissions = { ...targetUser.permissions, ...permissions };
+    if (permissions) targetUser.permissions = normalizePermissions({ ...targetUser.permissions, ...permissions });
     
     // Atualizar senha se fornecida
     if (password && password.trim() !== '') {

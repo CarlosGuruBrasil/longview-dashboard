@@ -17,7 +17,6 @@ import {
   FileCheck
 } from 'lucide-react';
 import { Task, Project } from '@/lib/db';
-import { useUser } from '@/context/UserContext';
 import Link from 'next/link';
 import TaskDrawer from '@/components/TaskDrawer';
 import ResponsibleModal from '@/components/ResponsibleModal';
@@ -41,7 +40,6 @@ import {
 } from 'recharts';
 
 export default function Home() {
-  const { currentUser } = useUser();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -242,20 +240,9 @@ export default function Home() {
     .slice(0, 5);
 
   return (
-    <div className="flex-1 p-4 md:p-6 lg:p-10 space-y-6 md:space-y-8 max-w-7xl mx-auto w-full">
-      {/* Header Executivo */}
-      <header className="flex flex-col gap-3 border-b border-[#1C1C1E] pb-4 md:pb-6">
-        {/* Badge + greeting — hidden on mobile (shell header already shows context) */}
-        <div className="hidden md:flex items-center gap-2">
-          <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-white/5 border border-white/10 text-zinc-400">
-            Acompanhamento Executivo
-          </span>
-          <span className="text-zinc-600 text-xs">•</span>
-          <span className="text-zinc-500 text-xs font-medium">Atualizado em tempo real</span>
-        </div>
-        <h2 className="hidden md:block text-3xl font-semibold tracking-tight text-white">LongView Manager</h2>
-        <p className="hidden md:block text-sm text-zinc-400">Olá, {currentUser.name}. Visualização configurada para nível {currentUser.role}.</p>
-
+    <div className="flex-1 w-full space-y-6 p-4 md:p-6 lg:px-6 lg:py-4">
+      {/* Filtro e Atualizar */}
+      <header className="flex flex-col gap-3 border-b border-[#1C1C1E] pb-4">
         {/* Filtro e Atualizar — responsivo */}
         <div className="flex items-center gap-2 w-full">
           <div className="flex flex-1 min-w-0 items-center gap-2 bg-[#1b1b1f] border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white">
@@ -403,17 +390,17 @@ export default function Home() {
       </section>
 
       {/* Seção de Gráficos e Detalhes */}
-      <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <section className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-3">
         
         {/* Gráfico 1: Andamento por Empreendimento */}
-        <div className="lg:col-span-2 bg-[#121214]/60 border border-[#1E1E22] rounded-xl p-5 space-y-4">
+        <div className="min-w-0 lg:col-span-2 bg-[#121214]/60 border border-[#1E1E22] rounded-xl p-5 space-y-4">
           <div className="flex justify-between items-center border-b border-[#1C1C1E] pb-3">
             <div>
               <h4 className="text-sm font-semibold text-white">Evolução Operacional por Empreendimento</h4>
               <p className="text-[11px] text-zinc-500 mt-0.5">Quantidade de tarefas por status em cada projeto</p>
             </div>
           </div>
-          <div className="h-64 w-full">
+          <div className="h-64 min-w-0 w-full">
             {mounted && (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={projectStats} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -446,14 +433,14 @@ export default function Home() {
         </div>
 
         {/* Gráfico 2: Distribuição por Setores (Pizza) */}
-        <div className="bg-[#121214]/60 border border-[#1E1E22] rounded-xl p-5 space-y-4">
+        <div className="min-w-0 bg-[#121214]/60 border border-[#1E1E22] rounded-xl p-5 space-y-4">
           <div className="flex justify-between items-center border-b border-[#1C1C1E] pb-3">
             <div>
               <h4 className="text-sm font-semibold text-white">Tarefas por Setor</h4>
               <p className="text-[11px] text-zinc-500 mt-0.5">Representatividade operacional no projeto</p>
             </div>
           </div>
-          <div className="h-64 w-full flex items-center justify-center relative">
+          <div className="h-64 min-w-0 w-full flex items-center justify-center relative">
             {mounted && sectorData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -487,7 +474,7 @@ export default function Home() {
       </section>
 
       {/* Gargalos e Risco Operacional */}
-      <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <section className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Gargalos Operacionais */}
         <div className="bg-[#121214]/60 border border-[#1E1E22] rounded-xl p-5 space-y-4">
           <div className="flex justify-between items-center border-b border-[#1C1C1E] pb-3">

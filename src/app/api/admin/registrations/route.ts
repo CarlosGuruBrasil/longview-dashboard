@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminAuth } from '@/lib/auth';
 import { readUsers, writeUsers, readKv, writeKv, PendingRegistration, DbUser } from '@/lib/db-kv';
+import { createDefaultPermissions } from '@/lib/permissions';
 import crypto from 'crypto';
 
 /** GET /api/admin/registrations — lista todos os pedidos de cadastro */
@@ -54,20 +55,8 @@ export async function PATCH(request: NextRequest) {
       name:         reg.name,
       email:        reg.email,
       passwordHash: reg.passwordHash,
-      role:         'Usuário' as DbUser['role'],  // role padrão — admin pode mudar depois
-      permissions: {
-        viewMarketingDashboard:   false,
-        viewMarketingLeads:       false,
-        viewMarketingOportunidades: false,
-        viewMarketingEstoque:     false,
-        viewMarketingAds:         false,
-        viewMarketingVendas:      false,
-        viewProjectVision:        false,
-        manageProjects:           false,
-        manageCommentsDocs:       false,
-        deleteTasks:              false,
-        isAdmin:                  false,
-      },
+      role:         'Visualizador',
+      permissions: createDefaultPermissions(),
       profile:   reg.profile as DbUser['profile'],
       createdAt: new Date().toISOString(),
     };

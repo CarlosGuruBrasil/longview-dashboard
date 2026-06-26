@@ -19,13 +19,35 @@ async function verifyAuth() {
     const cookieStore = await cookies();
     const token = cookieStore.get('auth_token')?.value;
     if (!token) return null;
-    return jwt.verify(token, JWT_SECRET) as { id: string; email: string; role: string; name: string };
+    return jwt.verify(token, JWT_SECRET) as { userId: string; email: string; role: string; name: string };
   } catch {
     return null;
   }
 }
 
-async function fetchDashboardData(): Promise<DashboardApiResponse | null> {
+function filterLeadsForUser<T extends { corretor?: { email?: string; nome?: string }; gestor?: { email?: string; nome?: string } }>(
+  leads: T[],
+  user: { email: string; name: string; role: string }
+): T[] {
+  const privileged = ['Gestor', 'Diretoria', 'Desenvolvedor'];
+  if (privileged.includes(user.role)) return leads;
+
+  const myEmail = String(user.email || '').toLowerCase().trim();
+  const myName = String(user.name || '').toLowerCase().trim();
+  return leads.filter((lead) => {
+    const emails = [lead.corretor?.email, lead.gestor?.email]
+      .filter(Boolean)
+      .map((email) => String(email).toLowerCase().trim());
+    if (myEmail && emails.includes(myEmail)) return true;
+
+    const names = [lead.corretor?.nome, lead.gestor?.nome]
+      .filter(Boolean)
+      .map((name) => String(name).toLowerCase().trim());
+    return !!myName && names.includes(myName);
+  });
+}
+
+async function fetchDashboardData(user: { email: string; role: string; name: string }): Promise<DashboardApiResponse | null> {
   try {
     // Import pg directly — avoids an extra HTTP round-trip since we're on the server
     const { sql, ensureSchema } = await import('@/lib/pg');
@@ -65,8 +87,10 @@ async function fetchDashboardData(): Promise<DashboardApiResponse | null> {
       daily: [], leadForms: [], page: null,
     };
 
+    const scopedLeads = filterLeadsForUser(leads as DashboardApiResponse['leads']['leads'], user);
+
     return {
-      leads:     { leads: leads as DashboardApiResponse['leads']['leads'], total: leads.length, crmTotal: leads.length },
+      leads:     { leads: scopedLeads, total: scopedLeads.length, crmTotal: scopedLeads.length },
       meta:      (metaData ?? emptyMeta) as DashboardApiResponse['meta'],
       estoque:   (estoqueData?.estoque ?? {}) as DashboardApiResponse['estoque'],
       leadForms: ((metaData as { leadForms?: DashboardApiResponse['leadForms'] } | null)?.leadForms) ?? [],
@@ -84,7 +108,7 @@ export default async function MarketingVisionPage() {
   const user = await verifyAuth();
   if (!user) redirect('/login');
 
-  const initialData = await fetchDashboardData();
+  const initialData = await fetchDashboardData(user);
 
   return (
     <div className="min-h-screen bg-[#09090b] text-[#e5e5e5] font-sans">

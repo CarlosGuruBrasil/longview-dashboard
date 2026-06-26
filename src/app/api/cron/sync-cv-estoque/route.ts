@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
 import { sql, ensureSchema } from '@/lib/pg';
+import { isCronAuthorized, unauthorizedJson } from '@/lib/internal-auth';
 
 export const maxDuration = 300;
 export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
-  const secret = request.headers.get('Authorization')?.replace('Bearer ', '');
-  if (secret !== process.env.CRON_SECRET) {
-    return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-  }
+  if (!isCronAuthorized(request)) return unauthorizedJson();
 
   await ensureSchema();
   const CV_EMAIL = process.env.CV_CRM_EMAIL!;

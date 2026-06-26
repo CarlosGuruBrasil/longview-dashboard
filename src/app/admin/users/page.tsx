@@ -12,24 +12,18 @@ import {
   ArrowLeft, 
   Loader2, 
   Check, 
-  X, 
-  AlertTriangle 
+  AlertTriangle,
+  LogOut,
 } from 'lucide-react';
-import { DbUser, UserPermissions } from '@/lib/db-kv';
+import type { DbUser } from '@/lib/db-kv';
+import PasswordInput from '@/components/app/PasswordInput';
+import {
+  createDefaultPermissions,
+  normalizePermissions,
+  type UserPermissions,
+} from '@/lib/permissions';
 
-const defaultPermissions: UserPermissions = {
-  viewMarketingDashboard: false,
-  viewMarketingLeads: false,
-  viewMarketingOportunidades: false,
-  viewMarketingEstoque: false,
-  viewMarketingAds: false,
-  viewMarketingVendas: false,
-  viewProjectVision: false,
-  manageProjects: false,
-  manageCommentsDocs: false,
-  deleteTasks: false,
-  isAdmin: false
-};
+const defaultPermissions: UserPermissions = createDefaultPermissions();
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<Omit<DbUser, 'passwordHash'>[]>([]);
@@ -37,6 +31,7 @@ export default function AdminUsersPage() {
   const [submitLoading, setSubmitLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [backHref, setBackHref] = useState('/select-app');
 
   // Estados do formulário
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
@@ -61,6 +56,10 @@ export default function AdminUsersPage() {
   };
 
   useEffect(() => {
+    const from = new URLSearchParams(window.location.search).get('from');
+    if (from?.startsWith('/')) {
+      window.setTimeout(() => setBackHref(from), 0);
+    }
     fetchUsers();
   }, []);
 
@@ -68,9 +67,9 @@ export default function AdminUsersPage() {
   const handleRoleChange = (selectedRole: typeof role) => {
     setRole(selectedRole);
 
-    let newPerms = { ...defaultPermissions };
+    let newPerms = createDefaultPermissions();
     if (selectedRole === 'Desenvolvedor') {
-      newPerms = {
+      newPerms = createDefaultPermissions({
         viewMarketingDashboard: true,
         viewMarketingLeads: true,
         viewMarketingOportunidades: true,
@@ -81,10 +80,12 @@ export default function AdminUsersPage() {
         manageProjects: true,
         manageCommentsDocs: true,
         deleteTasks: true,
+        viewRHVision: true,
+        viewQualityVision: true,
         isAdmin: true
-      };
+      });
     } else if (selectedRole === 'Diretoria') {
-      newPerms = {
+      newPerms = createDefaultPermissions({
         viewMarketingDashboard: true,
         viewMarketingLeads: true,
         viewMarketingOportunidades: true,
@@ -95,44 +96,43 @@ export default function AdminUsersPage() {
         manageProjects: true,
         manageCommentsDocs: true,
         deleteTasks: true,
+        viewRHVision: true,
+        viewQualityVision: true,
         isAdmin: true
-      };
+      });
     } else if (selectedRole === 'Operador') {
-      newPerms = {
-        ...defaultPermissions,
+      newPerms = createDefaultPermissions({
         viewProjectVision: true,
         manageProjects: true,
         manageCommentsDocs: true,
         deleteTasks: true
-      };
+      });
     } else if (selectedRole === 'Gestor') {
-      newPerms = {
-        ...defaultPermissions,
+      newPerms = createDefaultPermissions({
         viewMarketingDashboard: true,
         viewMarketingLeads: true,
         viewMarketingEstoque: true,
         viewProjectVision: true,
         manageProjects: true,
-        manageCommentsDocs: true
-      };
+        manageCommentsDocs: true,
+        viewRHVision: true,
+        viewQualityVision: true,
+      });
     } else if (selectedRole === 'Parceiro') {
-      newPerms = {
-        ...defaultPermissions,
+      newPerms = createDefaultPermissions({
         viewProjectVision: true,
         manageCommentsDocs: true
-      };
+      });
     } else if (selectedRole === 'Corretor') {
-      newPerms = {
-        ...defaultPermissions,
+      newPerms = createDefaultPermissions({
         viewMarketingDashboard: true,
         viewMarketingLeads: true,
         viewMarketingEstoque: true
-      };
+      });
     } else if (selectedRole === 'Visualizador') {
-      newPerms = {
-        ...defaultPermissions,
+      newPerms = createDefaultPermissions({
         viewProjectVision: true
-      };
+      });
     }
     setPermissions(newPerms);
   };
@@ -150,7 +150,7 @@ export default function AdminUsersPage() {
     setEmail(user.email);
     setPassword(''); // Deixar em branco (só preenche se quiser alterar)
     setRole(user.role);
-    setPermissions(user.permissions);
+    setPermissions(normalizePermissions(user.permissions));
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -160,7 +160,7 @@ export default function AdminUsersPage() {
     setEmail('');
     setPassword('');
     setRole('Corretor');
-    setPermissions(defaultPermissions);
+    setPermissions(createDefaultPermissions());
     setError(null);
   };
 
@@ -232,43 +232,42 @@ export default function AdminUsersPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#09090b] text-white p-6 sm:p-10 max-w-7xl mx-auto w-full space-y-8">
-      {/* Header */}
-      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-[#1C1C1E] pb-6">
-        <div>
-          <div className="flex items-center gap-2">
-            <Link href="/select-app" className="text-zinc-500 hover:text-white transition-colors flex items-center gap-1 text-xs">
-              <ArrowLeft size={14} />
-              <span>Voltar para Seleção</span>
-            </Link>
-            <span className="text-zinc-700 text-xs">•</span>
-            <span className="text-zinc-500 text-xs font-medium">Controle de Segurança</span>
-          </div>
-          <h2 className="text-3xl font-bold tracking-tight text-white mt-2 flex items-center gap-2.5">
-            <Shield className="text-zinc-400" size={28} />
-            Gerenciamento de Usuários
-          </h2>
-          <p className="text-sm text-zinc-400 mt-1">
-            Cadastre novos acessos e configure as permissões específicas por checkbox.
-          </p>
+    <main className="min-h-screen bg-[#09090b] text-white">
+      <header className="flex shrink-0 items-center gap-4 border-b border-white/[0.06] bg-[#0d0d0f]/88 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-2xl lg:px-6">
+        <Link
+          href={backHref}
+          className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.03] text-zinc-500 transition-colors hover:border-white/[0.12] hover:bg-white/[0.06] hover:text-white"
+          title="Voltar"
+        >
+          <ArrowLeft size={16} />
+        </Link>
+        <div className="min-w-0">
+          <h1 className="flex items-center gap-2 text-base font-semibold text-zinc-100">
+            <Shield className="text-red-400" size={16} />
+            <span className="truncate">Gerenciamento de Usuários</span>
+          </h1>
+          <p className="mt-0.5 truncate text-xs text-zinc-500">Controle de Segurança · cadastros e permissões</p>
         </div>
-        
-        <div className="relative w-36 h-12 flex items-center">
-          <Image
-            src="/logolongview.png"
-            alt="LongView"
-            fill
-            className="object-contain object-right"
-          />
+        <div className="ml-auto hidden h-9 w-28 items-center sm:flex">
+          <Image src="/logolongview.png" alt="LongView" width={112} height={32} className="object-contain" priority />
         </div>
+        <a
+          href="/api/auth/logout"
+          className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.03] text-zinc-500 transition-colors hover:border-red-500/20 hover:bg-red-500/10 hover:text-red-400"
+          title="Sair"
+        >
+          <LogOut size={15} />
+        </a>
       </header>
 
+      <div className="w-full space-y-6 px-4 py-4 lg:px-6">
+
       {/* Grid de Conteúdo */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
         
         {/* Coluna 1 e 2: Listagem de Usuários */}
-        <section className="lg:col-span-2 space-y-4">
-          <div className="bg-[#121214]/60 border border-[#1e1e22] rounded-2xl p-5 space-y-4">
+        <section className="min-w-0 space-y-4">
+          <div className="bg-[#121214]/60 border border-[#1e1e22] rounded-xl p-5 space-y-4">
             <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
               <Users size={16} />
               Usuários Ativos
@@ -305,7 +304,13 @@ export default function AdminUsersPage() {
                       return (
                         <tr key={u.id} className="hover:bg-white/1 transition-colors">
                           <td className="py-4.5 px-2">
-                            <p className="font-bold text-white text-sm">{u.name}</p>
+                            <Link
+                              href={`/rh-vision/colaboradores/${u.id}?from=${encodeURIComponent('/admin/users')}`}
+                              className="font-bold text-white text-sm hover:text-emerald-300 transition-colors"
+                              title="Abrir ficha no People Vision"
+                            >
+                              {u.name}
+                            </Link>
                             <p className="text-zinc-500 text-xs mt-0.5">{u.email}</p>
                           </td>
                           <td className="py-4.5 px-2">
@@ -331,6 +336,12 @@ export default function AdminUsersPage() {
                               )}
                               {u.permissions.viewProjectVision && (
                                 <span className="bg-orange-500/10 text-orange-400 px-1.5 py-0.2 rounded text-[11px] border border-orange-500/20 font-bold uppercase tracking-wide">Project</span>
+                              )}
+                              {u.permissions.viewRHVision && (
+                                <span className="bg-emerald-500/10 text-emerald-400 px-1.5 py-0.2 rounded text-[11px] border border-emerald-500/20 font-bold uppercase tracking-wide">People</span>
+                              )}
+                              {u.permissions.viewQualityVision && (
+                                <span className="bg-teal-500/10 text-teal-400 px-1.5 py-0.2 rounded text-[11px] border border-teal-500/20 font-bold uppercase tracking-wide">Qualidade</span>
                               )}
                               <span className="text-[11px] text-zinc-500">({permissionsCount} ativas)</span>
                             </div>
@@ -370,7 +381,7 @@ export default function AdminUsersPage() {
 
         {/* Coluna 3: Formulário de Cadastro / Edição */}
         <section className="space-y-4">
-          <div className="bg-[#121214]/60 border border-[#1e1e22] rounded-2xl p-5 space-y-5">
+          <div className="bg-[#121214]/60 border border-[#1e1e22] rounded-xl p-5 space-y-5">
             <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
               <UserPlus size={16} />
               {editingUserId ? 'Editar Usuário' : 'Novo Usuário'}
@@ -383,13 +394,17 @@ export default function AdminUsersPage() {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+            <form onSubmit={handleSubmit} className="space-y-4 text-xs" autoComplete="off">
+              <input type="text" name="username" autoComplete="username" className="hidden" tabIndex={-1} aria-hidden="true" />
+              <input type="password" name="password" autoComplete="current-password" className="hidden" tabIndex={-1} aria-hidden="true" />
               
               {/* Campo Nome */}
               <div className="space-y-1.5">
                 <label className="text-zinc-400 font-bold block">Nome completo</label>
                 <input
                   type="text"
+                  name="new-user-name"
+                  autoComplete="off"
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -403,6 +418,8 @@ export default function AdminUsersPage() {
                 <label className="text-zinc-400 font-bold block">E-mail corporativo</label>
                 <input
                   type="email"
+                  name="new-user-email"
+                  autoComplete="off"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -416,13 +433,14 @@ export default function AdminUsersPage() {
                 <label className="text-zinc-400 font-bold block">
                   Senha {editingUserId && <span className="text-[11px] text-zinc-500 font-normal">(deixe em branco se não quiser alterar)</span>}
                 </label>
-                <input
-                  type="password"
+                <PasswordInput
+                  name="new-user-password"
+                  autoComplete="new-password"
                   required={!editingUserId}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder={editingUserId ? '••••••••' : 'Defina a senha'}
-                  className="w-full bg-[#1b1b1f] border border-[#2e2e34] rounded-xl px-4 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-400 transition-all duration-200"
+                  inputClassName="w-full bg-[#1b1b1f] border border-[#2e2e34] rounded-xl px-4 py-2.5 pr-10 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-400 transition-all duration-200"
                 />
               </div>
 
@@ -543,6 +561,38 @@ export default function AdminUsersPage() {
                   </div>
                 </div>
 
+                {/* People Vision */}
+                <div className="space-y-2 pt-1">
+                  <span className="text-[11px] text-zinc-500 font-bold uppercase tracking-wider block">People Vision</span>
+                  <div className="space-y-1.5 pl-1">
+                    <label className="flex items-center gap-2 text-zinc-400 hover:text-white cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={permissions.viewRHVision}
+                        onChange={() => handleCheckboxChange('viewRHVision')}
+                        className="rounded bg-[#1b1b1f] border-[#2e2e34] text-white focus:ring-0 w-3.5 h-3.5"
+                      />
+                      <span>Visualizar People Vision</span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Quality Vision */}
+                <div className="space-y-2 pt-1">
+                  <span className="text-[11px] text-zinc-500 font-bold uppercase tracking-wider block">Quality Vision</span>
+                  <div className="space-y-1.5 pl-1">
+                    <label className="flex items-center gap-2 text-zinc-400 hover:text-white cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={permissions.viewQualityVision}
+                        onChange={() => handleCheckboxChange('viewQualityVision')}
+                        className="rounded bg-[#1b1b1f] border-[#2e2e34] text-white focus:ring-0 w-3.5 h-3.5"
+                      />
+                      <span>Visualizar Painel de Qualidade</span>
+                    </label>
+                  </div>
+                </div>
+
                 {/* Painel Administrativo */}
                 <div className="space-y-2 pt-1">
                   <span className="text-[11px] text-zinc-500 font-bold uppercase tracking-wider block">Administração Geral</span>
@@ -593,6 +643,7 @@ export default function AdminUsersPage() {
           </div>
         </section>
 
+      </div>
       </div>
     </main>
   );

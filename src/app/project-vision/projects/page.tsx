@@ -147,20 +147,8 @@ export default function ProjectsPage() {
   };
 
   return (
-    <div className="flex-1 p-6 lg:p-10 space-y-6 max-w-7xl mx-auto w-full">
-      {/* Header */}
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-[#1C1C1E] pb-6">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-white/5 border border-white/10 text-zinc-400">
-              Operações Imobiliárias
-            </span>
-          </div>
-          <h2 className="text-3xl font-semibold tracking-tight text-white mt-1">Nossos Empreendimentos</h2>
-          <p className="text-sm text-zinc-400 mt-0.5">Gestão centralizada de portfólio físico e processos.</p>
-        </div>
-
-        <div className="flex items-center gap-3">
+    <div className="flex-1 w-full space-y-6 p-4 md:p-6 lg:px-6 lg:py-4">
+      <header className="flex justify-end gap-3 border-b border-[#1C1C1E] pb-4">
           <button 
             onClick={fetchData}
             className="p-2.5 bg-[#121214] hover:bg-[#18181B] border border-[#1E1E22] text-zinc-400 hover:text-white rounded-lg transition-colors flex items-center gap-1.5 text-xs"
@@ -178,7 +166,6 @@ export default function ProjectsPage() {
               <span>Novo Empreendimento</span>
             </button>
           )}
-        </div>
       </header>
 
       {/* Grid de Empreendimentos */}
@@ -227,7 +214,7 @@ export default function ProjectsPage() {
                   {canEdit && (
                     <label
                       htmlFor={`banner-${proj.id}`}
-                      className="absolute top-2 right-2 z-20 p-2 bg-black/60 hover:bg-black/85 text-white rounded-lg cursor-pointer opacity-0 group-hover:opacity-100 transition-all duration-200 border border-white/10"
+                      className="absolute top-2 right-2 z-20 p-2 bg-black/60 hover:bg-black/85 text-white rounded-lg cursor-pointer opacity-0 group-hover:opacity-100 transition-all duration-200 border border-[#1E1E22]"
                       title="Alterar imagem do empreendimento"
                       onClick={e => e.stopPropagation()}
                     >
@@ -328,11 +315,11 @@ export default function ProjectsPage() {
         <>
           <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 animate-in fade-in" onClick={() => setCreateModalOpen(false)} />
           <div className="fixed inset-0 flex items-center justify-center p-4 z-50 animate-in zoom-in-95 duration-200 pointer-events-none">
-            <div className="bg-[#09090B] border border-[#1E1E22] rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col justify-between pointer-events-auto">
+            <div className="bg-[#09090B] border border-[#1E1E22] rounded-xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col justify-between pointer-events-auto">
               
               <div className="p-5 border-b border-[#1C1C1E] flex justify-between items-center bg-[#121214]/60">
                 <h3 className="text-base font-bold text-white">Criar Novo Empreendimento</h3>
-                <button onClick={() => setCreateModalOpen(false)} className="p-1 hover:bg-white/5 text-zinc-400 hover:text-white rounded-lg">
+                <button onClick={() => setCreateModalOpen(false)} className="p-1 hover:bg-[#18181B] text-zinc-400 hover:text-white rounded-lg">
                   <X size={16} />
                 </button>
               </div>
@@ -404,7 +391,7 @@ export default function ProjectsPage() {
                   <button 
                     type="button" 
                     onClick={() => setCreateModalOpen(false)}
-                    className="bg-transparent hover:bg-white/5 border border-zinc-700 text-zinc-300 px-4.5 py-2 rounded-lg text-xs font-semibold"
+                    className="bg-transparent hover:bg-[#18181B] border border-zinc-700 text-zinc-300 px-4.5 py-2 rounded-lg text-xs font-semibold"
                   >
                     Cancelar
                   </button>

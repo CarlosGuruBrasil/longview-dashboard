@@ -113,7 +113,7 @@ export default function ProjectSheetImportPanel() {
   const statusRows = report ? Object.entries(report.statusAndamento) : [];
 
   return (
-    <section className="mt-10 border-t border-white/10 pt-8">
+    <section className="mt-10 border-t border-[#1C1C1E] pt-8">
       <div className="flex items-center gap-2 mb-4">
         <FileSpreadsheet size={15} className="text-orange-400" />
         <h2 className="text-sm font-semibold text-zinc-300 uppercase tracking-wider">
@@ -121,8 +121,8 @@ export default function ProjectSheetImportPanel() {
         </h2>
       </div>
 
-      <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4 space-y-4">
-        <div className="rounded-md border border-white/8 bg-black/20 p-3 space-y-3">
+      <div className="rounded-xl border border-[#1E1E22] bg-[#121214]/60 p-4 space-y-4">
+        <div className="rounded-lg border border-[#1E1E22] bg-[#18181B] p-3 space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div>
               <p className="text-sm font-medium text-zinc-200">Diagnóstico dos dados atuais</p>
@@ -133,7 +133,7 @@ export default function ProjectSheetImportPanel() {
                 type="button"
                 disabled={checkingHealth || restoring}
                 onClick={checkHealth}
-                className="h-8 px-3 rounded-md bg-white/10 hover:bg-white/15 disabled:opacity-50 text-xs font-medium text-zinc-100 flex items-center gap-2 transition-colors"
+                className="h-8 px-3 rounded-md border border-[#1E1E22] bg-[#121214] hover:bg-[#202024] disabled:opacity-50 text-xs font-medium text-zinc-100 flex items-center gap-2 transition-colors"
               >
                 {checkingHealth && <Loader2 size={13} className="animate-spin" />}
                 Verificar
@@ -158,7 +158,7 @@ export default function ProjectSheetImportPanel() {
           )}
         </div>
 
-        <label className="flex items-center justify-between gap-3 rounded-md border border-dashed border-white/15 bg-black/20 px-3 py-3 cursor-pointer hover:border-orange-400/50 transition-colors">
+        <label className="flex items-center justify-between gap-3 rounded-lg border border-dashed border-[#2A2A2E] bg-[#18181B] px-3 py-3 cursor-pointer hover:border-orange-400/50 transition-colors">
           <span className="min-w-0">
             <span className="block text-sm font-medium text-zinc-200 truncate">
               {file ? file.name : 'Selecionar arquivo'}
@@ -185,7 +185,7 @@ export default function ProjectSheetImportPanel() {
             type="button"
             disabled={!file || loading || importing}
             onClick={() => sendImport(true)}
-            className="h-9 px-3 rounded-md bg-white/10 hover:bg-white/15 disabled:opacity-50 disabled:hover:bg-white/10 text-sm font-medium text-zinc-100 flex items-center justify-center gap-2 transition-colors"
+            className="h-9 px-3 rounded-md border border-[#1E1E22] bg-[#18181B] hover:bg-[#202024] disabled:opacity-50 disabled:hover:bg-[#18181B] text-sm font-medium text-zinc-100 flex items-center justify-center gap-2 transition-colors"
           >
             {loading ? <Loader2 size={15} className="animate-spin" /> : <FileSpreadsheet size={15} />}
             Pré-visualizar
@@ -224,16 +224,16 @@ export default function ProjectSheetImportPanel() {
               <Metric label="Responsáveis" value={report.responsibles} />
             </div>
 
-            <div className="rounded-md border border-white/8 overflow-hidden">
+            <div className="rounded-lg border border-[#1E1E22] overflow-hidden">
               <table className="w-full text-xs">
-                <thead className="bg-white/[0.04] text-zinc-500">
+                <thead className="bg-[#18181B] text-zinc-500">
                   <tr>
                     <th className="text-left px-3 py-2 font-medium">Empreendimento</th>
                     <th className="text-right px-3 py-2 font-medium">Tarefas</th>
                     <th className="text-right px-3 py-2 font-medium">Modelo</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/[0.06]">
+                <tbody className="divide-y divide-[#1C1C1E]">
                   {report.perProject.map((project) => (
                     <tr key={project.project}>
                       <td className="px-3 py-2 text-zinc-200">{project.project}</td>
@@ -247,7 +247,7 @@ export default function ProjectSheetImportPanel() {
 
             <div className="flex flex-wrap gap-2">
               {statusRows.map(([status, count]) => (
-                <span key={status} className="px-2 py-1 rounded-md bg-white/[0.06] text-[11px] text-zinc-300">
+                <span key={status} className="px-2 py-1 rounded-md border border-[#1E1E22] bg-[#18181B] text-[11px] text-zinc-300">
                   {status}: {count}
                 </span>
               ))}

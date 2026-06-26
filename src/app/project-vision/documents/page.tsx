@@ -152,20 +152,8 @@ export default function DocumentsPage() {
   };
 
   return (
-    <div className="flex-1 p-6 lg:p-10 space-y-6 max-w-7xl mx-auto w-full">
-      {/* Header */}
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-[#1C1C1E] pb-6">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-white/5 border border-white/10 text-zinc-400">
-              Arquivos Corporativos
-            </span>
-          </div>
-          <h2 className="text-3xl font-semibold tracking-tight text-white mt-1">Central de Documentos</h2>
-          <p className="text-sm text-zinc-400 mt-0.5">Repositório unificado de licenças, plantas, contratos e relatórios.</p>
-        </div>
-
-        <div className="flex items-center gap-3">
+    <div className="flex-1 w-full space-y-6 p-4 md:p-6 lg:px-6 lg:py-4">
+      <header className="flex justify-end gap-3 border-b border-[#1C1C1E] pb-4">
           <button 
             onClick={fetchData}
             className="p-2.5 bg-[#121214] hover:bg-[#18181B] border border-[#1E1E22] text-zinc-400 hover:text-white rounded-lg transition-colors flex items-center gap-1.5 text-xs"
@@ -181,7 +169,6 @@ export default function DocumentsPage() {
             <Plus size={16} />
             <span>Upload Documento</span>
           </button>
-        </div>
       </header>
 
       {/* Painel de Filtros e Busca */}
@@ -238,7 +225,7 @@ export default function DocumentsPage() {
                   <div className="w-9 h-9 rounded-lg bg-zinc-800 flex items-center justify-center border border-zinc-700 shrink-0">
                     <FileText size={18} className="text-zinc-400" />
                   </div>
-                  <span className="text-[8px] font-bold px-1.5 py-0.5 rounded border border-white/10 text-zinc-400 uppercase tracking-wider">
+                  <span className="text-[8px] font-bold px-1.5 py-0.5 rounded border border-[#1E1E22] bg-[#18181B] text-zinc-400 uppercase tracking-wider">
                     v{doc.version}.0
                   </span>
                 </div>
@@ -295,7 +282,7 @@ export default function DocumentsPage() {
         <>
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 animate-in fade-in" onClick={() => setUploadOpen(false)} />
           <div className="fixed inset-0 flex items-center justify-center p-4 z-50 animate-in zoom-in-95 duration-200">
-            <div className="bg-[#09090B] border border-[#1E1E22] rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+            <div className="bg-[#09090B] border border-[#1E1E22] rounded-xl w-full max-w-md shadow-2xl overflow-hidden">
               
               <div className="p-5 border-b border-[#1C1C1E] bg-[#121214]/60 flex justify-between items-center">
                 <h3 className="text-sm font-bold text-white">Anexar Documento ao Empreendimento</h3>
@@ -349,7 +336,7 @@ export default function DocumentsPage() {
                   <button 
                     type="button" 
                     onClick={() => setUploadOpen(false)}
-                    className="bg-transparent hover:bg-white/5 border border-zinc-700 text-zinc-300 px-4 py-2 rounded-lg text-xs font-semibold"
+                    className="bg-transparent hover:bg-[#18181B] border border-zinc-700 text-zinc-300 px-4 py-2 rounded-lg text-xs font-semibold"
                   >
                     Cancelar
                   </button>

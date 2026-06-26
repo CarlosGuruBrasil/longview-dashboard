@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
+import { isCronAuthorized, unauthorizedJson } from '@/lib/internal-auth';
 
 const META_API_VERSION = 'v21.0';
 const META_PAGE_ID     = '259079394232614';
 
 export async function GET(request: NextRequest) {
-  const secret = request.headers.get('authorization')?.replace('Bearer ', '');
-  if (secret !== process.env.CRON_SECRET) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  if (!isCronAuthorized(request)) return unauthorizedJson();
 
   const META_TOKEN  = process.env.META_TOKEN!;
   const META_ACT_ID = process.env.META_ACT_ID!;

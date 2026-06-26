@@ -196,20 +196,8 @@ export default function ResponsiblesPage() {
   };
 
   return (
-    <div className="flex-1 p-6 lg:p-10 space-y-6 max-w-7xl mx-auto w-full">
-      {/* Header */}
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-[#1C1C1E] pb-6">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-white/5 border border-white/10 text-zinc-400">
-              Operação & Recursos
-            </span>
-          </div>
-          <h2 className="text-3xl font-semibold tracking-tight text-white mt-1">Responsáveis & Executores</h2>
-          <p className="text-sm text-zinc-400 mt-0.5">Central de controle de carga de trabalho, gargalos e tarefas de cada executor.</p>
-        </div>
-
-        <div className="flex items-center gap-3">
+    <div className="flex-1 w-full space-y-6 p-4 md:p-6 lg:px-6 lg:py-4">
+      <header className="flex justify-end gap-3 border-b border-[#1C1C1E] pb-4">
           <button 
             onClick={fetchData}
             className="p-2.5 bg-[#121214] hover:bg-[#18181B] border border-[#1E1E22] text-zinc-400 hover:text-white rounded-lg transition-colors flex items-center gap-1.5 text-xs"
@@ -227,7 +215,6 @@ export default function ResponsiblesPage() {
               <span>Cadastrar Executor</span>
             </button>
           )}
-        </div>
       </header>
 
       {/* Busca e Resumos Rápidos */}
@@ -258,7 +245,7 @@ export default function ResponsiblesPage() {
           <p className="text-sm">Carregando painel de responsáveis...</p>
         </div>
       ) : filteredStats.length === 0 ? (
-        <div className="py-20 text-center text-zinc-500 border border-dashed border-[#1E1E22] rounded-2xl">
+        <div className="py-20 text-center text-zinc-500 border border-dashed border-[#1E1E22] rounded-xl">
           Nenhum executor cadastrado atende a esses critérios.
         </div>
       ) : (
@@ -271,7 +258,7 @@ export default function ResponsiblesPage() {
               <div 
                 key={stats.name}
                 onClick={() => setSelectedRespName(stats.name)}
-                className="bg-[#121214]/40 border border-[#1E1E22] hover:border-zinc-700 p-5 rounded-2xl flex flex-col justify-between space-y-5 cursor-pointer transition-all duration-300 hover:bg-[#18181B]/50 hover:-translate-y-0.5 group relative overflow-hidden"
+                className="bg-[#121214]/40 border border-[#1E1E22] hover:border-zinc-700 p-5 rounded-xl flex flex-col justify-between space-y-5 cursor-pointer transition-all duration-300 hover:bg-[#18181B]/50 hover:-translate-y-0.5 group relative overflow-hidden"
               >
                 {hasDelayed && (
                   <div className="absolute -right-16 -top-16 w-32 h-32 rounded-full bg-red-500/5 blur-3xl pointer-events-none group-hover:bg-red-500/10 transition-all duration-300" />
@@ -385,11 +372,11 @@ export default function ResponsiblesPage() {
         <>
           <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 animate-in fade-in" onClick={() => setCreateModalOpen(false)} />
           <div className="fixed inset-0 flex items-center justify-center p-4 z-50 animate-in zoom-in-95 duration-200 pointer-events-none">
-            <div className="bg-[#09090B] border border-[#1E1E22] rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden flex flex-col justify-between pointer-events-auto">
+            <div className="bg-[#09090B] border border-[#1E1E22] rounded-xl w-full max-w-xl shadow-2xl overflow-hidden flex flex-col justify-between pointer-events-auto">
               
               <div className="p-5 border-b border-[#1C1C1E] flex justify-between items-center bg-[#121214]/60">
                 <h3 className="text-base font-bold text-white">Cadastrar Novo Executor</h3>
-                <button onClick={() => setCreateModalOpen(false)} className="p-1 hover:bg-white/5 text-zinc-400 hover:text-white rounded-lg">
+                <button onClick={() => setCreateModalOpen(false)} className="p-1 hover:bg-[#18181B] text-zinc-400 hover:text-white rounded-lg">
                   <X size={16} />
                 </button>
               </div>
@@ -467,7 +454,7 @@ export default function ResponsiblesPage() {
                     <div className="flex flex-col items-center gap-1.5 shrink-0">
                       <span className="text-[8px] font-bold text-zinc-500 uppercase">Preview</span>
                       {newPhoto ? (
-                        <div className="w-20 h-20 rounded-full border border-white/10 overflow-hidden relative bg-black/30">
+                        <div className="w-20 h-20 rounded-full border border-[#1E1E22] overflow-hidden relative bg-black/30">
                           <img 
                             src={newPhoto} 
                             alt="Crop Preview" 
@@ -556,7 +543,7 @@ export default function ResponsiblesPage() {
                   <button 
                     type="button" 
                     onClick={() => setCreateModalOpen(false)}
-                    className="bg-transparent hover:bg-white/5 border border-zinc-700 text-zinc-300 px-4.5 py-2 rounded-lg text-xs font-semibold"
+                    className="bg-transparent hover:bg-[#18181B] border border-zinc-700 text-zinc-300 px-4.5 py-2 rounded-lg text-xs font-semibold"
                   >
                     Cancelar
                   </button>

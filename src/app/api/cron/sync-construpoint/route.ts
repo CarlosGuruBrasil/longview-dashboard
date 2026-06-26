@@ -1,14 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql, ensureSchema } from '@/lib/pg';
 import { getInspections, getVerifications, MODEL_TYPES, type ModelTypeKey } from '@/lib/construpoint';
+import { getBearerToken, isSecretAuthorized, unauthorizedJson } from '@/lib/internal-auth';
 
 export const maxDuration = 300; // 5 minutes
 export const runtime = 'nodejs';
 
-export async function POST(request: NextRequest) {
-  const secret = request.headers.get('Authorization')?.replace('Bearer ', '');
-  if (secret !== process.env.CRON_SECRET) {
-    return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+export async function GET(request: NextRequest) {
+  const url = new URL(request.url);
+  const querySecret = url.searchParams.get('secret');
+  const headerSecret = getBearerToken(request);
+  
+  if (
+    !isSecretAuthorized(process.env.CRON_SECRET, querySecret) &&
+    !isSecretAuthorized(process.env.CRON_SECRET, headerSecret)
+  ) {
+    return unauthorizedJson();
   }
 
   await ensureSchema();

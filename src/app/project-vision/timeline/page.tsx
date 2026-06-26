@@ -160,20 +160,8 @@ export default function TimelinePage() {
   });
 
   return (
-    <div className="flex-1 p-6 lg:p-10 space-y-6 max-w-7xl mx-auto w-full flex flex-col min-h-screen">
-      {/* Header */}
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-[#1C1C1E] pb-6 shrink-0">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-white/5 border border-white/10 text-zinc-400">
-              Planejamento Temporal
-            </span>
-          </div>
-          <h2 className="text-3xl font-semibold tracking-tight text-white mt-1">Timeline Operacional (Gantt)</h2>
-          <p className="text-sm text-zinc-400 mt-0.5">Visualize prazos, marcos e atrasos ao longo do cronograma corporativo.</p>
-        </div>
-
-        <div className="flex items-center gap-3">
+    <div className="flex-1 w-full space-y-6 p-4 md:p-6 lg:px-6 lg:py-4 flex flex-col min-h-screen">
+      <header className="flex justify-end gap-3 border-b border-[#1C1C1E] pb-4 shrink-0">
           <button 
             onClick={fetchData}
             className="p-2.5 bg-[#121214] hover:bg-[#18181B] border border-[#1E1E22] text-zinc-400 hover:text-white rounded-lg transition-colors flex items-center gap-1.5 text-xs"
@@ -181,7 +169,6 @@ export default function TimelinePage() {
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           </button>
-        </div>
       </header>
 
       {/* Filtros + Navegação */}

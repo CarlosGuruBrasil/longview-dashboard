@@ -93,11 +93,14 @@ let _tokenExpiry: number = 0;
 async function getToken(): Promise<string> {
   if (_cachedToken && Date.now() < _tokenExpiry) return _cachedToken;
 
-  const basicAuth = process.env.CONSTRUPOINT_BASIC_AUTH
-    ?? 'YTMyYjVlMmVkZGRhNGJmN2I2YmY4ZjE0ZDFhY2QxOWE6TG9uZ3ZpZXdATG9uZ3ZpZXc=';
-  const username  = process.env.CONSTRUPOINT_USERNAME ?? 'adminapi_longview@e-construmarket.com.br';
-  const password  = process.env.CONSTRUPOINT_PASSWORD ?? '*GSuG8U8';
+  const basicAuth = process.env.CONSTRUPOINT_BASIC_AUTH;
+  const username  = process.env.CONSTRUPOINT_USERNAME;
+  const password  = process.env.CONSTRUPOINT_PASSWORD;
+  if (!basicAuth || !username || !password) {
+    throw new Error('Construpoint credentials are not configured.');
+  }
 
+  console.log('Fetching token for user:', username);
   const body = new URLSearchParams({
     grant_type: 'password',
     username,
@@ -114,12 +117,13 @@ async function getToken(): Promise<string> {
   });
 
   if (!res.ok) {
-    throw new Error(`Construpoint auth failed: ${res.status} ${await res.text()}`);
+    const errText = await res.text().catch(() => '');
+    throw new Error(`Construpoint auth failed: ${res.status} ${errText}`);
   }
 
   const data: ConstrupointToken = await res.json();
+  console.log('Token successfully fetched, expires in:', data.expires_in);
   _cachedToken = data.access_token;
-  // Expire 60s antes do tempo real para segurança
   _tokenExpiry = Date.now() + (data.expires_in - 60) * 1000;
   return _cachedToken;
 }
@@ -146,21 +150,26 @@ export interface InspecoesParams {
 
 export async function getInspections(params: InspecoesParams): Promise<Inspecao[]> {
   const headers = await authHeaders();
+  const body = {
+    BeginDate: params.BeginDate,
+    EndDate: params.EndDate,
+    ModelTypeId: params.ModelTypeId,
+    StatusVerificacoesId: params.StatusVerificacoesId ?? null,
+    HistoricoCompleto: params.HistoricoCompleto ?? false,
+    CamposPersonalizados: params.CamposPersonalizados ?? false,
+    WorkId: params.WorkId ?? [],
+    ReviewId: params.ReviewId ?? null,
+  };
+
   const res = await fetch(`${BASE_URL}/InspecoesPorModeloCustomQualidade`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({
-      BeginDate: params.BeginDate,
-      EndDate: params.EndDate,
-      ModelTypeId: params.ModelTypeId,
-      StatusVerificacoesId: params.StatusVerificacoesId ?? null,
-      HistoricoCompleto: params.HistoricoCompleto ?? false,
-      CamposPersonalizados: params.CamposPersonalizados ?? false,
-      WorkId: params.WorkId ?? [],
-      ReviewId: params.ReviewId ?? null,
-    }),
+    body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`InspecoesPorModeloCustomQualidade: ${res.status}`);
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`InspecoesPorModeloCustomQualidade: ${res.status} - ${errText}`);
+  }
   return res.json();
 }
 
@@ -227,6 +236,9 @@ export async function getVerifications(params: VerificacoesParams): Promise<Veri
       ReviewId: params.ReviewId ?? null,
     }),
   });
-  if (!res.ok) throw new Error(`VerificacoesPorModeloCustom: ${res.status}`);
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`VerificacoesPorModeloCustom: ${res.status} - ${errText}`);
+  }
   return res.json();
 }

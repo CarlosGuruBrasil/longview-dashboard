@@ -6,14 +6,7 @@ import ProjectSheetImportPanel from './ProjectSheetImportPanel';
 
 export default function SettingsPage() {
   return (
-    <div className="px-4 pt-6 pb-10 max-w-lg mx-auto lg:px-8 lg:pt-10">
-
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-xl font-bold text-zinc-100 tracking-tight">Configurações</h1>
-        <p className="text-sm text-zinc-500 mt-1">Gerencie suas preferências de notificação</p>
-      </div>
-
+    <div className="w-full space-y-6 p-4 md:p-6 lg:px-6 lg:py-4">
       {/* Seção de Notificações */}
       <section>
         <div className="flex items-center gap-2 mb-4">

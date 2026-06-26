@@ -88,7 +88,7 @@ function GlassCard({ title, children, className = '' }: {
   title?: string; children: React.ReactNode; className?: string
 }) {
   return (
-    <div className={`rounded-2xl border border-white/[0.08] bg-white/[0.04] backdrop-blur p-5 ${className}`}>
+    <div className={`rounded-xl border border-[#1E1E22] bg-[#121214]/60 p-5 ${className}`}>
       {title && <h3 className="text-sm font-semibold text-zinc-300 mb-4">{title}</h3>}
       {children}
     </div>
@@ -99,7 +99,7 @@ function KpiCard({ icon: Icon, label, value, sub, color }: {
   icon: React.ElementType; label: string; value: string | number; sub?: string; color: string
 }) {
   return (
-    <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] backdrop-blur p-4">
+    <div className="rounded-xl border border-[#1E1E22] bg-[#121214]/60 p-4">
       <div className="flex items-start justify-between mb-3">
         <p className="text-xs text-zinc-500 leading-tight">{label}</p>
         <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: `${color}20` }}>
@@ -154,7 +154,7 @@ function CustomTooltip({ active, payload, label }: {
 }) {
   if (!active || !payload?.length) return null
   return (
-    <div className="bg-zinc-900 border border-white/10 rounded-xl p-3 text-xs min-w-[140px]">
+    <div className="rounded-xl border border-[#1E1E22] bg-[#121214] p-3 text-xs min-w-[140px]">
       <p className="text-zinc-300 font-semibold mb-2">{label}</p>
       {payload.map((p, i) => (
         <p key={i} style={{ color: p.color }} className="mb-1">
@@ -211,7 +211,7 @@ export default function QualidadeView() {
     return (
       <div className="flex flex-col items-center justify-center gap-4 p-12" style={{ minHeight: '60vh' }}>
         <div className="relative w-12 h-12">
-          <div className="absolute inset-0 rounded-full border-2 border-white/10" />
+          <div className="absolute inset-0 rounded-full border-2 border-[#1E1E22]" />
           <div className="absolute inset-0 rounded-full border-2 border-t-emerald-500 border-r-transparent border-b-transparent border-l-transparent animate-spin" />
         </div>
         <p className="text-sm text-zinc-400">Buscando dados Construpoint…</p>
@@ -227,7 +227,7 @@ export default function QualidadeView() {
         <p className="text-xs text-zinc-500">{error}</p>
         <button
           onClick={() => { setLoading(true); setError(null); fetch(`/api/construpoint?startYear=${startYear}&endYear=${endYear}`).then(r=>r.json()).then(setData).catch(e=>setError(e.message)).finally(()=>setLoading(false)) }}
-          className="mt-2 px-4 py-2 text-xs rounded-lg bg-white/5 border border-white/10 text-zinc-300 hover:bg-white/10 transition flex items-center gap-2"
+          className="mt-2 px-4 py-2 text-xs rounded-lg bg-[#121214]/60 border border-[#1E1E22] text-zinc-300 hover:bg-white/10 transition flex items-center gap-2"
         >
           <RefreshCw size={12} /> Tentar novamente
         </button>
@@ -252,15 +252,9 @@ export default function QualidadeView() {
   const totalVerifStr = safeKpis.totalVerificacoes.toLocaleString('pt-BR')
 
   return (
-    <div className="p-4 sm:p-6 flex flex-col gap-5">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-lg font-bold text-zinc-100">Quality Vision</h1>
-          <p className="text-xs text-zinc-500">Construpoint — Inspeções e Verificações</p>
-        </div>
-        {/* Filtro de período */}
-        <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-4 py-2">
+    <div className="w-full space-y-6 p-4 md:p-6 lg:px-6 lg:py-4">
+      <div className="flex justify-end">
+        <div className="flex items-center gap-2 rounded-xl border border-[#1E1E22] bg-[#121214]/60 px-4 py-2">
           <Calendar size={14} className="text-zinc-500" />
           <select
             value={startYear}
@@ -271,7 +265,7 @@ export default function QualidadeView() {
               <option key={y} value={y} className="bg-zinc-900">{y}</option>
             ))}
           </select>
-          <span className="text-zinc-600 text-xs">→</span>
+          <span className="text-zinc-600 text-xs">-</span>
           <select
             value={endYear}
             onChange={e => setEndYear(Number(e.target.value))}
@@ -359,7 +353,7 @@ export default function QualidadeView() {
             </BarChart>
           </ResponsiveContainer>
           {/* Legenda de tipos */}
-          <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3 pt-3 border-t border-white/5">
+          <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3 pt-3 border-t border-[#1C1C1E]">
             {Object.entries(COLORS_TIPO).map(([k, c]) => (
               <div key={k} className="flex items-center gap-1.5">
                 <div className="w-2.5 h-2.5 rounded-sm" style={{ background: c }} />
@@ -416,7 +410,7 @@ export default function QualidadeView() {
       <GlassCard>
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <h3 className="text-sm font-semibold text-zinc-300">Série Histórica — Inspeções por Mês</h3>
-          <div className="flex gap-1 bg-white/5 rounded-lg p-0.5">
+          <div className="flex gap-1 rounded-lg border border-[#1E1E22] bg-[#18181B] p-0.5">
             {(['volume', 'resultado'] as const).map(m => (
               <button
                 key={m}
@@ -455,7 +449,7 @@ export default function QualidadeView() {
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="border-b border-white/[0.07]">
+              <tr className="border-b border-[#1C1C1E]">
                 {['Código', 'Modelo', 'Obra', 'Inspetor', 'Data', 'Status', 'Nota'].map(h => (
                   <th key={h} className="text-left py-2 px-3 text-zinc-500 font-medium whitespace-nowrap">{h}</th>
                 ))}
@@ -468,14 +462,14 @@ export default function QualidadeView() {
                 </tr>
               ) : (
                 ultimasInspecoes.map((insp, i) => (
-                  <tr key={i} className="border-b border-white/[0.04] hover:bg-white/[0.03] transition">
+                  <tr key={i} className="border-b border-[#1C1C1E] hover:bg-[#17171A] transition">
                     <td className="py-2.5 px-3 text-zinc-400 font-mono">{insp.code ?? '-'}</td>
                     <td className="py-2.5 px-3 text-zinc-300">{insp.modelo ?? '-'}</td>
                     <td className="py-2.5 px-3 text-zinc-400 truncate max-w-[160px]">{insp.obra ?? '-'}</td>
                     <td className="py-2.5 px-3 text-zinc-400">{insp.inspetor ?? '-'}</td>
                     <td className="py-2.5 px-3 text-zinc-400 whitespace-nowrap">{formatDate(insp.data)}</td>
                     <td className="py-2.5 px-3">
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-white/5 text-zinc-400">
+                      <span className="px-2 py-0.5 rounded-full border border-[#1E1E22] bg-[#18181B] text-[10px] font-medium text-zinc-400">
                         {insp.status ?? '-'}
                       </span>
                     </td>

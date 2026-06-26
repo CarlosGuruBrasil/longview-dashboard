@@ -1,10 +1,7 @@
 /**
- * /api/meta/page-insights
- *
- * GET → insights da Página Facebook e conta Instagram:
- *   - Seguidores, alcance, impressões, engajamento da Página
- *   - Followers, reach, impressions do Instagram
- *   - Série temporal de crescimento
+ * GET /api/meta/page-insights
+ * Facebook + Instagram dados reais.
+ * Cache de 1h via KV.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
@@ -13,110 +10,113 @@ import axios from 'axios';
 
 const META_BASE = 'https://graph.facebook.com/v21.0';
 const PAGE_ID   = '259079394232614';
-const CACHE_TTL = 3600; // 1h
+const CACHE_TTL = 3600;
 
-function metaAuth() {
-  return { access_token: process.env.META_TOKEN };
-}
+function tok() { return process.env.META_TOKEN ?? ''; }
 
-export async function GET(request: NextRequest) {
+function daysAgo(n: number) { return Math.floor((Date.now() - n * 86400000) / 1000); }
+function nowTs()              { return Math.floor(Date.now() / 1000); }
+
+export async function GET(req: NextRequest) {
   const user = await verifyAuth();
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
 
-  const { searchParams } = new URL(request.url);
-  const period       = searchParams.get('period') ?? 'month';
-  const forceRefresh = searchParams.get('refresh') === 'true';
-  const cacheKey     = `meta_page_insights_${period}`;
+  const force    = req.nextUrl.searchParams.get('refresh') === 'true';
+  const cacheKey = 'social_insights_v2';
 
-  if (!forceRefresh) {
+  if (!force) {
     try {
-      const cached = await kv.get<any>(cacheKey);
-      if (cached) return NextResponse.json({ ...cached, _cached: true });
-    } catch { /* non-critical */ }
+      const cached = await kv.get<unknown>(cacheKey);
+      if (cached) return NextResponse.json({ ...cached as object, _cached: true });
+    } catch { /* skip */ }
   }
 
-  const [pageRes, pageInsightsRes, igAccountRes] = await Promise.allSettled([
-    // Dados da página Facebook
+  const token = tok();
+  if (!token) return NextResponse.json({ error: 'META_TOKEN não configurado' }, { status: 503 });
+
+  const since28 = daysAgo(28);
+  const until   = nowTs();
+
+  // ── Facebook ──────────────────────────────────────────────────────────────
+  const [fbPageRes, igAccountRes] = await Promise.allSettled([
     axios.get(`${META_BASE}/${PAGE_ID}`, {
-      params: {
-        fields: 'id,name,fan_count,followers_count,category,about,website,phone',
-        ...metaAuth(),
-      },
+      params: { fields: 'id,name,fan_count,followers_count,category', access_token: token },
       timeout: 10000,
     }),
-
-    // Insights da página: alcance, impressões, engajamento
-    axios.get(`${META_BASE}/${PAGE_ID}/insights`, {
-      params: {
-        metric: [
-          'page_fans',
-          'page_fan_adds',
-          'page_fan_removes',
-          'page_impressions',
-          'page_reach',
-          'page_engaged_users',
-          'page_post_engagements',
-          'page_views_total',
-        ].join(','),
-        period,
-        ...metaAuth(),
-      },
-      timeout: 15000,
-    }),
-
-    // Instagram Business Account
     axios.get(`${META_BASE}/${PAGE_ID}`, {
-      params: { fields: 'instagram_business_account', ...metaAuth() },
+      params: { fields: 'instagram_business_account', access_token: token },
       timeout: 10000,
     }),
   ]);
 
-  const pageData     = pageRes.status === 'fulfilled' ? (pageRes.value as any).data : null;
-  const pageInsights = pageInsightsRes.status === 'fulfilled' ? (pageInsightsRes.value as any).data?.data ?? [] : [];
-  const igId         = igAccountRes.status === 'fulfilled'
+  const fbPage = fbPageRes.status === 'fulfilled' ? (fbPageRes.value as any).data : null;
+  const igId   = igAccountRes.status === 'fulfilled'
     ? (igAccountRes.value as any).data?.instagram_business_account?.id
     : null;
 
-  // Instagram insights se disponível
-  let igData: any = null;
-  let igInsights: any[] = [];
+  // ── Instagram ─────────────────────────────────────────────────────────────
+  let igProfile: any = null;
+  let igReachDaily:     { date: string; value: number }[] = [];
+  let igFollowerDaily:  { date: string; value: number }[] = [];
 
   if (igId) {
-    const [igProfileRes, igInsightsRes] = await Promise.allSettled([
+    const [profileRes, reachRes, followerRes] = await Promise.allSettled([
       axios.get(`${META_BASE}/${igId}`, {
         params: {
-          fields: 'id,username,name,biography,followers_count,follows_count,media_count,profile_picture_url,website',
-          ...metaAuth(),
+          fields: 'username,name,followers_count,follows_count,media_count,biography',
+          access_token: token,
         },
         timeout: 10000,
       }),
       axios.get(`${META_BASE}/${igId}/insights`, {
-        params: {
-          metric: 'impressions,reach,profile_views,follower_count',
-          period,
-          ...metaAuth(),
-        },
-        timeout: 15000,
+        params: { metric: 'reach', period: 'day', since: since28, until, access_token: token },
+        timeout: 12000,
+      }),
+      axios.get(`${META_BASE}/${igId}/insights`, {
+        params: { metric: 'follower_count', period: 'day', since: since28, until, access_token: token },
+        timeout: 12000,
       }),
     ]);
 
-    igData     = igProfileRes.status === 'fulfilled' ? (igProfileRes.value as any).data : null;
-    igInsights = igInsightsRes.status === 'fulfilled' ? (igInsightsRes.value as any).data?.data ?? [] : [];
+    igProfile = profileRes.status === 'fulfilled' ? (profileRes.value as any).data : null;
+
+    const reachData   = reachRes.status   === 'fulfilled' ? (reachRes.value   as any).data?.data ?? [] : [];
+    const followerData = followerRes.status === 'fulfilled' ? (followerRes.value as any).data?.data ?? [] : [];
+
+    igReachDaily    = (reachData[0]?.values ?? []).map((v: any) => ({
+      date:  v.end_time?.slice(0, 10) ?? '',
+      value: typeof v.value === 'number' ? v.value : 0,
+    }));
+    igFollowerDaily = (followerData[0]?.values ?? []).map((v: any) => ({
+      date:  v.end_time?.slice(0, 10) ?? '',
+      value: typeof v.value === 'number' ? v.value : 0,
+    }));
   }
+
+  const newFollowers28d = igFollowerDaily.reduce((s, d) => s + d.value, 0);
+  const reach28d        = igReachDaily.reduce((s, d) => s + d.value, 0);
 
   const result = {
     facebook: {
-      page:     pageData,
-      insights: pageInsights,
+      name:       fbPage?.name       ?? 'Longview Empreendimentos',
+      fanCount:   fbPage?.fan_count  ?? 0,
+      followers:  fbPage?.followers_count ?? 0,
     },
     instagram: {
-      id:       igId,
-      profile:  igData,
-      insights: igInsights,
+      username:      igProfile?.username      ?? 'longviewempreendimentos',
+      name:          igProfile?.name          ?? '',
+      followers:     igProfile?.followers_count ?? 0,
+      following:     igProfile?.follows_count  ?? 0,
+      mediaCount:    igProfile?.media_count    ?? 0,
+      biography:     igProfile?.biography      ?? '',
+      newFollowers28d,
+      reach28d,
+      reachDaily:    igReachDaily,
+      followerDaily: igFollowerDaily,
     },
     updatedAt: new Date().toISOString(),
   };
 
-  try { await kv.set(cacheKey, result, { ex: CACHE_TTL }); } catch { /* non-critical */ }
+  try { await kv.set(cacheKey, result, { ex: CACHE_TTL }); } catch { /* skip */ }
   return NextResponse.json(result);
 }

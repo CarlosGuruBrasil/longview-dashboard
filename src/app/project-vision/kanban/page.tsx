@@ -147,20 +147,8 @@ export default function KanbanPage() {
   };
 
   return (
-    <div className="flex-1 p-6 lg:p-10 space-y-6 flex flex-col max-w-7xl mx-auto w-full min-h-screen">
-      {/* Header */}
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-[#1C1C1E] pb-6 shrink-0">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-white/5 border border-white/10 text-zinc-400">
-              Gestão de Fluxos
-            </span>
-          </div>
-          <h2 className="text-3xl font-semibold tracking-tight text-white mt-1">Quadro Kanban</h2>
-          <p className="text-sm text-zinc-400 mt-0.5">Mova cartões para atualizar o status operacional em tempo real.</p>
-        </div>
-
-        <div className="flex items-center gap-3">
+    <div className="flex-1 w-full min-h-screen space-y-6 p-4 md:p-6 lg:px-6 lg:py-4 flex flex-col">
+      <header className="flex justify-end gap-3 border-b border-[#1C1C1E] pb-4 shrink-0">
           <button 
             onClick={fetchData}
             className="p-2.5 bg-[#121214] hover:bg-[#18181B] border border-[#1E1E22] text-zinc-400 hover:text-white rounded-lg transition-colors flex items-center gap-1.5 text-xs"
@@ -168,7 +156,6 @@ export default function KanbanPage() {
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           </button>
-        </div>
       </header>
 
       {/* Barra de Filtros e Legenda */}

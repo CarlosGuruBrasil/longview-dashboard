@@ -1,8 +1,19 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+interface ProxyJwtPayload {
+  role?: string;
+  permissions?: {
+    isAdmin?: boolean;
+    viewProjectVision?: boolean;
+    viewMarketingDashboard?: boolean;
+    viewRHVision?: boolean;
+    viewQualityVision?: boolean;
+  };
+}
+
 // Função auxiliar para decodificar o payload do JWT de forma compatível com Edge Runtime
-function decodeJwtPayload(token: string): any {
+function decodeJwtPayload(token: string): ProxyJwtPayload | null {
   try {
     const parts = token.split('.');
     if (parts.length !== 3) return null;
@@ -11,7 +22,7 @@ function decodeJwtPayload(token: string): any {
     const payloadBase64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
     const jsonPayload = atob(payloadBase64);
     return JSON.parse(jsonPayload);
-  } catch (e) {
+  } catch {
     return null;
   }
 }
@@ -89,6 +100,24 @@ export function proxy(request: NextRequest) {
   // Rota do Marketing Vision (App Relatório)
   if (pathname.startsWith('/marketing-vision')) {
     const hasAccess = role === 'Desenvolvedor' || permissions?.viewMarketingDashboard === true;
+    if (!hasAccess) {
+      return NextResponse.redirect(new URL('/select-app', request.url));
+    }
+  }
+
+  if (pathname.startsWith('/rh-vision')) {
+    if (pathname === '/rh-vision/colaboradores/me') {
+      return NextResponse.next();
+    }
+
+    const hasAccess = role === 'Desenvolvedor' || permissions?.isAdmin === true || permissions?.viewRHVision === true;
+    if (!hasAccess) {
+      return NextResponse.redirect(new URL('/select-app', request.url));
+    }
+  }
+
+  if (pathname.startsWith('/qualidade-vision')) {
+    const hasAccess = role === 'Desenvolvedor' || permissions?.viewQualityVision === true;
     if (!hasAccess) {
       return NextResponse.redirect(new URL('/select-app', request.url));
     }
