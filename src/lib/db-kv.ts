@@ -52,18 +52,19 @@ export interface UserProfileData {
   professionalIdExpiry?: string;  // data de vencimento ISO
 }
 
-/** Documento/contrato de colaborador — armazenado na tabela user_documents */
+/** Documento/contrato de colaborador — armazenado na tabela user_documents (conteúdo no Postgres) */
 export interface UserDocument {
   id: string;
   userId: string;
   name: string;
   category: 'contrato_clt' | 'contrato_pj' | 'identificacao' | 'habilitacao' | 'outro';
-  url: string;
+  url: string;               // vazio '' — mantido por compatibilidade; arquivo fica em content_b64
   contentType?: string;
   sizeBytes?: number;
   expiresAt?: string;        // ISO date — validade do documento
   uploadedBy: string;        // userId
   uploadedAt: string;        // ISO datetime
+  contentB64?: string;       // base64 do arquivo — lido/gravado em user_documents.content_b64
 }
 
 export interface DbUser {
@@ -362,7 +363,8 @@ export async function readUserDocuments(userId: string): Promise<UserDocument[]>
         SELECT id, user_id AS "userId", name, category, url,
                content_type AS "contentType", size_bytes AS "sizeBytes",
                expires_at::text AS "expiresAt",
-               uploaded_by AS "uploadedBy", uploaded_at::text AS "uploadedAt"
+               uploaded_by AS "uploadedBy", uploaded_at::text AS "uploadedAt",
+               content_b64 AS "contentB64"
         FROM user_documents WHERE user_id = ${userId} ORDER BY uploaded_at DESC
       `;
       return rows;
@@ -377,10 +379,11 @@ export async function addUserDocument(doc: UserDocument): Promise<void> {
     try {
       const db = await getPg();
       await db`
-        INSERT INTO user_documents (id, user_id, name, category, url, content_type, size_bytes, expires_at, uploaded_by, uploaded_at)
-        VALUES (${doc.id}, ${doc.userId}, ${doc.name}, ${doc.category}, ${doc.url},
+        INSERT INTO user_documents (id, user_id, name, category, url, content_type, size_bytes, expires_at, uploaded_by, uploaded_at, content_b64)
+        VALUES (${doc.id}, ${doc.userId}, ${doc.name}, ${doc.category}, ${doc.url ?? ''},
                 ${doc.contentType ?? null}, ${doc.sizeBytes ?? null},
-                ${doc.expiresAt ?? null}, ${doc.uploadedBy}, ${doc.uploadedAt})
+                ${doc.expiresAt ?? null}, ${doc.uploadedBy}, ${doc.uploadedAt},
+                ${doc.contentB64 ?? null})
       `;
       return;
     } catch (e) { throwPgWriteError('addUserDocument', e); }

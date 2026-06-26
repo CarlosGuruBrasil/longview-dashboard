@@ -679,14 +679,15 @@ export default function ColaboradorPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
-                  {canManageDocs && doc.url && (
-                    <a href={doc.url} target="_blank" rel="noopener noreferrer"
+                  {canManageDocs && (
+                    <a href={`/api/admin/users/${id}/documents/${doc.id}`}
+                      target="_blank" rel="noopener noreferrer"
                       className="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-500 hover:text-sky-400 hover:bg-sky-500/10 transition-all">
                       <ExternalLink size={13} />
                     </a>
                   )}
-                  {canManageDocs && doc.url && (
-                    <a href={doc.url} download
+                  {canManageDocs && (
+                    <a href={`/api/admin/users/${id}/documents/${doc.id}`} download
                       className="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-500 hover:text-emerald-400 hover:bg-emerald-500/10 transition-all">
                       <Download size={13} />
                     </a>
