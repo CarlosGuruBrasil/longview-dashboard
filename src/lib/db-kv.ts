@@ -194,65 +194,61 @@ function throwPgWriteError(operation: string, error: unknown): never {
 // ─── 1. USUÁRIOS ─────────────────────────────────────────────────────────────
 
 export async function readUsers(): Promise<DbUser[]> {
-  const normalizeUser = (user: DbUser): DbUser => ({
-    ...user,
-    permissions: normalizePermissions(user.permissions),
-  });
+  const normalize = (u: DbUser): DbUser => ({ ...u, permissions: normalizePermissions(u.permissions) });
 
   if (isPg()) {
-    try {
-      const db = await getPg();
-      const rows = await db<{ data: DbUser }[]>`SELECT data FROM app_users ORDER BY created_at`;
-      // `data` column stores the full DbUser JSON
-      return rows.map(r => normalizeUser(typeof r.data === 'object' ? r.data : JSON.parse(r.data as unknown as string)));
-    } catch (e) { console.error('[db-kv] readUsers PG error:', e); }
+    // Em modo Postgres: banco é a fonte única de verdade — sem fallback local.
+    // Se o banco estiver indisponível, lança erro em vez de retornar lista incompleta.
+    const db = await getPg();
+    const rows = await db<{ data: DbUser }[]>`SELECT data FROM app_users ORDER BY created_at`;
+    return rows.map(r => normalize(typeof r.data === 'object' ? r.data : JSON.parse(r.data as unknown as string)));
   }
-  return readJson<DbUser[]>(LOCAL_USERS_FILE, []).map(normalizeUser);
+  return readJson<DbUser[]>(LOCAL_USERS_FILE, []).map(normalize);
 }
 
-export async function writeUsers(users: DbUser[]): Promise<void> {
-  const normalizedUsers = users.map(user => ({
-    ...user,
-    permissions: normalizePermissions(user.permissions),
-  }));
-
+/** Grava ou atualiza um único usuário no banco — nunca apaga outros registros. */
+export async function upsertUser(user: DbUser): Promise<void> {
+  const u = { ...user, permissions: normalizePermissions(user.permissions) };
   if (isPg()) {
-    try {
-      const db = await getPg();
-
-      // Nunca apagar todos — lista vazia indica erro de leitura, não intenção de limpeza
-      if (normalizedUsers.length === 0) {
-        console.warn('[db-kv] writeUsers chamado com lista vazia — ignorado para evitar perda de dados');
-        return;
-      }
-
-      // Upsert cada usuário individualmente
-      for (const u of normalizedUsers) {
-        await db`
-          INSERT INTO app_users (id, email, password_hash, name, role, permissions, data, created_at)
-          VALUES (${u.id}, ${u.email}, ${u.passwordHash}, ${u.name}, ${u.role},
-                  ${JSON.stringify(u.permissions)}, ${JSON.stringify(u)}, ${u.createdAt})
-          ON CONFLICT (id) DO UPDATE SET
-            email         = EXCLUDED.email,
-            password_hash = EXCLUDED.password_hash,
-            name          = EXCLUDED.name,
-            role          = EXCLUDED.role,
-            permissions   = EXCLUDED.permissions,
-            data          = EXCLUDED.data
-        `;
-      }
-
-      // Só remove usuários que não estão na lista SE a lista recebida >= total no banco
-      // Isso evita apagar usuários caso readUsers() tenha retornado lista incompleta
-      const ids = normalizedUsers.map(u => u.id);
-      const [{ count }] = await db<{ count: string }[]>`SELECT COUNT(*) AS count FROM app_users`;
-      if (Number(count) <= normalizedUsers.length) {
-        await db`DELETE FROM app_users WHERE id <> ALL(${ids}::text[])`;
-      }
-      return;
-    } catch (e) { throwPgWriteError('writeUsers', e); }
+    const db = await getPg();
+    await db`
+      INSERT INTO app_users (id, email, password_hash, name, role, permissions, data, created_at)
+      VALUES (${u.id}, ${u.email}, ${u.passwordHash}, ${u.name}, ${u.role},
+              ${JSON.stringify(u.permissions)}, ${JSON.stringify(u)}, ${u.createdAt})
+      ON CONFLICT (id) DO UPDATE SET
+        email         = EXCLUDED.email,
+        password_hash = EXCLUDED.password_hash,
+        name          = EXCLUDED.name,
+        role          = EXCLUDED.role,
+        permissions   = EXCLUDED.permissions,
+        data          = EXCLUDED.data
+    `;
+    return;
   }
-  writeJson(LOCAL_USERS_FILE, normalizedUsers);
+  const users = readJson<DbUser[]>(LOCAL_USERS_FILE, []);
+  const idx   = users.findIndex(x => x.id === u.id);
+  if (idx >= 0) users[idx] = u; else users.push(u);
+  writeJson(LOCAL_USERS_FILE, users);
+}
+
+/** Remove um único usuário pelo ID — operação explícita e segura. */
+export async function deleteUser(userId: string): Promise<void> {
+  if (isPg()) {
+    const db = await getPg();
+    await db`DELETE FROM app_users WHERE id = ${userId}`;
+    return;
+  }
+  const users = readJson<DbUser[]>(LOCAL_USERS_FILE, []);
+  writeJson(LOCAL_USERS_FILE, users.filter(u => u.id !== userId));
+}
+
+/**
+ * @deprecated Use upsertUser() para salvar um usuário ou deleteUser() para remover.
+ * writeUsers() ainda existe para compatibilidade com código legado mas agora
+ * faz apenas upserts individuais — NUNCA apaga registros do banco.
+ */
+export async function writeUsers(users: DbUser[]): Promise<void> {
+  for (const u of users) await upsertUser(u);
 }
 
 // ─── 2. PROJECT VISION (tasks + projetos) ────────────────────────────────────
