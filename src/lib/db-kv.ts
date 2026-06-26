@@ -219,11 +219,14 @@ export async function writeUsers(users: DbUser[]): Promise<void> {
   if (isPg()) {
     try {
       const db = await getPg();
-      // upsert all — delete orphans via NOT IN
+
+      // Nunca apagar todos — lista vazia indica erro de leitura, não intenção de limpeza
       if (normalizedUsers.length === 0) {
-        await db`DELETE FROM app_users`;
+        console.warn('[db-kv] writeUsers chamado com lista vazia — ignorado para evitar perda de dados');
         return;
       }
+
+      // Upsert cada usuário individualmente
       for (const u of normalizedUsers) {
         await db`
           INSERT INTO app_users (id, email, password_hash, name, role, permissions, data, created_at)
@@ -238,8 +241,14 @@ export async function writeUsers(users: DbUser[]): Promise<void> {
             data          = EXCLUDED.data
         `;
       }
+
+      // Só remove usuários que não estão na lista SE a lista recebida >= total no banco
+      // Isso evita apagar usuários caso readUsers() tenha retornado lista incompleta
       const ids = normalizedUsers.map(u => u.id);
-      await db`DELETE FROM app_users WHERE id <> ALL(${ids}::text[])`;
+      const [{ count }] = await db<{ count: string }[]>`SELECT COUNT(*) AS count FROM app_users`;
+      if (Number(count) <= normalizedUsers.length) {
+        await db`DELETE FROM app_users WHERE id <> ALL(${ids}::text[])`;
+      }
       return;
     } catch (e) { throwPgWriteError('writeUsers', e); }
   }
@@ -320,34 +329,56 @@ export async function mutateProjectData(
 // ─── 3. SEED ─────────────────────────────────────────────────────────────────
 
 export async function seedDatabaseIfEmpty(): Promise<void> {
-  const users = await readUsers();
-  if (users.length === 0) {
-    console.log('[db-kv] Semeando usuários padrão...');
-    const [developerHash, diretoriaHash] = await Promise.all([
-      bcrypt.hash('Guru$2026', 10),
-      bcrypt.hash('Longview$2026', 10),
-    ]);
-
-    const allPerms = createDefaultPermissions({
-      viewMarketingDashboard: true, viewMarketingLeads: true, viewMarketingOportunidades: true,
-      viewMarketingEstoque: true, viewMarketingAds: true, viewMarketingVendas: true,
-      viewProjectVision: true, manageProjects: true, manageCommentsDocs: true,
-      deleteTasks: true, viewRHVision: true, viewQualityVision: true, isAdmin: true,
-    });
-
-    await writeUsers([
-      { id: 'usr-dev',   name: 'Carlos Santos (Desenvolvedor)', email: 'carlos@longview.com.br',   passwordHash: developerHash, role: 'Desenvolvedor', permissions: allPerms, createdAt: new Date().toISOString() },
-      { id: 'usr-admin', name: 'Diretoria Executiva',           email: 'diretoria@longview.com.br', passwordHash: diretoriaHash, role: 'Diretoria',    permissions: allPerms, createdAt: new Date().toISOString() },
-    ]);
+  if (isPg()) {
+    try {
+      const db = await getPg();
+      // Conta direto no banco — nunca depende de readUsers() que pode retornar [] por erro
+      const [{ count }] = await db<{ count: string }[]>`SELECT COUNT(*) AS count FROM app_users`;
+      if (Number(count) > 0) {
+        // Banco tem usuários — não fazer nada, evita sobrescrever dados reais
+        // Verifica apenas project state
+        const proj = await readProjectData();
+        if (!hasProjectVisionData(proj)) {
+          const local = readLocalProjectData();
+          if (hasProjectVisionData(local)) await writeProjectData(local);
+        }
+        return;
+      }
+      // Banco confirmado vazio — semear usuários padrão
+    } catch {
+      // Banco indisponível (ex: container ainda subindo) — abortar sem semear
+      // Isso evita o bug onde conexão falha → readUsers() retorna [] → seed apaga todos
+      console.warn('[db-kv] seedDatabaseIfEmpty: banco indisponível, seed abortado para preservar dados');
+      return;
+    }
+  } else {
+    const users = readJson<DbUser[]>(LOCAL_USERS_FILE, []);
+    if (users.length > 0) return;
   }
 
-  // import tasks from legacy CSV if nothing in project state
+  console.log('[db-kv] Banco vazio confirmado — semeando usuários padrão...');
+  const [developerHash, diretoriaHash] = await Promise.all([
+    bcrypt.hash('Guru$2026', 10),
+    bcrypt.hash('Longview$2026', 10),
+  ]);
+
+  const allPerms = createDefaultPermissions({
+    viewMarketingDashboard: true, viewMarketingLeads: true, viewMarketingOportunidades: true,
+    viewMarketingEstoque: true, viewMarketingAds: true, viewMarketingVendas: true,
+    viewProjectVision: true, manageProjects: true, manageCommentsDocs: true,
+    deleteTasks: true, viewRHVision: true, viewQualityVision: true, isAdmin: true,
+  });
+
+  await writeUsers([
+    { id: 'usr-dev',   name: 'Carlos Santos (Desenvolvedor)', email: 'carlos@longview.com.br',   passwordHash: developerHash, role: 'Desenvolvedor', permissions: allPerms, createdAt: new Date().toISOString() },
+    { id: 'usr-admin', name: 'Diretoria Executiva',           email: 'diretoria@longview.com.br', passwordHash: diretoriaHash, role: 'Diretoria',    permissions: allPerms, createdAt: new Date().toISOString() },
+  ]);
+
+  // Importa tasks do CSV legado se project state estiver vazio
   const proj = await readProjectData();
   if (!hasProjectVisionData(proj)) {
     const local = readLocalProjectData();
-    if (hasProjectVisionData(local)) {
-      await writeProjectData(local);
-    }
+    if (hasProjectVisionData(local)) await writeProjectData(local);
   }
 }
 
