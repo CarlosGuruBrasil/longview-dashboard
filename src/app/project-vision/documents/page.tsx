@@ -1,357 +1,309 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { 
-  FolderArchive, 
-  Search, 
-  Filter, 
-  FileText, 
-  Download, 
-  Plus, 
-  History, 
-  User, 
-  Calendar,
-  Layers,
-  RefreshCw,
-  FolderOpen
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  FolderOpen, Search, FileText, Download, RefreshCw,
+  Paperclip, Filter, X, Loader2, Plus, Upload,
 } from 'lucide-react';
-import { Task, Document } from '@/lib/db';
+import type { DocumentWithContext } from '@/app/api/documents/route';
 import { useUser } from '@/context/UserContext';
 
-interface EnhancedDocument extends Document {
-  taskSubject: string;
-  taskId: string;
-  projectName: string;
+const CATEGORIES = ['Todos', 'contrato', 'proposta', 'planta', 'foto', 'aprovacao', 'ata', 'outro'];
+const CAT_LABEL: Record<string, string> = {
+  contrato: 'Contrato', proposta: 'Proposta', planta: 'Planta',
+  foto: 'Foto', aprovacao: 'Aprovação', ata: 'Ata', outro: 'Outro',
+};
+
+function fmtSize(bytes?: number | null) {
+  if (!bytes) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function fmtDate(iso?: string | null) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function fileIcon(contentType?: string | null) {
+  if (!contentType) return '📄';
+  if (contentType.startsWith('image/')) return '🖼️';
+  if (contentType === 'application/pdf') return '📕';
+  if (contentType.includes('word') || contentType.includes('document')) return '📝';
+  if (contentType.includes('sheet') || contentType.includes('excel')) return '📊';
+  if (contentType.includes('zip') || contentType.includes('compressed')) return '📦';
+  return '📄';
 }
 
 export default function DocumentsPage() {
   const { currentUser } = useUser();
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('Todos');
+  const isEditable = ['Desenvolvedor', 'Diretoria', 'Operador', 'Gestor'].includes(currentUser.role)
+    || currentUser.permissions?.manageProjects === true;
 
-  // Modal para upload global real
-  const [uploadOpen, setUploadOpen] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [newDocCat, setNewDocCat] = useState('Projetos');
-  const [newDocProject, setNewDocProject] = useState('Villa Alta');
+  const [docs,     setDocs]     = useState<DocumentWithContext[]>([]);
+  const [tasks,    setTasks]    = useState<{ id: string; subject: string; project: string }[]>([]);
+  const [projects, setProjects] = useState<string[]>([]);
+  const [loading,  setLoading]  = useState(true);
 
-  const fetchData = async () => {
+  // Filtros
+  const [q,          setQ]          = useState('');
+  const [filterCat,  setFilterCat]  = useState('Todos');
+  const [filterProj, setFilterProj] = useState('Todos');
+
+  // Modal upload
+  const [uploadOpen,    setUploadOpen]    = useState(false);
+  const [uploadTask,    setUploadTask]    = useState('');
+  const [uploadCat,     setUploadCat]     = useState('outro');
+  const [uploadFile,    setUploadFile]    = useState<File | null>(null);
+  const [uploading,     setUploading]     = useState(false);
+
+  const fetchDocs = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/tasks');
+      const params = new URLSearchParams();
+      if (q && q.trim())              params.set('q', q.trim());
+      if (filterCat !== 'Todos')      params.set('category', filterCat);
+      if (filterProj !== 'Todos')     params.set('project', filterProj);
+
+      const res = await fetch(`/api/documents?${params}`);
       const data = await res.json();
-      setTasks(data.tasks || []);
+      setDocs(data.documents ?? []);
     } catch (e) {
-      console.error('Erro ao buscar tarefas:', e);
+      console.error(e);
     } finally {
       setLoading(false);
     }
-  };
+  }, [q, filterCat, filterProj]);
 
-  useEffect(() => {
-    Promise.resolve().then(() => {
-      fetchData();
-    });
-  }, []);
-
-  // Compilar todos os documentos anexados das tarefas em uma lista única consolidada
-  const documentsList: EnhancedDocument[] = [];
-  tasks.forEach(t => {
-    if (t.documents && t.documents.length > 0) {
-      t.documents.forEach(doc => {
-        documentsList.push({
-          ...doc,
-          taskSubject: t.subject,
-          taskId: t.id,
-          projectName: t.project
-        });
-      });
-    }
-  });
-
-  // Filtros aplicados localmente no cliente
-  const categories = ['Todos', 'Projetos', 'Processos', 'Documentação', 'Contratos', 'Marketing'];
-
-  const filteredDocs = documentsList.filter(doc => {
-    const matchesSearch = !searchQuery ? true : (
-      doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      doc.uploader.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      doc.projectName.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
-    const matchesCategory = selectedCategory === 'Todos' || doc.category.toLowerCase() === selectedCategory.toLowerCase();
-
-    return matchesSearch && matchesCategory;
-  });
-
-  const handleUploadReal = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedFile) return;
-
-    // Encontra a primeira tarefa correspondente ao projeto para receber o anexo
-    const targetTask = tasks.find(t => t.project.toLowerCase() === newDocProject.toLowerCase());
-    
-    if (!targetTask) {
-      alert(`Nenhuma tarefa encontrada para o projeto ${newDocProject} para receber o anexo.`);
-      return;
-    }
-
-    setLoading(true);
-
+  // Carrega tarefas para o modal de upload
+  const fetchTasks = useCallback(async () => {
     try {
-      const formData = new FormData();
-      formData.append('file', selectedFile);
+      const res  = await fetch('/api/tasks');
+      const data = await res.json();
+      const list = (data.tasks ?? []) as { id: string; subject: string; project: string }[];
+      setTasks(list);
+      const projs = [...new Set(list.map(t => t.project).filter(Boolean))].sort();
+      setProjects(projs);
+      if (!uploadTask && list.length > 0) setUploadTask(list[0].id);
+    } catch { /* ignora */ }
+  }, [uploadTask]);
 
-      const uploadRes = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData
-      });
+  useEffect(() => { fetchDocs(); }, [fetchDocs]);
+  useEffect(() => { if (uploadOpen) fetchTasks(); }, [uploadOpen, fetchTasks]);
 
-      if (!uploadRes.ok) {
-        throw new Error('Falha no upload do arquivo físico.');
+  const handleUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!uploadFile || !uploadTask) return;
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append('file', uploadFile);
+      form.append('category', uploadCat);
+      const res = await fetch(`/api/tasks/${uploadTask}/documents`, { method: 'POST', body: form });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        alert(d.error ?? 'Erro ao enviar arquivo');
+        return;
       }
-
-      const uploadData = await uploadRes.json();
-
-      const doc: Document = {
-        id: `doc-${Date.now()}`,
-        name: uploadData.name,
-        category: newDocCat,
-        uploadDate: new Date().toLocaleDateString('pt-BR'),
-        uploader: currentUser.name,
-        version: 1,
-        url: uploadData.url,
-        size: uploadData.size
-      };
-
-      const res = await fetch(`/api/tasks/${targetTask.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          documents: [...(targetTask.documents || []), doc],
-          currentUser
-        })
-      });
-
-      if (res.ok) {
-        setUploadOpen(false);
-        setSelectedFile(null);
-        fetchData();
-        alert('Documento corporativo anexado e salvo com sucesso!');
-      } else {
-        alert('Erro ao vincular documento à tarefa.');
-      }
-    } catch (e) {
-      console.error('Erro ao fazer upload:', e);
-      alert('Erro ao realizar upload do documento.');
+      setUploadOpen(false);
+      setUploadFile(null);
+      fetchDocs();
     } finally {
-      setLoading(false);
+      setUploading(false);
     }
   };
+
+  const clearFilters = () => { setQ(''); setFilterCat('Todos'); setFilterProj('Todos'); };
+  const hasFilters   = q || filterCat !== 'Todos' || filterProj !== 'Todos';
 
   return (
-    <div className="flex-1 w-full space-y-6 p-4 md:p-6 lg:px-6 lg:py-4">
-      <header className="flex justify-end gap-3 border-b border-[#1C1C1E] pb-4">
-          <button 
-            onClick={fetchData}
-            className="p-2.5 bg-[#121214] hover:bg-[#18181B] border border-[#1E1E22] text-zinc-400 hover:text-white rounded-lg transition-colors flex items-center gap-1.5 text-xs"
-            title="Atualizar dados"
-          >
+    <div className="flex-1 w-full space-y-5 p-4 md:p-6 lg:px-6 lg:py-4">
+
+      {/* Header */}
+      <header className="flex items-center justify-between border-b border-[#1C1C1E] pb-4">
+        <div className="flex items-center gap-2 text-zinc-400">
+          <Paperclip size={16} />
+          <span className="text-sm font-semibold text-white">Documentos</span>
+          {!loading && (
+            <span className="text-xs text-zinc-500">— {docs.length} arquivo{docs.length !== 1 ? 's' : ''}</span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={fetchDocs}
+            className="p-2.5 bg-[#121214] hover:bg-[#18181B] border border-[#1E1E22] text-zinc-400 hover:text-white rounded-lg transition-colors">
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           </button>
-          
-          <button 
-            onClick={() => setUploadOpen(true)}
-            className="bg-white hover:bg-zinc-200 text-black px-4.5 py-2.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all duration-200"
-          >
-            <Plus size={16} />
-            <span>Upload Documento</span>
-          </button>
+          {isEditable && (
+            <button onClick={() => setUploadOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-2 bg-white text-black text-xs font-bold rounded-lg hover:bg-zinc-200 transition-colors">
+              <Plus size={13} /> Anexar Arquivo
+            </button>
+          )}
+        </div>
       </header>
 
-      {/* Painel de Filtros e Busca */}
-      <section className="bg-[#121214]/60 border border-[#1E1E22] rounded-xl p-4.5 space-y-4">
-        <div className="flex flex-col md:flex-row gap-3">
+      {/* Filtros */}
+      <section className="bg-[#121214]/60 border border-[#1E1E22] rounded-xl p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-xs text-zinc-400">
+            <Filter size={13} />
+            <span className="font-semibold">Filtros</span>
+          </div>
+          {hasFilters && (
+            <button onClick={clearFilters} className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-white">
+              <X size={11} /> Limpar
+            </button>
+          )}
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-3">
+          {/* Busca */}
           <div className="flex-1 relative">
-            <Search size={16} className="absolute left-3.5 top-3.5 text-zinc-500" />
-            <input 
-              type="text" 
-              placeholder="Buscar documento por nome, empreendimento, uploader..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-[#0A0A0B] border border-[#1E1E22] rounded-lg pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-zinc-700 transition-colors"
-            />
+            <Search size={14} className="absolute left-3 top-2.5 text-zinc-500" />
+            <input type="text" placeholder="Buscar por nome, tarefa, empreendimento, responsável..."
+              value={q} onChange={e => setQ(e.target.value)}
+              className="w-full bg-[#0A0A0B] border border-[#1E1E22] rounded-lg pl-9 pr-4 py-2 text-xs text-white focus:outline-none focus:border-zinc-700" />
           </div>
-          
-          <div className="w-56 flex items-center gap-2 bg-[#0A0A0B] border border-[#1E1E22] rounded-lg px-3 py-1.5 text-xs text-zinc-300">
-            <Filter size={14} className="text-zinc-500" />
-            <span className="font-medium shrink-0">Categoria:</span>
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="bg-transparent text-white font-semibold focus:outline-none cursor-pointer w-full"
-            >
-              {categories.map(cat => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-            </select>
-          </div>
+
+          {/* Categoria */}
+          <select value={filterCat} onChange={e => setFilterCat(e.target.value)}
+            className="bg-[#0A0A0B] border border-[#1E1E22] rounded-lg px-3 py-2 text-xs text-white focus:outline-none">
+            {CATEGORIES.map(c => <option key={c} value={c}>{c === 'Todos' ? 'Todas categorias' : CAT_LABEL[c] ?? c}</option>)}
+          </select>
+
+          {/* Projeto */}
+          <select value={filterProj} onChange={e => setFilterProj(e.target.value)}
+            className="bg-[#0A0A0B] border border-[#1E1E22] rounded-lg px-3 py-2 text-xs text-white focus:outline-none">
+            <option value="Todos">Todos os empreendimentos</option>
+            {projects.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
         </div>
       </section>
 
-      {/* Grade de Documentos */}
+      {/* Lista */}
       {loading ? (
-        <div className="py-20 text-center text-zinc-500 flex flex-col items-center justify-center gap-2">
-          <RefreshCw size={24} className="animate-spin text-zinc-400" />
-          <p className="text-sm">Buscando repositório de arquivos...</p>
+        <div className="flex items-center justify-center py-20 gap-3 text-zinc-500">
+          <Loader2 size={18} className="animate-spin" />
+          <span className="text-sm">Buscando documentos...</span>
         </div>
-      ) : filteredDocs.length === 0 ? (
-        <section className="bg-[#121214]/60 border border-[#1E1E22] rounded-xl p-16 text-center text-zinc-500 flex flex-col items-center justify-center gap-3 shadow-xl">
-          <FolderOpen size={36} className="text-zinc-600 animate-pulse" />
-          <p className="text-sm font-medium">Nenhum documento anexado ou encontrado.</p>
-        </section>
+      ) : docs.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 gap-3 text-zinc-600">
+          <FolderOpen size={36} />
+          <p className="text-sm">Nenhum documento encontrado.</p>
+          {hasFilters && (
+            <button onClick={clearFilters} className="text-xs text-zinc-500 hover:text-white underline">Limpar filtros</button>
+          )}
+        </div>
       ) : (
-        <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredDocs.map((doc) => (
-            <div 
-              key={doc.id}
-              className="bg-[#121214]/60 border border-[#1E1E22] p-4.5 rounded-xl hover:border-zinc-700 transition-all duration-300 flex flex-col justify-between shadow-lg group relative overflow-hidden"
-            >
-              {/* Info Superior */}
-              <div className="space-y-3">
-                <div className="flex items-start justify-between">
-                  <div className="w-9 h-9 rounded-lg bg-zinc-800 flex items-center justify-center border border-zinc-700 shrink-0">
-                    <FileText size={18} className="text-zinc-400" />
-                  </div>
-                  <span className="text-[8px] font-bold px-1.5 py-0.5 rounded border border-[#1E1E22] bg-[#18181B] text-zinc-400 uppercase tracking-wider">
-                    v{doc.version}.0
-                  </span>
-                </div>
-
-                <div className="space-y-1">
-                  <h4 className="text-xs font-bold text-white truncate" title={doc.name}>
-                    {doc.name}
-                  </h4>
-                  <div className="flex items-center gap-1.5 text-[9px] text-zinc-500">
-                    <span className="font-semibold text-zinc-400">{doc.category}</span>
-                    <span>•</span>
-                    <span className="truncate">{doc.projectName}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Detalhes de autoria e tarefa */}
-              <div className="border-t border-[#1C1C1E] mt-4 pt-3.5 space-y-2 text-[10px] text-zinc-500">
-                <p className="truncate" title={doc.taskSubject}>
-                  <span className="font-semibold text-zinc-400">Atividade:</span> {doc.taskSubject}
-                </p>
-                <div className="flex justify-between items-center pt-0.5">
-                  <span className="flex items-center gap-1"><User size={10} /> {doc.uploader}</span>
-                  <span className="flex items-center gap-1"><Calendar size={10} /> {doc.uploadDate}</span>
-                </div>
-              </div>
-
-              {/* Botões Rápidos */}
-              <div className="mt-4 flex justify-end gap-2.5">
-                <button 
-                  onClick={() => alert(`Versão ${doc.version}.0. Histórico de auditoria: Nenhuma alteração de versão registrada.`)}
-                  className="p-1.5 text-zinc-500 hover:text-white bg-zinc-900 border border-zinc-800 hover:border-zinc-700 rounded-lg transition-colors flex items-center gap-1 text-[9px] font-bold"
-                  title="Histórico de versionamento"
-                >
-                  <History size={12} />
-                  <span>Versionamento</span>
-                </button>
-                <a 
-                  href={doc.url}
-                  download={doc.name}
-                  className="bg-white hover:bg-zinc-200 text-black px-3.5 py-1.5 rounded-lg text-[9px] font-bold flex items-center gap-1 transition-colors"
-                >
-                  <Download size={12} />
-                  <span>Download</span>
-                </a>
-              </div>
-            </div>
-          ))}
-        </section>
+        <div className="bg-[#121214]/40 border border-[#1E1E22] rounded-xl overflow-hidden">
+          <table className="w-full text-left">
+            <thead className="border-b border-[#1C1C1E] bg-[#0E0E10] text-[11px] uppercase font-bold text-zinc-500 tracking-wider">
+              <tr>
+                <th className="py-3 px-4">Arquivo</th>
+                <th className="py-3 px-4">Categoria</th>
+                <th className="py-3 px-4">Tarefa</th>
+                <th className="py-3 px-4">Empreendimento</th>
+                <th className="py-3 px-4">Enviado por</th>
+                <th className="py-3 px-4">Data</th>
+                <th className="py-3 px-4">Tamanho</th>
+                <th className="py-3 px-4"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#1C1C1E]">
+              {docs.map(doc => (
+                <tr key={doc.id} className="hover:bg-[#17171A] transition-colors">
+                  <td className="py-3 px-4">
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-base leading-none">{fileIcon(doc.contentType)}</span>
+                      <span className="text-xs font-medium text-white max-w-[200px] truncate" title={doc.name}>
+                        {doc.name}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="py-3 px-4">
+                    <span className="text-[11px] px-2 py-0.5 rounded-full border border-[#2E2E34] bg-[#1a1a1f] text-zinc-400">
+                      {CAT_LABEL[doc.category] ?? doc.category}
+                    </span>
+                  </td>
+                  <td className="py-3 px-4 text-xs text-zinc-400 max-w-[200px]">
+                    <span className="truncate block" title={doc.taskSubject}>{doc.taskSubject}</span>
+                  </td>
+                  <td className="py-3 px-4 text-xs text-zinc-400 whitespace-nowrap">{doc.project}</td>
+                  <td className="py-3 px-4 text-xs text-zinc-500 whitespace-nowrap">{doc.uploadedBy}</td>
+                  <td className="py-3 px-4 text-xs text-zinc-500 whitespace-nowrap font-mono">{fmtDate(doc.uploadedAt)}</td>
+                  <td className="py-3 px-4 text-xs text-zinc-600 whitespace-nowrap">{fmtSize(doc.sizeBytes)}</td>
+                  <td className="py-3 px-4">
+                    <a href={doc.downloadUrl} download={doc.name}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white text-[11px] rounded-lg transition-colors border border-white/5">
+                      <Download size={11} /> Baixar
+                    </a>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
-      {/* Modal de Simulação de Upload */}
+      {/* Modal upload */}
       {uploadOpen && (
-        <>
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 animate-in fade-in" onClick={() => setUploadOpen(false)} />
-          <div className="fixed inset-0 flex items-center justify-center p-4 z-50 animate-in zoom-in-95 duration-200">
-            <div className="bg-[#09090B] border border-[#1E1E22] rounded-xl w-full max-w-md shadow-2xl overflow-hidden">
-              
-              <div className="p-5 border-b border-[#1C1C1E] bg-[#121214]/60 flex justify-between items-center">
-                <h3 className="text-sm font-bold text-white">Anexar Documento ao Empreendimento</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setUploadOpen(false)} />
+          <div className="relative bg-[#111113] border border-[#1E1E22] rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <Upload size={14} /> Anexar Arquivo a uma Tarefa
+              </h3>
+              <button onClick={() => setUploadOpen(false)} className="text-zinc-500 hover:text-white">
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpload} className="space-y-4">
+              {/* Tarefa */}
+              <div>
+                <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 block mb-1">Tarefa *</label>
+                <select value={uploadTask} onChange={e => setUploadTask(e.target.value)} required
+                  className="w-full bg-[#1a1a1f] border border-[#2E2E34] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-zinc-600">
+                  {tasks.map(t => (
+                    <option key={t.id} value={t.id}>{t.id} — {t.subject} ({t.project})</option>
+                  ))}
+                </select>
               </div>
 
-              <form onSubmit={handleUploadReal} className="p-6 space-y-4">
-                <div className="flex flex-col gap-1">
-                  <label className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">Selecionar Arquivo (Obrigatório)</label>
-                  <input
-                    type="file"
-                    required
-                    onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                    className="bg-[#121214] border border-[#1E1E22] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-zinc-700 w-full"
-                  />
-                </div>
+              {/* Categoria */}
+              <div>
+                <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 block mb-1">Categoria</label>
+                <select value={uploadCat} onChange={e => setUploadCat(e.target.value)}
+                  className="w-full bg-[#1a1a1f] border border-[#2E2E34] rounded-lg px-3 py-2 text-xs text-white focus:outline-none">
+                  {Object.entries(CAT_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
+              </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">Categoria</label>
-                    <select
-                      value={newDocCat}
-                      onChange={(e) => setNewDocCat(e.target.value)}
-                      className="bg-[#121214] border border-[#1E1E22] rounded-lg px-3 py-2 text-xs text-white focus:outline-none"
-                    >
-                      <option value="Projetos">Projetos</option>
-                      <option value="Processos">Processos</option>
-                      <option value="Documentação">Documentação</option>
-                      <option value="Contratos">Contratos</option>
-                      <option value="Marketing">Marketing</option>
-                    </select>
-                  </div>
+              {/* Arquivo */}
+              <div>
+                <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 block mb-1">Arquivo * (máx 200 MB)</label>
+                <input type="file" required onChange={e => setUploadFile(e.target.files?.[0] ?? null)}
+                  className="w-full bg-[#1a1a1f] border border-[#2E2E34] rounded-lg px-3 py-2 text-xs text-zinc-300 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-zinc-700 file:text-white" />
+                {uploadFile && (
+                  <p className="text-[11px] text-zinc-500 mt-1">{uploadFile.name} — {fmtSize(uploadFile.size)}</p>
+                )}
+              </div>
 
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">Projeto</label>
-                    <select
-                      value={newDocProject}
-                      onChange={(e) => setNewDocProject(e.target.value)}
-                      className="bg-[#121214] border border-[#1E1E22] rounded-lg px-3 py-2 text-xs text-white focus:outline-none"
-                    >
-                      <option value="Villa Alta">Villa Alta</option>
-                      <option value="Varandas">Varandas</option>
-                      <option value="Jerivá">Jerivá</option>
-                      <option value="Ride">Ride</option>
-                      <option value="Altana">Altana</option>
-                      <option value="Cacupé">Cacupé</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-3 pt-4 border-t border-[#1C1C1E]">
-                  <button 
-                    type="button" 
-                    onClick={() => setUploadOpen(false)}
-                    className="bg-transparent hover:bg-[#18181B] border border-zinc-700 text-zinc-300 px-4 py-2 rounded-lg text-xs font-semibold"
-                  >
-                    Cancelar
-                  </button>
-                  <button 
-                    type="submit"
-                    className="bg-white hover:bg-zinc-200 text-black px-4 py-2 rounded-lg text-xs font-semibold"
-                  >
-                    Anexar Arquivo
-                  </button>
-                </div>
-              </form>
-
-            </div>
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setUploadOpen(false)}
+                  className="flex-1 px-4 py-2.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold border border-zinc-700">
+                  Cancelar
+                </button>
+                <button type="submit" disabled={uploading || !uploadFile || !uploadTask}
+                  className="flex-1 px-4 py-2.5 rounded-lg bg-white hover:bg-zinc-200 disabled:opacity-50 text-black text-xs font-bold flex items-center justify-center gap-2">
+                  {uploading ? <><Loader2 size={13} className="animate-spin" /> Enviando...</> : <><Upload size={13} /> Enviar</>}
+                </button>
+              </div>
+            </form>
           </div>
-        </>
+        </div>
       )}
     </div>
   );
