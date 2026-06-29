@@ -434,7 +434,7 @@ export default function TaskDrawer({ taskId, onClose, onUpdate }: Props) {
                 <div className="p-5 space-y-4">
                   {isEditable && (
                     <div className="border border-dashed border-[#2E2E34] rounded-xl p-4 space-y-3">
-                      <p className="text-xs text-zinc-500 text-center">Selecione um arquivo para anexar (máx 20 MB)</p>
+                      <p className="text-xs text-zinc-500 text-center">Selecione um arquivo para anexar (máx 200 MB)</p>
                       <div className="flex gap-2">
                         <select value={docCategory} onChange={e => setDocCategory(e.target.value)}
                           className="bg-[#121214] border border-[#1E1E22] rounded-lg px-3 py-2 text-xs text-white focus:outline-none">

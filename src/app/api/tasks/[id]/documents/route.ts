@@ -24,7 +24,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     const form = await request.formData();
     const file = form.get('file') as File | null;
     if (!file) return NextResponse.json({ error: 'Arquivo obrigatório' }, { status: 400 });
-    if (file.size > 20 * 1024 * 1024) return NextResponse.json({ error: 'Arquivo muito grande (máx 20 MB)' }, { status: 413 });
+    if (file.size > 200 * 1024 * 1024) return NextResponse.json({ error: 'Arquivo muito grande (máx 200 MB)' }, { status: 413 });
 
     const buf      = Buffer.from(await file.arrayBuffer());
     const category = (form.get('category') as string) || 'outro';
