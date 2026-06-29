@@ -90,17 +90,17 @@ export default async function SelectAppPage() {
       </header>
 
       {/* Corpo Central */}
-      <div className="flex-1 flex flex-col items-center justify-center max-w-[1400px] w-full mx-auto relative z-10 my-8">
-        <div className="text-center mb-10 max-w-4xl -mt-10 flex flex-col items-center">
-          <div className="flex min-h-[104px] -translate-y-14 flex-col items-center justify-center">
-            <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+      <div className="flex-1 flex flex-col items-center justify-center max-w-[1400px] w-full mx-auto relative z-10 my-4 md:my-8">
+        <div className="text-center mb-6 md:mb-10 max-w-4xl flex flex-col items-center">
+          <div className="flex flex-col items-center justify-center pt-4 md:-translate-y-14 md:-mt-10">
+            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white tracking-tight">
               Olá, {name}
             </h2>
-            <p className="text-sm text-zinc-400 mt-1.5 lg:whitespace-nowrap">
+            <p className="text-sm text-zinc-400 mt-1.5 text-center lg:whitespace-nowrap">
               Selecione qual aplicativo deseja acessar no momento de acordo com suas liberações:
             </p>
           </div>
-          <span className="inline-flex mt-8 text-[11px] uppercase font-bold tracking-wider px-2.5 py-1 rounded bg-white/5 border border-white/10 text-zinc-400">
+          <span className="inline-flex mt-6 text-[11px] uppercase font-bold tracking-wider px-2.5 py-1 rounded bg-white/5 border border-white/10 text-zinc-400">
             Ambiente Integrado
           </span>
         </div>
