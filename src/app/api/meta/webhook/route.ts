@@ -80,8 +80,9 @@ async function fetchMetaLead(leadgenId: string): Promise<MetaLeadFull | null> {
       timeout: 10_000,
     });
     return res.data as MetaLeadFull;
-  } catch (err: any) {
-    console.warn(`[meta/webhook] fetchMetaLead ${leadgenId} falhou:`, err.response?.data?.error?.message ?? err.message);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Erro desconhecido';
+    console.warn(`[meta/webhook] fetchMetaLead ${leadgenId} falhou:`, msg);
     return null;
   }
 }
@@ -128,8 +129,9 @@ async function saveToPostgres(lead: MetaLeadFull, parsed: {
         raw              = EXCLUDED.raw,
         synced_at        = NOW()
     `;
-  } catch (e: any) {
-    console.warn('[meta/webhook] saveToPostgres falhou:', e.message);
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'Erro desconhecido';
+    console.warn('[meta/webhook] saveToPostgres falhou:', msg);
   }
 }
 
@@ -206,7 +208,7 @@ export async function GET(request: NextRequest) {
 // ─── POST — recebe evento de novo lead ───────────────────────────────────────
 
 export async function POST(request: NextRequest) {
-  let body: any;
+  let body: Record<string, unknown>;
   try {
     body = await request.json();
   } catch {
@@ -220,7 +222,7 @@ export async function POST(request: NextRequest) {
 
   // Responde 200 imediatamente — Meta considera timeout > 20s como falha
   const processAsync = async () => {
-    const entries = body?.entry ?? [];
+    const entries = Array.isArray(body?.entry) ? body.entry : [];
 
     for (const entry of entries) {
       const changes = entry?.changes ?? [];

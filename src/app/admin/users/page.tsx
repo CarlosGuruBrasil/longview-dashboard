@@ -48,8 +48,8 @@ export default function AdminUsersPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Erro ao carregar usuários.');
       setUsers(data.users || []);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Erro desconhecido');
     } finally {
       setLoading(false);
     }
@@ -58,9 +58,27 @@ export default function AdminUsersPage() {
   useEffect(() => {
     const from = new URLSearchParams(window.location.search).get('from');
     if (from?.startsWith('/')) {
-      window.setTimeout(() => setBackHref(from), 0);
+      // ponytail: defer state update to next tick to avoid cascading renders
+      Promise.resolve().then(() => setBackHref(from));
     }
-    fetchUsers();
+    // ponytail: mount flag para cancelar setState se component unmount antes de fetch
+    let mounted = true;
+    (async () => {
+      setLoading(true);
+      try {
+        const res = await fetch('/api/admin/users');
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Erro ao carregar usuários.');
+        if (mounted) setUsers(data.users || []);
+      } catch (err: unknown) {
+        if (mounted) setError(err instanceof Error ? err.message : 'Erro desconhecido');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   // Autofill permissões ao mudar o perfil base (atalho para facilidade de uso)
@@ -80,7 +98,7 @@ export default function AdminUsersPage() {
         manageProjects: true,
         manageCommentsDocs: true,
         deleteTasks: true,
-        viewRHVision: true,
+        viewPeopleVision: true,
         viewQualityVision: true,
         isAdmin: true
       });
@@ -96,7 +114,7 @@ export default function AdminUsersPage() {
         manageProjects: true,
         manageCommentsDocs: true,
         deleteTasks: true,
-        viewRHVision: true,
+        viewPeopleVision: true,
         viewQualityVision: true,
         isAdmin: true
       });
@@ -115,7 +133,7 @@ export default function AdminUsersPage() {
         viewProjectVision: true,
         manageProjects: true,
         manageCommentsDocs: true,
-        viewRHVision: true,
+        viewPeopleVision: true,
         viewQualityVision: true,
       });
     } else if (selectedRole === 'Parceiro') {
@@ -174,7 +192,7 @@ export default function AdminUsersPage() {
     const url = '/api/admin/users';
     const method = isEditing ? 'PUT' : 'POST';
     
-    const payload: any = {
+    const payload: Record<string, unknown> = {
       name,
       email,
       role,
@@ -202,9 +220,9 @@ export default function AdminUsersPage() {
 
       setSuccess(isEditing ? 'Usuário atualizado com sucesso!' : 'Novo usuário cadastrado com sucesso!');
       handleCancelEdit();
-      fetchUsers();
-    } catch (err: any) {
-      setError(err.message);
+      void fetchUsers();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Erro desconhecido');
     } finally {
       setSubmitLoading(false);
     }
@@ -225,9 +243,9 @@ export default function AdminUsersPage() {
       if (!res.ok) throw new Error(data.error || 'Erro ao excluir usuário.');
       
       setSuccess(`Usuário "${name}" foi removido com sucesso.`);
-      fetchUsers();
-    } catch (err: any) {
-      setError(err.message);
+      void fetchUsers();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Erro desconhecido');
     }
   };
 
@@ -305,7 +323,7 @@ export default function AdminUsersPage() {
                         <tr key={u.id} className="hover:bg-white/1 transition-colors">
                           <td className="py-4.5 px-2">
                             <Link
-                              href={`/rh-vision/colaboradores/${u.id}?from=${encodeURIComponent('/admin/users')}`}
+                              href={`/people-vision/colaboradores/${u.id}?from=${encodeURIComponent('/admin/users')}`}
                               className="font-bold text-white text-sm hover:text-emerald-300 transition-colors"
                               title="Abrir ficha no People Vision"
                             >
@@ -337,11 +355,11 @@ export default function AdminUsersPage() {
                               {u.permissions.viewProjectVision && (
                                 <span className="bg-orange-500/10 text-orange-400 px-1.5 py-0.2 rounded text-[11px] border border-orange-500/20 font-bold uppercase tracking-wide">Project</span>
                               )}
-                              {u.permissions.viewRHVision && (
+                              {u.permissions.viewPeopleVision && (
                                 <span className="bg-emerald-500/10 text-emerald-400 px-1.5 py-0.2 rounded text-[11px] border border-emerald-500/20 font-bold uppercase tracking-wide">People</span>
                               )}
                               {u.permissions.viewQualityVision && (
-                                <span className="bg-teal-500/10 text-teal-400 px-1.5 py-0.2 rounded text-[11px] border border-teal-500/20 font-bold uppercase tracking-wide">Qualidade</span>
+                                <span className="bg-teal-500/10 text-teal-400 px-1.5 py-0.2 rounded text-[11px] border border-teal-500/20 font-bold uppercase tracking-wide">Quality</span>
                               )}
                               <span className="text-[11px] text-zinc-500">({permissionsCount} ativas)</span>
                             </div>
@@ -449,7 +467,7 @@ export default function AdminUsersPage() {
                 <label className="text-zinc-400 font-bold block">Perfil Base</label>
                 <select
                   value={role}
-                  onChange={(e) => handleRoleChange(e.target.value as any)}
+                  onChange={(e) => handleRoleChange(e.target.value as 'Desenvolvedor' | 'Diretoria' | 'Operador' | 'Gestor' | 'Parceiro' | 'Corretor' | 'Visualizador')}
                   className="w-full bg-[#1b1b1f] border border-[#2e2e34] rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-zinc-400 transition-all duration-200 cursor-pointer"
                 >
                   <option value="Desenvolvedor">Desenvolvedor (Acesso Total)</option>
@@ -568,8 +586,8 @@ export default function AdminUsersPage() {
                     <label className="flex items-center gap-2 text-zinc-400 hover:text-white cursor-pointer select-none">
                       <input
                         type="checkbox"
-                        checked={permissions.viewRHVision}
-                        onChange={() => handleCheckboxChange('viewRHVision')}
+                        checked={permissions.viewPeopleVision}
+                        onChange={() => handleCheckboxChange('viewPeopleVision')}
                         className="rounded bg-[#1b1b1f] border-[#2e2e34] text-white focus:ring-0 w-3.5 h-3.5"
                       />
                       <span>Visualizar People Vision</span>
@@ -588,7 +606,7 @@ export default function AdminUsersPage() {
                         onChange={() => handleCheckboxChange('viewQualityVision')}
                         className="rounded bg-[#1b1b1f] border-[#2e2e34] text-white focus:ring-0 w-3.5 h-3.5"
                       />
-                      <span>Visualizar Painel de Qualidade</span>
+                      <span>Visualizar Quality Vision</span>
                     </label>
                   </div>
                 </div>
