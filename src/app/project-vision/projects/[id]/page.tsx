@@ -2,18 +2,61 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { RefreshCw, ArrowLeft, SlidersHorizontal, X, Search } from 'lucide-react';
+import { RefreshCw, ArrowLeft, SlidersHorizontal, X, Search, Plus, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { Task, Project } from '@/lib/db';
 import TaskDrawer from '@/components/TaskDrawer';
+import { useUser } from '@/context/UserContext';
 
 export default function ProjectDetailPage() {
   const params = useParams();
   const id = params?.id as string;
+  const { currentUser } = useUser();
+  const canCreate = ['Desenvolvedor','Diretoria','Operador'].includes(currentUser.role) || currentUser.permissions?.manageProjects === true;
+
   const [project, setProject] = useState<Project | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+
+  // Modal nova tarefa
+  const [showNewTask, setShowNewTask] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [newSubject, setNewSubject] = useState('');
+  const [newSector, setNewSector] = useState('Gestão');
+  const [newResp, setNewResp] = useState('');
+  const [newUrgencia, setNewUrgencia] = useState('Baixa');
+  const [newStatus, setNewStatus] = useState('Não iniciado');
+  const [newPrevisao, setNewPrevisao] = useState('');
+  const [newDesc, setNewDesc] = useState('');
+
+  const handleCreateTask = async () => {
+    if (!project || !newSubject.trim()) return;
+    setCreating(true);
+    try {
+      const res = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project: project.name,
+          sector: newSector,
+          subject: newSubject.trim(),
+          description: newDesc.trim(),
+          responsible: newResp.trim() || 'Não atribuído',
+          urgencia: newUrgencia,
+          statusAndamento: newStatus,
+          previsaoEntrega: newPrevisao,
+        }),
+      });
+      if (res.ok) {
+        setShowNewTask(false);
+        setNewSubject(''); setNewSector('Gestão'); setNewResp('');
+        setNewUrgencia('Baixa'); setNewStatus('Não iniciado');
+        setNewPrevisao(''); setNewDesc('');
+        await fetchData();
+      }
+    } finally { setCreating(false); }
+  };
 
   // Filtros
   const [searchQuery, setSearchQuery] = useState('');
@@ -101,7 +144,18 @@ export default function ProjectDetailPage() {
         <Link href="/project-vision/projects" className="text-zinc-400 hover:text-white transition-colors">
           <ArrowLeft size={20} />
         </Link>
-        <div className="ml-auto">
+        {project && (
+          <div className="min-w-0">
+            <h1 className="text-base font-bold text-white truncate">{project.name}</h1>
+          </div>
+        )}
+        <div className="ml-auto flex items-center gap-2">
+          {canCreate && (
+            <button onClick={() => setShowNewTask(true)}
+              className="flex items-center gap-1.5 px-3 py-2 bg-white text-black text-xs font-bold rounded-lg hover:bg-zinc-200 transition-colors">
+              <Plus size={13} /> Nova Tarefa
+            </button>
+          )}
           <button onClick={fetchData} className="p-2.5 bg-[#121214] hover:bg-[#18181B] border border-[#1E1E22] text-zinc-400 hover:text-white rounded-lg transition-colors">
             <RefreshCw size={14} />
           </button>
@@ -302,6 +356,82 @@ export default function ProjectDetailPage() {
       </div>
 
       <TaskDrawer taskId={selectedTaskId} onClose={() => setSelectedTaskId(null)} onUpdate={fetchData} />
+
+      {/* Modal nova tarefa */}
+      {showNewTask && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setShowNewTask(false)} />
+          <div className="relative bg-[#111113] border border-[#1E1E22] rounded-2xl p-6 w-full max-w-lg shadow-2xl space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold text-white">Nova Tarefa — {project?.name}</h3>
+              <button onClick={() => setShowNewTask(false)} className="p-1.5 hover:bg-white/5 text-zinc-400 rounded-lg"><X size={16} /></button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Assunto *</label>
+                <input value={newSubject} onChange={e => setNewSubject(e.target.value)} autoFocus
+                  placeholder="Descreva a tarefa..."
+                  className="mt-1 w-full bg-[#1a1a1f] border border-[#2E2E34] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-600" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Setor</label>
+                  <input value={newSector} onChange={e => setNewSector(e.target.value)}
+                    placeholder="Gestão, Projetos..."
+                    className="mt-1 w-full bg-[#1a1a1f] border border-[#2E2E34] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-zinc-600" />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Responsável</label>
+                  <input value={newResp} onChange={e => setNewResp(e.target.value)}
+                    placeholder="Nome do responsável"
+                    className="mt-1 w-full bg-[#1a1a1f] border border-[#2E2E34] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-zinc-600" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Urgência</label>
+                  <select value={newUrgencia} onChange={e => setNewUrgencia(e.target.value)}
+                    className="mt-1 w-full bg-[#1a1a1f] border border-[#2E2E34] rounded-lg px-3 py-2 text-xs text-white focus:outline-none">
+                    {['Baixa','Média','Alta','Crítica','Emergencial'].map(u => <option key={u}>{u}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Status</label>
+                  <select value={newStatus} onChange={e => setNewStatus(e.target.value)}
+                    className="mt-1 w-full bg-[#1a1a1f] border border-[#2E2E34] rounded-lg px-3 py-2 text-xs text-white focus:outline-none">
+                    {['Não iniciado','Em andamento','Aguardando','Em análise','Finalizado'].map(s => <option key={s}>{s}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Previsão</label>
+                  <input value={newPrevisao} onChange={e => setNewPrevisao(e.target.value)} placeholder="DD/MM/AAAA"
+                    className="mt-1 w-full bg-[#1a1a1f] border border-[#2E2E34] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-zinc-600" />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Descrição</label>
+                <textarea value={newDesc} onChange={e => setNewDesc(e.target.value)} rows={2} placeholder="Detalhes opcionais..."
+                  className="mt-1 w-full bg-[#1a1a1f] border border-[#2E2E34] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-zinc-600 resize-none" />
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button onClick={() => setShowNewTask(false)}
+                className="flex-1 px-4 py-2.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-semibold border border-zinc-700">
+                Cancelar
+              </button>
+              <button onClick={handleCreateTask} disabled={creating || !newSubject.trim()}
+                className="flex-1 px-4 py-2.5 rounded-lg bg-white hover:bg-zinc-200 disabled:opacity-50 text-black text-sm font-bold flex items-center justify-center gap-2">
+                {creating ? <><Loader2 size={14} className="animate-spin" />Criando...</> : <><Plus size={14} />Criar Tarefa</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

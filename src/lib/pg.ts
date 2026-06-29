@@ -237,6 +237,37 @@ export async function ensureSchema(): Promise<void> {
       )
     `;
 
+    // Tabela dedicada de tarefas — substitui o JSONB monolítico
+    await sql`
+      CREATE TABLE IF NOT EXISTS tasks (
+        id          TEXT PRIMARY KEY,
+        project     TEXT NOT NULL DEFAULT '',
+        data        JSONB NOT NULL DEFAULT '{}',
+        created_at  TIMESTAMPTZ DEFAULT NOW(),
+        updated_at  TIMESTAMPTZ DEFAULT NOW()
+      )
+    `;
+    await optionalSchemaStep('tasks project index',     () => sql`CREATE INDEX IF NOT EXISTS tasks_project_idx     ON tasks (project)`);
+    await optionalSchemaStep('tasks status index',      () => sql`CREATE INDEX IF NOT EXISTS tasks_status_idx      ON tasks ((data->>'statusAndamento'))`);
+    await optionalSchemaStep('tasks responsible index', () => sql`CREATE INDEX IF NOT EXISTS tasks_responsible_idx ON tasks ((data->>'responsible'))`);
+
+    // Anexos de tarefas em binário (BYTEA) — sem base64
+    await sql`
+      CREATE TABLE IF NOT EXISTS task_documents (
+        id           TEXT PRIMARY KEY,
+        task_id      TEXT NOT NULL,
+        name         TEXT NOT NULL,
+        category     TEXT NOT NULL DEFAULT 'outro',
+        content_type TEXT,
+        size_bytes   BIGINT,
+        data         BYTEA NOT NULL,
+        uploaded_by  TEXT NOT NULL DEFAULT 'Sistema',
+        uploaded_at  TIMESTAMPTZ DEFAULT NOW(),
+        version      INT DEFAULT 1
+      )
+    `;
+    await optionalSchemaStep('task_docs task_id index', () => sql`CREATE INDEX IF NOT EXISTS task_docs_task_idx ON task_documents (task_id)`);
+
     schemaReady = true;
   })();
 

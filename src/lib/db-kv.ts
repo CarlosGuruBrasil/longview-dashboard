@@ -566,3 +566,199 @@ export async function writeKv<T>(key: string, value: T): Promise<void> {
   store[key]  = value;
   writeJson(LOCAL_KV_FILE, store);
 }
+
+// ─── 7. TASKS — tabela dedicada ──────────────────────────────────────────────
+// Migração transparente: na primeira leitura, se a tabela tasks estiver vazia,
+// copia automaticamente do JSONB legado (project_state). JSONB original preservado.
+
+export interface TaskDocumentMeta {
+  id: string; taskId: string; name: string; category: string;
+  contentType?: string; sizeBytes?: number;
+  uploadedBy: string; uploadedAt: string; version: number;
+}
+
+/** Migra tarefas do JSONB legado para a tabela tasks (idempotente). */
+async function migrateTasksIfNeeded(db: Awaited<ReturnType<typeof getPg>>): Promise<void> {
+  const [{ count }] = await db<{ count: string }[]>`SELECT COUNT(*) AS count FROM tasks`;
+  if (Number(count) > 0) return; // já migrado
+
+  const rows = await db<{ data: { tasks?: Task[] } }[]>`
+    SELECT data FROM project_state WHERE key = 'state' LIMIT 1
+  `;
+  const tasks: Task[] = rows[0]?.data?.tasks ?? [];
+  if (tasks.length === 0) return;
+
+  for (const t of tasks) {
+    await db`
+      INSERT INTO tasks (id, project, data, created_at, updated_at)
+      VALUES (${t.id}, ${t.project ?? ''}, ${JSON.stringify(t)}, NOW(), NOW())
+      ON CONFLICT (id) DO NOTHING
+    `;
+  }
+  console.log(`[db-kv] Migradas ${tasks.length} tarefas do JSONB → tabela tasks`);
+}
+
+/** Lê tarefas com filtros opcionais. Fallback para JSONB em dev sem Postgres. */
+export async function readTasks(filters: {
+  project?: string; sector?: string; status?: string;
+  urgencia?: string; responsible?: string; statusContratacao?: string; q?: string;
+} = {}): Promise<Task[]> {
+  if (isPg()) {
+    const db = await getPg();
+    await migrateTasksIfNeeded(db);
+
+    const rows = await db<{ data: Task }[]>`SELECT data FROM tasks ORDER BY updated_at DESC`;
+    let tasks = rows.map(r => (typeof r.data === 'object' ? r.data : JSON.parse(r.data as unknown as string)) as Task);
+
+    if (filters.project)           tasks = tasks.filter(t => t.project?.toLowerCase() === filters.project!.toLowerCase());
+    if (filters.sector)            tasks = tasks.filter(t => t.sector?.toLowerCase() === filters.sector!.toLowerCase());
+    if (filters.status)            tasks = tasks.filter(t => t.statusAndamento?.toLowerCase() === filters.status!.toLowerCase());
+    if (filters.urgencia)          tasks = tasks.filter(t => t.urgencia?.toLowerCase() === filters.urgencia!.toLowerCase());
+    if (filters.responsible)       tasks = tasks.filter(t => t.responsible?.toLowerCase() === filters.responsible!.toLowerCase() || t.secondaryResponsibles?.some(r => r.toLowerCase() === filters.responsible!.toLowerCase()));
+    if (filters.statusContratacao) tasks = tasks.filter(t => t.statusContratacao?.toLowerCase() === filters.statusContratacao!.toLowerCase());
+    if (filters.q) {
+      const q = filters.q.toLowerCase();
+      tasks = tasks.filter(t => [t.subject, t.id, t.description, t.responsible, t.sector, t.project, t.situacao, t.observacoesRotinas].some(f => f?.toLowerCase().includes(q)));
+    }
+    return tasks;
+  }
+  // Dev local: ler do JSON
+  return (readLocalProjectData()).tasks;
+}
+
+/** Lê uma tarefa por ID. */
+export async function readTaskById(id: string): Promise<Task | null> {
+  if (isPg()) {
+    const db = await getPg();
+    await migrateTasksIfNeeded(db);
+    const rows = await db<{ data: Task }[]>`SELECT data FROM tasks WHERE id = ${id} LIMIT 1`;
+    if (!rows[0]) return null;
+    return typeof rows[0].data === 'object' ? rows[0].data as Task : JSON.parse(rows[0].data as unknown as string) as Task;
+  }
+  const state = readLocalProjectData();
+  return state.tasks.find(t => t.id === id) ?? null;
+}
+
+/** Gera próximo ID de tarefa (LVM-XXXX). Race-safe com MAX no banco. */
+export async function nextTaskId(): Promise<string> {
+  if (isPg()) {
+    const db = await getPg();
+    await migrateTasksIfNeeded(db);
+    const rows = await db<{ max_id: string | null }[]>`
+      SELECT MAX(CAST(REGEXP_REPLACE(id, '[^0-9]', '', 'g') AS INTEGER)) AS max_id FROM tasks
+    `;
+    const max = Number(rows[0]?.max_id ?? 0);
+    return `LVM-${String(max + 1).padStart(4, '0')}`;
+  }
+  const state = readLocalProjectData();
+  const max = state.tasks.length > 0 ? Math.max(...state.tasks.map(t => parseInt(t.id.replace('LVM-', '')) || 0)) : 0;
+  return `LVM-${String(max + 1).padStart(4, '0')}`;
+}
+
+/** Insere ou atualiza tarefa. */
+export async function upsertTask(task: Task): Promise<void> {
+  if (isPg()) {
+    const db = await getPg();
+    await db`
+      INSERT INTO tasks (id, project, data, created_at, updated_at)
+      VALUES (${task.id}, ${task.project ?? ''}, ${JSON.stringify(task)}, NOW(), NOW())
+      ON CONFLICT (id) DO UPDATE SET
+        project    = EXCLUDED.project,
+        data       = EXCLUDED.data,
+        updated_at = NOW()
+    `;
+    // Atualiza progresso do projeto no project_state
+    await _syncProjectProgress(db, task.project);
+    return;
+  }
+  // Dev local
+  await mutateProjectData(db => {
+    const idx = db.tasks.findIndex(t => t.id === task.id);
+    if (idx >= 0) db.tasks[idx] = task; else db.tasks.push(task);
+  });
+}
+
+/** Remove tarefa. */
+export async function deleteTask(id: string): Promise<boolean> {
+  if (isPg()) {
+    const db = await getPg();
+    const task = await readTaskById(id);
+    await db`DELETE FROM tasks WHERE id = ${id}`;
+    if (task) await _syncProjectProgress(db, task.project);
+    return !!task;
+  }
+  let found = false;
+  await mutateProjectData(db => {
+    const idx = db.tasks.findIndex(t => t.id === id);
+    if (idx >= 0) { found = true; db.tasks.splice(idx, 1); }
+  });
+  return found;
+}
+
+/** Recalcula progresso do projeto e atualiza project_state. */
+async function _syncProjectProgress(db: Awaited<ReturnType<typeof getPg>>, projectName: string): Promise<void> {
+  try {
+    const rows = await db<{ data: Task }[]>`SELECT data FROM tasks WHERE project = ${projectName}`;
+    const tasks = rows.map(r => (typeof r.data === 'object' ? r.data : JSON.parse(r.data as unknown as string)) as Task);
+    const finished = tasks.filter(t => t.statusAndamento === 'Finalizado').length;
+    const progress = tasks.length > 0 ? Math.round((finished / tasks.length) * 100) : 0;
+    const status   = progress === 100 ? 'Finalizado' : progress > 0 ? 'Em andamento' : 'Não iniciado';
+
+    const stateRows = await db<{ data: { projects: Project[]; responsibles: Responsible[] } }[]>`
+      SELECT data FROM project_state WHERE key = 'state' LIMIT 1
+    `;
+    if (!stateRows[0]) return;
+    const state = stateRows[0].data;
+    state.projects = state.projects.map(p =>
+      p.name.toLowerCase() === projectName.toLowerCase() ? { ...p, progress, status } : p
+    );
+    await db`
+      UPDATE project_state SET data = ${JSON.stringify(state)} WHERE key = 'state'
+    `;
+  } catch (e) { console.warn('[db-kv] _syncProjectProgress error:', e); }
+}
+
+// ─── 8. TASK DOCUMENTS — binário no Postgres ─────────────────────────────────
+
+/** Lista metadados dos anexos de uma tarefa (sem o conteúdo binário). */
+export async function listTaskDocuments(taskId: string): Promise<TaskDocumentMeta[]> {
+  if (!isPg()) return [];
+  const db = await getPg();
+  const rows = await db<TaskDocumentMeta[]>`
+    SELECT id, task_id AS "taskId", name, category,
+           content_type AS "contentType", size_bytes AS "sizeBytes",
+           uploaded_by AS "uploadedBy", uploaded_at::text AS "uploadedAt", version
+    FROM task_documents WHERE task_id = ${taskId} ORDER BY uploaded_at DESC
+  `;
+  return rows;
+}
+
+/** Busca conteúdo binário de um anexo. */
+export async function getTaskDocumentData(docId: string): Promise<{ data: Buffer; contentType: string; name: string } | null> {
+  if (!isPg()) return null;
+  const db = await getPg();
+  const rows = await db<{ data: Buffer; content_type: string; name: string }[]>`
+    SELECT data, content_type, name FROM task_documents WHERE id = ${docId}
+  `;
+  if (!rows[0]) return null;
+  return { data: rows[0].data, contentType: rows[0].content_type ?? 'application/octet-stream', name: rows[0].name };
+}
+
+/** Adiciona um anexo a uma tarefa. */
+export async function addTaskDocument(meta: Omit<TaskDocumentMeta, 'uploadedAt'> & { data: Buffer }): Promise<void> {
+  if (!isPg()) throw new Error('Anexos requerem Postgres');
+  const db = await getPg();
+  await db`
+    INSERT INTO task_documents (id, task_id, name, category, content_type, size_bytes, data, uploaded_by, version)
+    VALUES (${meta.id}, ${meta.taskId}, ${meta.name}, ${meta.category}, ${meta.contentType ?? null},
+            ${meta.sizeBytes ?? null}, ${meta.data}, ${meta.uploadedBy}, ${meta.version ?? 1})
+  `;
+}
+
+/** Remove um anexo de tarefa. */
+export async function deleteTaskDocument(docId: string, taskId: string): Promise<boolean> {
+  if (!isPg()) return false;
+  const db = await getPg();
+  const result = await db`DELETE FROM task_documents WHERE id = ${docId} AND task_id = ${taskId}`;
+  return result.count > 0;
+}
