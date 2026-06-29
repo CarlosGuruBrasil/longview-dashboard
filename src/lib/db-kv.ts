@@ -577,38 +577,81 @@ export interface TaskDocumentMeta {
   uploadedBy: string; uploadedAt: string; version: number;
 }
 
-/** Migra tarefas do JSONB legado para a tabela tasks (idempotente). */
-async function migrateTasksIfNeeded(db: Awaited<ReturnType<typeof getPg>>): Promise<void> {
-  const [{ count }] = await db<{ count: string }[]>`SELECT COUNT(*) AS count FROM tasks`;
-  if (Number(count) > 0) return; // já migrado
-
-  const rows = await db<{ data: { tasks?: Task[] } }[]>`
-    SELECT data FROM project_state WHERE key = 'state' LIMIT 1
-  `;
-  const tasks: Task[] = rows[0]?.data?.tasks ?? [];
-  if (tasks.length === 0) return;
-
-  for (const t of tasks) {
-    await db`
-      INSERT INTO tasks (id, project, data, created_at, updated_at)
-      VALUES (${t.id}, ${t.project ?? ''}, ${JSON.stringify(t)}, NOW(), NOW())
-      ON CONFLICT (id) DO NOTHING
+/** Lê tasks do JSONB legado (project_state). Retorna [] se não houver. */
+async function readTasksFromJsonb(db: Awaited<ReturnType<typeof getPg>>): Promise<Task[]> {
+  try {
+    const rows = await db<{ data: unknown }[]>`
+      SELECT data FROM project_state WHERE key = 'state' LIMIT 1
     `;
-  }
-  console.log(`[db-kv] Migradas ${tasks.length} tarefas do JSONB → tabela tasks`);
+    const raw = rows[0]?.data;
+    // postgres.js retorna JSONB como objeto JS; pode vir como string se coluna for text
+    const state = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    const tasks = (state as { tasks?: Task[] })?.tasks;
+    return Array.isArray(tasks) ? tasks : [];
+  } catch { return []; }
 }
 
-/** Lê tarefas com filtros opcionais. Fallback para JSONB em dev sem Postgres. */
+/** Migra tarefas do JSONB legado para a tabela tasks (idempotente). */
+async function migrateTasksIfNeeded(db: Awaited<ReturnType<typeof getPg>>): Promise<Task[]> {
+  const [{ count }] = await db<{ count: string }[]>`SELECT COUNT(*) AS count FROM tasks`;
+  if (Number(count) > 0) return []; // já migrado, nada a fazer
+
+  const tasks = await readTasksFromJsonb(db);
+  if (tasks.length === 0) return [];
+
+  console.log(`[db-kv] Iniciando migração de ${tasks.length} tarefas JSONB → tabela tasks`);
+  let migrated = 0;
+  for (const t of tasks) {
+    try {
+      // Cast explícito para contornar restrição de tipo do postgres.js
+      await db`
+        INSERT INTO tasks (id, project, data, created_at, updated_at)
+        VALUES (${t.id}, ${t.project ?? ''}, ${JSON.stringify(t)}::jsonb, NOW(), NOW())
+        ON CONFLICT (id) DO NOTHING
+      `;
+      migrated++;
+    } catch (e) {
+      console.warn(`[db-kv] migrate task ${t.id} falhou:`, e);
+    }
+  }
+  console.log(`[db-kv] Migração concluída: ${migrated}/${tasks.length} tarefas`);
+  return tasks; // retorna as tarefas mesmo que a migração falhe parcialmente
+}
+
+/** Lê tarefas com filtros opcionais. Fallback para JSONB se tabela vazia. */
 export async function readTasks(filters: {
   project?: string; sector?: string; status?: string;
   urgencia?: string; responsible?: string; statusContratacao?: string; q?: string;
 } = {}): Promise<Task[]> {
   if (isPg()) {
     const db = await getPg();
-    await migrateTasksIfNeeded(db);
 
-    const rows = await db<{ data: Task }[]>`SELECT data FROM tasks ORDER BY updated_at DESC`;
-    let tasks = rows.map(r => (typeof r.data === 'object' ? r.data : JSON.parse(r.data as unknown as string)) as Task);
+    let tasks: Task[] = [];
+    try {
+      // Tenta migrar se necessário (retorna tasks legadas se migração recém-rodou)
+      const migrated = await migrateTasksIfNeeded(db);
+
+      const rows = await db<{ data: unknown }[]>`SELECT data FROM tasks ORDER BY updated_at DESC`;
+      tasks = rows.map(r => {
+        const raw = r.data;
+        return (typeof raw === 'string' ? JSON.parse(raw) : raw) as Task;
+      });
+
+      // Fallback: migração acabou de rodar mas INSERT pode ter falhado → usa dados originais
+      if (tasks.length === 0 && migrated.length > 0) {
+        console.warn('[db-kv] Tabela tasks vazia após migração — usando fallback JSONB');
+        tasks = migrated;
+      }
+    } catch (e) {
+      console.error('[db-kv] readTasks erro:', e);
+      // Último recurso: ler direto do JSONB
+      tasks = await readTasksFromJsonb(db);
+    }
+
+    // Fallback final: tasks ainda vazio → ler do JSONB
+    if (tasks.length === 0) {
+      tasks = await readTasksFromJsonb(db);
+    }
 
     if (filters.project)           tasks = tasks.filter(t => t.project?.toLowerCase() === filters.project!.toLowerCase());
     if (filters.sector)            tasks = tasks.filter(t => t.sector?.toLowerCase() === filters.sector!.toLowerCase());
@@ -622,7 +665,6 @@ export async function readTasks(filters: {
     }
     return tasks;
   }
-  // Dev local: ler do JSON
   return (readLocalProjectData()).tasks;
 }
 
