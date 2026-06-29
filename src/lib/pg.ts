@@ -216,10 +216,16 @@ export async function ensureSchema(): Promise<void> {
         status_venda      INTEGER,
         valor             NUMERIC,
         metragem          NUMERIC,
+        andar             INTEGER,
+        coluna            INTEGER,
+        tipologia         TEXT,
         raw               JSONB NOT NULL DEFAULT '{}',
         synced_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `;
+    await optionalSchemaStep('cv_unidades andar col', () => sql`ALTER TABLE cv_unidades ADD COLUMN IF NOT EXISTS andar INTEGER`);
+    await optionalSchemaStep('cv_unidades coluna col', () => sql`ALTER TABLE cv_unidades ADD COLUMN IF NOT EXISTS coluna INTEGER`);
+    await optionalSchemaStep('cv_unidades tipologia col', () => sql`ALTER TABLE cv_unidades ADD COLUMN IF NOT EXISTS tipologia TEXT`);
 
     await sql`
       CREATE TABLE IF NOT EXISTS cv_vendas (

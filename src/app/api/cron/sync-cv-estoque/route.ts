@@ -94,11 +94,17 @@ export async function POST(request: NextRequest) {
           const blocoNome = uni._bloco_nome || null;
           const num = uni.nome || null;
 
+          const andar     = uni.andar  ? parseInt(String(uni.andar),  10) : null;
+          const coluna    = uni.coluna ? parseInt(String(uni.coluna), 10) : null;
+          const tipologia = uni.tipologia ?? uni.tipo ?? null;
+
           await sql`
             INSERT INTO cv_unidades (
-              id, id_empreendimento, bloco, numero, status, status_venda, valor, metragem, raw, synced_at
+              id, id_empreendimento, bloco, numero, status, status_venda,
+              valor, metragem, andar, coluna, tipologia, raw, synced_at
             ) VALUES (
-              ${idUni}, ${idEmp}, ${blocoNome}, ${num}, ${statusText}, ${statusVenda}, ${valor}, ${metragem}, ${JSON.stringify(uni)}, NOW()
+              ${idUni}, ${idEmp}, ${blocoNome}, ${num}, ${statusText}, ${statusVenda},
+              ${valor}, ${metragem}, ${andar}, ${coluna}, ${tipologia}, ${JSON.stringify(uni)}, NOW()
             )
           `;
           upsertedUnidades++;
