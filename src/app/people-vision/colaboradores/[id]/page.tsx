@@ -59,12 +59,33 @@ interface UserDocument {
   uploadedAt: string;
 }
 
+interface UserPerms {
+  viewMarketingDashboard: boolean; viewMarketingLeads: boolean;
+  viewMarketingOportunidades: boolean; viewMarketingEstoque: boolean;
+  viewMarketingAds: boolean; viewMarketingVendas: boolean;
+  viewProjectVision: boolean; manageProjects: boolean;
+  manageCommentsDocs: boolean; deleteTasks: boolean;
+  viewPeopleVision: boolean; viewQualityVision: boolean;
+  isAdmin: boolean;
+}
+
+const DEFAULT_PERMS: UserPerms = {
+  viewMarketingDashboard: false, viewMarketingLeads: false,
+  viewMarketingOportunidades: false, viewMarketingEstoque: false,
+  viewMarketingAds: false, viewMarketingVendas: false,
+  viewProjectVision: false, manageProjects: false,
+  manageCommentsDocs: false, deleteTasks: false,
+  viewPeopleVision: false, viewQualityVision: false,
+  isAdmin: false,
+};
+
 interface UserData {
   id: string;
   name: string;
   email: string;
   role: string;
   createdAt: string;
+  permissions?: Partial<UserPerms>;
   profile?: {
     phone?: string; whatsapp?: string; position?: string; department?: string;
     company?: string; activatedAt?: string; birthDate?: string; linkedIn?: string;
@@ -234,12 +255,34 @@ export default function ColaboradorPage() {
 
   const canEdit = isAdmin || isSelf || id === currentUser?.id;
 
+  // Permissões (apenas admin pode ver/alterar permissões de outros)
+  const [perms, setPerms] = useState<UserPerms>({ ...DEFAULT_PERMS });
+  const [permsSaving, setPermsSaving] = useState(false);
+  const [permsSaved, setPermsSaved]   = useState(false);
+
+  const handleSavePermissions = async () => {
+    setPermsSaving(true);
+    try {
+      const res = await fetch(`/api/admin/users/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ permissions: perms }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? 'Erro');
+      setPermsSaved(true);
+      setTimeout(() => setPermsSaved(false), 3000);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Erro ao salvar permissões');
+    } finally { setPermsSaving(false); }
+  };
+
   // ── Load user ──────────────────────────────────────────────────────────────
   useEffect(() => {
     const ep = isSelf ? '/api/user/me' : `/api/admin/users/${id}`;
     fetch(ep).then(r => r.json()).then(d => {
       const u: UserData = d.user ?? d;
       setUser(u);
+      setPerms({ ...DEFAULT_PERMS, ...(u.permissions ?? {}) });
       setName(u.name ?? '');
       setRole(u.role ?? '');
       setStatus(u.profile?.status ?? 'ativo');
@@ -717,6 +760,78 @@ export default function ColaboradorPage() {
               rows={3}
               className="w-full px-3 py-2.5 rounded-xl bg-[#121214]/60 border border-[#1E1E22] text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 resize-none" />
           </Field>
+        </Section>
+      )}
+
+      {/* ── Permissões do sistema (somente admin, não é o próprio) ── */}
+      {isAdmin && !isSelf && (
+        <Section title="Permissões do Sistema" icon={ShieldCheck} accent="text-amber-400">
+          <div className="space-y-4">
+            {/* Marketing Vision */}
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-2">Marketing Vision</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                {([
+                  ['viewMarketingDashboard',     'Dashboard Comercial'],
+                  ['viewMarketingLeads',         'Leads (CRM)'],
+                  ['viewMarketingOportunidades', 'Oportunidades'],
+                  ['viewMarketingEstoque',       'Estoque'],
+                  ['viewMarketingAds',           'Anúncios (Meta)'],
+                  ['viewMarketingVendas',        'Vendas'],
+                ] as [keyof UserPerms, string][]).map(([key, label]) => (
+                  <label key={key} className="flex items-center gap-2 text-sm text-zinc-400 hover:text-white cursor-pointer select-none">
+                    <input type="checkbox" checked={perms[key] as boolean}
+                      onChange={() => setPerms(p => ({ ...p, [key]: !p[key] }))}
+                      className="w-3.5 h-3.5 rounded bg-[#1b1b1f] border-[#2e2e34] text-amber-500 focus:ring-0" />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </div>
+            {/* Project Vision */}
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-2">Project Vision</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                {([
+                  ['viewProjectVision',   'Acessar Project Vision'],
+                  ['manageProjects',      'Criar/Editar Projetos'],
+                  ['manageCommentsDocs',  'Comentários e Documentos'],
+                  ['deleteTasks',         'Excluir Tarefas'],
+                ] as [keyof UserPerms, string][]).map(([key, label]) => (
+                  <label key={key} className="flex items-center gap-2 text-sm text-zinc-400 hover:text-white cursor-pointer select-none">
+                    <input type="checkbox" checked={perms[key] as boolean}
+                      onChange={() => setPerms(p => ({ ...p, [key]: !p[key] }))}
+                      className="w-3.5 h-3.5 rounded bg-[#1b1b1f] border-[#2e2e34] text-amber-500 focus:ring-0" />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </div>
+            {/* Outros módulos */}
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-2">Outros Módulos</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                {([
+                  ['viewPeopleVision',  'People Vision'],
+                  ['viewQualityVision', 'Quality Vision'],
+                  ['isAdmin',           'Administrador (acesso total)'],
+                ] as [keyof UserPerms, string][]).map(([key, label]) => (
+                  <label key={key} className="flex items-center gap-2 text-sm text-zinc-400 hover:text-white cursor-pointer select-none">
+                    <input type="checkbox" checked={perms[key] as boolean}
+                      onChange={() => setPerms(p => ({ ...p, [key]: !p[key] }))}
+                      className="w-3.5 h-3.5 rounded bg-[#1b1b1f] border-[#2e2e34] text-amber-500 focus:ring-0" />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </div>
+            {/* Botão salvar permissões */}
+            <button onClick={handleSavePermissions} disabled={permsSaving}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm font-medium hover:bg-amber-500/20 transition-colors disabled:opacity-50">
+              {permsSaving ? <Loader2 size={14} className="animate-spin" /> : permsSaved ? <Check size={14} /> : <ShieldCheck size={14} />}
+              {permsSaved ? 'Permissões salvas!' : 'Salvar Permissões'}
+            </button>
+          </div>
         </Section>
       )}
 

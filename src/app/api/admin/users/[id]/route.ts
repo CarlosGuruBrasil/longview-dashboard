@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth, verifyAdminAuth } from '@/lib/auth';
 import { readUsers, writeUsers, UserProfileData } from '@/lib/db-kv';
+import { normalizePermissions, type UserPermissions } from '@/lib/permissions';
 
 /** GET /api/admin/users/[id] */
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -36,9 +37,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   }
 
   const body = await request.json() as {
-    name?:    string;
-    role?:    string;
-    profile?: Partial<UserProfileData>;
+    name?:        string;
+    role?:        string;
+    profile?:     Partial<UserProfileData>;
+    permissions?: Partial<UserPermissions>;
   };
 
   const users = await readUsers();
@@ -49,9 +51,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
   if (body.name && body.name.trim().length >= 2) user.name = body.name.trim();
 
-  // Apenas admin pode alterar role
+  // Apenas admin pode alterar role e permissões
   if (admin && body.role && ['Desenvolvedor','Diretoria','Gestor','Operador','Parceiro','Corretor','Visualizador'].includes(body.role)) {
     user.role = body.role as typeof user.role;
+  }
+  if (admin && body.permissions) {
+    user.permissions = normalizePermissions({ ...user.permissions, ...body.permissions });
   }
 
   if (body.profile) {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
+import { readUsers } from '@/lib/db-kv';
 import { rateLimit, getClientIp } from '@/lib/rateLimit';
 
 export async function GET(request: NextRequest) {
@@ -10,19 +11,34 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Muitas requisições.' }, { status: 429 });
   }
 
-  const user = await verifyAuth();
-  if (!user) {
+  const auth = await verifyAuth();
+  if (!auth) {
     return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 });
   }
+
+  // ponytail: lê permissões sempre do banco — JWT só identifica o usuário.
+  // Evita que mudanças de permissão só valham após o usuário fazer logout.
+  let permissions = auth.permissions;
+  let role = auth.role;
+  let name = auth.name;
+  try {
+    const users = await readUsers();
+    const dbUser = users.find(u => u.id === auth.userId);
+    if (dbUser) {
+      permissions = dbUser.permissions as unknown as typeof permissions;
+      role = dbUser.role;
+      name = dbUser.name;
+    }
+  } catch { /* fallback para dados do JWT se banco indisponível */ }
 
   return NextResponse.json({
     isAuthenticated: true,
     user: {
-      id:          user.userId,
-      name:        user.name,
-      email:       user.email,
-      role:        user.role,
-      permissions: user.permissions,
+      id:          auth.userId,
+      name,
+      email:       auth.email,
+      role,
+      permissions,
     },
   });
 }
