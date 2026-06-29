@@ -86,7 +86,7 @@ export default function ColaboradoresPage() {
 
       <div className="flex items-center justify-between">
         <p className="text-sm text-zinc-500">{users.length} registros</p>
-        <Link href="/rh-vision/cadastro" className="flex items-center gap-2 h-9 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-semibold transition-colors">
+        <Link href="/people-vision/cadastro" className="flex items-center gap-2 h-9 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-semibold transition-colors">
           <UserPlus size={15} />
           <span className="hidden sm:inline">Convidar</span>
         </Link>
@@ -139,7 +139,7 @@ export default function ColaboradoresPage() {
             return (
               <div
                 key={u.id}
-                onClick={() => router.push(`/rh-vision/colaboradores/${u.id}`)}
+                onClick={() => router.push(`/people-vision/colaboradores/${u.id}`)}
                 className="flex items-center gap-4 p-4 rounded-xl border border-[#1E1E22] bg-[#121214]/60 hover:bg-[#17171A] hover:border-zinc-700 transition-all group cursor-pointer"
               >
                 {u.profile?.avatarUrl ? (

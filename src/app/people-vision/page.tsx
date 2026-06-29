@@ -75,7 +75,7 @@ function roleColor(role: string) {
   return map[role] ?? 'bg-zinc-500/15 text-zinc-300';
 }
 
-export default function RHDashboard() {
+export default function PeopleDashboard() {
   const [users, setUsers]       = useState<SafeUser[]>([]);
   const [pending, setPending]   = useState<Pending[]>([]);
   const [loading, setLoading]   = useState(true);
@@ -132,17 +132,17 @@ export default function RHDashboard() {
 
       {/* KPI Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <KpiCard icon={Users}     label="Total"          value={users.length}            color="bg-emerald-500/15 text-emerald-300" href="/rh-vision/colaboradores" />
-        <KpiCard icon={UserCheck} label="Ativos"         value={stats.active.length}     color="bg-sky-500/15 text-sky-300"         href="/rh-vision/colaboradores" />
-        <KpiCard icon={UserPlus}  label="Novos este mês" value={stats.newThisMonth.length} color="bg-violet-500/15 text-violet-300" sub={monthName} href="/rh-vision/colaboradores" />
-        <KpiCard icon={AlertCircle} label="Aprovações pendentes" value={pending.length} color={pending.length > 0 ? 'bg-amber-500/15 text-amber-300' : 'bg-zinc-500/15 text-zinc-400'} href="/rh-vision/cadastro" />
+        <KpiCard icon={Users}     label="Total"          value={users.length}            color="bg-emerald-500/15 text-emerald-300" href="/people-vision/colaboradores" />
+        <KpiCard icon={UserCheck} label="Ativos"         value={stats.active.length}     color="bg-sky-500/15 text-sky-300"         href="/people-vision/colaboradores" />
+        <KpiCard icon={UserPlus}  label="Novos este mês" value={stats.newThisMonth.length} color="bg-violet-500/15 text-violet-300" sub={monthName} href="/people-vision/colaboradores" />
+        <KpiCard icon={AlertCircle} label="Aprovações pendentes" value={pending.length} color={pending.length > 0 ? 'bg-amber-500/15 text-amber-300' : 'bg-zinc-500/15 text-zinc-400'} href="/people-vision/cadastro" />
       </div>
 
       {/* Second row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard icon={Gift}      label={`Aniversários — ${monthName}`} value={stats.birthdays.length}  color="bg-pink-500/15 text-pink-300" />
-        <KpiCard icon={Building2} label="Departamentos"  value={Object.keys(stats.byDept).length}       color="bg-orange-500/15 text-orange-300" href="/rh-vision/colaboradores" />
-        <KpiCard icon={Clock}     label="Inativos / Afastados" value={stats.inactive.length}            color="bg-zinc-500/15 text-zinc-400"  href="/rh-vision/colaboradores" />
+        <KpiCard icon={Building2} label="Departamentos"  value={Object.keys(stats.byDept).length}       color="bg-orange-500/15 text-orange-300" href="/people-vision/colaboradores" />
+        <KpiCard icon={Clock}     label="Inativos / Afastados" value={stats.inactive.length}            color="bg-zinc-500/15 text-zinc-400"  href="/people-vision/colaboradores" />
         <KpiCard icon={TrendingUp} label="Funções diferentes" value={Object.keys(stats.byRole).length} color="bg-teal-500/15 text-teal-300" />
       </div>
 
@@ -188,7 +188,7 @@ export default function RHDashboard() {
           ) : (
             <div className="space-y-2">
               {stats.birthdays.map(u => (
-                <Link key={u.id} href={`/rh-vision/colaboradores/${u.id}`} className="flex items-center gap-3 p-2 rounded-xl hover:bg-[#17171A] transition-colors">
+                <Link key={u.id} href={`/people-vision/colaboradores/${u.id}`} className="flex items-center gap-3 p-2 rounded-xl hover:bg-[#17171A] transition-colors">
                   <div className="w-8 h-8 rounded-full bg-pink-500/20 border border-pink-500/20 flex items-center justify-center text-xs font-bold text-pink-300">
                     {getInitials(u.name)}
                   </div>
@@ -222,7 +222,7 @@ export default function RHDashboard() {
                   <p className="text-sm text-zinc-100 font-medium truncate">{reg.name}</p>
                   <p className="text-[11px] text-zinc-500">{reg.email} · aprovação: {reg.approverName}</p>
                 </div>
-                <Link href="/rh-vision/cadastro" className="text-xs text-amber-400 hover:text-amber-300 font-medium shrink-0">
+                <Link href="/people-vision/cadastro" className="text-xs text-amber-400 hover:text-amber-300 font-medium shrink-0">
                   Revisar →
                 </Link>
               </div>
@@ -238,13 +238,13 @@ export default function RHDashboard() {
             <Users size={14} className="text-emerald-400" />
             Colaboradores
           </h2>
-          <Link href="/rh-vision/colaboradores" className="text-xs text-emerald-400 hover:text-emerald-300">
+          <Link href="/people-vision/colaboradores" className="text-xs text-emerald-400 hover:text-emerald-300">
             Ver todos →
           </Link>
         </div>
         <div className="space-y-1">
           {users.slice(0, 8).map(u => (
-            <Link key={u.id} href={`/rh-vision/colaboradores/${u.id}`} className="flex items-center gap-3 px-2 py-2.5 rounded-xl hover:bg-[#17171A] transition-colors group">
+            <Link key={u.id} href={`/people-vision/colaboradores/${u.id}`} className="flex items-center gap-3 px-2 py-2.5 rounded-xl hover:bg-[#17171A] transition-colors group">
               {u.profile?.avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={u.profile.avatarUrl} alt={u.name} className="w-8 h-8 rounded-full object-cover border border-[#1E1E22]" />
@@ -265,7 +265,7 @@ export default function RHDashboard() {
           ))}
         </div>
         {users.length > 8 && (
-          <Link href="/rh-vision/colaboradores" className="mt-3 block text-center text-xs text-zinc-500 hover:text-emerald-400 transition-colors">
+          <Link href="/people-vision/colaboradores" className="mt-3 block text-center text-xs text-zinc-500 hover:text-emerald-400 transition-colors">
             + {users.length - 8} colaboradores
           </Link>
         )}

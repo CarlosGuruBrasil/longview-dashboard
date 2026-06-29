@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
         ${full.temperatura ?? null},
         ${parseCrmDate(full.data_cad ?? full.data_cadastro)},
         ${parseCrmDate(full.data_atualizacao)},
-        ${JSON.stringify(full)},
+        ${JSON.stringify(full)}::jsonb,
         NOW()
       )
       ON CONFLICT (id) DO UPDATE SET

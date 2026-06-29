@@ -15,7 +15,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 
   const docs = await readUserDocuments(id);
 
-  // Não-RH vê apenas metadados — sem conteúdo do arquivo
+  // Usuário sem permissão People Vision vê apenas metadados — sem conteúdo do arquivo
   if (!canManage(auth.role)) {
     return NextResponse.json({
       count: docs.length,
@@ -26,7 +26,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     });
   }
 
-  // RH vê tudo exceto o base64 bruto (download via rota dedicada)
+  // People Vision vê tudo exceto o base64 bruto (download via rota dedicada)
   return NextResponse.json({
     count: docs.length,
     docs: docs.map(d => ({

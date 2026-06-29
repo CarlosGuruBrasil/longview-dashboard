@@ -43,7 +43,7 @@ interface UltimaInspecao {
   nota?: number
 }
 
-interface QualidadeData {
+interface QualityData {
   kpis: KpiData
   inspecoesPorTipo: Record<string, number>
   serieMensal: MonthlyPoint[]
@@ -166,11 +166,11 @@ function CustomTooltip({ active, payload, label }: {
 }
 
 // ---------- main ----------
-export default function QualidadeView() {
+export default function QualityView() {
   const currentYear = new Date().getFullYear()
   const [startYear, setStartYear] = useState(currentYear - 1)
   const [endYear,   setEndYear]   = useState(currentYear)
-  const [data,      setData]      = useState<QualidadeData | null>(null)
+  const [data,      setData]      = useState<QualityData | null>(null)
   const [loading,   setLoading]   = useState(true)
   const [error,     setError]     = useState<string | null>(null)
   const [chartMode, setChartMode] = useState<'volume' | 'resultado'>('volume')
@@ -183,7 +183,7 @@ export default function QualidadeView() {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         return r.json()
       })
-      .then((d: QualidadeData) => setData(d))
+      .then((d: QualityData) => setData(d))
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
   }, [startYear, endYear])

@@ -8,12 +8,12 @@ import GlassCard from './GlassCard'
 const TICK = '#71717a'
 
 interface SocialData {
-  facebook: { name: string; fanCount: number; followers: number }
-  instagram: {
-    username: string; followers: number; following: number
-    mediaCount: number; newFollowers28d: number; reach28d: number
-    reachDaily:    { date: string; value: number }[]
-    followerDaily: { date: string; value: number }[]
+  facebook?: { name?: string; fanCount?: number; followers?: number }
+  instagram?: {
+    username?: string; followers?: number; following?: number
+    mediaCount?: number; newFollowers28d?: number; reach28d?: number
+    reachDaily?:    { date: string; value: number }[]
+    followerDaily?: { date: string; value: number }[]
   }
 }
 
@@ -52,8 +52,21 @@ export default function SocialPanel() {
 
   if (!data) return null
 
-  const ig = data.instagram
-  const fb = data.facebook
+  const ig = {
+    username:        data.instagram?.username ?? 'longviewempreendimentos',
+    followers:       data.instagram?.followers ?? 0,
+    following:       data.instagram?.following ?? 0,
+    mediaCount:      data.instagram?.mediaCount ?? 0,
+    newFollowers28d: data.instagram?.newFollowers28d ?? 0,
+    reach28d:        data.instagram?.reach28d ?? 0,
+    reachDaily:      Array.isArray(data.instagram?.reachDaily) ? data.instagram.reachDaily : [],
+    followerDaily:   Array.isArray(data.instagram?.followerDaily) ? data.instagram.followerDaily : [],
+  }
+  const fb = {
+    name:      data.facebook?.name ?? 'LongView',
+    fanCount:  data.facebook?.fanCount ?? 0,
+    followers: data.facebook?.followers ?? 0,
+  }
   const igRatio = ig.followers > 0
     ? Math.round((ig.followers / Math.max(ig.followers, fb.fanCount)) * 100)
     : 50

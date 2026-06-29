@@ -7,7 +7,7 @@ interface ProxyJwtPayload {
     isAdmin?: boolean;
     viewProjectVision?: boolean;
     viewMarketingDashboard?: boolean;
-    viewRHVision?: boolean;
+    viewPeopleVision?: boolean;
     viewQualityVision?: boolean;
   };
 }
@@ -105,18 +105,18 @@ export function proxy(request: NextRequest) {
     }
   }
 
-  if (pathname.startsWith('/rh-vision')) {
-    if (pathname === '/rh-vision/colaboradores/me') {
+  if (pathname.startsWith('/people-vision')) {
+    if (pathname === '/people-vision/colaboradores/me') {
       return NextResponse.next();
     }
 
-    const hasAccess = role === 'Desenvolvedor' || permissions?.isAdmin === true || permissions?.viewRHVision === true;
+    const hasAccess = role === 'Desenvolvedor' || permissions?.isAdmin === true || permissions?.viewPeopleVision === true;
     if (!hasAccess) {
       return NextResponse.redirect(new URL('/select-app', request.url));
     }
   }
 
-  if (pathname.startsWith('/qualidade-vision')) {
+  if (pathname.startsWith('/quality-vision')) {
     const hasAccess = role === 'Desenvolvedor' || permissions?.viewQualityVision === true;
     if (!hasAccess) {
       return NextResponse.redirect(new URL('/select-app', request.url));

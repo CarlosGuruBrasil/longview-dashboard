@@ -13,7 +13,7 @@ export interface UserPermissions {
   manageProjects: boolean;
   manageCommentsDocs: boolean;
   deleteTasks: boolean;
-  viewRHVision: boolean;
+  viewPeopleVision: boolean;
   viewQualityVision: boolean;
   isAdmin: boolean;
 }
@@ -49,7 +49,7 @@ const defaultUser: User = {
     manageProjects: false,
     manageCommentsDocs: false,
     deleteTasks: false,
-    viewRHVision: false,
+    viewPeopleVision: false,
     viewQualityVision: false,
     isAdmin: false
   }

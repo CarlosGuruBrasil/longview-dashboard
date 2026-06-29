@@ -18,7 +18,7 @@ interface MonthlyPoint {
   naoAplica: number
 }
 
-interface QualidadeData {
+interface QualityData {
   inspecoesPorTipo: Record<string, number>
   serieMensal: MonthlyPoint[]
   kpis: {
@@ -70,7 +70,7 @@ export default function RelatoriosPage() {
   const currentYear = new Date().getFullYear()
   const [startYear, setStartYear] = useState(currentYear - 1)
   const [endYear,   setEndYear]   = useState(currentYear)
-  const [data,      setData]      = useState<QualidadeData | null>(null)
+  const [data,      setData]      = useState<QualityData | null>(null)
   const [loading,   setLoading]   = useState(true)
   const [error,     setError]     = useState<string | null>(null)
 

@@ -46,7 +46,7 @@ export async function PUT(request: NextRequest) {
     user.name = body.name.trim();
   }
 
-  // ── Atualizar campos de perfil RH ─────────────────────────────────────────
+  // ── Atualizar campos de perfil People Vision ─────────────────────────────────────────
   if (body.profile) {
     user.profile = {
       ...(user.profile ?? {}),

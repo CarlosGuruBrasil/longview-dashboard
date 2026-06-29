@@ -8,6 +8,17 @@ const JWT_SECRET   = process.env.JWT_SECRET || 'secret-longview-key';
 const META_PAGE_ID = '259079394232614';
 // Cache nunca expira no caminho de leitura — cron ou ?refresh=true renovam.
 
+function parseJsonValue<T = any>(value: unknown): T {
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value) as T;
+    } catch {
+      return value as T;
+    }
+  }
+  return value as T;
+}
+
 async function verifyAuth(): Promise<any | null> {
   try {
     const cookieStore = await cookies();
@@ -24,11 +35,11 @@ async function readPgCache(key: string): Promise<any | null> {
     await ensureSchema();
     const rows = await sql`SELECT data FROM project_state WHERE key = ${key} LIMIT 1`;
     if (!rows[0]) return null;
-    return rows[0].data;
+    return parseJsonValue(rows[0].data);
   } catch { return null; }
 }
 
-async function readLeadsFromPg(): Promise<{ leads: any[]; total: number; crmTotal: number } | null> {
+async function readLeadsFromPg(startDate?: string | null, endDate?: string | null): Promise<{ leads: any[]; total: number; crmTotal: number } | null> {
   if (!process.env.DATABASE_URL) return null;
   try {
     const { sql, ensureSchema } = await import('@/lib/pg');
@@ -36,9 +47,38 @@ async function readLeadsFromPg(): Promise<{ leads: any[]; total: number; crmTota
     const [countRow] = await sql<{ count: string }[]>`SELECT COUNT(*) AS count FROM leads`;
     const count = parseInt(countRow?.count ?? '0', 10);
     if (count === 0) return null;
-    const rows = await sql`SELECT raw FROM leads ORDER BY data_cadastro DESC NULLS LAST`;
-    const leads = rows.map((r: any) => typeof r.raw === 'object' ? r.raw : JSON.parse(r.raw));
-    return { leads, total: leads.length, crmTotal: leads.length };
+
+    const endExclusive = endDate
+      ? new Date(`${endDate}T00:00:00-03:00`)
+      : null;
+    if (endExclusive) endExclusive.setDate(endExclusive.getDate() + 1);
+
+    let rows: { raw: unknown }[];
+    if (startDate && endExclusive) {
+      rows = await sql`
+        SELECT raw FROM leads
+        WHERE data_cadastro >= ${startDate}::date
+          AND data_cadastro < ${endExclusive.toISOString()}
+        ORDER BY data_cadastro DESC NULLS LAST
+      `;
+    } else if (startDate) {
+      rows = await sql`
+        SELECT raw FROM leads
+        WHERE data_cadastro >= ${startDate}::date
+        ORDER BY data_cadastro DESC NULLS LAST
+      `;
+    } else if (endExclusive) {
+      rows = await sql`
+        SELECT raw FROM leads
+        WHERE data_cadastro < ${endExclusive.toISOString()}
+        ORDER BY data_cadastro DESC NULLS LAST
+      `;
+    } else {
+      rows = await sql`SELECT raw FROM leads ORDER BY data_cadastro DESC NULLS LAST`;
+    }
+
+    const leads = rows.map((r: any) => parseJsonValue(r.raw));
+    return { leads, total: leads.length, crmTotal: count };
   } catch (e: any) {
     console.warn('[/api/data] Postgres leads falhou:', e.message);
     return null;
@@ -239,6 +279,14 @@ export async function GET(request: NextRequest) {
   const authUser = await verifyAuth();
   if (!authUser) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
 
+  const canAccessMarketing =
+    authUser.role === 'Desenvolvedor' ||
+    authUser.permissions?.viewMarketingDashboard === true;
+
+  if (!canAccessMarketing) {
+    return NextResponse.json({ error: 'Sem permissão para acessar o Marketing Vision.' }, { status: 403 });
+  }
+
   const ip = getClientIp(request);
   const rl = await rateLimit(`data:${ip}`, 30, 60);
   if (!rl.success) {
@@ -254,6 +302,7 @@ export async function GET(request: NextRequest) {
   const forceRefresh = searchParams.get('refresh') === 'true';
   const isFiltered   = !!(startDate || endDate);
   const syncForce    = searchParams.get('sync') === 'true';
+  const validateMeta = searchParams.get('validateMeta') === 'true';
 
   if (syncForce) {
     const canForceSync = authUser.role === 'Desenvolvedor' || authUser.permissions?.isAdmin === true;
@@ -298,7 +347,7 @@ export async function GET(request: NextRequest) {
                 VALUES
                   (${id}, ${nome}, ${email_lead}, ${telefone}, ${origem}, ${status},
                    ${empreend}, ${score}, ${temperatura}, ${dataCad}, ${dataAtual},
-                   ${JSON.stringify(lead)}, NOW())
+                   ${JSON.stringify(lead)}::jsonb, NOW())
                 ON CONFLICT (id) DO UPDATE SET
                   nome             = EXCLUDED.nome,
                   email            = EXCLUDED.email,
@@ -324,15 +373,17 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // ---------- LEADS (sempre do Postgres, webhook mantém atualizado) ----------
-  const pgLeads = await readLeadsFromPg();
+  const [pgLeads, metaCache, pgEstoque] = await Promise.all([
+    readLeadsFromPg(startDate, endDate),
+    readPgCache('meta_cache'),
+    readEstoqueFromPg(),
+  ]);
 
   // ---------- META (SEMPRE do Postgres; API externa só nos crons/webhook) ----------
   // O cron sync-dashboard mantém 'meta_cache' fresco a cada 2h. O carregamento da
   // tela nunca depende da API do Meta — leitura instantânea do nosso banco.
   // O filtro por data é aplicado no cliente sobre os dados em cache (daily etc.).
   let metaData: any = null;
-  const metaCache = await readPgCache('meta_cache');
   if (metaCache?.data) metaData = metaCache.data;
 
   // Live SÓ em dois casos: refresh manual explícito (botão) ou cold-start
@@ -351,12 +402,10 @@ export async function GET(request: NextRequest) {
     metaData = liveMetaResult.value;
     // Persiste no banco (sem await) — próximos loads já vêm do Postgres
     import('@/lib/pg').then(({ sql }) =>
-      sql`INSERT INTO project_state (key, data) VALUES ('meta_cache', ${JSON.stringify({ data: metaData, updatedAt: new Date().toISOString() })})
+      sql`INSERT INTO project_state (key, data) VALUES ('meta_cache', ${JSON.stringify({ data: metaData, updatedAt: new Date().toISOString() })}::jsonb)
           ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data`.catch(() => {})
     );
   }
-
-  const pgEstoque = await readEstoqueFromPg();
 
   const leadsResultRaw = (pgLeads ?? (liveCRMLeads.status === 'fulfilled' ? liveCRMLeads.value : null)) ?? { leads: [], total: 0, crmTotal: 0 };
 
@@ -387,8 +436,8 @@ export async function GET(request: NextRequest) {
   const META_TOKEN = process.env.META_TOKEN;
   const metaAuth = { access_token: META_TOKEN || '' };
   
-  let metaValidation = { orphanedLeads: [] as any[], totalMetaLeads: 0, error: null as string | null };
-  if (META_TOKEN && metaFinal.leadForms && metaFinal.leadForms.length > 0) {
+  let metaValidation: { orphanedLeads: any[]; totalMetaLeads: number; error: string | null } | null = null;
+  if (validateMeta && META_TOKEN && metaFinal.leadForms && metaFinal.leadForms.length > 0) {
     metaValidation = await fetchMetaOrphanedLeads(metaFinal.leadForms, metaAuth, 'v21.0');
   }
 

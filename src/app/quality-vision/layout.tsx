@@ -1,4 +1,4 @@
-import QualidadeSidebar from './components/Sidebar'
+import QualitySidebar from './components/Sidebar'
 import NotificationBanner from '@/components/NotificationBanner'
 import AppHeader from '@/components/app/AppHeader'
 
@@ -7,15 +7,15 @@ export const metadata = {
 }
 
 const TITLE_MAP = {
-  '/qualidade-vision/inspecoes': 'Inspeções',
-  '/qualidade-vision/relatorios': 'Relatórios',
-  '/qualidade-vision': 'Dashboard',
+  '/quality-vision/inspecoes': 'Inspeções',
+  '/quality-vision/relatorios': 'Relatórios',
+  '/quality-vision': 'Dashboard',
 }
 
-export default function QualidadeVisionLayout({ children }: { children: React.ReactNode }) {
+export default function QualityVisionLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="bg-[#09090b] text-zinc-100 antialiased w-full" style={{ minHeight: '100dvh' }}>
-      <QualidadeSidebar />
+      <QualitySidebar />
       <main className="lg:pl-[220px] w-full overflow-x-hidden" style={{
         paddingTop:    'calc(max(env(safe-area-inset-top), 0px) + 52px)',
         paddingBottom: 'calc(max(env(safe-area-inset-bottom), 0px) + 64px)',
@@ -25,7 +25,7 @@ export default function QualidadeVisionLayout({ children }: { children: React.Re
           module="quality"
           titleMap={TITLE_MAP}
           fallbackTitle="Quality Vision"
-          subtitle="Controle de qualidade e inspeções de obra"
+          subtitle="Quality control e inspeções de obra"
           accent="violet"
         />
         {children}

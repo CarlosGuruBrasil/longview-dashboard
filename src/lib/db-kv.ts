@@ -23,7 +23,7 @@ export interface UserEmergencyContact {
   relationship?: string;
 }
 
-/** Campos de perfil RH — armazenados em data JSONB via writeUsers */
+/** Campos de perfil People Vision — armazenados em data JSONB via writeUsers */
 export interface UserProfileData {
   phone?: string;
   whatsapp?: string;
@@ -362,7 +362,7 @@ export async function seedDatabaseIfEmpty(): Promise<void> {
     viewMarketingDashboard: true, viewMarketingLeads: true, viewMarketingOportunidades: true,
     viewMarketingEstoque: true, viewMarketingAds: true, viewMarketingVendas: true,
     viewProjectVision: true, manageProjects: true, manageCommentsDocs: true,
-    deleteTasks: true, viewRHVision: true, viewQualityVision: true, isAdmin: true,
+    deleteTasks: true, viewPeopleVision: true, viewQualityVision: true, isAdmin: true,
   });
 
   await writeUsers([

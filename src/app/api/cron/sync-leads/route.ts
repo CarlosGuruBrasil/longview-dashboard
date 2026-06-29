@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
         const empreend     = lead.empreendimento?.nome || lead.empreendimento || null;
         const score        = lead.score != null ? Number(lead.score) : null;
         const temperatura  = lead.temperatura || lead.temperatura_lead || null;
-        const dataCad      = parseDate(lead.data_cadastro || lead.created_at || lead.createdAt);
+        const dataCad      = parseDate(lead.data_cad || lead.data_cadastro || lead.created_at || lead.createdAt);
         const dataAtual    = parseDate(lead.data_atualizacao || lead.updated_at || lead.updatedAt);
 
         await sql`
@@ -96,7 +96,7 @@ export async function GET(request: NextRequest) {
           VALUES
             (${id}, ${nome}, ${email_lead}, ${telefone}, ${origem}, ${status},
              ${empreend}, ${score}, ${temperatura}, ${dataCad}, ${dataAtual},
-             ${JSON.stringify(lead)}, NOW())
+             ${JSON.stringify(lead)}::jsonb, NOW())
           ON CONFLICT (id) DO UPDATE SET
             nome             = EXCLUDED.nome,
             email            = EXCLUDED.email,

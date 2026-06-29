@@ -25,10 +25,11 @@ const WEATHER_LABELS: Record<number, string> = {
 const RAIN_CODES = new Set([51, 53, 55, 61, 63, 65, 80, 81, 82, 95]);
 
 export default function SelectAppHeaderStatus() {
-  const [now, setNow] = useState(() => new Date());
+  const [now, setNow] = useState<Date | null>(null);
   const [weather, setWeather] = useState<{ temp: number; code: number } | null>(null);
 
   useEffect(() => {
+    setNow(new Date());
     const id = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(id);
   }, []);
@@ -62,6 +63,7 @@ export default function SelectAppHeaderStatus() {
   }, []);
 
   const time = useMemo(() => {
+    if (!now) return '--/--, --:--:--';
     return new Intl.DateTimeFormat('pt-BR', {
       timeZone: 'America/Sao_Paulo',
       day: '2-digit',
@@ -76,7 +78,7 @@ export default function SelectAppHeaderStatus() {
 
   return (
     <div className={`hidden md:flex items-center gap-2 rounded-xl border px-3 py-2 text-xs ${isRain ? 'border-amber-400/30 bg-amber-500/10 text-amber-200' : 'border-white/[0.08] bg-white/[0.055] text-zinc-400'} shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-xl`}>
-      <span className="font-mono text-zinc-200">{time}</span>
+      <span className="font-mono text-zinc-200" suppressHydrationWarning>{time}</span>
       <span className="h-4 w-px bg-white/[0.08]" />
       {isRain ? <CloudRain size={14} className="text-amber-300" /> : <CloudSun size={14} className={weather ? 'text-amber-300' : 'text-zinc-600'} />}
       <span>{weather ? `${weather.temp}°C · ${WEATHER_LABELS[weather.code] ?? 'Tempo'}` : 'Clima'}</span>

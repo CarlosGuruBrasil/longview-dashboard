@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useData } from '../../context/DataContext'
 import GlassCard from '../ui/GlassCard'
 import StageSummary from '../ui/StageSummary'
@@ -12,9 +12,15 @@ import { getOrigin } from '../../utils/leads'
 type SubTab = 'crm' | 'meta-validation' | 'score'
 
 export default function LeadsView() {
-  const { filteredLeads, metaData, metaValidation } = useData()
+  const { filteredLeads, metaData, metaValidation, loading, refresh } = useData()
   const [activeTab, setActiveTab] = useState<SubTab>('crm')
   const [growthMode, setGrowthMode] = useState<'month' | 'year'>('month')
+
+  useEffect(() => {
+    if (activeTab === 'meta-validation' && !metaValidation && !loading) {
+      refresh(false, undefined, { validateMeta: true })
+    }
+  }, [activeTab, loading, metaValidation, refresh])
 
   // Chart: Top 7 Origens (dados reais — campo midia_principal/origem da API)
   const origensData = useMemo(() => {
@@ -120,7 +126,13 @@ export default function LeadsView() {
             </p>
           </GlassCard>
 
-          {metaValidation?.error ? (
+          {loading && !metaValidation ? (
+            <div className="bg-sky-500/10 border border-sky-500/20 text-sky-300 p-4 rounded-xl text-sm">
+              Validando leads do Meta Ads...
+            </div>
+          ) : null}
+
+          {!metaValidation ? null : metaValidation.error ? (
             <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 p-4 rounded-xl text-sm">
               <h4 className="font-semibold mb-1">Atenção na Validação</h4>
               <p>{metaValidation.error}</p>

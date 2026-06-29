@@ -1,18 +1,18 @@
-import RHSidebar from './components/Sidebar';
+import PeopleSidebar from './components/Sidebar';
 import NotificationBanner from '@/components/NotificationBanner';
 import AppHeader from '@/components/app/AppHeader';
 
 const TITLE_MAP = {
-  '/rh-vision/colaboradores': 'Colaboradores',
-  '/rh-vision/cadastro': 'Cadastro',
-  '/rh-vision/notificacoes': 'Notificações',
-  '/rh-vision': 'Dashboard',
+  '/people-vision/colaboradores': 'Colaboradores',
+  '/people-vision/cadastro': 'Cadastro',
+  '/people-vision/notificacoes': 'Notificações',
+  '/people-vision': 'Dashboard',
 };
 
-export default function RHVisionLayout({ children }: { children: React.ReactNode }) {
+export default function PeopleVisionLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="bg-[#09090b] text-zinc-100 antialiased w-full" style={{ minHeight: '100dvh' }}>
-      <RHSidebar />
+      <PeopleSidebar />
       <main className="lg:pl-[220px] w-full overflow-x-hidden" style={{
         paddingTop:    'calc(max(env(safe-area-inset-top), 0px) + 52px)',
         paddingBottom: 'calc(max(env(safe-area-inset-bottom), 0px) + 64px)',

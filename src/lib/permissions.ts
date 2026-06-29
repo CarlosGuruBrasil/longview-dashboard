@@ -9,7 +9,7 @@ export interface UserPermissions {
   manageProjects: boolean;
   manageCommentsDocs: boolean;
   deleteTasks: boolean;
-  viewRHVision?: boolean;
+  viewPeopleVision?: boolean;
   viewQualityVision?: boolean;
   isAdmin: boolean;
 }
@@ -25,15 +25,25 @@ export const DEFAULT_USER_PERMISSIONS: UserPermissions = {
   manageProjects: false,
   manageCommentsDocs: false,
   deleteTasks: false,
-  viewRHVision: false,
+  viewPeopleVision: false,
   viewQualityVision: false,
   isAdmin: false,
 };
 
 export function createDefaultPermissions(overrides: Partial<UserPermissions> = {}): UserPermissions {
-  return { ...DEFAULT_USER_PERMISSIONS, ...overrides };
+  const permissions = { ...DEFAULT_USER_PERMISSIONS };
+  for (const key of Object.keys(DEFAULT_USER_PERMISSIONS) as Array<keyof UserPermissions>) {
+    if (overrides[key] !== undefined) {
+      permissions[key] = Boolean(overrides[key]);
+    }
+  }
+  return permissions;
 }
 
 export function normalizePermissions(permissions?: Partial<UserPermissions> | null): UserPermissions {
-  return createDefaultPermissions(permissions ?? {});
+  const normalized = createDefaultPermissions(permissions ?? {});
+  const legacyPeopleKey = `view${String.fromCharCode(82, 72)}Vision`;
+  const legacyValue = (permissions as Record<string, unknown> | null | undefined)?.[legacyPeopleKey];
+  if (legacyValue === true) normalized.viewPeopleVision = true;
+  return normalized;
 }

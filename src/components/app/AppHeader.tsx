@@ -188,7 +188,7 @@ export default function AppHeader({
       <div className="min-w-0">
         <h1 className="text-base font-semibold text-zinc-100 truncate">{title}</h1>
         <Link
-          href="/rh-vision/colaboradores/me"
+          href="/people-vision/colaboradores/me"
           className="mt-0.5 inline-flex max-w-[260px] items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-200 transition-colors"
           title="Abrir configurações do usuário"
         >

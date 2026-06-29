@@ -7,6 +7,19 @@ import { sql, ensureSchema } from './pg';
 
 let tableReady = false;
 
+async function optionalKvSchemaStep(label: string, step: () => Promise<unknown>): Promise<void> {
+  try {
+    await step();
+  } catch (error) {
+    const pgError = error as { code?: string; message?: string };
+    if (pgError.code === '42501') {
+      console.warn(`[kv] optional schema step skipped (${label}): ${pgError.message}`);
+      return;
+    }
+    throw error;
+  }
+}
+
 async function ensureTable() {
   if (tableReady) return;
   await ensureSchema(); // garante que o schema base existe
@@ -17,7 +30,7 @@ async function ensureTable() {
       expires_at TIMESTAMPTZ
     )
   `;
-  await sql`CREATE INDEX IF NOT EXISTS kv_store_expires ON kv_store (expires_at) WHERE expires_at IS NOT NULL`;
+  await optionalKvSchemaStep('kv_store_expires index', () => sql`CREATE INDEX IF NOT EXISTS kv_store_expires ON kv_store (expires_at) WHERE expires_at IS NOT NULL`);
   tableReady = true;
 }
 
@@ -34,7 +47,15 @@ export const kv = {
         await sql`DELETE FROM kv_store WHERE key = ${key}`.catch(() => { });
         return null;
       }
-      return rows[0].value as T;
+      const value = rows[0].value;
+      if (typeof value === 'string') {
+        try {
+          return JSON.parse(value) as T;
+        } catch {
+          return value as T;
+        }
+      }
+      return value as T;
     } catch (e) {
       console.error('[kv] get error:', e);
       return null;
@@ -57,12 +78,12 @@ export const kv = {
       const jsonValue = JSON.stringify(value);
       if (expiresAt) {
         await sql`
-          INSERT INTO kv_store (key, value, expires_at) VALUES (${key}, ${jsonValue}, ${expiresAt})
+          INSERT INTO kv_store (key, value, expires_at) VALUES (${key}, ${jsonValue}::jsonb, ${expiresAt})
           ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, expires_at = EXCLUDED.expires_at
         `;
       } else {
         await sql`
-          INSERT INTO kv_store (key, value, expires_at) VALUES (${key}, ${jsonValue}, NULL)
+          INSERT INTO kv_store (key, value, expires_at) VALUES (${key}, ${jsonValue}::jsonb, NULL)
           ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, expires_at = NULL
         `;
       }
@@ -123,7 +144,7 @@ export const kv = {
           // Expirado - reinicia para 1
           await sql`
             UPDATE kv_store
-            SET value = ${JSON.stringify(1)}, expires_at = NULL
+            SET value = ${JSON.stringify(1)}::jsonb, expires_at = NULL
             WHERE key = ${key}
           `;
           return 1;
@@ -133,7 +154,7 @@ export const kv = {
           const newVal = currentVal + 1;
           await sql`
             UPDATE kv_store
-            SET value = ${JSON.stringify(newVal)}
+            SET value = ${JSON.stringify(newVal)}::jsonb
             WHERE key = ${key}
           `;
           return newVal;
@@ -142,8 +163,8 @@ export const kv = {
         // Não existe
         await sql`
           INSERT INTO kv_store (key, value, expires_at)
-          VALUES (${key}, ${JSON.stringify(1)}, NULL)
-          ON CONFLICT (key) DO UPDATE SET value = ${JSON.stringify(1)}, expires_at = NULL
+          VALUES (${key}, ${JSON.stringify(1)}::jsonb, NULL)
+          ON CONFLICT (key) DO UPDATE SET value = ${JSON.stringify(1)}::jsonb, expires_at = NULL
         `;
         return 1;
       }

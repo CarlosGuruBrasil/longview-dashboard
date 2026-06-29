@@ -22,7 +22,7 @@ interface SelectAppJwtPayload {
   permissions?: {
     viewProjectVision?: boolean;
     viewMarketingDashboard?: boolean;
-    viewRHVision?: boolean;
+    viewPeopleVision?: boolean;
     viewQualityVision?: boolean;
     isAdmin?: boolean;
   };
@@ -49,7 +49,7 @@ export default async function SelectAppPage() {
   const isDeveloper = role === 'Desenvolvedor';
   const hasProjectAccess   = isDeveloper || permissions?.viewProjectVision === true;
   const hasMarketingAccess = isDeveloper || permissions?.viewMarketingDashboard === true;
-  const hasRHAccess        = isDeveloper || permissions?.viewRHVision === true;
+  const hasPeopleAccess        = isDeveloper || permissions?.viewPeopleVision === true;
   const hasQualityAccess   = isDeveloper || permissions?.viewQualityVision === true;
 
   return (
@@ -62,21 +62,23 @@ export default async function SelectAppPage() {
       <div className="absolute bottom-[-30%] right-[-20%] w-[800px] h-[800px] rounded-full bg-blue-500/5 blur-[160px] pointer-events-none" />
 
       {/* Header */}
-      <header className="grid grid-cols-3 items-center max-w-7xl w-full mx-auto relative z-10">
-        <div className="relative w-36 h-10 flex items-center">
+      <header className="h-16 w-full relative z-10 shrink-0">
+        <div className="hidden md:block absolute left-0 top-1/2 -translate-y-1/2">
+          <SelectAppHeaderStatus />
+        </div>
+
+        <div className="absolute left-1/2 top-1/2 h-[54px] w-[194px] -translate-x-1/2 -translate-y-1/2">
           <Image
             src="/logolongview.png"
             alt="LongView"
             fill
-            className="object-contain object-left"
+            className="object-contain"
+            priority
+            sizes="194px"
           />
         </div>
 
-        <div className="flex justify-center">
-          <SelectAppHeaderStatus />
-        </div>
-
-        <div className="flex items-center justify-end gap-4">
+        <div className="absolute right-0 top-1/2 -translate-y-1/2">
           <a
             href="/api/auth/logout"
             className="flex items-center gap-1.5 text-xs font-bold text-red-400 hover:text-red-300 bg-red-500/10 border border-red-500/20 hover:border-red-400/30 rounded-xl px-4 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-xl transition-all duration-200"
@@ -88,21 +90,23 @@ export default async function SelectAppPage() {
       </header>
 
       {/* Corpo Central */}
-      <div className="flex-1 flex flex-col items-center justify-center max-w-5xl w-full mx-auto relative z-10 my-8">
-        <div className="text-center mb-10 max-w-lg">
-          <span className="text-[11px] uppercase font-bold tracking-wider px-2.5 py-1 rounded bg-white/5 border border-white/10 text-zinc-400">
+      <div className="flex-1 flex flex-col items-center justify-center max-w-[1400px] w-full mx-auto relative z-10 my-8">
+        <div className="text-center mb-10 max-w-4xl -mt-10 flex flex-col items-center">
+          <div className="flex min-h-[104px] -translate-y-14 flex-col items-center justify-center">
+            <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+              Olá, {name}
+            </h2>
+            <p className="text-sm text-zinc-400 mt-1.5 lg:whitespace-nowrap">
+              Selecione qual aplicativo deseja acessar no momento de acordo com suas liberações:
+            </p>
+          </div>
+          <span className="inline-flex mt-8 text-[11px] uppercase font-bold tracking-wider px-2.5 py-1 rounded bg-white/5 border border-white/10 text-zinc-400">
             Ambiente Integrado
           </span>
-          <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight mt-3">
-            Olá, {name}
-          </h2>
-          <p className="text-sm text-zinc-400 mt-1.5">
-            Selecione qual aplicativo deseja acessar no momento de acordo com suas liberações:
-          </p>
         </div>
 
         {/* Grid dos Cards de Aplicativos */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full max-w-[1100px]">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 w-full max-w-[1400px] justify-center">
           
           {/* Card: Project Vision */}
           <div className={`
@@ -185,7 +189,7 @@ export default async function SelectAppPage() {
           {/* Card: People Vision */}
           <div className={`
             bg-white/[0.035] border border-emerald-400/15 rounded-2xl p-6.5 flex flex-col justify-between min-h-[260px] relative transition-all duration-300 group shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur-2xl
-            ${hasRHAccess
+            ${hasPeopleAccess
               ? 'hover:border-emerald-300/30 hover:bg-emerald-500/[0.045]'
               : 'opacity-50'
             }
@@ -204,9 +208,9 @@ export default async function SelectAppPage() {
             </div>
 
             <div className="mt-6 flex items-center justify-between">
-              {hasRHAccess ? (
+              {hasPeopleAccess ? (
                 <Link
-                  href="/rh-vision"
+                  href="/people-vision"
                   className="flex items-center gap-1.5 text-xs font-bold bg-emerald-500/90 hover:bg-emerald-400 text-white px-4.5 py-2.5 rounded-xl transition-all duration-200 cursor-pointer shadow-[0_12px_28px_rgba(16,185,129,0.18)]"
                 >
                   <span>Entrar no App</span>
@@ -236,7 +240,7 @@ export default async function SelectAppPage() {
               <h3 className="text-lg font-bold text-white group-hover:text-violet-300 transition-colors">
                 Quality Vision
               </h3>
-              <p className="text-[11px] text-violet-300/80 font-bold uppercase tracking-wider mt-1">Qualidade & Obras</p>
+              <p className="text-[11px] text-violet-300/80 font-bold uppercase tracking-wider mt-1">Quality & Obras</p>
               <p className="text-xs leading-relaxed text-zinc-400 mt-2">
                 Painel de inspeções e verificações integrado ao Construpoint. Acompanhe fichas FVS, FVM, CHK, SEG, MA e EDU com série histórica, taxas de aprovação e relatórios por obra.
               </p>
@@ -245,7 +249,7 @@ export default async function SelectAppPage() {
             <div className="mt-6 flex items-center justify-between">
               {hasQualityAccess ? (
                 <Link
-                  href="/qualidade-vision"
+                  href="/quality-vision"
                   className="flex items-center gap-1.5 text-xs font-bold bg-violet-500/90 hover:bg-violet-400 text-white px-4.5 py-2.5 rounded-xl transition-all duration-200 cursor-pointer shadow-[0_12px_28px_rgba(139,92,246,0.18)]"
                 >
                   <span>Entrar no App</span>
@@ -265,8 +269,8 @@ export default async function SelectAppPage() {
 
       {/* Footer */}
       <footer className="text-center relative z-10">
-        <p className="text-[11px] text-zinc-600 tracking-wider uppercase font-semibold">
-          LongView Empreendimentos • Hauzi Tecnologia
+        <p className="text-[11px] text-zinc-600 tracking-wider uppercase font-semibold lg:whitespace-nowrap">
+          LongView Empreendimentos • Hauzi Tecnologia • Desenvolvido por Carlos Guru em 06/2026 V.1.
         </p>
       </footer>
     </main>

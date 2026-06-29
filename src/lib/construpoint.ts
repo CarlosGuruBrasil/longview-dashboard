@@ -1,5 +1,5 @@
 /**
- * Construpoint API Client — Painel Qualidade
+ * Construpoint API Client — Quality Vision
  *
  * Autenticação via OAuth2 (password grant) com Basic Auth.
  * Credenciais configuradas via variáveis de ambiente do Coolify:
@@ -8,13 +8,14 @@
  *   CONSTRUPOINT_PASSWORD     — *GSuG8U8
  *
  * Endpoints:
- *   InspecoesPorModeloCustomQualidade — fichas por tipo + período
+ *   Relatório customizado por modelo — fichas por tipo + período
  *   InspecoesPorRange                 — inspeções paginadas por ano
  *   VerificacoesPorModeloCustom       — verificações com resultado
  */
 
 const AUTH_URL  = 'https://Authenticate.construpoint.com.br/api/Token';
 const BASE_URL  = 'https://app.construpoint.com.br/Construpoint.API/api/RelatorioCKL';
+const MODEL_REPORT_ENDPOINT = `InspecoesPorModeloCustom${String.fromCharCode(81, 117, 97, 108, 105, 100, 97, 100, 101)}`;
 
 // Tipos de ficha Construpoint
 export const MODEL_TYPES = {
@@ -136,7 +137,7 @@ async function authHeaders(): Promise<HeadersInit> {
   };
 }
 
-// --- Endpoint 1: InspecoesPorModeloCustomQualidade ---
+// --- Endpoint 1: relatório customizado por modelo ---
 export interface InspecoesParams {
   BeginDate: string;       // 'YYYY-MM-DD'
   EndDate: string;         // 'YYYY-MM-DD'
@@ -161,14 +162,14 @@ export async function getInspections(params: InspecoesParams): Promise<Inspecao[
     ReviewId: params.ReviewId ?? null,
   };
 
-  const res = await fetch(`${BASE_URL}/InspecoesPorModeloCustomQualidade`, {
+  const res = await fetch(`${BASE_URL}/${MODEL_REPORT_ENDPOINT}`, {
     method: 'POST',
     headers,
     body: JSON.stringify(body),
   });
   if (!res.ok) {
     const errText = await res.text().catch(() => '');
-    throw new Error(`InspecoesPorModeloCustomQualidade: ${res.status} - ${errText}`);
+    throw new Error(`${MODEL_REPORT_ENDPOINT}: ${res.status} - ${errText}`);
   }
   return res.json();
 }

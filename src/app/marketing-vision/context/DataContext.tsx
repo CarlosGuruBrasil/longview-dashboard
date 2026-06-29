@@ -28,7 +28,7 @@ interface DataContextValue {
   setActiveView: (view: ActiveView) => void;
 
   // refresh
-  refresh: (force?: boolean, rangeOverride?: DateRange) => Promise<void>;
+  refresh: (force?: boolean, rangeOverride?: DateRange, options?: { validateMeta?: boolean }) => Promise<void>;
 }
 
 const DataContext = createContext<DataContextValue | null>(null);
@@ -73,7 +73,7 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
   const [metaValidation, setMetaValidation] = useState<{ orphanedLeads: any[]; totalMetaLeads: number; error: string | null } | null>(initialData?.metaValidation ?? null);
   const [crmTotal, setCrmTotal] = useState(initialData?.crmTotal ?? 0);
   const [updatedAt, setUpdatedAt] = useState(initialData?.updatedAt ?? '');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(!initialData);
   const [dateRange, setDateRange] = useState<DateRange>(monthToDate());
   const [activeView, setActiveView] = useState<ActiveView>('dashboard');
 
@@ -100,7 +100,7 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const refresh = useCallback(async (force = false, rangeOverride?: DateRange) => {
+  const refresh = useCallback(async (force = false, rangeOverride?: DateRange, options?: { validateMeta?: boolean }) => {
     setLoading(true);
     try {
       const r = rangeOverride ?? dateRange;
@@ -108,6 +108,7 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
       if (force) params.set('refresh', 'true');
       if (r.start) params.set('start', r.start);
       if (r.end) params.set('end', r.end);
+      if (options?.validateMeta) params.set('validateMeta', 'true');
       const qs = params.toString();
       const url = `/api/data${qs ? '?' + qs : ''}`;
       const res = await fetch(url);
