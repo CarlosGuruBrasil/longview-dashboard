@@ -81,21 +81,41 @@ export default function ProjectsPage() {
   const handleProjectBannerUpdate = async (projId: string, file: File) => {
     setUploadingBanner(projId);
     try {
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64 = reader.result as string;
-        const res = await fetch('/api/projects', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: projId, banner: base64 })
-        });
-        if (res.ok) {
-          setProjects(prev => prev.map(p => p.id === projId ? { ...p, banner: base64 } : p));
-        }
-        setUploadingBanner(null);
-      };
-      reader.readAsDataURL(file);
-    } catch {
+      // Redimensiona para max 1200px e comprime antes de enviar (evita payload >4MB)
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('Erro ao ler arquivo'));
+        reader.onloadend = () => {
+          const img = new window.Image();
+          img.onerror = () => reject(new Error('Imagem inválida'));
+          img.onload = () => {
+            const MAX = 1200;
+            const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+            const canvas = document.createElement('canvas');
+            canvas.width  = Math.round(img.width  * scale);
+            canvas.height = Math.round(img.height * scale);
+            canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL('image/jpeg', 0.82));
+          };
+          img.src = reader.result as string;
+        };
+        reader.readAsDataURL(file);
+      });
+
+      const res = await fetch('/api/projects', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: projId, banner: base64 }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? `Erro ${res.status}`);
+      }
+      setProjects(prev => prev.map(p => p.id === projId ? { ...p, banner: base64 } : p));
+    } catch (err: unknown) {
+      alert(`Não foi possível atualizar a foto: ${err instanceof Error ? err.message : 'Erro desconhecido'}`);
+    } finally {
       setUploadingBanner(null);
     }
   };
