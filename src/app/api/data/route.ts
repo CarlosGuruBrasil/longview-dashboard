@@ -75,7 +75,7 @@ async function readLeadsFromPg(startDate?: string | null, endDate?: string | nul
       rows = await sql`SELECT raw FROM leads ORDER BY data_cadastro DESC NULLS LAST`;
     }
 
-    const leads = rows.map((r: unknown) => parseJsonValue(r as Record<string, unknown>));
+    const leads = rows.map((r: { raw: unknown }) => parseJsonValue(r.raw));
     return { leads, total: leads.length, crmTotal: count };
   } catch (e: unknown) {
     console.warn('[/api/data] Postgres leads falhou:', e instanceof Error ? e.message : e);
