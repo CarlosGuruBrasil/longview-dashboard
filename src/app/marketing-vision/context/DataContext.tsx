@@ -13,7 +13,8 @@ interface DataContextValue {
   crmTotal: number;
   updatedAt: string;
   loading: boolean;
-  metaValidation: { orphanedLeads: any[]; totalMetaLeads: number; error: string | null } | null;
+  dataError: string | null;
+  metaValidation: { orphanedLeads: unknown[]; totalMetaLeads: number; error: string | null } | null;
 
   // filtered
   filteredLeads: Lead[];
@@ -70,10 +71,11 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
   const [estoque, setEstoque] = useState<EstoqueData>(initialData?.estoque ?? { empreendimentos: [], resumo: [], unidades: [] });
   const [leadForms, setLeadForms] = useState<MetaLeadForm[]>(initialData?.leadForms ?? []);
   const [metaPage, setMetaPage] = useState<MetaPageInfo | null>(initialData?.page ?? null);
-  const [metaValidation, setMetaValidation] = useState<{ orphanedLeads: any[]; totalMetaLeads: number; error: string | null } | null>(initialData?.metaValidation ?? null);
+  const [metaValidation, setMetaValidation] = useState<{ orphanedLeads: unknown[]; totalMetaLeads: number; error: string | null } | null>(initialData?.metaValidation ?? null);
   const [crmTotal, setCrmTotal] = useState(initialData?.crmTotal ?? 0);
   const [updatedAt, setUpdatedAt] = useState(initialData?.updatedAt ?? '');
   const [loading, setLoading] = useState(!initialData);
+  const [dataError, setDataError] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<DateRange>(monthToDate());
   const [activeView, setActiveView] = useState<ActiveView>('dashboard');
 
@@ -123,8 +125,11 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
       setMetaPage(data.page ?? null);
       setMetaValidation(data.metaValidation ?? null);
       setUpdatedAt(data.updatedAt ?? new Date().toISOString());
+      setDataError(null);
     } catch (e) {
-      console.error('[DataContext] refresh error:', e);
+      const msg = e instanceof Error ? e.message : 'Erro ao carregar dados';
+      console.error('[DataContext] refresh error:', msg);
+      setDataError(msg);
     } finally {
       setLoading(false);
     }
@@ -133,7 +138,7 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
   return (
     <DataContext.Provider value={{
       allLeads, metaData, estoque, leadForms, metaPage,
-      crmTotal, updatedAt, loading, metaValidation,
+      crmTotal, updatedAt, loading, dataError, metaValidation,
       filteredLeads,
       dateRange, setDateRange, clearFilters,
       activeView, setActiveView,

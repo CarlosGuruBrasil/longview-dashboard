@@ -237,6 +237,17 @@ export async function ensureSchema(): Promise<void> {
       )
     `;
 
+    await sql`
+      CREATE TABLE IF NOT EXISTS webhook_errors (
+        id         BIGSERIAL PRIMARY KEY,
+        source     TEXT NOT NULL,
+        payload    JSONB NOT NULL DEFAULT '{}',
+        error      TEXT,
+        resolved   BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `;
+
     // Tabela dedicada de tarefas — substitui o JSONB monolítico
     await sql`
       CREATE TABLE IF NOT EXISTS tasks (

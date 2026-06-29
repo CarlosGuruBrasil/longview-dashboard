@@ -167,8 +167,18 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ ok: true });
 
-  } catch (e: any) {
-    console.error('[webhook/cvcrm]', e.message);
-    return NextResponse.json({ ok: false, error: e.message }, { status: 500 });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error('[webhook/cvcrm]', msg);
+    // Grava falha para retry manual — não retorna 500 para o CV não parar de reenviar
+    try {
+      const { sql } = await import('@/lib/pg');
+      await sql`
+        INSERT INTO webhook_errors (source, payload, error, created_at)
+        VALUES ('cvcrm', ${JSON.stringify({})}::jsonb, ${msg}, NOW())
+        ON CONFLICT DO NOTHING
+      `.catch(() => {}); // ignora se tabela não existe ainda
+    } catch { /* não bloqueia resposta */ }
+    return NextResponse.json({ ok: true, warning: 'processed with errors' });
   }
 }

@@ -121,7 +121,7 @@ function MarketingHeaderMetrics() {
 }
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
-  const { activeView, setActiveView, refresh } = useData();
+  const { activeView, setActiveView, refresh, dataError, loading } = useData();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const user = useCurrentUser();
 
@@ -134,6 +134,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex bg-[#09090b] overflow-hidden" style={{ height: '100dvh' }}>
+
+      {/* Banner de erro de carregamento */}
+      {dataError && !loading && (
+        <div className="fixed top-0 inset-x-0 z-[100] bg-red-900/90 border-b border-red-700/50 px-4 py-2 flex items-center justify-between text-xs text-red-100 backdrop-blur-sm">
+          <span>⚠️ Erro ao carregar dados: {dataError}</span>
+          <button onClick={() => refresh(true)} className="ml-3 px-2 py-0.5 rounded bg-red-700/60 hover:bg-red-600/60 text-white text-[11px] font-semibold">
+            Tentar novamente
+          </button>
+        </div>
+      )}
+
       {/* ── Desktop sidebar (unchanged) ─────────────────────── */}
       <div className="hidden lg:block">
         <Sidebar />

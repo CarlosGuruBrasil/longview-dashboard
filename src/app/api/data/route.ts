@@ -48,17 +48,15 @@ async function readLeadsFromPg(startDate?: string | null, endDate?: string | nul
     const count = parseInt(countRow?.count ?? '0', 10);
     if (count === 0) return null;
 
-    const endExclusive = endDate
-      ? new Date(`${endDate}T00:00:00-03:00`)
-      : null;
-    if (endExclusive) endExclusive.setDate(endExclusive.getDate() + 1);
-
+    // ponytail: comparação puramente em SQL — sem manipulação de Date em JS.
+    // Evita bugs de timezone/DST (o hardcoded -03:00 quebrava em março/outubro).
+    // endDate inclui o próprio dia: data_cadastro < endDate::date + 1 dia.
     let rows: { raw: unknown }[];
-    if (startDate && endExclusive) {
+    if (startDate && endDate) {
       rows = await sql`
         SELECT raw FROM leads
         WHERE data_cadastro >= ${startDate}::date
-          AND data_cadastro < ${endExclusive.toISOString()}
+          AND data_cadastro <  (${endDate}::date + INTERVAL '1 day')
         ORDER BY data_cadastro DESC NULLS LAST
       `;
     } else if (startDate) {
@@ -67,20 +65,20 @@ async function readLeadsFromPg(startDate?: string | null, endDate?: string | nul
         WHERE data_cadastro >= ${startDate}::date
         ORDER BY data_cadastro DESC NULLS LAST
       `;
-    } else if (endExclusive) {
+    } else if (endDate) {
       rows = await sql`
         SELECT raw FROM leads
-        WHERE data_cadastro < ${endExclusive.toISOString()}
+        WHERE data_cadastro < (${endDate}::date + INTERVAL '1 day')
         ORDER BY data_cadastro DESC NULLS LAST
       `;
     } else {
       rows = await sql`SELECT raw FROM leads ORDER BY data_cadastro DESC NULLS LAST`;
     }
 
-    const leads = rows.map((r: any) => parseJsonValue(r.raw));
+    const leads = rows.map((r: unknown) => parseJsonValue(r as Record<string, unknown>));
     return { leads, total: leads.length, crmTotal: count };
-  } catch (e: any) {
-    console.warn('[/api/data] Postgres leads falhou:', e.message);
+  } catch (e: unknown) {
+    console.warn('[/api/data] Postgres leads falhou:', e instanceof Error ? e.message : e);
     return null;
   }
 }
@@ -183,96 +181,76 @@ async function fetchMetaOrphanedLeads(
   leadForms: any[],
   metaAuth: { access_token: string },
   META_API_VERSION: string
-): Promise<{ orphanedLeads: any[]; totalMetaLeads: number; error: string | null }> {
-  if (!leadForms || leadForms.length === 0) {
-    return { orphanedLeads: [], totalMetaLeads: 0, error: null };
-  }
+): Promise<{ orphanedLeads: unknown[]; totalMetaLeads: number; error: string | null }> {
+  if (!leadForms || leadForms.length === 0) return { orphanedLeads: [], totalMetaLeads: 0, error: null };
 
-  const activeForms = leadForms.filter((f: any) => f.status === 'ACTIVE' && (f.leads_count ?? 0) > 0);
-  if (activeForms.length === 0) {
-    return { orphanedLeads: [], totalMetaLeads: 0, error: null };
-  }
+  const activeForms = (leadForms as { id: string; name: string; status: string; leads_count?: number }[])
+    .filter(f => f.status === 'ACTIVE' && (f.leads_count ?? 0) > 0);
+  if (activeForms.length === 0) return { orphanedLeads: [], totalMetaLeads: 0, error: null };
 
-  try {
-    console.log(`[meta-validation] Buscando leads de ${activeForms.length} formulários ativos no Meta Ads...`);
-    const results = await Promise.allSettled(
-      activeForms.map((f: any) =>
-        axios.get(`https://graph.facebook.com/${META_API_VERSION}/${f.id}/leads`, {
-          params: { fields: 'id,created_time,field_data', limit: 200, ...metaAuth },
-          timeout: 15000
-        }).then(r => ({ formName: f.name, leads: r.data?.data || [] }))
-      )
-    );
+  // ponytail: timeout de 25s — evita travar o worker (antes poderia chegar a 150s)
+  const TIMEOUT_MS = 25_000;
+  const deadline   = new Promise<{ orphanedLeads: unknown[]; totalMetaLeads: number; error: string | null }>(
+    resolve => setTimeout(() => resolve({ orphanedLeads: [], totalMetaLeads: 0, error: 'Timeout — resultado parcial' }), TIMEOUT_MS)
+  );
 
-    const metaLeads: any[] = [];
-    results.forEach((res: any) => {
-      if (res.status === 'fulfilled') {
+  const work = async () => {
+    try {
+      console.log(`[meta-validation] ${activeForms.length} formulários ativos`);
+      const results = await Promise.allSettled(
+        activeForms.map(f =>
+          axios.get(`https://graph.facebook.com/${META_API_VERSION}/${f.id}/leads`, {
+            params: { fields: 'id,created_time,field_data', limit: 200, ...metaAuth },
+            timeout: 10000,
+          }).then(r => ({ formName: f.name, leads: (r.data?.data ?? []) as { id: string; created_time: string; field_data: { name: string; values: string[] }[] }[] }))
+        )
+      );
+
+      const metaLeads: { id: string; createdTime: string; formName: string; name: string; email: string; phone: string }[] = [];
+      for (const res of results) {
+        if (res.status !== 'fulfilled') continue;
         const { formName, leads } = res.value;
-        leads.forEach((lead: any) => {
-          let email = '';
-          let phone = '';
-          let name = '';
-          if (Array.isArray(lead.field_data)) {
-            lead.field_data.forEach((fd: any) => {
-              const fieldName = (fd.name || '').toLowerCase();
-              const val = fd.values?.[0] || '';
-              if (fieldName.includes('email')) {
-                email = val;
-              } else if (fieldName.includes('phone') || fieldName.includes('tel') || fieldName.includes('cel')) {
-                phone = val;
-              } else if (fieldName.includes('name') || fieldName.includes('nome')) {
-                name = val;
-              }
-            });
+        for (const lead of leads) {
+          let email = '', phone = '', name = '';
+          for (const fd of lead.field_data ?? []) {
+            const key = (fd.name ?? '').toLowerCase();
+            const val = fd.values?.[0] ?? '';
+            if (key.includes('email'))                                             email = val;
+            else if (key.includes('phone') || key.includes('tel') || key.includes('cel')) phone = val;
+            else if (key.includes('name') || key.includes('nome'))                 name  = val;
           }
-          metaLeads.push({
-            id: lead.id,
-            createdTime: lead.created_time,
-            formName,
-            name,
-            email,
-            phone
-          });
-        });
-      }
-    });
-
-    if (metaLeads.length === 0) {
-      return { orphanedLeads: [], totalMetaLeads: 0, error: null };
-    }
-
-    if (!process.env.DATABASE_URL) {
-      return { orphanedLeads: [], totalMetaLeads: metaLeads.length, error: 'DATABASE_URL não configurada no backend' };
-    }
-
-    const { sql } = await import('@/lib/pg');
-    const dbLeads = await sql`SELECT email, telefone FROM leads`;
-    const dbEmails = new Set(dbLeads.map(l => l.email?.toLowerCase().trim()).filter(Boolean));
-    const dbPhones = new Set(dbLeads.map(l => l.telefone?.replace(/\D/g, '') || '').filter(Boolean));
-
-    const orphanedLeads = metaLeads.filter(ml => {
-      const mEmail = ml.email?.toLowerCase().trim();
-      const mPhone = ml.phone?.replace(/\D/g, '') || '';
-      const hasEmail = mEmail && dbEmails.has(mEmail);
-      let hasPhone = false;
-      if (mPhone) {
-        if (dbPhones.has(mPhone)) {
-          hasPhone = true;
-        } else {
-          const phoneNoDdi = mPhone.replace(/^55/, '');
-          if (dbPhones.has(phoneNoDdi) || dbPhones.has('55' + mPhone)) {
-            hasPhone = true;
-          }
+          metaLeads.push({ id: lead.id, createdTime: lead.created_time, formName, name, email, phone });
         }
       }
-      return !hasEmail && !hasPhone;
-    });
 
-    return { orphanedLeads, totalMetaLeads: metaLeads.length, error: null };
-  } catch (err: any) {
-    console.error('[meta-validation] Erro ao validar leads do Meta:', err.message);
-    return { orphanedLeads: [], totalMetaLeads: 0, error: `Erro na API do Meta: ${err.message}` };
-  }
+      if (!metaLeads.length) return { orphanedLeads: [], totalMetaLeads: 0, error: null };
+      if (!process.env.DATABASE_URL) return { orphanedLeads: [], totalMetaLeads: metaLeads.length, error: 'DATABASE_URL não configurada' };
+
+      const { sql } = await import('@/lib/pg');
+      const dbLeads = await sql<{ email: string | null; telefone: string | null }[]>`SELECT email, telefone FROM leads`;
+      const dbEmails = new Set(dbLeads.map(l => l.email?.toLowerCase().trim()).filter(Boolean));
+      const dbPhones = new Set(dbLeads.map(l => l.telefone?.replace(/\D/g, '') ?? '').filter(Boolean));
+
+      const orphanedLeads = metaLeads.filter(ml => {
+        const mEmail = ml.email?.toLowerCase().trim();
+        const mPhone = ml.phone?.replace(/\D/g, '') ?? '';
+        if (mEmail && dbEmails.has(mEmail)) return false;
+        if (mPhone) {
+          const stripped = mPhone.replace(/^55/, '');
+          if (dbPhones.has(mPhone) || dbPhones.has(stripped) || dbPhones.has('55' + mPhone)) return false;
+        }
+        return true;
+      });
+
+      return { orphanedLeads, totalMetaLeads: metaLeads.length, error: null };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[meta-validation] erro:', msg);
+      return { orphanedLeads: [], totalMetaLeads: 0, error: `Erro na API do Meta: ${msg}` };
+    }
+  };
+
+  return Promise.race([work(), deadline]);
 }
 
 export async function GET(request: NextRequest) {
@@ -380,15 +358,19 @@ export async function GET(request: NextRequest) {
   ]);
 
   // ---------- META (SEMPRE do Postgres; API externa só nos crons/webhook) ----------
-  // O cron sync-dashboard mantém 'meta_cache' fresco a cada 2h. O carregamento da
-  // tela nunca depende da API do Meta — leitura instantânea do nosso banco.
-  // O filtro por data é aplicado no cliente sobre os dados em cache (daily etc.).
-  let metaData: any = null;
-  if (metaCache?.data) metaData = metaCache.data;
+  type MetaDataShape = { leadForms?: unknown[]; page?: unknown; [k: string]: unknown };
+  let metaData: MetaDataShape | null = null;
+  if (metaCache?.data) metaData = metaCache.data as MetaDataShape;
 
-  // Live SÓ em dois casos: refresh manual explícito (botão) ou cold-start
-  // (cache ainda não criado pelo cron) — auto-cura e segue servindo do banco.
-  const needMetaLive = forceRefresh || !metaData;
+  // Cache stale: força live se o cron parou (TTL = 3h).
+  // Evita que dados desatualizados fiquem no ar indefinidamente sem aviso.
+  const cacheAgeMin = metaCache?.updatedAt
+    ? (Date.now() - new Date(metaCache.updatedAt as string).getTime()) / 60_000
+    : Infinity;
+  const cacheStale  = cacheAgeMin > 180;
+
+  const needMetaLive = forceRefresh || !metaData || cacheStale;
+  if (cacheStale && metaData) console.warn(`[/api/data] meta_cache stale (${Math.round(cacheAgeMin)}min) — buscando ao vivo`);
 
   const CV_EMAIL = process.env.CV_CRM_EMAIL!;
   const CV_TOKEN = process.env.CV_CRM_TOKEN!;
@@ -399,7 +381,7 @@ export async function GET(request: NextRequest) {
   ]);
 
   if (needMetaLive && liveMetaResult.status === 'fulfilled' && liveMetaResult.value) {
-    metaData = liveMetaResult.value;
+    metaData = liveMetaResult.value as MetaDataShape;
     // Persiste no banco (sem await) — próximos loads já vêm do Postgres
     import('@/lib/pg').then(({ sql }) =>
       sql`INSERT INTO project_state (key, data) VALUES ('meta_cache', ${JSON.stringify({ data: metaData, updatedAt: new Date().toISOString() })}::jsonb)
@@ -436,9 +418,10 @@ export async function GET(request: NextRequest) {
   const META_TOKEN = process.env.META_TOKEN;
   const metaAuth = { access_token: META_TOKEN || '' };
   
-  let metaValidation: { orphanedLeads: any[]; totalMetaLeads: number; error: string | null } | null = null;
-  if (validateMeta && META_TOKEN && metaFinal.leadForms && metaFinal.leadForms.length > 0) {
-    metaValidation = await fetchMetaOrphanedLeads(metaFinal.leadForms, metaAuth, 'v21.0');
+  let metaValidation: { orphanedLeads: unknown[]; totalMetaLeads: number; error: string | null } | null = null;
+  const leadForms = Array.isArray(metaFinal.leadForms) ? metaFinal.leadForms : [];
+  if (validateMeta && META_TOKEN && leadForms.length > 0) {
+    metaValidation = await fetchMetaOrphanedLeads(leadForms, metaAuth, 'v21.0');
   }
 
   return NextResponse.json({
