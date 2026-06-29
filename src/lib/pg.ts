@@ -183,6 +183,30 @@ export async function ensureSchema(): Promise<void> {
     `;
 
     await sql`
+      CREATE TABLE IF NOT EXISTS cv_empreendimento_images (
+        id_empreendimento BIGINT PRIMARY KEY,
+        content_type      TEXT NOT NULL DEFAULT 'image/jpeg',
+        data              BYTEA NOT NULL,
+        updated_at        TIMESTAMPTZ DEFAULT NOW()
+      )
+    `;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS cv_materiais (
+        id                TEXT PRIMARY KEY,
+        id_empreendimento BIGINT NOT NULL,
+        nome              TEXT NOT NULL,
+        tipo              TEXT NOT NULL DEFAULT 'outro',
+        content_type      TEXT,
+        size_bytes        BIGINT,
+        data              BYTEA NOT NULL,
+        uploaded_by       TEXT NOT NULL DEFAULT 'Sistema',
+        created_at        TIMESTAMPTZ DEFAULT NOW()
+      )
+    `;
+    await optionalSchemaStep('cv_materiais emp index', () => sql`CREATE INDEX IF NOT EXISTS cv_materiais_emp ON cv_materiais (id_empreendimento)`);
+
+    await sql`
       CREATE TABLE IF NOT EXISTS cv_unidades (
         id                BIGINT PRIMARY KEY,
         id_empreendimento BIGINT REFERENCES cv_empreendimentos(id) ON DELETE CASCADE,
