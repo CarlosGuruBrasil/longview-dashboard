@@ -14,6 +14,7 @@ import DateFilter from './DateFilter';
 import NotificationBanner from '@/components/NotificationBanner';
 import AppHeader from '@/components/app/AppHeader';
 import SidebarFooter from '@/components/app/SidebarFooter';
+import PWAInstallBanner from '@/components/app/PWAInstallBanner';
 
 // ── Pull-to-refresh hook (HIG: padrão obrigatório para conteúdo atualizável) ─
 function usePullToRefresh(onRefresh: () => Promise<void>) {
@@ -283,6 +284,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {/* ── Banner de permissão de notificação (FCM) ──────────── */}
       <NotificationBanner />
 
+      <PWAInstallBanner />
+
       {/* ── Mobile bottom tab bar ─────────────────────────────── */}
       <nav
         className="lg:hidden fixed inset-x-0 bottom-0 z-30 no-tap"
@@ -292,7 +295,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           WebkitBackdropFilter: 'blur(28px)',
           borderTop: '1px solid rgba(255,255,255,0.06)',
           boxShadow: '0 -12px 40px rgba(0,0,0,0.5)',
-          paddingBottom: 'var(--safe-bottom)',
+          paddingBottom: 'max(var(--safe-bottom), 8px)',
         }}
       >
         <div className="flex items-end h-[60px] px-1">

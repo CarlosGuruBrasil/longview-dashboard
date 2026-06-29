@@ -48,9 +48,32 @@ body {
 .pt-safe { padding-top:    max(12px, var(--safe-top));    }
 .pb-safe { padding-bottom: max(8px,  var(--safe-bottom)); }
 
-/* Native-app bottom nav */
+/* Native-app bottom nav
+ * max() garante mínimo de 8px + padding para toolbar do browser em modo navegador.
+ * Em PWA standalone, safe-bottom = home indicator e toolbar some. */
 .bottom-nav {
-  padding-bottom: var(--safe-bottom);
+  padding-bottom: max(var(--safe-bottom), 8px);
+}
+
+/* Quando rodando como PWA instalada, remove padding extra do browser toolbar */
+@media (display-mode: standalone) {
+  .bottom-nav {
+    padding-bottom: var(--safe-bottom);
+  }
+}
+
+/* iOS Safari: força o body a nunca ter bounce scroll que expõe o fundo */
+html, body {
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Impede que a address bar do Safari empurre o layout ao scroll */
+html {
+  height: -webkit-fill-available;
+}
+body {
+  min-height: -webkit-fill-available;
 }
 
 /* Remove tap highlight on mobile nav buttons */

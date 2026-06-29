@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation';
 import { ChevronRight, X, type LucideIcon } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import SidebarFooter from './SidebarFooter';
+import PWAInstallBanner from './PWAInstallBanner';
 import type { ModuleKey } from './moduleNavigation';
 
 type Accent = 'blue' | 'emerald' | 'violet';
@@ -157,7 +158,9 @@ export default function ModuleSidebar({
         </div>
       </aside>
 
-      <nav className="lg:hidden fixed inset-x-0 bottom-0 z-30 no-tap border-t border-white/[0.06] bg-[#08080a]/[0.97] backdrop-blur-2xl" style={{ paddingBottom: 'var(--safe-bottom)' }}>
+      <PWAInstallBanner />
+
+      <nav className="lg:hidden fixed inset-x-0 bottom-0 z-30 no-tap border-t border-white/[0.06] bg-[#08080a]/[0.97] backdrop-blur-2xl" style={{ paddingBottom: 'max(var(--safe-bottom), 8px)' }}>
         <div className="flex h-[60px] items-end px-1">
           {bottomItems.map(item => {
             const active = isActive(item.href, pathname, rootHref);
