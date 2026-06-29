@@ -228,6 +228,15 @@ export async function ensureSchema(): Promise<void> {
     await optionalSchemaStep('user_documents.content_b64 column', () => sql`ALTER TABLE user_documents ADD COLUMN IF NOT EXISTS content_b64 TEXT`);
     await optionalSchemaStep('user_docs_user_id index', () => sql`CREATE INDEX IF NOT EXISTS user_docs_user_id ON user_documents (user_id)`);
 
+    await sql`
+      CREATE TABLE IF NOT EXISTS project_banners (
+        project_id   TEXT PRIMARY KEY,
+        content_type TEXT NOT NULL DEFAULT 'image/jpeg',
+        data         BYTEA NOT NULL,
+        updated_at   TIMESTAMPTZ DEFAULT NOW()
+      )
+    `;
+
     schemaReady = true;
   })();
 

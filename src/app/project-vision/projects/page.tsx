@@ -81,38 +81,16 @@ export default function ProjectsPage() {
   const handleProjectBannerUpdate = async (projId: string, file: File) => {
     setUploadingBanner(projId);
     try {
-      // Redimensiona para max 1200px e comprime antes de enviar (evita payload >4MB)
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onerror = () => reject(new Error('Erro ao ler arquivo'));
-        reader.onloadend = () => {
-          const img = new window.Image();
-          img.onerror = () => reject(new Error('Imagem inválida'));
-          img.onload = () => {
-            const MAX = 1200;
-            const scale = Math.min(1, MAX / Math.max(img.width, img.height));
-            const canvas = document.createElement('canvas');
-            canvas.width  = Math.round(img.width  * scale);
-            canvas.height = Math.round(img.height * scale);
-            canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
-            resolve(canvas.toDataURL('image/jpeg', 0.82));
-          };
-          img.src = reader.result as string;
-        };
-        reader.readAsDataURL(file);
-      });
-
-      const res = await fetch('/api/projects', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: projId, banner: base64 }),
-      });
-
+      const form = new FormData();
+      form.append('file', file);
+      const res = await fetch(`/api/projects/${projId}/banner`, { method: 'POST', body: form });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error ?? `Erro ${res.status}`);
       }
-      setProjects(prev => prev.map(p => p.id === projId ? { ...p, banner: base64 } : p));
+      // força cache-bust adicionando timestamp
+      const url = `/api/projects/${projId}/banner?t=${Date.now()}`;
+      setProjects(prev => prev.map(p => p.id === projId ? { ...p, banner: url } : p));
     } catch (err: unknown) {
       alert(`Não foi possível atualizar a foto: ${err instanceof Error ? err.message : 'Erro desconhecido'}`);
     } finally {
@@ -220,12 +198,12 @@ export default function ProjectsPage() {
                       </div>
                     </div>
                   ) : (
-                    <Image
+                    // ponytail: <img> nativo — banner é rota local, next/image bloquearia sem remotePatterns
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
                       src={proj.banner}
                       alt={proj.name}
-                      fill
-                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                      className="object-cover transition-transform duration-500 group-hover:scale-105"
+                      className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />
                   )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent" />
