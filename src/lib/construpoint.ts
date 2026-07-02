@@ -146,7 +146,7 @@ export interface InspecoesParams {
   HistoricoCompleto?: boolean;
   CamposPersonalizados?: boolean;
   WorkId?: number[];
-  ReviewId?: number;
+  ReviewId?: number[];
 }
 
 export async function getInspections(params: InspecoesParams): Promise<Inspecao[]> {
@@ -159,7 +159,7 @@ export async function getInspections(params: InspecoesParams): Promise<Inspecao[
     HistoricoCompleto: params.HistoricoCompleto ?? false,
     CamposPersonalizados: params.CamposPersonalizados ?? false,
     WorkId: params.WorkId ?? [],
-    ReviewId: params.ReviewId ?? null,
+    ReviewId: params.ReviewId ?? [],
   };
 
   const res = await fetch(`${BASE_URL}/${MODEL_REPORT_ENDPOINT}`, {
@@ -193,17 +193,18 @@ export interface InspecoesByRangeResponse {
 
 export async function getInspectionsByRange(params: InspecoesByRangeParams): Promise<InspecoesByRangeResponse> {
   const headers = await authHeaders();
-  const res = await fetch(`${BASE_URL}/InspecoesPorRange`, {
+  // Este endpoint recebe os filtros via query string, não JSON body.
+  const qs = new URLSearchParams({
+    startYear: String(params.StartYear),
+    endYear: String(params.EndYear),
+    page: String(params.Page ?? 1),
+    pageSize: String(params.PageSize ?? 500),
+    modelType: String(params.ModelType),
+    onlyActiveWorks: String(params.OnlyActiveWorks ?? true),
+  });
+  const res = await fetch(`${BASE_URL}/InspecoesPorRange?${qs.toString()}`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({
-      StartYear: params.StartYear,
-      EndYear: params.EndYear,
-      Page: params.Page ?? 1,
-      PageSize: params.PageSize ?? 500,
-      ModelType: params.ModelType,
-      OnlyActiveWorks: params.OnlyActiveWorks ?? true,
-    }),
   });
   if (!res.ok) throw new Error(`InspecoesPorRange: ${res.status}`);
   return res.json();
@@ -218,7 +219,7 @@ export interface VerificacoesParams {
   HistoricoCompleto?: boolean;
   CamposPersonalizados?: boolean;
   WorkId?: number[];
-  ReviewId?: number;
+  ReviewId?: number[];
 }
 
 export async function getVerifications(params: VerificacoesParams): Promise<Verificacao[]> {
@@ -234,7 +235,7 @@ export async function getVerifications(params: VerificacoesParams): Promise<Veri
       HistoricoCompleto: params.HistoricoCompleto ?? false,
       CamposPersonalizados: params.CamposPersonalizados ?? false,
       WorkId: params.WorkId ?? [],
-      ReviewId: params.ReviewId ?? null,
+      ReviewId: params.ReviewId ?? [],
     }),
   });
   if (!res.ok) {
