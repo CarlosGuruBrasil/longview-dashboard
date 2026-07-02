@@ -18,6 +18,7 @@ const PublicarView       = lazy(() => import('./views/PublicarView'));
 const AudienciasView     = lazy(() => import('./views/AudienciasView'));
 const ScoreView          = lazy(() => import('./views/ScoreView'));
 const LinksView          = lazy(() => import('../LinksView'));
+const BiView             = lazy(() => import('./views/BiView'));
 
 function ViewRouter() {
   const { activeView } = useData();
@@ -28,6 +29,7 @@ function ViewRouter() {
     oportunidades:   <OportunidadesView />,
     empreendimentos: <EmpreendimentosView />,
     vendas:          <VendasView />,
+    insights:        <BiView />,
     metrics:         <MetricsView />,
     marketing:       <MarketingAdsView />,
     trafego:         <TrafegoView />,

@@ -14,6 +14,7 @@ import {
   Send,
   UsersRound,
   Link as LinkIcon,
+  BrainCircuit,
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import type { ActiveView } from '../types';
@@ -31,6 +32,7 @@ const NAV_ITEMS: NavItem[] = [
   { icon: TrendingUp,      label: 'Oportunidades',   view: 'oportunidades'  },
   { icon: Building2,       label: 'Empreendimentos', view: 'empreendimentos'},
   { icon: DollarSign,      label: 'Vendas',          view: 'vendas'         },
+  { icon: BrainCircuit,    label: 'BI Insights',     view: 'insights'       },
   { icon: BarChart3,       label: 'Métricas',        view: 'metrics'        },
   { icon: Gauge,           label: 'Tráfego',         view: 'trafego'        },
   { icon: Megaphone,       label: 'Marketing ADS',   view: 'marketing'      },

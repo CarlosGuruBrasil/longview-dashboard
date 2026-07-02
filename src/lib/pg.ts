@@ -1,7 +1,6 @@
 import postgres from 'postgres';
 
 declare global {
-  // eslint-disable-next-line no-var
   var _pg: postgres.Sql | undefined;
 }
 
@@ -17,7 +16,7 @@ function getClient(): postgres.Sql {
 // Lazy proxy — safe to import at module level; only throws when actually called
 export const sql: postgres.Sql = new Proxy(
   ((...args: Parameters<postgres.Sql>) => (getClient() as unknown as (...a: typeof args) => unknown)(...args)) as unknown as postgres.Sql,
-  { get: (_t, prop) => (getClient() as any)[prop] }
+  { get: (_t, prop) => Reflect.get(getClient(), prop) }
 );
 
 let schemaReady = false;
@@ -308,6 +307,178 @@ export async function ensureSchema(): Promise<void> {
       )
     `;
     await optionalSchemaStep('task_docs task_id index', () => sql`CREATE INDEX IF NOT EXISTS task_docs_task_idx ON task_documents (task_id)`);
+
+    // ═══════════════════════════════════════════════════════════════
+    // BI Star Schema — Dimensões e Fatos para Analytics
+    // ═══════════════════════════════════════════════════════════════
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS dim_tempo (
+        id_data        INTEGER PRIMARY KEY,
+        data           DATE NOT NULL,
+        dia            INTEGER NOT NULL,
+        mes            INTEGER NOT NULL,
+        ano            INTEGER NOT NULL,
+        nome_mes       TEXT NOT NULL,
+        trimestre      INTEGER NOT NULL,
+        dia_semana     INTEGER NOT NULL,
+        nome_dia_semana TEXT NOT NULL,
+        fim_de_semana  BOOLEAN NOT NULL DEFAULT false
+      )
+    `;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS dim_empreendimentos (
+        id_empreendimento INTEGER PRIMARY KEY,
+        nome              TEXT,
+        situacao          TEXT,
+        tipo              TEXT,
+        cidade            TEXT,
+        estado            TEXT,
+        regiao            TEXT,
+        segmento          TEXT,
+        situacao_obra     TEXT,
+        ativo             BOOLEAN DEFAULT true
+      )
+    `;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS dim_corretores (
+        id_corretor  SERIAL PRIMARY KEY,
+        nome         TEXT,
+        email        TEXT,
+        imobiliaria  TEXT,
+        ativo        BOOLEAN DEFAULT true
+      )
+    `;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS dim_clientes (
+        id_cliente   SERIAL PRIMARY KEY,
+        nome         TEXT,
+        email        TEXT,
+        telefone     TEXT,
+        cidade       TEXT,
+        renda        NUMERIC,
+        sexo         TEXT,
+        idade        INTEGER,
+        estado_civil TEXT
+      )
+    `;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS dim_campanhas_meta (
+        id_campanha  TEXT PRIMARY KEY,
+        nome         TEXT,
+        objective    TEXT,
+        status       TEXT,
+        buying_type  TEXT,
+        created_time TIMESTAMPTZ
+      )
+    `;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS fato_leads (
+        id                  BIGSERIAL PRIMARY KEY,
+        id_lead             TEXT,
+        id_empreendimento   INTEGER,
+        id_corretor         INTEGER,
+        id_cliente          INTEGER,
+        data_cadastro       DATE,
+        data_atualizacao    DATE,
+        data_venda          DATE,
+        origem              TEXT,
+        midia               TEXT,
+        campanha            TEXT,
+        status              TEXT,
+        etapa               TEXT,
+        temperatura         TEXT,
+        score               INTEGER,
+        valor_venda         NUMERIC,
+        tempo_conversao_dias INTEGER,
+        utm_campaign        TEXT,
+        utm_source          TEXT,
+        utm_content         TEXT,
+        id_data_cadastro    INTEGER REFERENCES dim_tempo(id_data),
+        id_data_venda       INTEGER REFERENCES dim_tempo(id_data),
+        raw                 JSONB DEFAULT '{}',
+        synced_at           TIMESTAMPTZ DEFAULT NOW()
+      )
+    `;
+    await optionalSchemaStep('fato_leads_id_lead index', () => sql`CREATE INDEX IF NOT EXISTS fato_leads_id_lead ON fato_leads (id_lead)`);
+    await optionalSchemaStep('fato_leads_data_cadastro index', () => sql`CREATE INDEX IF NOT EXISTS fato_leads_data_cadastro ON fato_leads (data_cadastro DESC)`);
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS fato_vendas (
+        id_venda          BIGINT PRIMARY KEY,
+        id_lead           TEXT,
+        id_empreendimento INTEGER,
+        id_unidade        BIGINT,
+        id_corretor       INTEGER,
+        id_cliente        INTEGER,
+        data_venda        DATE,
+        valor             NUMERIC,
+        status            TEXT,
+        midia             TEXT,
+        campanha          TEXT,
+        origem            TEXT,
+        id_data           INTEGER REFERENCES dim_tempo(id_data)
+      )
+    `;
+    await optionalSchemaStep('fato_vendas_data_venda index', () => sql`CREATE INDEX IF NOT EXISTS fato_vendas_data_venda ON fato_vendas (data_venda DESC)`);
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS fato_midia_paga (
+        id           BIGSERIAL PRIMARY KEY,
+        id_campanha  TEXT REFERENCES dim_campanhas_meta(id_campanha),
+        data         DATE NOT NULL,
+        spend        NUMERIC DEFAULT 0,
+        impressions  BIGINT DEFAULT 0,
+        clicks       BIGINT DEFAULT 0,
+        reach        BIGINT DEFAULT 0,
+        frequency    NUMERIC DEFAULT 0,
+        cpc          NUMERIC DEFAULT 0,
+        cpm          NUMERIC DEFAULT 0,
+        ctr          NUMERIC DEFAULT 0,
+        leads_meta   BIGINT DEFAULT 0,
+        id_data      INTEGER REFERENCES dim_tempo(id_data)
+      )
+    `;
+    await optionalSchemaStep('fato_midia_paga_campanha_data index', () => sql`CREATE INDEX IF NOT EXISTS fato_midia_paga_campanha_data ON fato_midia_paga (id_campanha, data)`);
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS fato_interacoes (
+        id          BIGSERIAL PRIMARY KEY,
+        id_lead     TEXT,
+        lead_nome   TEXT,
+        de          TEXT,
+        para        TEXT,
+        autor       TEXT,
+        changed_at  TIMESTAMPTZ,
+        id_data     INTEGER REFERENCES dim_tempo(id_data)
+      )
+    `;
+    await optionalSchemaStep('fato_interacoes_id_lead index', () => sql`CREATE INDEX IF NOT EXISTS fato_interacoes_id_lead ON fato_interacoes (id_lead)`);
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS fato_atribuicao_marketing (
+        id              BIGSERIAL PRIMARY KEY,
+        id_campanha     TEXT,
+        nome_campanha   TEXT,
+        data            DATE NOT NULL,
+        spend           NUMERIC DEFAULT 0,
+        impressions     BIGINT DEFAULT 0,
+        clicks          BIGINT DEFAULT 0,
+        leads_gerados   BIGINT DEFAULT 0,
+        leads_com_venda BIGINT DEFAULT 0,
+        valor_vendas    NUMERIC DEFAULT 0,
+        cpl             NUMERIC DEFAULT 0,
+        cac             NUMERIC DEFAULT 0,
+        roas            NUMERIC DEFAULT 0,
+        id_data         INTEGER REFERENCES dim_tempo(id_data)
+      )
+    `;
+    await optionalSchemaStep('fato_atribuicao_marketing_campanha index', () => sql`CREATE INDEX IF NOT EXISTS fato_atribuicao_marketing_campanha ON fato_atribuicao_marketing (id_campanha, data)`);
 
     schemaReady = true;
   })();

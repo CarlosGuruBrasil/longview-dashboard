@@ -177,26 +177,66 @@ export interface MetaData {
 
 // ── Estoque ───────────────────────────────────────────────────────────────────
 
+export interface Empreendimento {
+  id: number;
+  nome: string;
+  situacao: string;
+  tipo: string;
+  cidade?: string | null;
+  bairro?: string | null;
+  estado?: string | null;
+  endereco?: string | null;
+  regiao?: string | null;
+  cep?: string | null;
+  sigla?: string | null;
+  numero?: string | null;
+  data_entrega?: string | null;
+  andamento?: number | null;
+  segmento?: string | null;
+  situacao_obra?: string | null;
+  foto?: string | null;
+  logo?: string | null;
+  tabela?: Record<string, unknown> | null;
+  link_disponibilidade?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  area_construida?: string | null;
+  area_privativa?: string | null;
+  nome_empresa?: string | null;
+  periodo_venda_inicio?: string | null;
+  disponivel?: string | null;
+  raw?: Record<string, unknown>;
+}
+
+export interface EmpreendimentoResumo {
+  id_empreendimento: number;
+  total: number;
+  disponivel: number;
+  reservado: number;
+  vendido: number;
+  vgv_disponivel: number;
+  vgv_vendido: number;
+}
+
+export interface UnidadeResumida {
+  id: number;
+  id_empreendimento: number;
+  bloco: string;
+  numero: string;
+  status: string;
+  status_venda: number;
+  valor: number;
+  metragem: number;
+  andar?: number | null;
+  coluna?: number | null;
+  tipologia?: string | null;
+  situacao_mapa_disponibilidade?: number | null;
+}
+
 export interface EstoqueData {
-  empreendimentos: { id: number; nome: string; situacao: string; tipo: string }[];
-  resumo: {
-    id_empreendimento: number;
-    total: number;
-    disponivel: number;
-    reservado: number;
-    vendido: number;
-    vgv_disponivel: number;
-    vgv_vendido: number;
-  }[];
-  unidades: {
-    id: number;
-    id_empreendimento: number;
-    bloco: string;
-    numero: string;
-    status: string;
-    valor: number;
-    metragem: number;
-  }[];
+  empreendimentos: Empreendimento[];
+  resumo: EmpreendimentoResumo[];
+  unidades: UnidadeResumida[];
 }
 
 // ── API response ──────────────────────────────────────────────────────────────
@@ -289,7 +329,87 @@ export type ActiveView =
   | 'links'
   | 'score'
   | 'trafego'
-  | 'metrics';
+  | 'metrics'
+  | 'insights';
+
+// ── BI / Star Schema ──────────────────────────────────────────────────────────
+
+export interface BiInsights {
+  funnel: BiFunnelStage[];
+  perDevelopment: BiPerDevelopment[];
+  conversionTime: BiConversionTime[];
+  campaignAttribution: BiCampaignAttribution[];
+  monthlySeries: BiMonthlySeries[];
+  metaPageInsights: BiPageInsights | null;
+  summary: BiSummary;
+  syncedAt: string;
+}
+
+export interface BiSummary {
+  totalLeads: number;
+  totalSales: number;
+  totalVGV: number;
+  avgTicket: number;
+  avgConversionDays: number;
+  totalSpend: number;
+  cpl: number;
+  cac: number;
+  roas: number;
+  leadsWithSale: number;
+}
+
+export interface BiFunnelStage {
+  name: string;
+  value: number;
+  percentage: number;
+}
+
+export interface BiPerDevelopment {
+  nome: string;
+  leads: number;
+  visits: number;
+  reservations: number;
+  sales: number;
+  vgv: number;
+  avgTicket: number;
+  conversionPct: number;
+  cpl: number;
+}
+
+export interface BiConversionTime {
+  range: string;
+  count: number;
+  percentage: number;
+}
+
+export interface BiCampaignAttribution {
+  campaignName: string;
+  spend: number;
+  impressions: number;
+  clicks: number;
+  leads: number;
+  sales: number;
+  revenue: number;
+  cpl: number;
+  cac: number;
+  roas: number;
+}
+
+export interface BiMonthlySeries {
+  month: string;
+  leads: number;
+  sales: number;
+  vgv: number;
+  spend: number;
+}
+
+export interface BiPageInsights {
+  followers: number;
+  instagramFollowers: number;
+  profileViews: number;
+  reach: number;
+  engagement: number;
+}
 export interface DateRange {
   start: string;
   end: string;

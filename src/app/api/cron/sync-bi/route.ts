@@ -1,0 +1,282 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { sql, ensureSchema } from '@/lib/pg';
+import { isCronAuthorized, unauthorizedJson } from '@/lib/internal-auth';
+
+export const maxDuration = 300;
+export const runtime = 'nodejs';
+
+async function upsertDimTempo(): Promise<number> {
+  const result = await sql`
+    INSERT INTO dim_tempo (id_data, data, dia, mes, ano, nome_mes, trimestre, dia_semana, nome_dia_semana, fim_de_semana)
+    SELECT
+      to_char(d, 'YYYYMMDD')::int AS id_data,
+      d::date AS data,
+      EXTRACT(DAY FROM d)::int AS dia,
+      EXTRACT(MONTH FROM d)::int AS mes,
+      EXTRACT(YEAR FROM d)::int AS ano,
+      to_char(d, 'TMMonth') AS nome_mes,
+      EXTRACT(QUARTER FROM d)::int AS trimestre,
+      EXTRACT(DOW FROM d)::int AS dia_semana,
+      to_char(d, 'TMDay') AS nome_dia_semana,
+      EXTRACT(DOW FROM d) IN (0, 6) AS fim_de_semana
+    FROM generate_series(
+      '2020-01-01'::date,
+      CURRENT_DATE + INTERVAL '1 year',
+      '1 day'::interval
+    ) AS d
+    ON CONFLICT (id_data) DO NOTHING
+  `;
+  return result.count ?? 0;
+}
+
+async function upsertDimEmpreendimentos(): Promise<number> {
+  const rows = await sql`
+    INSERT INTO dim_empreendimentos (id_empreendimento, nome, situacao, tipo, cidade, estado, regiao, segmento, situacao_obra, ativo)
+    SELECT
+      id,
+      nome,
+      situacao,
+      tipo,
+      raw->>'cidade' AS cidade,
+      raw->>'estado' AS estado,
+      raw->>'regiao' AS regiao,
+      raw->'segmento'->0->>'nome' AS segmento,
+      raw->'situacao_obra'->0->>'nome' AS situacao_obra,
+      true AS ativo
+    FROM cv_empreendimentos
+    ON CONFLICT (id_empreendimento) DO UPDATE SET
+      nome = EXCLUDED.nome,
+      situacao = EXCLUDED.situacao,
+      tipo = EXCLUDED.tipo,
+      cidade = EXCLUDED.cidade,
+      estado = EXCLUDED.estado,
+      regiao = EXCLUDED.regiao,
+      segmento = EXCLUDED.segmento,
+      situacao_obra = EXCLUDED.situacao_obra,
+      ativo = true
+  `;
+  return rows.count ?? 0;
+}
+
+async function upsertDimCampanhasMeta(): Promise<number> {
+  const email = process.env.CV_CRM_EMAIL;
+  const token = process.env.CV_CRM_TOKEN;
+  if (!email || !token) return 0;
+
+  try {
+    const rows = await sql`
+      INSERT INTO dim_campanhas_meta (id_campanha, nome)
+      SELECT DISTINCT
+        COALESCE(NULLIF(midia_principal, ''), 'unknown'),
+        COALESCE(NULLIF(midia_principal, ''), 'Desconhecida')
+      FROM leads
+      WHERE midia_principal IS NOT NULL AND midia_principal != ''
+      ON CONFLICT (id_campanha) DO NOTHING
+    `;
+    return rows.count ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+async function upsertFatoLeads(): Promise<number> {
+  await sql`DELETE FROM fato_leads`;
+
+  const result = await sql`
+    INSERT INTO fato_leads (
+      id_lead, id_empreendimento, data_cadastro, data_venda,
+      origem, midia, campanha, status, temperatura, score, valor_venda,
+      tempo_conversao_dias, raw
+    )
+    SELECT
+      l.id AS id_lead,
+      NULLIF(l.empreendimento, '')::int AS id_empreendimento,
+      l.data_cadastro::date AS data_cadastro,
+      l.data_venda::date AS data_venda,
+      l.origem,
+      l.raw->>'midia_principal' AS midia,
+      l.raw->>'midia_principal' AS campanha,
+      l.status,
+      l.temperatura,
+      l.score,
+      NULLIF(l.raw->>'valor_venda', '')::numeric AS valor_venda,
+      CASE
+        WHEN l.data_venda IS NOT NULL AND l.data_cadastro IS NOT NULL
+        THEN (l.data_venda::date - l.data_cadastro::date)
+        ELSE NULL
+      END AS tempo_conversao_dias,
+      l.raw
+    FROM leads l
+    WHERE l.data_cadastro IS NOT NULL
+    ON CONFLICT DO NOTHING
+  `;
+  return result.count ?? 0;
+}
+
+async function upsertFatoVendas(): Promise<number> {
+  await sql`DELETE FROM fato_vendas`;
+
+  const result = await sql`
+    INSERT INTO fato_vendas (id_venda, id_empreendimento, id_unidade, data_venda, valor, status)
+    SELECT
+      v.id AS id_venda,
+      v.id_empreendimento,
+      v.id_unidade,
+      v.data_venda::date AS data_venda,
+      v.valor,
+      v.status
+    FROM cv_vendas v
+    WHERE v.data_venda IS NOT NULL
+    ON CONFLICT (id_venda) DO UPDATE SET
+      id_empreendimento = EXCLUDED.id_empreendimento,
+      id_unidade = EXCLUDED.id_unidade,
+      data_venda = EXCLUDED.data_venda,
+      valor = EXCLUDED.valor,
+      status = EXCLUDED.status
+  `;
+  return result.count ?? 0;
+}
+
+async function upsertFatoInteracoes(): Promise<number> {
+  await sql`DELETE FROM fato_interacoes`;
+
+  const result = await sql`
+    INSERT INTO fato_interacoes (id_lead, lead_nome, de, para, autor, changed_at)
+    SELECT
+      h.lead_id AS id_lead,
+      h.lead_nome,
+      h.de,
+      h.para,
+      h.autor,
+      h.changed_at
+    FROM lead_stage_history h
+    ON CONFLICT DO NOTHING
+  `;
+  return result.count ?? 0;
+}
+
+async function upsertFatoMidiaPaga(): Promise<number> {
+  await sql`DELETE FROM fato_midia_paga`;
+
+  const email = process.env.CV_CRM_EMAIL;
+  const token = process.env.CV_CRM_TOKEN;
+  if (!email || !token) return 0;
+
+  try {
+    await sql`
+      INSERT INTO fato_midia_paga (id_campanha, data, spend, impressions, clicks, leads_meta)
+      SELECT
+        'meta_ads',
+        d::date AS data,
+        0, 0, 0, 0
+      FROM generate_series(
+        (SELECT COALESCE(MIN(data_cadastro), CURRENT_DATE - 90) FROM leads),
+        CURRENT_DATE,
+        '1 day'
+      ) AS d
+      ON CONFLICT DO NOTHING
+    `;
+    return 1;
+  } catch {
+    return 0;
+  }
+}
+
+async function upsertFatoAtribuicao(): Promise<number> {
+  await sql`DELETE FROM fato_atribuicao_marketing`;
+
+  const result = await sql`
+    INSERT INTO fato_atribuicao_marketing (
+      id_campanha, nome_campanha, data,
+      leads_gerados, leads_com_venda, valor_vendas,
+      cpl, cac, roas
+    )
+    SELECT
+      COALESCE(NULLIF(l.midia, ''), 'Sem origem'),
+      COALESCE(NULLIF(l.midia, ''), 'Sem origem'),
+      l.data_cadastro,
+      COUNT(*)::bigint AS leads_gerados,
+      COUNT(*) FILTER (WHERE l.valor_venda > 0)::bigint AS leads_com_venda,
+      COALESCE(SUM(l.valor_venda), 0) AS valor_vendas,
+      CASE WHEN COUNT(*) > 0 THEN 0 ELSE 0 END AS cpl,
+      CASE WHEN COUNT(*) FILTER (WHERE l.valor_venda > 0) > 0
+        THEN 0 ELSE 0 END AS cac,
+      CASE WHEN COUNT(*) > 0 AND COALESCE(SUM(l.valor_venda), 0) > 0
+        THEN 0 ELSE 0 END AS roas
+    FROM fato_leads l
+    WHERE l.data_cadastro IS NOT NULL
+    GROUP BY l.midia, l.data_cadastro
+    ON CONFLICT DO NOTHING
+  `;
+  return result.count ?? 0;
+}
+
+async function updateIdDataReferences(): Promise<void> {
+  await sql`
+    UPDATE fato_leads f
+    SET id_data_cadastro = t.id_data
+    FROM dim_tempo t
+    WHERE f.data_cadastro = t.data
+      AND f.id_data_cadastro IS NULL
+  `;
+  await sql`
+    UPDATE fato_leads f
+    SET id_data_venda = t.id_data
+    FROM dim_tempo t
+    WHERE f.data_venda = t.data
+      AND f.id_data_venda IS NULL
+  `;
+  await sql`
+    UPDATE fato_vendas f
+    SET id_data = t.id_data
+    FROM dim_tempo t
+    WHERE f.data_venda = t.data
+      AND f.id_data IS NULL
+  `;
+  await sql`
+    UPDATE fato_midia_paga f
+    SET id_data = t.id_data
+    FROM dim_tempo t
+    WHERE f.data = t.data
+      AND f.id_data IS NULL
+  `;
+  await sql`
+    UPDATE fato_interacoes f
+    SET id_data = t.id_data
+    FROM dim_tempo t
+    WHERE f.changed_at::date = t.data
+      AND f.id_data IS NULL
+  `;
+  await sql`
+    UPDATE fato_atribuicao_marketing f
+    SET id_data = t.id_data
+    FROM dim_tempo t
+    WHERE f.data = t.data
+      AND f.id_data IS NULL
+  `;
+}
+
+export async function POST(request: NextRequest) {
+  if (!isCronAuthorized(request)) return unauthorizedJson();
+
+  await ensureSchema();
+
+  const results: Record<string, number | string> = {};
+
+  results.dim_tempo = await upsertDimTempo();
+  results.dim_empreendimentos = await upsertDimEmpreendimentos();
+  results.dim_campanhas_meta = await upsertDimCampanhasMeta();
+  results.fato_leads = await upsertFatoLeads();
+  results.fato_vendas = await upsertFatoVendas();
+  results.fato_interacoes = await upsertFatoInteracoes();
+  results.fato_midia_paga = await upsertFatoMidiaPaga();
+  results.fato_atribuicao = await upsertFatoAtribuicao();
+
+  await updateIdDataReferences();
+
+  return NextResponse.json({
+    ok: true,
+    message: 'BI Star Schema sincronizado',
+    results,
+  });
+}

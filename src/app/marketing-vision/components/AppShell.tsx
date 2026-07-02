@@ -67,6 +67,7 @@ const VIEW_TITLES: Record<ActiveView, string> = {
   oportunidades:   'Oportunidades',
   empreendimentos: 'Empreendimentos',
   vendas:          'Vendas',
+  insights:        'BI Insights',
   metrics:         'Métricas',
   trafego:         'Tráfego',
   marketing:       'Marketing ADS',
