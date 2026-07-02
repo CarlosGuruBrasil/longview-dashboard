@@ -3,6 +3,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import { ShoppingBag, DollarSign, TrendingUp, MousePointerClick, RefreshCw } from 'lucide-react'
 import { useData } from '../../context/DataContext'
+import FilterBar from '../ui/FilterBar'
 import { isSale, getLeadValueNumber } from '../../utils/leads'
 import { getLeadStage } from '../../utils/metrics'
 import { formatCurrency, formatDate, CHART_PALETTE } from '../../utils/formatters'
@@ -398,6 +399,9 @@ export default function VendasView() {
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Lead filters */}
+      <FilterBar />
+
       {/* Banner de origem dos dados */}
       {!loadingVendas && (
         <div className={`flex items-center justify-between gap-3 px-4 py-2.5 rounded-lg text-xs border ${

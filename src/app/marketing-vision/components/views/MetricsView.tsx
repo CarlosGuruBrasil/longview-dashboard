@@ -1,6 +1,7 @@
 'use client'
 
 import { useData } from '../../context/DataContext'
+import FilterBar from '../ui/FilterBar'
 import KpiGaugeHistoryCard from '../metrics/KpiGaugeHistoryCard'
 import CostPerLeadCard from '../metrics/CostPerLeadCard'
 import AlertsPanel from '../ui/AlertsPanel'
@@ -25,6 +26,9 @@ export default function MetricsView() {
 
   return (
     <div className="flex flex-col gap-5">
+
+      {/* Filters */}
+      <FilterBar />
 
       {/* ── Alertas e sugestões ── */}
       <section>

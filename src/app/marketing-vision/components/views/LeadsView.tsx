@@ -7,6 +7,7 @@ import StageSummary from '../ui/StageSummary'
 import LeadsTable from '../ui/LeadsTable'
 import GrowthLineChart from '../charts/GrowthLineChart'
 import PieDonutChart from '../charts/PieDonutChart'
+import FilterBar from '../ui/FilterBar'
 import { getOrigin } from '../../utils/leads'
 
 type SubTab = 'crm' | 'meta-validation' | 'score'
@@ -97,6 +98,9 @@ export default function LeadsView() {
 
       {activeTab === 'crm' && (
         <div className="flex flex-col gap-6">
+          {/* Filters */}
+          <FilterBar />
+
           {/* Stage summary */}
           <StageSummary leads={filteredLeads} />
 
