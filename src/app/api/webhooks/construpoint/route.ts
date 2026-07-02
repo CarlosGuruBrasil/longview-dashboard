@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql, ensureSchema } from '@/lib/pg';
 import { getBearerToken } from '@/lib/internal-auth';
+import { parseConstrupointDate } from '@/lib/construpoint';
 
 type ConstrupointPayload = Record<string, unknown> & {
   Id?: string | number;
@@ -34,10 +35,6 @@ function asPayload(value: unknown): ConstrupointPayload {
 function sqlScalar(value: unknown): string | number | boolean | null {
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value;
   return value == null ? null : String(value);
-}
-
-function parseDate(value: unknown): Date | null {
-  return value ? new Date(value as string | number | Date) : null;
 }
 
 function errorMessage(error: unknown): string {
@@ -78,9 +75,9 @@ export async function POST(request: NextRequest) {
       const inspetor = body.Inspector?.Name || body.inspetor || null;
       const status = body.Status?.Name || body.status || null;
       
-      const dCriacao = parseDate(body.CreateDate || body.data_criacao);
-      const dAgend = parseDate(body.ScheduleDate || body.data_agendamento);
-      const dAtualiz = parseDate(body.UpdateDate || body.data_atualizacao);
+      const dCriacao = parseConstrupointDate(body.CreateDate || body.data_criacao);
+      const dAgend = parseConstrupointDate(body.ScheduleDate || body.data_agendamento);
+      const dAtualiz = parseConstrupointDate(body.UpdateDate || body.data_atualizacao);
       
       const nota = body.WeightedGrade || body.nota || null;
 

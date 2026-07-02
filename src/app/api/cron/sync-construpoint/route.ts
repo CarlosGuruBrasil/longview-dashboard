@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql, ensureSchema } from '@/lib/pg';
-import { getInspections, getVerifications, MODEL_TYPES, type ModelTypeKey } from '@/lib/construpoint';
+import { getInspections, getVerifications, parseConstrupointDate, MODEL_TYPES, type ModelTypeKey } from '@/lib/construpoint';
 import { getBearerToken, isSecretAuthorized, unauthorizedJson } from '@/lib/internal-auth';
 
 export const maxDuration = 300; // 5 minutes
@@ -52,9 +52,9 @@ export async function GET(request: NextRequest) {
 
       for (const insp of res) {
         if (!insp.Id) continue;
-        const dCriacao = insp.Criacao ? new Date(insp.Criacao) : null;
-        const dAgend = insp.PrimeiraVistoria ? new Date(insp.PrimeiraVistoria) : null;
-        const dAtualiz = insp.DataReinspecao ? new Date(insp.DataReinspecao) : null;
+        const dCriacao = parseConstrupointDate(insp.Criacao);
+        const dAgend = parseConstrupointDate(insp.PrimeiraVistoria);
+        const dAtualiz = parseConstrupointDate(insp.DataReinspecao);
 
         await sql`
           INSERT INTO construpoint_inspecoes (
@@ -118,7 +118,7 @@ export async function GET(request: NextRequest) {
         if (!Array.isArray(items) || items.length === 0) continue;
 
       for (const v of items) {
-        const d = v.Verificacao ? new Date(v.Verificacao) : null;
+        const d = parseConstrupointDate(v.Verificacao);
         await sql`
           INSERT INTO construpoint_verificacoes (
             codigo, modelo, verificacao, resultado, obra, local, inspetor,

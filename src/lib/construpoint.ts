@@ -17,6 +17,20 @@ const AUTH_URL  = 'https://Authenticate.construpoint.com.br/api/Token';
 const BASE_URL  = 'https://apiext.construpoint.com.br/api/RelatorioCKL';
 const MODEL_REPORT_ENDPOINT = `InspecoesPorModeloCustom${String.fromCharCode(81, 117, 97, 108, 105, 100, 97, 100, 101)}`;
 
+/** A API retorna datas em "DD/MM/AAAA" ou "DD/MM/AAAA HH:mm:ss" — new Date() do JS interpreta errado (assume MM/DD). */
+export function parseConstrupointDate(value: unknown): Date | null {
+  if (!value) return null;
+  const str = String(value).trim();
+  const m = str.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:[ T](\d{2}):(\d{2}):(\d{2}))?$/);
+  if (m) {
+    const [, day, month, year, hh = '00', mm = '00', ss = '00'] = m;
+    const d = new Date(Number(year), Number(month) - 1, Number(day), Number(hh), Number(mm), Number(ss));
+    return isNaN(d.getTime()) ? null : d;
+  }
+  const fallback = new Date(str);
+  return isNaN(fallback.getTime()) ? null : fallback;
+}
+
 // Tipos de ficha Construpoint
 export const MODEL_TYPES = {
   FVS: 1,
