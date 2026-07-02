@@ -38,16 +38,29 @@ export async function GET(request: NextRequest) {
 
   const p = url.searchParams;
   const endpoint = p.get('endpoint') ?? 'InspecoesPorModeloCustomQualidade';
-  const payload: Record<string, unknown> = {
-    BeginDate: p.get('BeginDate') ?? '2025-01-01',
-    EndDate: p.get('EndDate') ?? '2025-12-31',
-    ModelTypeId: Number(p.get('ModelTypeId') ?? 1),
-    HistoricoCompleto: p.get('HistoricoCompleto') === 'true',
-    CamposPersonalizados: p.get('CamposPersonalizados') === 'true',
-    WorkId: [],
-  };
-  if (p.has('StatusVerificacoesId')) payload.StatusVerificacoesId = Number(p.get('StatusVerificacoesId'));
-  if (p.has('ReviewId')) payload.ReviewId = Number(p.get('ReviewId'));
+  const shape = p.get('shape') ?? 'custom';
+
+  const payload: Record<string, unknown> = shape === 'range'
+    ? {
+        StartYear: Number(p.get('StartYear') ?? 2025),
+        EndYear: Number(p.get('EndYear') ?? 2025),
+        Page: Number(p.get('Page') ?? 1),
+        PageSize: Number(p.get('PageSize') ?? 50),
+        ModelType: Number(p.get('ModelTypeId') ?? 1),
+        OnlyActiveWorks: p.get('OnlyActiveWorks') !== 'false',
+      }
+    : {
+        BeginDate: p.get('BeginDate') ?? '2025-01-01',
+        EndDate: p.get('EndDate') ?? '2025-12-31',
+        ModelTypeId: Number(p.get('ModelTypeId') ?? 1),
+        HistoricoCompleto: p.get('HistoricoCompleto') === 'true',
+        CamposPersonalizados: p.get('CamposPersonalizados') === 'true',
+        WorkId: [],
+      };
+  if (shape === 'custom') {
+    if (p.has('StatusVerificacoesId')) payload.StatusVerificacoesId = Number(p.get('StatusVerificacoesId'));
+    if (p.has('ReviewId')) payload.ReviewId = Number(p.get('ReviewId'));
+  }
 
   try {
     const token = await getToken();
