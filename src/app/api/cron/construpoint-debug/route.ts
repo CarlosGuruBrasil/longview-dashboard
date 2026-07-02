@@ -6,7 +6,7 @@ import { getBearerToken, isSecretAuthorized, unauthorizedJson } from '@/lib/inte
 export const runtime = 'nodejs';
 
 const AUTH_URL = 'https://Authenticate.construpoint.com.br/api/Token';
-const BASE_URL = 'https://app.construpoint.com.br/Construpoint.API/api/RelatorioCKL';
+const BASE_URL = 'https://apiext.construpoint.com.br/api/RelatorioCKL';
 
 async function getToken(): Promise<string> {
   const basicAuth = process.env.CONSTRUPOINT_BASIC_AUTH;

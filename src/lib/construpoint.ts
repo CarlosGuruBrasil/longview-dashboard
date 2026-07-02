@@ -14,7 +14,7 @@
  */
 
 const AUTH_URL  = 'https://Authenticate.construpoint.com.br/api/Token';
-const BASE_URL  = 'https://app.construpoint.com.br/Construpoint.API/api/RelatorioCKL';
+const BASE_URL  = 'https://apiext.construpoint.com.br/api/RelatorioCKL';
 const MODEL_REPORT_ENDPOINT = `InspecoesPorModeloCustom${String.fromCharCode(81, 117, 97, 108, 105, 100, 97, 100, 101)}`;
 
 // Tipos de ficha Construpoint
