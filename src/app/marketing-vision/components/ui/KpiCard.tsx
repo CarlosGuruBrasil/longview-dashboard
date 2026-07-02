@@ -13,7 +13,7 @@ interface KpiCardProps {
 
 export default function KpiCard({ icon: Icon, label, value, subtitle, subtitleNode, color = '#0ea5e9' }: KpiCardProps) {
   return (
-    <div className="bg-white/5 border border-white/10 rounded-2xl p-3.5 sm:p-5 flex flex-col gap-2 sm:gap-3">
+    <div className="bg-white/5 border border-white/10 rounded-2xl p-3.5 sm:p-5 flex flex-col gap-2 sm:gap-3 overflow-hidden min-w-0">
       {/* Icon + label — label truncada para nunca quebrar em 2 linhas */}
       <div className="flex items-center gap-2 sm:gap-3">
         <div

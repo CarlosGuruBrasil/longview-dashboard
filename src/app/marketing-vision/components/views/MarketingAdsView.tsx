@@ -144,11 +144,13 @@ export default function MarketingAdsView() {
   return (
     <div className="flex flex-col gap-6">
       {/* KPI Row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <KpiCard icon={DollarSign} label="Investimento" value={formatCurrency(spend)} color="#f59e0b" />
         <KpiCard icon={Users} label="Alcance" value={reach.toLocaleString('pt-BR')} color="#0ea5e9" />
         <KpiCard icon={Eye} label="Impressões" value={impressions.toLocaleString('pt-BR')} color="#a855f7" />
         <KpiCard icon={MousePointerClick} label="Cliques" value={clicks.toLocaleString('pt-BR')} color="#10b981" />
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <KpiCard icon={DollarSign} label="CPM" value={formatCurrency(cpm)} color="#f59e0b" />
         <KpiCard icon={DollarSign} label="CPC" value={formatCurrency(cpc)} color="#f43f5e" />
         <KpiCard icon={TrendingUp} label="CTR" value={`${ctr.toFixed(2)}%`} color="#06b6d4" />
