@@ -3,13 +3,14 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import {
-  LayoutDashboard, Users, DollarSign, Megaphone, X,
+  LayoutDashboard, Users, DollarSign, BarChart3, Megaphone, X,
   ChevronRight, RefreshCw,
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import type { ActiveView } from '../types';
 import Sidebar from './Sidebar';
 import DateFilter from './DateFilter';
+import FilterBar from './ui/FilterBar';
 import NotificationBanner from '@/components/NotificationBanner';
 import AppHeader from '@/components/app/AppHeader';
 import SidebarFooter from '@/components/app/SidebarFooter';
@@ -79,6 +80,7 @@ const PRIMARY_NAV = [
   { icon: LayoutDashboard, label: 'Dashboard', view: 'dashboard' as ActiveView },
   { icon: Users,           label: 'Leads',     view: 'leads'     as ActiveView },
   { icon: DollarSign,      label: 'Vendas',    view: 'vendas'    as ActiveView },
+  { icon: BarChart3,       label: 'Métricas',  view: 'metrics'   as ActiveView },
   { icon: Megaphone,       label: 'Marketing', view: 'marketing' as ActiveView },
 ] as const;
 
@@ -86,6 +88,7 @@ const DRAWER_NAV = [
   { icon: LayoutDashboard, label: 'Smart Dashboard',  view: 'dashboard' as ActiveView },
   { icon: Users,           label: 'Leads & Pipeline',  view: 'leads'     as ActiveView },
   { icon: DollarSign,      label: 'Vendas & Projetos', view: 'vendas'    as ActiveView },
+  { icon: BarChart3,       label: 'Métricas',         view: 'metrics'   as ActiveView },
   { icon: Megaphone,       label: 'Marketing',        view: 'marketing' as ActiveView },
 ] as const;
 
@@ -221,7 +224,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           fallbackTitle={title}
           accent="orange"
           centerContent={<MarketingHeaderMetrics />}
-          actions={<DateFilter />}
+          actions={
+            <div className="flex items-center gap-2">
+              <FilterBar />
+              <DateFilter />
+            </div>
+          }
         />
 
         <main
@@ -242,8 +250,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             />
           </div>
 
-          <div className="lg:hidden sticky top-0 z-20 px-4 pt-2.5 pb-2 bg-[#09090b]/96 backdrop-blur-md border-b border-white/[0.05]">
+          <div className="lg:hidden sticky top-0 z-20 px-4 pt-2.5 pb-2 bg-[#09090b]/96 backdrop-blur-md border-b border-white/[0.05] space-y-2">
             <DateFilter />
+            <FilterBar />
           </div>
           <div
             className="px-4 pt-3 pb-3 lg:px-6 lg:py-4 min-w-0"

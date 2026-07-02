@@ -8,6 +8,7 @@ import type { DashboardApiResponse } from '../types';
 const DashboardView      = lazy(() => import('./views/DashboardView'));
 const LeadsView          = lazy(() => import('./views/LeadsView'));
 const VendasView         = lazy(() => import('./views/VendasView'));
+const MetricsView        = lazy(() => import('./views/MetricsView'));
 const MarketingAdsView   = lazy(() => import('./views/MarketingAdsView'));
 
 function ViewRouter() {
@@ -17,6 +18,7 @@ function ViewRouter() {
     dashboard: <DashboardView />,
     leads:     <LeadsView />,
     vendas:    <VendasView />,
+    metrics:   <MetricsView />,
     marketing: <MarketingAdsView />,
   };
 

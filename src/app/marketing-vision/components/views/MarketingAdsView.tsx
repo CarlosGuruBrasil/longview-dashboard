@@ -39,6 +39,7 @@ export default function MarketingAdsView() {
   const { metaData, filteredLeads } = useData()
   const [dailyMetric, setDailyMetric] = useState<DailyMetric>('spend')
   const [campaignSearch, setCampaignSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'ACTIVE'>('all')
   const [sortField, setSortField] = useState<keyof MetaCampaignInsight>('spend')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
@@ -89,15 +90,21 @@ export default function MarketingAdsView() {
   }, [metaData])
 
   const filteredCampaigns = useMemo(() => {
-    const list = (metaData?.campaigns ?? []).filter(c =>
-      c.campaign_name.toLowerCase().includes(campaignSearch.toLowerCase())
-    )
+    const list = (metaData?.campaigns ?? [])
+      .filter(c =>
+        c.campaign_name.toLowerCase().includes(campaignSearch.toLowerCase()) &&
+        (statusFilter === 'all' || statusById.get(c.campaign_id) === statusFilter)
+      )
     return list.slice().sort((a, b) => {
+      const aStatus = statusById.get(a.campaign_id)
+      const bStatus = statusById.get(b.campaign_id)
+      if (aStatus === 'ACTIVE' && bStatus !== 'ACTIVE') return -1
+      if (aStatus !== 'ACTIVE' && bStatus === 'ACTIVE') return 1
       const av = Number(a[sortField] ?? 0)
       const bv = Number(b[sortField] ?? 0)
       return sortDir === 'desc' ? bv - av : av - bv
     })
-  }, [metaData, campaignSearch, sortField, sortDir])
+  }, [metaData, campaignSearch, statusFilter, sortField, sortDir, statusById])
 
   function toggleSort(field: keyof MetaCampaignInsight) {
     if (sortField === field) {
@@ -202,16 +209,28 @@ export default function MarketingAdsView() {
       <GlassCard
         title="Campanhas"
         action={
-          <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 opacity-40" style={{ color: 'var(--text-primary)' }} />
-            <input
-              type="text"
-              placeholder="Filtrar campanha..."
-              value={campaignSearch}
-              onChange={e => setCampaignSearch(e.target.value)}
-              className="pl-8 pr-3 py-1.5 text-xs rounded-lg bg-white/5 border border-white/10 focus:outline-none focus:border-sky-500/40 w-48"
-              style={{ color: 'var(--text-primary)' }}
-            />
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setStatusFilter(s => s === 'all' ? 'ACTIVE' : 'all')}
+              className={`px-2.5 py-1.5 text-xs rounded-lg font-medium transition-colors ${
+                statusFilter === 'ACTIVE'
+                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                  : 'bg-white/5 text-zinc-400 border border-white/10 hover:bg-white/10'
+              }`}
+            >
+              {statusFilter === 'ACTIVE' ? 'Só ativas' : 'Todas'}
+            </button>
+            <div className="relative">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 opacity-40" style={{ color: 'var(--text-primary)' }} />
+              <input
+                type="text"
+                placeholder="Filtrar campanha..."
+                value={campaignSearch}
+                onChange={e => setCampaignSearch(e.target.value)}
+                className="pl-8 pr-3 py-1.5 text-xs rounded-lg bg-white/5 border border-white/10 focus:outline-none focus:border-sky-500/40 w-48"
+                style={{ color: 'var(--text-primary)' }}
+              />
+            </div>
           </div>
         }
       >

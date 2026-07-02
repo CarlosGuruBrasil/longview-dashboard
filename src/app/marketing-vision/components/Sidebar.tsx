@@ -7,6 +7,7 @@ import {
   Users,
   DollarSign,
   Megaphone,
+  BarChart3,
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import type { ActiveView } from '../types';
@@ -22,6 +23,7 @@ const NAV_ITEMS: NavItem[] = [
   { icon: LayoutDashboard, label: 'Smart Dashboard', view: 'dashboard' },
   { icon: Users,           label: 'Leads & Pipeline', view: 'leads'      },
   { icon: DollarSign,      label: 'Vendas & Projetos',view: 'vendas'     },
+  { icon: BarChart3,       label: 'Métricas',        view: 'metrics'    },
   { icon: Megaphone,       label: 'Marketing',       view: 'marketing'  },
 ];
 

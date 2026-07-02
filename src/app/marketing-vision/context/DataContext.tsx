@@ -1,7 +1,13 @@
 'use client';
 import React, { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
-import type { Lead, MetaData, EstoqueData, MetaLeadForm, MetaPageInfo, DateRange, ActiveView } from '../types';
-import { toISODate } from '../utils/leads';
+import type { Lead, MetaData, EstoqueData, MetaLeadForm, MetaPageInfo, DateRange, ActiveView, LeadSituacao } from '../types';
+import { toISODate, getOrigin } from '../utils/leads';
+
+export interface LeadFilters {
+  origem?: string;
+  situacao?: string;
+  empreendimento?: string;
+}
 
 interface DataContextValue {
   // raw data
@@ -30,6 +36,8 @@ interface DataContextValue {
   // filters
   dateRange: DateRange;
   setDateRange: (range: DateRange) => void;
+  leadFilters: LeadFilters;
+  setLeadFilters: (filters: LeadFilters) => void;
   clearFilters: () => void;
 
   // navigation
@@ -85,6 +93,7 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
   const [loading, setLoading] = useState(!initialData);
   const [dataError, setDataError] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<DateRange>(monthToDate());
+  const [leadFilters, setLeadFilters] = useState<LeadFilters>({});
   const [activeView, setActiveView] = useState<ActiveView>('dashboard');
 
   // Detailed leads pagination states
@@ -95,17 +104,48 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
   const [detailedLoading, setDetailedLoading] = useState(false);
 
   const filteredLeads = useMemo(() => {
-    if (!dateRange.start && !dateRange.end) return allLeads;
-    return allLeads.filter(lead => {
-      const raw = lead.data_cad || lead.data_cadastro || lead.data_cadastramento;
-      if (!raw) return false;
-      const d = toISODate(raw);
-      if (!d) return false;
-      if (dateRange.start && d < dateRange.start) return false;
-      if (dateRange.end && d > dateRange.end) return false;
-      return true;
-    });
-  }, [allLeads, dateRange]);
+    let result = allLeads;
+
+    // Date filter
+    if (dateRange.start || dateRange.end) {
+      result = result.filter(lead => {
+        const raw = lead.data_cad || lead.data_cadastro || lead.data_cadastramento;
+        if (!raw) return false;
+        const d = toISODate(raw);
+        if (!d) return false;
+        if (dateRange.start && d < dateRange.start) return false;
+        if (dateRange.end && d > dateRange.end) return false;
+        return true;
+      });
+    }
+
+    // Lead filters
+    if (leadFilters.origem) {
+      const filterVal = leadFilters.origem.toLowerCase();
+      result = result.filter(lead => {
+        const origin = getOrigin(lead);
+        return origin.toLowerCase().includes(filterVal);
+      });
+    }
+    if (leadFilters.situacao) {
+      const filterVal = leadFilters.situacao;
+      result = result.filter(lead => {
+        const sit = lead.situacao as LeadSituacao | undefined;
+        return sit?.nome?.toLowerCase() === filterVal.toLowerCase();
+      });
+    }
+    if (leadFilters.empreendimento) {
+      const filterVal = leadFilters.empreendimento.toLowerCase();
+      result = result.filter(lead => {
+        const emp = lead.empreendimento;
+        return Array.isArray(emp)
+          ? emp.some(e => (e.nome || '').toLowerCase().includes(filterVal))
+          : (emp as { nome?: string } | undefined)?.nome?.toLowerCase().includes(filterVal);
+      });
+    }
+
+    return result;
+  }, [allLeads, dateRange, leadFilters]);
 
   const fetchDetailedLeads = useCallback(async (page: number, limit = 50, rangeOverride?: DateRange) => {
     setDetailedLoading(true);
@@ -171,6 +211,7 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
 
   const clearFilters = useCallback(() => {
     setDateRange(DEFAULT_DATE);
+    setLeadFilters({});
   }, []);
 
   // Initial load — fetches data once on mount
@@ -196,7 +237,7 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
       crmTotal, updatedAt, loading, dataError, metaValidation,
       detailedLeads, detailedPage, detailedLimit, detailedTotal, detailedLoading, fetchDetailedLeads,
       filteredLeads,
-      dateRange, setDateRange, clearFilters,
+      dateRange, setDateRange, leadFilters, setLeadFilters, clearFilters,
       activeView, setActiveView,
       refresh,
     }}>
