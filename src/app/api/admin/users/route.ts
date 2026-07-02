@@ -1,32 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { readUsers, writeUsers, DbUser } from '@/lib/db-kv';
 import { normalizePermissions } from '@/lib/permissions';
 import { rateLimit, getClientIp } from '@/lib/rateLimit';
+import { verifyAdminAuth } from '@/lib/auth';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'secret-longview-key';
-
-// Helper para validar se a requisição vem de um administrador
-async function checkAdminAuth(): Promise<any | null> {
-  try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get('auth_token')?.value;
-    
-    if (!token) return null;
-
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
-    
-    // Verifica se é Desenvolvedor ou tem a permissão de Admin ativa
-    if (decoded && (decoded.role === 'Desenvolvedor' || decoded.permissions?.isAdmin === true)) {
-      return decoded;
-    }
-    return null;
-  } catch (e) {
-    return null;
-  }
-}
 
 // GET: Listar usuários cadastrados
 export async function GET(request: NextRequest) {
@@ -36,7 +13,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Muitas requisições.' }, { status: 429 });
   }
 
-  const adminUser = await checkAdminAuth();
+  const adminUser = await verifyAdminAuth();
   if (!adminUser) {
     return NextResponse.json({ error: 'Acesso negado. Apenas administradores podem gerenciar usuários.' }, { status: 403 });
   }
@@ -45,7 +22,7 @@ export async function GET(request: NextRequest) {
     const users = await readUsers();
     // Ocultar os hashes de senha antes de retornar os usuários
     const safeUsers = users.map(u => {
-      const { passwordHash, ...safeUser } = u;
+      const { passwordHash: _, ...safeUser } = u;
       return safeUser;
     });
 
@@ -58,7 +35,7 @@ export async function GET(request: NextRequest) {
 
 // POST: Criar novo usuário com permissões customizadas e senha
 export async function POST(request: NextRequest) {
-  const adminUser = await checkAdminAuth();
+  const adminUser = await verifyAdminAuth();
   if (!adminUser) {
     return NextResponse.json({ error: 'Acesso negado. Apenas administradores podem cadastrar usuários.' }, { status: 403 });
   }
@@ -106,7 +83,7 @@ export async function POST(request: NextRequest) {
 
 // PUT: Atualizar usuário existente (permissões ou dados)
 export async function PUT(request: NextRequest) {
-  const adminUser = await checkAdminAuth();
+  const adminUser = await verifyAdminAuth();
   if (!adminUser) {
     return NextResponse.json({ error: 'Acesso negado. Apenas administradores podem atualizar usuários.' }, { status: 403 });
   }
@@ -119,7 +96,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'ID do usuário é obrigatório.' }, { status: 400 });
     }
 
-    let users = await readUsers();
+    const users = await readUsers();
     const userIndex = users.findIndex(u => u.id === id);
 
     if (userIndex === -1) {
@@ -157,7 +134,7 @@ export async function PUT(request: NextRequest) {
 
 // DELETE: Remover usuário
 export async function DELETE(request: NextRequest) {
-  const adminUser = await checkAdminAuth();
+  const adminUser = await verifyAdminAuth();
   if (!adminUser) {
     return NextResponse.json({ error: 'Acesso negado. Apenas administradores podem excluir usuários.' }, { status: 403 });
   }

@@ -13,7 +13,7 @@
  */
 
 import type { Lead, MetaData } from '../types';
-import { isSale, toISODate, getLeadDate } from './leads';
+import { toISODate, getLeadDate } from './leads';
 import { getLeadStage } from './metrics';
 
 // ─── Thresholds ───────────────────────────────────────────────────────────────

@@ -8,6 +8,20 @@ export const revalidate = 0;
 
 const MONTHS_PT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
+type MonthlySeriesPoint = {
+  label: string;
+  year: number;
+  month: number;
+  total: number;
+  aprovadas: number;
+  reprovadas: number;
+  naoAplica: number;
+};
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const startYear = parseInt(searchParams.get('startYear') ?? String(new Date().getFullYear() - 1));
@@ -88,7 +102,7 @@ export async function GET(req: Request) {
     `;
 
     // Merge monthly series
-    const seriesMap: Record<string, any> = {};
+    const seriesMap: Record<string, MonthlySeriesPoint> = {};
 
     for (const row of inspMensalQuery) {
       if (!row.year || !row.month) continue;
@@ -146,8 +160,8 @@ export async function GET(req: Request) {
       ultimasInspecoes,
       meta: { startYear, endYear },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[API/construpoint]', error);
-    return NextResponse.json({ error: `Erro ao buscar dados no SQL: ${error.message}` }, { status: 500 });
+    return NextResponse.json({ error: `Erro ao buscar dados no SQL: ${errorMessage(error)}` }, { status: 500 });
   }
 }

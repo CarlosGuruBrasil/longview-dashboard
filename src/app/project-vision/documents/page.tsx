@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  FolderOpen, Search, FileText, Download, RefreshCw,
+  FolderOpen, Search, Download, RefreshCw,
   Paperclip, Filter, X, Loader2, Plus, Upload,
 } from 'lucide-react';
 import type { DocumentWithContext } from '@/app/api/documents/route';
@@ -89,8 +89,15 @@ export default function DocumentsPage() {
     } catch { /* ignora */ }
   }, [uploadTask]);
 
-  useEffect(() => { fetchDocs(); }, [fetchDocs]);
-  useEffect(() => { if (uploadOpen) fetchTasks(); }, [uploadOpen, fetchTasks]);
+  useEffect(() => {
+    const id = window.setTimeout(() => { void fetchDocs(); }, 0);
+    return () => window.clearTimeout(id);
+  }, [fetchDocs]);
+  useEffect(() => {
+    if (!uploadOpen) return;
+    const id = window.setTimeout(() => { void fetchTasks(); }, 0);
+    return () => window.clearTimeout(id);
+  }, [uploadOpen, fetchTasks]);
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();

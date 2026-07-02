@@ -5,6 +5,34 @@ import { isCronAuthorized, unauthorizedJson } from '@/lib/internal-auth';
 const META_API_VERSION = 'v21.0';
 const META_PAGE_ID     = '259079394232614';
 
+type ApiListResponse = {
+  data?: unknown[];
+};
+
+type ProjectResponse = {
+  idempreendimento?: string | number;
+};
+
+function isId(value: string | number | undefined): value is string | number {
+  return Boolean(value);
+}
+
+function settledData(result: PromiseSettledResult<unknown>): unknown {
+  return result.status === 'fulfilled' && result.value && typeof result.value === 'object'
+    ? (result.value as { data?: unknown }).data ?? null
+    : null;
+}
+
+function listData(value: unknown): unknown[] {
+  return value && typeof value === 'object' && Array.isArray((value as ApiListResponse).data)
+    ? (value as ApiListResponse).data ?? []
+    : [];
+}
+
+function errorMessage(error: unknown): string {
+  return axios.isAxiosError(error) ? error.message : error instanceof Error ? error.message : String(error);
+}
+
 export async function GET(request: NextRequest) {
   if (!isCronAuthorized(request)) return unauthorizedJson();
 
@@ -40,20 +68,20 @@ export async function GET(request: NextRequest) {
         axios.get(`https://graph.facebook.com/${META_API_VERSION}/${META_PAGE_ID}`, { params: { fields: 'id,name,fan_count,followers_count,instagram_business_account', ...auth }, timeout: 10000 }),
       ]);
 
-    const get = (r: PromiseSettledResult<any>) => r.status === 'fulfilled' ? r.value.data : null;
+    const get = settledData;
 
     const metaData = {
-      global:          get(global)?.data?.[0] ?? null,
-      campaigns:       get(camps)?.data ?? [],
-      campaignDetails: get(campDetails)?.data ?? [],
-      adsets:          get(adsets)?.data ?? [],
-      demographics:    get(demo)?.data ?? [],
-      regions:         get(region)?.data ?? [],
-      platforms:       get(platform)?.data ?? [],
-      devices:         get(device)?.data ?? [],
-      daily:           get(daily)?.data ?? [],
-      monthly:         get(monthly)?.data ?? [],
-      leadForms:       get(forms)?.data ?? [],
+      global:          listData(get(global))[0] ?? null,
+      campaigns:       listData(get(camps)),
+      campaignDetails: listData(get(campDetails)),
+      adsets:          listData(get(adsets)),
+      demographics:    listData(get(demo)),
+      regions:         listData(get(region)),
+      platforms:       listData(get(platform)),
+      devices:         listData(get(device)),
+      daily:           listData(get(daily)),
+      monthly:         listData(get(monthly)),
+      leadForms:       listData(get(forms)),
       page:            get(page) ?? null,
     };
 
@@ -62,8 +90,8 @@ export async function GET(request: NextRequest) {
       ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data
     `;
     console.log('[sync-dashboard] Meta cache atualizado');
-  } catch (e: any) {
-    errors.push('meta: ' + e.message);
+  } catch (e: unknown) {
+    errors.push('meta: ' + errorMessage(e));
   }
 
   // ---------- ESTOQUE ----------
@@ -73,19 +101,22 @@ export async function GET(request: NextRequest) {
       'https://longviewempreendimentos.cvcrm.com.br/api/v1/cadastros/empreendimentos',
       { headers, timeout: 15000 }
     );
-    const projects = Array.isArray(projRes.data) ? projRes.data : [];
-    const ids = projects.map((p: any) => p.idempreendimento).filter(Boolean);
+    const projects = Array.isArray(projRes.data) ? projRes.data as ProjectResponse[] : [];
+    const ids = projects.map((p) => p.idempreendimento).filter(isId);
 
     const estoqueResults = await Promise.allSettled(
-      ids.map((id: string) =>
+      ids.map((id) => {
+        const idText = String(id);
+        return (
         axios.get(`https://longviewempreendimentos.cvcrm.com.br/api/v1/cadastros/empreendimentos/${id}`,
           { params: { limite_dados_unidade: 1000 }, headers, timeout: 15000 }
-        ).then(r => ({ id, data: r.data }))
-      )
+        ).then(r => ({ id: idText, data: r.data }))
+        );
+      })
     );
 
-    const estoqueMap: Record<string, any> = {};
-    estoqueResults.forEach((r: any) => {
+    const estoqueMap: Record<string, unknown> = {};
+    estoqueResults.forEach((r) => {
       if (r.status === 'fulfilled') estoqueMap[r.value.id] = r.value.data;
     });
 
@@ -94,8 +125,8 @@ export async function GET(request: NextRequest) {
       ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data
     `;
     console.log('[sync-dashboard] Estoque cache atualizado');
-  } catch (e: any) {
-    errors.push('estoque: ' + e.message);
+  } catch (e: unknown) {
+    errors.push('estoque: ' + errorMessage(e));
   }
 
   return NextResponse.json({ ok: true, errors, updatedAt: new Date().toISOString() });

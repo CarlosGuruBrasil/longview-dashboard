@@ -1,14 +1,96 @@
+export const dynamic = 'force-dynamic';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import axios from 'axios';
+import type { AxiosResponse } from 'axios';
 import jwt from 'jsonwebtoken';
 import { rateLimit, getClientIp } from '@/lib/rateLimit';
+import type { MetaData, MetaLeadForm, MetaPageInfo } from '@/app/marketing-vision/types';
 
 const JWT_SECRET   = process.env.JWT_SECRET || 'secret-longview-key';
 const META_PAGE_ID = '259079394232614';
 // Cache nunca expira no caminho de leitura — cron ou ?refresh=true renovam.
 
-function parseJsonValue<T = any>(value: unknown): T {
+type AuthUser = {
+  role?: string;
+  email?: string;
+  name?: string;
+  permissions?: {
+    viewMarketingDashboard?: boolean;
+    isAdmin?: boolean;
+  };
+};
+
+type PgLeadRow = {
+  id: string | number;
+  idlead: unknown;
+  nome: string | null;
+  email: string | null;
+  telefone: string | null;
+  celular: unknown;
+  midia_principal: unknown;
+  midia_visita: unknown;
+  origem: unknown;
+  status: string | null;
+  situacao: unknown;
+  empreendimento: unknown;
+  corretor: unknown;
+  gestor: unknown;
+  imobiliaria: unknown;
+  autor_ultima_alteracao: unknown;
+  temperatura: string | null;
+  score: number | null;
+  valor_negocio: unknown;
+  valor_venda: unknown;
+  data_venda: unknown;
+  qtde_reservas_associadas: unknown;
+  qtde_simulacoes_associadas: unknown;
+  motivo_cancelamento: unknown;
+  cidade: unknown;
+  tags: unknown;
+  bolsao: unknown;
+  data_cadastro: string | Date | null;
+  data_atualizacao: string | Date | null;
+};
+
+type DashboardLead = Record<string, unknown> & {
+  corretor?: unknown;
+  gestor?: unknown;
+};
+
+type CRMRawLead = DashboardLead & {
+  idlead?: string | number;
+  id?: string | number;
+  nome?: string;
+  name?: string;
+  email?: string;
+  telefone?: string;
+  celular?: string;
+  phone?: string;
+  origem?: unknown;
+  source?: unknown;
+  status?: string;
+  empreendimento?: { nome?: string } | string;
+  corretor?: unknown;
+  gestor?: unknown;
+  score?: string | number | null;
+  temperatura?: string;
+  temperatura_lead?: string;
+  data_cadastro?: string;
+  created_at?: string;
+  createdAt?: string;
+  data_atualizacao?: string;
+  updated_at?: string;
+  updatedAt?: string;
+};
+
+type CRMLeadsResponse = { leads?: CRMRawLead[]; total?: number };
+type MetaApiList<T> = { data?: T[] };
+type MetaCache = { data?: Partial<MetaData>; updatedAt?: string };
+type LeadResult = { leads: DashboardLead[]; total: number; crmTotal: number };
+
+function parseJsonValue<T = unknown>(value: unknown): T {
   if (typeof value === 'string') {
     try {
       return JSON.parse(value) as T;
@@ -19,16 +101,24 @@ function parseJsonValue<T = any>(value: unknown): T {
   return value as T;
 }
 
-async function verifyAuth(): Promise<any | null> {
+function stringOrNull(value: unknown): string | null {
+  return value == null ? null : String(value);
+}
+
+function personFields(value: unknown): { email?: string; nome?: string } {
+  return typeof value === 'object' && value !== null ? value as { email?: string; nome?: string } : {};
+}
+
+async function verifyAuth(): Promise<AuthUser | null> {
   try {
     const cookieStore = await cookies();
     const token = cookieStore.get('auth_token')?.value;
     if (!token) return null;
-    return jwt.verify(token, JWT_SECRET);
+    return jwt.verify(token, JWT_SECRET) as AuthUser;
   } catch { return null; }
 }
 
-async function readPgCache(key: string): Promise<any | null> {
+async function readPgCache<T = unknown>(key: string): Promise<T | null> {
   if (!process.env.DATABASE_URL) return null;
   try {
     const { sql, ensureSchema } = await import('@/lib/pg');
@@ -39,7 +129,13 @@ async function readPgCache(key: string): Promise<any | null> {
   } catch { return null; }
 }
 
-async function readLeadsFromPg(startDate?: string | null, endDate?: string | null): Promise<{ leads: any[]; total: number; crmTotal: number } | null> {
+async function readLeadsFromPg(
+  startDate?: string | null,
+  endDate?: string | null,
+  detailed = false,
+  page = 1,
+  limit = 50
+): Promise<LeadResult | null> {
   if (!process.env.DATABASE_URL) return null;
   try {
     const { sql, ensureSchema } = await import('@/lib/pg');
@@ -48,35 +144,190 @@ async function readLeadsFromPg(startDate?: string | null, endDate?: string | nul
     const count = parseInt(countRow?.count ?? '0', 10);
     if (count === 0) return null;
 
-    // ponytail: comparação puramente em SQL — sem manipulação de Date em JS.
-    // Evita bugs de timezone/DST (o hardcoded -03:00 quebrava em março/outubro).
-    // endDate inclui o próprio dia: data_cadastro < endDate::date + 1 dia.
-    let rows: { raw: unknown }[];
-    if (startDate && endDate) {
-      rows = await sql`
-        SELECT raw FROM leads
-        WHERE data_cadastro >= ${startDate}::date
-          AND data_cadastro <  (${endDate}::date + INTERVAL '1 day')
-        ORDER BY data_cadastro DESC NULLS LAST
-      `;
-    } else if (startDate) {
-      rows = await sql`
-        SELECT raw FROM leads
-        WHERE data_cadastro >= ${startDate}::date
-        ORDER BY data_cadastro DESC NULLS LAST
-      `;
-    } else if (endDate) {
-      rows = await sql`
-        SELECT raw FROM leads
-        WHERE data_cadastro < (${endDate}::date + INTERVAL '1 day')
-        ORDER BY data_cadastro DESC NULLS LAST
+    let selectFields;
+    if (detailed) {
+      selectFields = sql`
+        id,
+        raw->'idlead' AS idlead,
+        nome,
+        email,
+        telefone,
+        raw->'celular' AS celular,
+        raw->'midia_principal' AS midia_principal,
+        raw->'midia_visita' AS midia_visita,
+        raw->'origem' AS origem,
+        status,
+        raw->'situacao' AS situacao,
+        raw->'empreendimento' AS empreendimento,
+        raw->'corretor' AS corretor,
+        raw->'gestor' AS gestor,
+        raw->'imobiliaria' AS imobiliaria,
+        raw->'autor_ultima_alteracao' AS autor_ultima_alteracao,
+        temperatura,
+        score,
+        raw->'valor_negocio' AS valor_negocio,
+        raw->'valor_venda' AS valor_venda,
+        raw->'data_venda' AS data_venda,
+        raw->'qtde_reservas_associadas' AS qtde_reservas_associadas,
+        raw->'qtde_simulacoes_associadas' AS qtde_simulacoes_associadas,
+        raw->'motivo_cancelamento' AS motivo_cancelamento,
+        NULL::text AS cidade,
+        NULL::text AS bolsao,
+        raw->'tags' AS tags,
+        data_cadastro,
+        data_atualizacao
       `;
     } else {
-      rows = await sql`SELECT raw FROM leads ORDER BY data_cadastro DESC NULLS LAST`;
+      selectFields = sql`
+        id,
+        raw->'idlead' AS idlead,
+        nome,
+        telefone,
+        raw->'celular' AS celular,
+        raw->'midia_principal' AS midia_principal,
+        raw->'origem' AS origem,
+        status,
+        raw->'situacao' AS situacao,
+        raw->'empreendimento' AS empreendimento,
+        raw->'corretor' AS corretor,
+        raw->'gestor' AS gestor,
+        raw->'imobiliaria' AS imobiliaria,
+        temperatura,
+        score,
+        raw->'valor_negocio' AS valor_negocio,
+        raw->'valor_venda' AS valor_venda,
+        raw->'data_venda' AS data_venda,
+        NULL::text AS cidade,
+        NULL::text AS bolsao,
+        raw->'tags' AS tags,
+        data_cadastro,
+        data_atualizacao
+      `;
     }
 
-    const leads = rows.map((r: { raw: unknown }) => parseJsonValue(r.raw));
-    return { leads, total: leads.length, crmTotal: count };
+    let rows: PgLeadRow[];
+    if (startDate && endDate) {
+      if (detailed) {
+        rows = await sql<PgLeadRow[]>`
+          SELECT ${selectFields}
+          FROM leads
+          WHERE data_cadastro >= ${startDate}::date
+            AND data_cadastro <  (${endDate}::date + INTERVAL '1 day')
+          ORDER BY data_cadastro DESC NULLS LAST
+          LIMIT ${limit} OFFSET ${(page - 1) * limit}
+        `;
+      } else {
+        rows = await sql<PgLeadRow[]>`
+          SELECT ${selectFields}
+          FROM leads
+          WHERE data_cadastro >= ${startDate}::date
+            AND data_cadastro <  (${endDate}::date + INTERVAL '1 day')
+          ORDER BY data_cadastro DESC NULLS LAST
+        `;
+      }
+    } else if (startDate) {
+      if (detailed) {
+        rows = await sql<PgLeadRow[]>`
+          SELECT ${selectFields}
+          FROM leads
+          WHERE data_cadastro >= ${startDate}::date
+          ORDER BY data_cadastro DESC NULLS LAST
+          LIMIT ${limit} OFFSET ${(page - 1) * limit}
+        `;
+      } else {
+        rows = await sql<PgLeadRow[]>`
+          SELECT ${selectFields}
+          FROM leads
+          WHERE data_cadastro >= ${startDate}::date
+          ORDER BY data_cadastro DESC NULLS LAST
+        `;
+      }
+    } else if (endDate) {
+      if (detailed) {
+        rows = await sql<PgLeadRow[]>`
+          SELECT ${selectFields}
+          FROM leads
+          WHERE data_cadastro < (${endDate}::date + INTERVAL '1 day')
+          ORDER BY data_cadastro DESC NULLS LAST
+          LIMIT ${limit} OFFSET ${(page - 1) * limit}
+        `;
+      } else {
+        rows = await sql<PgLeadRow[]>`
+          SELECT ${selectFields}
+          FROM leads
+          WHERE data_cadastro < (${endDate}::date + INTERVAL '1 day')
+          ORDER BY data_cadastro DESC NULLS LAST
+        `;
+      }
+    } else {
+      if (detailed) {
+        rows = await sql<PgLeadRow[]>`
+          SELECT ${selectFields}
+          FROM leads
+          ORDER BY data_cadastro DESC NULLS LAST
+          LIMIT ${limit} OFFSET ${(page - 1) * limit}
+        `;
+      } else {
+        rows = await sql<PgLeadRow[]>`
+          SELECT ${selectFields}
+          FROM leads
+          ORDER BY data_cadastro DESC NULLS LAST
+        `;
+      }
+    }
+
+    const leads: DashboardLead[] = rows.map((r) => {
+      const base: DashboardLead = {
+        id: r.id,
+        idlead: r.idlead,
+        midia_principal: r.midia_principal,
+        origem: parseJsonValue(r.origem),
+        status: r.status,
+        situacao: parseJsonValue(r.situacao),
+        empreendimento: parseJsonValue(r.empreendimento),
+        corretor: parseJsonValue(r.corretor),
+        imobiliaria: parseJsonValue(r.imobiliaria),
+        temperatura: r.temperatura,
+        score: r.score,
+        valor_negocio: r.valor_negocio,
+        valor_venda: r.valor_venda,
+        data_venda: r.data_venda,
+        cidade: r.cidade,
+        bolsao: r.bolsao,
+        data_cadastro: r.data_cadastro,
+      };
+
+      if (detailed) {
+        base.nome = r.nome ?? undefined;
+        base.email = r.email ?? undefined;
+        base.telefone = r.telefone ?? undefined;
+        base.celular = r.celular;
+        base.midia_visita = r.midia_visita;
+        base.gestor = parseJsonValue(r.gestor);
+        base.autor_ultima_alteracao = r.autor_ultima_alteracao;
+        base.qtde_reservas_associadas = r.qtde_reservas_associadas;
+        base.qtde_simulacoes_associadas = r.qtde_simulacoes_associadas;
+        base.motivo_cancelamento = parseJsonValue(r.motivo_cancelamento);
+        base.tags = parseJsonValue(r.tags);
+        base.data_atualizacao = r.data_atualizacao;
+      }
+
+      return base;
+    });
+
+    let totalCount = count;
+    if (startDate || endDate) {
+      const [filterCountRow] = await sql<{ count: string }[]>`
+        SELECT COUNT(*)::int AS count 
+        FROM leads 
+        WHERE 1=1 
+          ${startDate ? sql`AND data_cadastro >= ${startDate}::date` : sql``}
+          ${endDate ? sql`AND data_cadastro < (${endDate}::date + INTERVAL '1 day')` : sql``}
+      `;
+      totalCount = parseInt(filterCountRow?.count ?? '0', 10);
+    }
+
+    return { leads, total: leads.length, crmTotal: totalCount };
   } catch (e: unknown) {
     console.warn('[/api/data] Postgres leads falhou:', e instanceof Error ? e.message : e);
     return null;
@@ -88,7 +339,33 @@ async function readEstoqueFromPg() {
   try {
     const { sql, ensureSchema } = await import('@/lib/pg');
     await ensureSchema();
-    const empreendimentos = await sql`SELECT id, nome, situacao, tipo FROM cv_empreendimentos`;
+    const empreendimentos = await sql`
+      SELECT id, nome, situacao, tipo,
+        raw->>'cidade' AS cidade,
+        raw->>'bairro' AS bairro,
+        raw->>'estado' AS estado,
+        raw->>'endereco' AS endereco,
+        raw->>'regiao' AS regiao,
+        raw->>'cep' AS cep,
+        raw->>'sigla' AS sigla,
+        raw->>'numero' AS numero,
+        raw->>'data_entrega' AS data_entrega,
+        (raw->>'andamento')::int AS andamento,
+        raw->>'foto' AS foto,
+        raw->>'logo' AS logo,
+        (raw->>'latitude')::float AS latitude,
+        (raw->>'longitude')::float AS longitude,
+        raw->>'area_construida' AS area_construida,
+        raw->>'area_privativa' AS area_privativa,
+        raw->>'nome_empresa' AS nome_empresa,
+        raw->>'periodo_venda_inicio' AS periodo_venda_inicio,
+        raw->>'disponivel' AS disponivel,
+        raw->>'link_disponibilidade' AS link_disponibilidade,
+        raw->'segmento'->0->>'nome' AS segmento,
+        raw->'situacao_obra'->0->>'nome' AS situacao_obra,
+        raw->'tabela' AS tabela
+      FROM cv_empreendimentos ORDER BY id
+    `;
     const resumo = await sql`
       SELECT 
         id_empreendimento,
@@ -101,35 +378,164 @@ async function readEstoqueFromPg() {
       FROM cv_unidades
       GROUP BY id_empreendimento
     `;
-    const unidades = await sql`SELECT id, id_empreendimento, bloco, numero, status, valor, metragem FROM cv_unidades`;
+    const unidades = await sql`
+      SELECT id, id_empreendimento, bloco, numero, status, status_venda, valor, metragem,
+        (raw->>'andar')::int AS andar,
+        (raw->>'coluna')::int AS coluna,
+        raw->>'tipologia' AS tipologia,
+        (raw->'situacao'->>'situacao_mapa_disponibilidade')::int AS situacao_mapa_disponibilidade
+      FROM cv_unidades
+    `;
     
     if (empreendimentos.length === 0) return null;
     return { empreendimentos, resumo, unidades };
-  } catch(e: any) {
-    console.warn('[/api/data] Postgres estoque falhou:', e.message);
+  } catch(e: unknown) {
+    console.warn('[/api/data] Postgres estoque falhou:', e instanceof Error ? e.message : e);
     return null;
   }
 }
 
 // Fallback: busca ao vivo do CRM (quando Postgres vazio)
-async function fetchAllCRMLeads(email: string, token: string) {
+async function fetchAllCRMLeads(email: string, token: string): Promise<{ leads: CRMRawLead[]; total: number; crmTotal: number }> {
   const headers = { email, token, Accept: 'application/json' };
   const base    = 'https://longviewempreendimentos.cvcrm.com.br/api/v1/comercial/leads';
   try {
-    const initial = await axios.get(base, { params: { limit: 1 }, headers, timeout: 8000 });
+    const initial = await axios.get<CRMLeadsResponse>(base, { params: { limit: 1 }, headers, timeout: 8000 });
     const maxLeads   = initial.data.total || 0;
     const limit      = 500;
     const totalPages = Math.ceil(maxLeads / limit);
     const results = await Promise.allSettled(
       Array.from({ length: totalPages }, (_, i) =>
-        axios.get(base, { params: { limit, offset: i * limit }, headers, timeout: 12000 })
+        axios.get<CRMLeadsResponse>(base, { params: { limit, offset: i * limit }, headers, timeout: 12000 })
       )
     );
-    const allLeads = results.filter(r => r.status === 'fulfilled').flatMap((r: any) => r.value.data?.leads || []);
+    const allLeads = results.flatMap(r => r.status === 'fulfilled' ? r.value.data.leads ?? [] : []);
     return { leads: allLeads, total: allLeads.length, crmTotal: initial.data.total || allLeads.length };
-  } catch (err: any) {
-    console.warn('[/api/data] CRM leads falhou:', err.message);
+  } catch (err: unknown) {
+    console.warn('[/api/data] CRM leads falhou:', err instanceof Error ? err.message : err);
     return { leads: [], total: 0, crmTotal: 0 };
+  }
+}
+
+// Fallback: busca empreendimentos ao vivo do CRM e persiste no Postgres
+async function fetchCRMEmpreendimentos(): Promise<{ empreendimentos: unknown[]; resumo: unknown[]; unidades: unknown[] } | null> {
+  const email = process.env.CV_CRM_EMAIL;
+  const token = process.env.CV_CRM_TOKEN;
+  if (!email || !token) return null;
+  const headers = { email, token, Accept: 'application/json' };
+
+  try {
+    const { sql, ensureSchema } = await import('@/lib/pg');
+    await ensureSchema();
+
+    console.log('[fetchCRMEmpreendimentos] Iniciando fallback...');
+    const projRes = await axios.get('https://longviewempreendimentos.cvcrm.com.br/api/v1/cadastros/empreendimentos', { headers, timeout: 20000 });
+    const projects = Array.isArray(projRes.data) ? projRes.data : [];
+    console.log(`[fetchCRMEmpreendimentos] ${projects.length} projetos recebidos do CRM`);
+    const validProjects = projects.filter((p: Record<string, unknown>) => {
+      const te = (p.tipo_empreendimento as { nome?: string }[] | undefined);
+      const sc = (p.situacao_comercial as { nome?: string }[] | undefined);
+      return te?.[0]?.nome !== null && sc?.[0]?.nome !== null;
+    });
+
+    const empreendimentos: { id: number; nome: string; situacao: string; tipo: string }[] = [];
+    const unidades: { id: number; id_empreendimento: number; bloco: string; numero: string; status: string; valor: number; metragem: number; andar: number | null; coluna: number | null; tipologia: string; situacao_mapa_disponibilidade: number | null }[] = [];
+
+    for (const raw of validProjects) {
+      const p = raw as Record<string, unknown>;
+      const idEmp = Number(p.idempreendimento);
+      if (!idEmp) continue;
+
+      const te = (p.tipo_empreendimento as { nome?: string }[] | undefined);
+      const sc = (p.situacao_comercial as { nome?: string }[] | undefined);
+      const nome = String(p.nome || p.empreendimento || '');
+      const situacao = String(sc?.[0]?.nome || '');
+      const tipo = String(te?.[0]?.nome || '');
+
+      empreendimentos.push({ id: idEmp, nome, situacao, tipo });
+
+      // Upsert into Postgres for persistence
+      await sql`
+        INSERT INTO cv_empreendimentos (id, nome, situacao, tipo, raw, synced_at)
+        VALUES (${idEmp}, ${nome}, ${situacao}, ${tipo}, ${JSON.stringify(p)}, NOW())
+        ON CONFLICT (id) DO UPDATE SET
+          nome = EXCLUDED.nome, situacao = EXCLUDED.situacao, tipo = EXCLUDED.tipo,
+          raw = EXCLUDED.raw, synced_at = EXCLUDED.synced_at
+      `;
+      await sql`DELETE FROM cv_unidades WHERE id_empreendimento = ${idEmp}`;
+
+      try {
+        const detRes = await axios.get(`https://longviewempreendimentos.cvcrm.com.br/api/v1/cadastros/empreendimentos/${idEmp}`, {
+          params: { limite_dados_unidade: 1000 }, headers, timeout: 20000
+        });
+        const rawData = detRes.data as { etapas?: { blocos?: { nome?: string; unidades?: Record<string, unknown>[] }[] }[] };
+        const rawUnidades: Record<string, unknown>[] = [];
+
+        if (Array.isArray(rawData?.etapas)) {
+          for (const etapa of rawData.etapas) {
+            if (Array.isArray(etapa.blocos)) {
+              for (const bloco of etapa.blocos) {
+                if (Array.isArray(bloco.unidades)) {
+                  for (const uni of bloco.unidades) {
+                    uni._bloco_nome = bloco.nome;
+                    rawUnidades.push(uni);
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        for (const uni of rawUnidades) {
+          const idUni = Number(uni.idunidade);
+          if (!idUni) continue;
+
+          const sitObj = (uni.situacao || {}) as Record<string, unknown>;
+          const statusVenda = Number(sitObj.situacao_para_venda ?? 0);
+          let statusText = 'Desconhecido';
+          if (statusVenda === 1) statusText = 'Disponivel';
+          else if (statusVenda === 2 || statusVenda === 5 || sitObj.reservada != null) statusText = 'Reservado';
+          else if (statusVenda === 3 || sitObj.vendida != null || sitObj.vendida_idsituacao === 3) statusText = 'Vendido';
+
+          const valor = parseFloat(String(uni.valor)) || 0;
+          const metragem = parseFloat(String(uni.metragem_real)) || 0;
+          const blocoNome = String(uni._bloco_nome || '');
+          const num = String(uni.nome || '');
+          const andar = uni.andar ? parseInt(String(uni.andar), 10) : null;
+          const coluna = uni.coluna ? parseInt(String(uni.coluna), 10) : null;
+          const tipologia = String(uni.tipologia ?? uni.tipo ?? '');
+          const situacao_mapa_disponibilidade = (sitObj.situacao_mapa_disponibilidade != null) ? Number(sitObj.situacao_mapa_disponibilidade) : null;
+
+          unidades.push({ id: idUni, id_empreendimento: idEmp, bloco: blocoNome, numero: num, status: statusText, valor, metragem, andar, coluna, tipologia, situacao_mapa_disponibilidade });
+
+          await sql`
+            INSERT INTO cv_unidades (id, id_empreendimento, bloco, numero, status, status_venda, valor, metragem, andar, coluna, tipologia, raw, synced_at)
+            VALUES (${idUni}, ${idEmp}, ${blocoNome}, ${num}, ${statusText}, ${statusVenda},
+              ${valor}, ${metragem}, ${andar}, ${coluna}, ${tipologia}, ${JSON.stringify(uni)}, NOW())
+          `;
+        }
+      } catch (detErr: unknown) {
+        console.warn(`[/api/data] Detalhes emp ${idEmp} falhou:`, detErr instanceof Error ? detErr.message : detErr);
+      }
+    }
+
+    // Build resumo aggregated from collected unidades
+    const resumoMap = new Map<number, { total: number; disponivel: number; reservado: number; vendido: number; vgv_disponivel: number; vgv_vendido: number }>();
+    for (const u of unidades) {
+      let r = resumoMap.get(u.id_empreendimento);
+      if (!r) { r = { total: 0, disponivel: 0, reservado: 0, vendido: 0, vgv_disponivel: 0, vgv_vendido: 0 }; resumoMap.set(u.id_empreendimento, r); }
+      r.total++;
+      if (u.status === 'Disponivel') { r.disponivel++; r.vgv_disponivel += u.valor; }
+      else if (u.status === 'Reservado') { r.reservado++; r.vgv_vendido += u.valor; }
+      else if (u.status === 'Vendido') { r.vendido++; r.vgv_vendido += u.valor; }
+    }
+    const resumo = Array.from(resumoMap.entries()).map(([id_empreendimento, v]) => ({ id_empreendimento, ...v }));
+
+    console.log(`[fetchCRMEmpreendimentos] Retornando ${empreendimentos.length} emp, ${unidades.length} unid (${validProjects.length} projetos válidos de ${projects.length})`);
+    return { empreendimentos, resumo, unidades };
+  } catch (e: unknown) {
+    console.warn('[/api/data] CRM empreendimentos falhou:', e instanceof Error ? e.message : e);
+    return null;
   }
 }
 
@@ -147,20 +553,20 @@ async function fetchMetaLive(startDate?: string | null, endDate?: string | null)
 
   const [global, camps, campDetails, adsets, demo, region, platform, device, daily, forms, page] =
     await Promise.allSettled([
-      axios.get(`${metaBase}/insights`, { params: { level: 'account', fields: 'spend,impressions,clicks,reach,frequency,cpc,cpm,ctr,cpp,actions,cost_per_action_type', ...timeParams, ...metaAuth }, timeout: 15000 }),
-      axios.get(`${metaBase}/insights`, { params: { level: 'campaign', fields: 'campaign_id,campaign_name,spend,impressions,clicks,reach,frequency,cpc,cpm,ctr,actions,cost_per_action_type,date_start,date_stop', ...timeParams, limit: 500, ...metaAuth }, timeout: 15000 }),
-      axios.get(`${metaBase}/campaigns`, { params: { fields: 'id,name,created_time,start_time,stop_time,status,objective,buying_type,daily_budget,lifetime_budget,spend_cap', limit: 1000, ...metaAuth }, timeout: 15000 }),
-      axios.get(`${metaBase}/insights`, { params: { level: 'adset', fields: 'campaign_id,campaign_name,adset_id,adset_name,spend,impressions,clicks,reach,cpc,cpm,ctr,actions,cost_per_action_type', ...timeParams, limit: 500, ...metaAuth }, timeout: 15000 }),
-      axios.get(`${metaBase}/insights`, { params: { level: 'account', fields: 'clicks,impressions,spend,reach', breakdowns: 'gender,age', ...timeParams, ...metaAuth }, timeout: 15000 }),
-      axios.get(`${metaBase}/insights`, { params: { level: 'account', fields: 'clicks,impressions,spend,reach', breakdowns: 'region', ...timeParams, ...metaAuth }, timeout: 15000 }),
-      axios.get(`${metaBase}/insights`, { params: { level: 'account', fields: 'clicks,impressions,spend,reach', breakdowns: 'publisher_platform', ...timeParams, ...metaAuth }, timeout: 15000 }),
-      axios.get(`${metaBase}/insights`, { params: { level: 'account', fields: 'clicks,impressions,spend,reach', breakdowns: 'device_platform', ...timeParams, ...metaAuth }, timeout: 15000 }),
-      axios.get(`${metaBase}/insights`, { params: { level: 'account', fields: 'spend,impressions,clicks,reach,actions', time_increment: 1, ...(startDate || endDate ? timeParams : { date_preset: 'last_30d' }), limit: 90, ...metaAuth }, timeout: 15000 }),
-      axios.get(`https://graph.facebook.com/${META_API_VERSION}/${META_PAGE_ID}/leadgen_forms`, { params: { fields: 'id,name,status,leads_count,created_time', limit: 50, ...metaAuth }, timeout: 10000 }),
-      axios.get(`https://graph.facebook.com/${META_API_VERSION}/${META_PAGE_ID}`, { params: { fields: 'id,name,fan_count,followers_count,instagram_business_account', ...metaAuth }, timeout: 8000 }),
+      axios.get<MetaApiList<unknown>>(`${metaBase}/insights`, { params: { level: 'account', fields: 'spend,impressions,clicks,reach,frequency,cpc,cpm,ctr,cpp,actions,cost_per_action_type', ...timeParams, ...metaAuth }, timeout: 15000 }),
+      axios.get<MetaApiList<unknown>>(`${metaBase}/insights`, { params: { level: 'campaign', fields: 'campaign_id,campaign_name,spend,impressions,clicks,reach,frequency,cpc,cpm,ctr,actions,cost_per_action_type,date_start,date_stop', ...timeParams, limit: 500, ...metaAuth }, timeout: 15000 }),
+      axios.get<MetaApiList<unknown>>(`${metaBase}/campaigns`, { params: { fields: 'id,name,created_time,start_time,stop_time,status,objective,buying_type,daily_budget,lifetime_budget,spend_cap', limit: 1000, ...metaAuth }, timeout: 15000 }),
+      axios.get<MetaApiList<unknown>>(`${metaBase}/insights`, { params: { level: 'adset', fields: 'campaign_id,campaign_name,adset_id,adset_name,spend,impressions,clicks,reach,cpc,cpm,ctr,actions,cost_per_action_type', ...timeParams, limit: 500, ...metaAuth }, timeout: 15000 }),
+      axios.get<MetaApiList<unknown>>(`${metaBase}/insights`, { params: { level: 'account', fields: 'clicks,impressions,spend,reach', breakdowns: 'gender,age', ...timeParams, ...metaAuth }, timeout: 15000 }),
+      axios.get<MetaApiList<unknown>>(`${metaBase}/insights`, { params: { level: 'account', fields: 'clicks,impressions,spend,reach', breakdowns: 'region', ...timeParams, ...metaAuth }, timeout: 15000 }),
+      axios.get<MetaApiList<unknown>>(`${metaBase}/insights`, { params: { level: 'account', fields: 'clicks,impressions,spend,reach', breakdowns: 'publisher_platform', ...timeParams, ...metaAuth }, timeout: 15000 }),
+      axios.get<MetaApiList<unknown>>(`${metaBase}/insights`, { params: { level: 'account', fields: 'clicks,impressions,spend,reach', breakdowns: 'device_platform', ...timeParams, ...metaAuth }, timeout: 15000 }),
+      axios.get<MetaApiList<unknown>>(`${metaBase}/insights`, { params: { level: 'account', fields: 'spend,impressions,clicks,reach,actions', time_increment: 1, ...(startDate || endDate ? timeParams : { date_preset: 'last_30d' }), limit: 90, ...metaAuth }, timeout: 15000 }),
+      axios.get<MetaApiList<MetaLeadForm>>(`https://graph.facebook.com/${META_API_VERSION}/${META_PAGE_ID}/leadgen_forms`, { params: { fields: 'id,name,status,leads_count,created_time', limit: 50, ...metaAuth }, timeout: 10000 }),
+      axios.get<MetaPageInfo>(`https://graph.facebook.com/${META_API_VERSION}/${META_PAGE_ID}`, { params: { fields: 'id,name,fan_count,followers_count,instagram_business_account', ...metaAuth }, timeout: 8000 }),
     ]);
 
-  const get = (r: PromiseSettledResult<any>) => r.status === 'fulfilled' ? r.value.data : null;
+  const get = <T>(r: PromiseSettledResult<AxiosResponse<T>>) => r.status === 'fulfilled' ? r.value.data : null;
 
   return {
     global:          get(global)?.data?.[0] ?? null,
@@ -178,7 +584,7 @@ async function fetchMetaLive(startDate?: string | null, endDate?: string | null)
 }
 
 async function fetchMetaOrphanedLeads(
-  leadForms: any[],
+  leadForms: unknown[],
   metaAuth: { access_token: string },
   META_API_VERSION: string
 ): Promise<{ orphanedLeads: unknown[]; totalMetaLeads: number; error: string | null }> {
@@ -278,9 +684,11 @@ export async function GET(request: NextRequest) {
   const startDate    = searchParams.get('start');
   const endDate      = searchParams.get('end');
   const forceRefresh = searchParams.get('refresh') === 'true';
-  const isFiltered   = !!(startDate || endDate);
   const syncForce    = searchParams.get('sync') === 'true';
   const validateMeta = searchParams.get('validateMeta') === 'true';
+  const page         = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+  const limit        = Math.max(1, Math.min(500, parseInt(searchParams.get('limit') || '50', 10)));
+  const detailed     = searchParams.get('detailed') === 'true';
 
   if (syncForce) {
     const canForceSync = authUser.role === 'Desenvolvedor' || authUser.permissions?.isAdmin === true;
@@ -310,9 +718,11 @@ export async function GET(request: NextRequest) {
               const nome = lead.nome || lead.name || null;
               const email_lead = lead.email || null;
               const telefone = lead.telefone || lead.celular || lead.phone || null;
-              const origem = lead.origem || lead.source || null;
+              const origem = stringOrNull(lead.origem || lead.source);
               const status = lead.status || null;
-              const empreend = lead.empreendimento?.nome || lead.empreendimento || null;
+              const empreend = typeof lead.empreendimento === 'object'
+                ? lead.empreendimento.nome ?? null
+                : lead.empreendimento ?? null;
               const score = lead.score != null ? Number(lead.score) : null;
               const temperatura = lead.temperatura || lead.temperatura_lead || null;
               const dataCad = parseCrmDate(lead.data_cadastro || lead.created_at || lead.createdAt);
@@ -346,16 +756,21 @@ export async function GET(request: NextRequest) {
           console.log(`[api/data] Sincronização forçada concluída. ${upserted} leads atualizados.`);
         }
       }
-    } catch (e: any) {
-      console.error('[api/data] Erro na sincronização forçada:', e.message);
+    } catch (e: unknown) {
+      console.error('[api/data] Erro na sincronização forçada:', e instanceof Error ? e.message : e);
     }
   }
 
   const [pgLeads, metaCache, pgEstoque] = await Promise.all([
-    readLeadsFromPg(startDate, endDate),
-    readPgCache('meta_cache'),
+    readLeadsFromPg(startDate, endDate, detailed, page, limit),
+    readPgCache<MetaCache>('meta_cache'),
     readEstoqueFromPg(),
   ]);
+
+  // Se estoque vazio, busca ao vivo do CRM e persiste
+  if (!pgEstoque) console.log('[/api/data] pgEstoque vazio — tentando fallback CRM');
+  const estoque = pgEstoque ?? (await fetchCRMEmpreendimentos()) ?? { empreendimentos: [], resumo: [], unidades: [] };
+  console.log(`[/api/data] estoque: ${estoque.empreendimentos.length} emp, ${estoque.unidades.length} unid`);
 
   // ---------- META (SEMPRE do Postgres; API externa só nos crons/webhook) ----------
   type MetaDataShape = { leadForms?: unknown[]; page?: unknown; [k: string]: unknown };
@@ -372,8 +787,8 @@ export async function GET(request: NextRequest) {
   const needMetaLive = forceRefresh || !metaData || cacheStale;
   if (cacheStale && metaData) console.warn(`[/api/data] meta_cache stale (${Math.round(cacheAgeMin)}min) — buscando ao vivo`);
 
-  const CV_EMAIL = process.env.CV_CRM_EMAIL!;
-  const CV_TOKEN = process.env.CV_CRM_TOKEN!;
+  const CV_EMAIL = process.env.CV_CRM_EMAIL || '';
+  const CV_TOKEN = process.env.CV_CRM_TOKEN || '';
 
   const [liveMetaResult, liveCRMLeads] = await Promise.allSettled([
     needMetaLive ? fetchMetaLive(startDate, endDate) : Promise.resolve(null),
@@ -389,21 +804,23 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const leadsResultRaw = (pgLeads ?? (liveCRMLeads.status === 'fulfilled' ? liveCRMLeads.value : null)) ?? { leads: [], total: 0, crmTotal: 0 };
+  const leadsResultRaw: LeadResult = (pgLeads ?? (liveCRMLeads.status === 'fulfilled' ? liveCRMLeads.value : null)) ?? { leads: [], total: 0, crmTotal: 0 };
 
   // ── Escopo por papel ────────────────────────────────────────────────────────
   // Gestor / Diretoria / Desenvolvedor veem tudo. Demais veem só os leads
   // ligados a eles (corretor.email ou gestor.email == email do usuário).
   // Filtro no servidor — não envia leads de terceiros pro navegador.
   const PRIVILEGED = ['Gestor', 'Diretoria', 'Desenvolvedor'];
-  let leadsResult = leadsResultRaw;
-  if (!PRIVILEGED.includes(authUser.role)) {
+  let leadsResult: LeadResult = leadsResultRaw;
+  if (!PRIVILEGED.includes(authUser.role ?? '')) {
     const myEmail = String(authUser.email || '').toLowerCase().trim();
     const myName  = String(authUser.name  || '').toLowerCase().trim();
-    const mine = (leadsResultRaw.leads as any[]).filter(l => {
-      const emails = [l.corretor?.email, l.gestor?.email].filter(Boolean).map((e: string) => e.toLowerCase().trim());
+    const mine = leadsResultRaw.leads.filter(l => {
+      const corretor = personFields(l.corretor);
+      const gestor = personFields(l.gestor);
+      const emails = [corretor.email, gestor.email].flatMap((e) => e ? [e.toLowerCase().trim()] : []);
       if (myEmail && emails.includes(myEmail)) return true;
-      const names = [l.corretor?.nome, l.gestor?.nome].filter(Boolean).map((n: string) => n.toLowerCase().trim());
+      const names = [corretor.nome, gestor.nome].flatMap((n) => n ? [n.toLowerCase().trim()] : []);
       return !!myName && names.includes(myName);
     });
     leadsResult = { leads: mine, total: mine.length, crmTotal: mine.length };
@@ -427,7 +844,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     leads:     leadsResult,
     meta:      metaFinal,
-    estoque:   pgEstoque ?? { empreendimentos: [], resumo: [], unidades: [] },
+    estoque,
     leadForms: metaFinal.leadForms,
     page:      metaFinal.page,
     metaValidation,

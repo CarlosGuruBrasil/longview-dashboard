@@ -11,8 +11,8 @@ import {
 } from 'lucide-react';
 import { Task, Project } from '@/lib/db';
 import { useUser } from '@/context/UserContext';
-import TaskDrawer from '@/components/TaskDrawer';
-import ResponsibleModal from '@/components/ResponsibleModal';
+import TaskDrawer from '../components/TaskDrawer';
+import ResponsibleModal from '../components/ResponsibleModal';
 
 export default function TimelinePage() {
   const { currentUser } = useUser();

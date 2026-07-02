@@ -11,19 +11,23 @@ export function useNotifications() {
 
   // Verifica permissão atual ao montar
   useEffect(() => {
-    if (typeof window === 'undefined' || !('Notification' in window)) {
-      setStatus('unsupported');
-      return;
-    }
-    if (Notification.permission === 'granted') setStatus('granted');
-    else if (Notification.permission === 'denied') setStatus('denied');
+    const id = window.setTimeout(() => {
+      if (typeof window === 'undefined' || !('Notification' in window)) {
+        setStatus('unsupported');
+        return;
+      }
+      if (Notification.permission === 'granted') setStatus('granted');
+      else if (Notification.permission === 'denied') setStatus('denied');
+    }, 0);
+    return () => window.clearTimeout(id);
   }, []);
 
   // Listener de mensagens em foreground (app aberto)
   useEffect(() => {
     if (status !== 'granted') return;
     
-    (async () => {
+    let unsubscribe: (() => void) | undefined;
+    void (async () => {
       const unsub = await onForegroundMessage((payload) => {
         const { title = 'LongView', body = '' } = payload.notification ?? {};
         // Mostra notificação nativa mesmo com app aberto
@@ -35,8 +39,9 @@ export function useNotifications() {
           });
         }
       });
-      return unsub;
+      unsubscribe = unsub;
     })();
+    return () => unsubscribe?.();
   }, [status]);
 
   const requestPermission = useCallback(async () => {

@@ -1,10 +1,13 @@
 'use client';
 
+/* eslint-disable react-hooks/preserve-manual-memoization */
+
 import { useState, useEffect, useMemo } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import {
   Users, UserPlus, UserCheck, Gift, Clock, AlertCircle,
-  Building2, TrendingUp, CheckCircle2, ChevronRight,
+  Building2, TrendingUp, ChevronRight,
 } from 'lucide-react';
 
 interface SafeUser {
@@ -246,8 +249,7 @@ export default function PeopleDashboard() {
           {users.slice(0, 8).map(u => (
             <Link key={u.id} href={`/people-vision/colaboradores/${u.id}`} className="flex items-center gap-3 px-2 py-2.5 rounded-xl hover:bg-[#17171A] transition-colors group">
               {u.profile?.avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={u.profile.avatarUrl} alt={u.name} className="w-8 h-8 rounded-full object-cover border border-[#1E1E22]" />
+                <Image src={u.profile.avatarUrl} alt={u.name} width={32} height={32} className="rounded-full object-cover border border-[#1E1E22]" unoptimized />
               ) : (
                 <div className="w-8 h-8 rounded-full bg-emerald-800/30 border border-emerald-700/20 flex items-center justify-center text-xs font-bold text-emerald-300">
                   {getInitials(u.name)}

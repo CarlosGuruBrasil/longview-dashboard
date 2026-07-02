@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { readUsers, writeUsers, readKv, writeKv, PendingRegistration, UserProfileData } from '@/lib/db-kv';
+import { readUsers, readKv, writeKv, PendingRegistration, UserProfileData } from '@/lib/db-kv';
 import { InviteToken } from '@/app/api/admin/invite-link/route';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';

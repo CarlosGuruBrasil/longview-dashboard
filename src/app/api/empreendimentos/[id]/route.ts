@@ -23,10 +23,15 @@ export async function GET(_req: NextRequest, { params }: Params) {
       sql<{ id: number; nome: string; situacao: string; tipo: string; raw: Record<string, unknown> }[]>`
         SELECT id, nome, situacao, tipo, raw FROM cv_empreendimentos WHERE id = ${empId} LIMIT 1
       `,
-      sql<{ id: number; bloco: string; numero: string; status: string; status_venda: number; valor: number; metragem: number; andar: number | null; coluna: number | null; tipologia: string | null; raw: Record<string, unknown> }[]>`
-        SELECT id, bloco, numero, status, status_venda, valor, metragem, andar, coluna, tipologia, raw
+      sql<{ id: number; bloco: string; numero: string; status: string; status_venda: number; valor: number; metragem: number; andar: string | null; coluna: string | null; tipologia: string | null; situacao_mapa_disponibilidade: number | null; raw: Record<string, unknown> }[]>`
+        SELECT id, bloco, numero, status, status_venda, valor, metragem,
+          raw->>'andar' AS andar,
+          raw->>'coluna' AS coluna,
+          raw->>'tipologia' AS tipologia,
+          (raw->'situacao'->>'situacao_mapa_disponibilidade')::int AS situacao_mapa_disponibilidade,
+          raw
         FROM cv_unidades WHERE id_empreendimento = ${empId}
-        ORDER BY andar ASC NULLS LAST, coluna ASC NULLS LAST, numero ASC NULLS LAST
+        ORDER BY (raw->>'andar')::int ASC NULLS LAST, (raw->>'coluna')::int ASC NULLS LAST, numero ASC NULLS LAST
       `,
       sql<{ id: number; id_unidade: number; valor: number; data_venda: string; status: string; raw: Record<string, unknown> }[]>`
         SELECT id, id_unidade, valor, data_venda::text, status, raw
@@ -89,6 +94,15 @@ export async function GET(_req: NextRequest, { params }: Params) {
         bairro: raw.bairro ?? null,
         cidade: raw.cidade ?? null,
         estado: raw.estado ?? null,
+        numero: raw.numero ?? null,
+        cep: raw.cep ?? null,
+        regiao: raw.regiao ?? null,
+        sigla: raw.sigla ?? null,
+        area_construida: raw.area_construida ?? null,
+        area_privativa: raw.area_privativa ?? null,
+        nome_empresa: raw.nome_empresa ?? null,
+        periodo_venda_inicio: raw.periodo_venda_inicio ?? null,
+        disponivel: raw.disponivel ?? null,
         latitude: raw.latitude ?? null,
         longitude: raw.longitude ?? null,
       },

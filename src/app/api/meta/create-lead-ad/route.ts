@@ -7,7 +7,16 @@ const ACT        = 'act_913791682330789';
 const AUTH_TOKEN = process.env.LEAD_AD_TOKEN || process.env.CRON_SECRET;
 const FORM_ID    = '1298188975776677';
 const IMG_HASH   = '3b7d5874b1c00fb96b1e307e897ab3c2';
-const END        = '2026-06-30T23:59:59-03:00';
+
+type MetaIdResponse = { id?: string };
+type StepLog = Record<string, unknown>;
+type AdResult = { ad: string; adset: string; ok: boolean; id?: string; error?: string };
+type MetaErrorData = {
+  error?: {
+    error_user_msg?: string;
+    message?: string;
+  };
+};
 
 const COPIES = [
   { video_id:'1355363606481492', label:'Lucas',  msg:'O Saco dos Limoes foi um dos bairros que mais se valorizou em Florianopolis nos ultimos 12 meses. O Hub Beira Mar ainda tem 8 apartamentos de 2 suites com vista direta para o mar, a partir de R$ 1,3 milhao. Entrada de 10%, parcelas mensais e chaves em janeiro de 2028.',  hl:'Invista onde Florianopolis mais cresce' },
@@ -34,7 +43,14 @@ function auth(req: NextRequest): boolean {
 }
 
 async function api(token: string, path: string, data: object) {
-  return axios.post(`${G}/${path}`, { ...data, access_token: token }, { timeout: 20000 });
+  return axios.post<MetaIdResponse>(`${G}/${path}`, { ...data, access_token: token }, { timeout: 20000 });
+}
+
+function metaError(e: unknown): string {
+  if (axios.isAxiosError<MetaErrorData>(e)) {
+    return e.response?.data?.error?.error_user_msg || e.response?.data?.error?.message || e.message;
+  }
+  return e instanceof Error ? e.message : String(e);
 }
 
 export async function GET(req: NextRequest) {
@@ -48,7 +64,7 @@ export async function GET(req: NextRequest) {
   if (!token)       return NextResponse.json({ error:'user_token obrigatorio como query param' }, { status:400 });
   const step = url.searchParams.get('step') || 'all';
 
-  const log: any[] = [];
+  const log: StepLog[] = [];
 
   // Campanhas ja criadas com sucesso via token Longview
   const campL = '120249915769170415'; // HUB Beira Mar | Leads | Formulario | Jun 2026
@@ -67,10 +83,9 @@ export async function GET(req: NextRequest) {
         promoted_object: { page_id: PAGE_ID }, targeting: cfg.targeting,
         status: 'PAUSED',
       });
-      return { name:cfg.name, id:(r as any).data?.id, ok:true };
-    } catch (e: any) {
-      const err = e.response?.data?.error?.error_user_msg || e.response?.data?.error?.message || e.message;
-      return { name:cfg.name, id:null, ok:false, error:err };
+      return { name:cfg.name, id:r.data.id, ok:true };
+    } catch (e: unknown) {
+      return { name:cfg.name, id:null, ok:false, error:metaError(e) };
     }
   }));
   log.push({ step:'adsets', results:adsetRes });
@@ -86,11 +101,11 @@ export async function GET(req: NextRequest) {
   const adsetIdx = url.searchParams.get('adset_idx');
   if (adsetIdx !== null) {
     const idx = parseInt(adsetIdx);
-    finalAdSets = finalAdSets.filter((_:any, i:number) => i === idx);
+    finalAdSets = finalAdSets.filter((_, i) => i === idx);
   }
 
   // 3. Criar 12 anuncios
-  const adRes: any[] = [];
+  const adRes: AdResult[] = [];
   for (const adSet of finalAdSets) {
     for (const copy of COPIES) {
       try {
@@ -104,10 +119,9 @@ export async function GET(req: NextRequest) {
             call_to_action: { type:'LEARN_MORE', value:{ lead_gen_form_id: FORM_ID } },
           }}},
         });
-        adRes.push({ ad:`HBM|${copy.label}`, adset:adSet.name, ok:true, id:(r as any).data?.id });
-      } catch (e: any) {
-        const err = (e as any).response?.data?.error?.error_user_msg || (e as any).response?.data?.error?.message || (e as any).message;
-        adRes.push({ ad:`HBM|${copy.label}`, adset:adSet.name, ok:false, error:err });
+        adRes.push({ ad:`HBM|${copy.label}`, adset:adSet.name, ok:true, id:r.data.id });
+      } catch (e: unknown) {
+        adRes.push({ ad:`HBM|${copy.label}`, adset:adSet.name, ok:false, error:metaError(e) });
       }
       await new Promise(r => setTimeout(r, 300));
     }

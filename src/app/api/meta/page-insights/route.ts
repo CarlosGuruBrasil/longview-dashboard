@@ -12,6 +12,38 @@ const META_BASE = 'https://graph.facebook.com/v21.0';
 const PAGE_ID   = '259079394232614';
 const CACHE_TTL = 3600;
 
+type FacebookPage = {
+  name?: string;
+  fan_count?: number;
+  followers_count?: number;
+};
+
+type InstagramAccountResponse = {
+  instagram_business_account?: { id?: string };
+};
+
+type InstagramProfile = {
+  username?: string;
+  name?: string;
+  followers_count?: number;
+  follows_count?: number;
+  media_count?: number;
+  biography?: string;
+};
+
+type InsightValue = {
+  end_time?: string;
+  value?: number;
+};
+
+type InsightMetric = {
+  values?: InsightValue[];
+};
+
+type InsightResponse = {
+  data?: InsightMetric[];
+};
+
 function tok() { return process.env.META_TOKEN ?? ''; }
 
 function daysAgo(n: number) { return Math.floor((Date.now() - n * 86400000) / 1000); }
@@ -39,55 +71,55 @@ export async function GET(req: NextRequest) {
 
   // ── Facebook ──────────────────────────────────────────────────────────────
   const [fbPageRes, igAccountRes] = await Promise.allSettled([
-    axios.get(`${META_BASE}/${PAGE_ID}`, {
+    axios.get<FacebookPage>(`${META_BASE}/${PAGE_ID}`, {
       params: { fields: 'id,name,fan_count,followers_count,category', access_token: token },
       timeout: 10000,
     }),
-    axios.get(`${META_BASE}/${PAGE_ID}`, {
+    axios.get<InstagramAccountResponse>(`${META_BASE}/${PAGE_ID}`, {
       params: { fields: 'instagram_business_account', access_token: token },
       timeout: 10000,
     }),
   ]);
 
-  const fbPage = fbPageRes.status === 'fulfilled' ? (fbPageRes.value as any).data : null;
+  const fbPage = fbPageRes.status === 'fulfilled' ? fbPageRes.value.data : null;
   const igId   = igAccountRes.status === 'fulfilled'
-    ? (igAccountRes.value as any).data?.instagram_business_account?.id
+    ? igAccountRes.value.data?.instagram_business_account?.id
     : null;
 
   // ── Instagram ─────────────────────────────────────────────────────────────
-  let igProfile: any = null;
+  let igProfile: InstagramProfile | null = null;
   let igReachDaily:     { date: string; value: number }[] = [];
   let igFollowerDaily:  { date: string; value: number }[] = [];
 
   if (igId) {
     const [profileRes, reachRes, followerRes] = await Promise.allSettled([
-      axios.get(`${META_BASE}/${igId}`, {
+      axios.get<InstagramProfile>(`${META_BASE}/${igId}`, {
         params: {
           fields: 'username,name,followers_count,follows_count,media_count,biography',
           access_token: token,
         },
         timeout: 10000,
       }),
-      axios.get(`${META_BASE}/${igId}/insights`, {
+      axios.get<InsightResponse>(`${META_BASE}/${igId}/insights`, {
         params: { metric: 'reach', period: 'day', since: since28, until, access_token: token },
         timeout: 12000,
       }),
-      axios.get(`${META_BASE}/${igId}/insights`, {
+      axios.get<InsightResponse>(`${META_BASE}/${igId}/insights`, {
         params: { metric: 'follower_count', period: 'day', since: since28, until, access_token: token },
         timeout: 12000,
       }),
     ]);
 
-    igProfile = profileRes.status === 'fulfilled' ? (profileRes.value as any).data : null;
+    igProfile = profileRes.status === 'fulfilled' ? profileRes.value.data : null;
 
-    const reachData   = reachRes.status   === 'fulfilled' ? (reachRes.value   as any).data?.data ?? [] : [];
-    const followerData = followerRes.status === 'fulfilled' ? (followerRes.value as any).data?.data ?? [] : [];
+    const reachData   = reachRes.status   === 'fulfilled' ? reachRes.value.data?.data ?? [] : [];
+    const followerData = followerRes.status === 'fulfilled' ? followerRes.value.data?.data ?? [] : [];
 
-    igReachDaily    = (reachData[0]?.values ?? []).map((v: any) => ({
+    igReachDaily    = (reachData[0]?.values ?? []).map((v) => ({
       date:  v.end_time?.slice(0, 10) ?? '',
       value: typeof v.value === 'number' ? v.value : 0,
     }));
-    igFollowerDaily = (followerData[0]?.values ?? []).map((v: any) => ({
+    igFollowerDaily = (followerData[0]?.values ?? []).map((v) => ({
       date:  v.end_time?.slice(0, 10) ?? '',
       value: typeof v.value === 'number' ? v.value : 0,
     }));

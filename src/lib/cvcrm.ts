@@ -68,17 +68,18 @@ export async function createCrmLead(lead: CrmLeadInput): Promise<CrmLeadResult> 
       { headers: crmHeaders(), timeout: CRM_TIMEOUT }
     );
 
-    const data = res.data;
-    const id   = data?.idlead ?? data?.id ?? data?.lead?.id ?? data?.lead?.idlead;
+    const data = res.data as { idlead?: string | number; id?: string | number; lead?: { id?: string | number; idlead?: string | number } };
+    const id   = data.idlead ?? data.id ?? data.lead?.id ?? data.lead?.idlead;
 
     console.log(`[cvcrm] lead criado: id=${id} nome="${lead.nome}"`);
     return { ok: true, id, raw: data };
 
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const data = axios.isAxiosError(err) ? err.response?.data as { message?: string; error?: string } | undefined : undefined;
     const detail =
-      err.response?.data?.message ??
-      err.response?.data?.error   ??
-      err.message;
+      data?.message ??
+      data?.error   ??
+      (err instanceof Error ? err.message : String(err));
     console.warn(`[cvcrm] createLead falhou: ${detail}`);
     return { ok: false, error: detail };
   }
@@ -88,7 +89,7 @@ export async function createCrmLead(lead: CrmLeadInput): Promise<CrmLeadResult> 
  * Busca leads recentes do CRM por e-mail ou telefone.
  * Útil para dedup antes de criar.
  */
-export async function findCrmLeadByContact(email?: string, telefone?: string): Promise<any | null> {
+export async function findCrmLeadByContact(email?: string, telefone?: string): Promise<unknown | null> {
   if (!email && !telefone) return null;
   try {
     const params: Record<string, string> = {};

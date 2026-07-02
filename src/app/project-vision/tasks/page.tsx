@@ -4,24 +4,14 @@ import React, { useState, useEffect } from 'react';
 import { 
   Plus, 
   Search, 
-  Filter, 
-  SlidersHorizontal,
-  ChevronDown,
-  Building2,
-  Calendar,
-  AlertCircle,
-  Clock,
-  User,
-  CheckCircle2,
-  FileText,
   RefreshCw,
   FolderOpen,
   X
 } from 'lucide-react';
 import { Task, Project } from '@/lib/db';
 import { useUser } from '@/context/UserContext';
-import TaskDrawer from '@/components/TaskDrawer';
-import ResponsibleModal from '@/components/ResponsibleModal';
+import TaskDrawer from '../components/TaskDrawer';
+import ResponsibleModal from '../components/ResponsibleModal';
 
 export default function TasksPage() {
   const { currentUser } = useUser();
@@ -49,7 +39,7 @@ export default function TasksPage() {
   const [newSubject, setNewSubject] = useState('');
   const [newDesc, setNewDesc] = useState('');
   const [newResp, setNewResp] = useState('');
-  const [newStatusContratacao, setNewStatusContratacao] = useState('Indefinido');
+  const [newStatusContratacao] = useState('Indefinido');
   const [newUrgencia, setNewUrgencia] = useState<'Baixa' | 'Média' | 'Alta' | 'Crítica' | 'Emergencial'>('Baixa');
   const [newInicio, setNewInicio] = useState('');
   const [newPrevisao, setNewPrevisao] = useState('');

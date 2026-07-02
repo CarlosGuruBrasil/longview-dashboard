@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Search, Filter, ChevronRight, UserPlus, Phone, Mail } from 'lucide-react';
 
 interface SafeUser {
@@ -143,8 +144,7 @@ export default function ColaboradoresPage() {
                 className="flex items-center gap-4 p-4 rounded-xl border border-[#1E1E22] bg-[#121214]/60 hover:bg-[#17171A] hover:border-zinc-700 transition-all group cursor-pointer"
               >
                 {u.profile?.avatarUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={u.profile.avatarUrl} alt={u.name} className="w-11 h-11 rounded-full object-cover border border-[#1E1E22] shrink-0" />
+                  <Image src={u.profile.avatarUrl} alt={u.name} width={44} height={44} className="rounded-full object-cover border border-[#1E1E22] shrink-0" unoptimized />
                 ) : (
                   <div className={`w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${avatarBg(u.name)}`}>
                     {getInitials(u.name)}

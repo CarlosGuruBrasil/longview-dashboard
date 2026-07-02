@@ -32,18 +32,64 @@ function Field({ label, value }: { label: string; value?: string | number | null
 
 export default function LeadDrawer({ lead, onClose }: Props) {
   const [history, setHistory] = useState<StageChange[] | null>(null);
+  const [fullLead, setFullLead] = useState<Lead | null>(null);
+  const [loadingLead, setLoadingLead] = useState(false);
 
+  // Busca os dados completos do lead (incluindo interações) assincronamente
   useEffect(() => {
-    if (!lead) return;
-    const id = lead.idlead ?? lead.id;
-    if (!id) { setHistory([]); return; }
-    setHistory(null);
+    const leadId = lead?.idlead ?? lead?.id;
+
+    const timer = window.setTimeout(() => {
+      if (!lead) {
+        setFullLead(null);
+        setLoadingLead(false);
+        return;
+      }
+      if (!leadId) return;
+
+      setFullLead(lead);
+      setLoadingLead(true);
+    }, 0);
+
     let active = true;
-    fetch(`/api/leads/${id}/history`)
+
+    if (leadId) {
+      fetch(`/api/leads/${leadId}`)
+        .then((r) => r.json())
+        .then((d) => {
+          if (active && d.ok && d.lead) {
+            setFullLead(d.lead);
+          }
+        })
+        .catch(console.error)
+        .finally(() => {
+          if (active) setLoadingLead(false);
+        });
+    }
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [lead]);
+
+  // Busca o histórico de movimentação do lead
+  useEffect(() => {
+    const leadId = lead?.idlead ?? lead?.id;
+    if (!lead || !leadId) return;
+
+    const timer = window.setTimeout(() => setHistory(null), 0);
+    let active = true;
+
+    fetch(`/api/leads/${leadId}/history`)
       .then((r) => r.json())
       .then((d) => { if (active) setHistory(d.history ?? []); })
       .catch(() => { if (active) setHistory([]); });
-    return () => { active = false; };
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
   }, [lead]);
 
   // Fecha no ESC
@@ -54,14 +100,15 @@ export default function LeadDrawer({ lead, onClose }: Props) {
     return () => document.removeEventListener('keydown', h);
   }, [lead, onClose]);
 
-  if (!lead) return null;
+  const activeLead = fullLead || lead;
+  if (!activeLead) return null;
 
-  const id = lead.idlead ?? lead.id;
+  const id = activeLead.idlead ?? activeLead.id;
   const crmUrl = id ? `https://longviewempreendimentos.cvcrm.com.br/gestor/comercial/leads/${id}/detalhes` : undefined;
-  const sc = getStatusColor(lead);
-  const tags = getLeadTags(lead);
-  const interacoes = lead.interacao ?? [];
-  const source = getLeadSource(lead);
+  const sc = getStatusColor(activeLead);
+  const tags = getLeadTags(activeLead);
+  const interacoes = activeLead.interacao ?? [];
+  const source = getLeadSource(activeLead);
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }} onClick={onClose}>
@@ -73,10 +120,10 @@ export default function LeadDrawer({ lead, onClose }: Props) {
         {/* Header */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex flex-col gap-1.5 min-w-0">
-            <h2 className="text-lg font-bold truncate" style={{ color: 'var(--text-primary)' }}>{lead.nome || 'Lead'}</h2>
-            {lead.situacao?.nome && (
+            <h2 className="text-lg font-bold truncate" style={{ color: 'var(--text-primary)' }}>{activeLead.nome || 'Lead'}</h2>
+            {activeLead.situacao?.nome && (
               <span className="self-start text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: sc.bg, color: sc.text }}>
-                {lead.situacao.nome}
+                {activeLead.situacao.nome}
               </span>
             )}
           </div>
@@ -85,18 +132,18 @@ export default function LeadDrawer({ lead, onClose }: Props) {
 
         {/* Panorama */}
         <section className="grid grid-cols-2 gap-3">
-          <Field label="E-mail" value={lead.email} />
-          <Field label="Telefone" value={lead.telefone || lead.celular} />
-          <Field label="Origem" value={getOrigin(lead)} />
-          <Field label="Temperatura" value={lead.temperatura} />
-          <Field label="Corretor" value={lead.corretor?.nome} />
-          <Field label="Gestor" value={lead.gestor?.nome} />
-          <Field label="Imobiliária" value={lead.imobiliaria?.nome} />
-          <Field label="Empreendimento" value={lead.empreendimento?.map((e) => e.nome).join(', ')} />
-          <Field label="Cidade" value={lead.cidade} />
-          <Field label="Score" value={lead.score} />
-          <Field label="Cadastro" value={formatDate(lead.data_cad || lead.data_cadastro || lead.data_cadastramento)} />
-          <Field label="Reservas" value={lead.qtde_reservas_associadas} />
+          <Field label="E-mail" value={activeLead.email} />
+          <Field label="Telefone" value={activeLead.telefone || activeLead.celular} />
+          <Field label="Origem" value={getOrigin(activeLead)} />
+          <Field label="Temperatura" value={activeLead.temperatura} />
+          <Field label="Corretor" value={activeLead.corretor?.nome} />
+          <Field label="Gestor" value={activeLead.gestor?.nome} />
+          <Field label="Imobiliária" value={activeLead.imobiliaria?.nome} />
+          <Field label="Empreendimento" value={activeLead.empreendimento?.map((e) => e.nome).join(', ')} />
+          <Field label="Cidade" value={activeLead.cidade} />
+          <Field label="Score" value={activeLead.score} />
+          <Field label="Cadastro" value={formatDate(activeLead.data_cad || activeLead.data_cadastro || activeLead.data_cadastramento)} />
+          <Field label="Reservas" value={activeLead.qtde_reservas_associadas} />
         </section>
 
         {/* Origem do cadastro */}
@@ -165,7 +212,9 @@ export default function LeadDrawer({ lead, onClose }: Props) {
         {/* Interações */}
         <section className="flex flex-col gap-2">
           <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Interações</h3>
-          {interacoes.length === 0 ? (
+          {loadingLead ? (
+            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Carregando interações…</p>
+          ) : interacoes.length === 0 ? (
             <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Sem interações registradas.</p>
           ) : (
             <ol className="flex flex-col gap-1.5">

@@ -1,19 +1,24 @@
 'use client'
 
+/* eslint-disable react-hooks/preserve-manual-memoization */
+
 import { useEffect, useMemo, useRef, useState } from 'react'
+import Image from 'next/image'
 import {
   Building2, X, Upload, Download, Trash2, Loader2, Camera,
   CheckSquare, Clock, FileText, BarChart3, DollarSign, Home, Map as MapIcon,
 } from 'lucide-react'
 import { useData } from '../../context/DataContext'
 import { useUser } from '@/context/UserContext'
+import type { Empreendimento } from '../../types'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
 interface Unidade {
   id: number; bloco: string; numero: string; status: string; status_venda: number;
   valor: number; metragem: number; andar: number | null; coluna: number | null;
-  tipologia: string | null; raw: Record<string, unknown>;
+  tipologia: string | null; situacao_mapa_disponibilidade: number | null;
+  raw: Record<string, unknown>;
 }
 interface Venda   { id: number; id_unidade: number; valor: number; data_venda: string; status: string; }
 interface Material{ id: string; nome: string; tipo: string; content_type?: string; size_bytes?: number | null; uploaded_by?: string; created_at?: string; downloadUrl: string; fonte: 'cvcrm' | 'manual'; }
@@ -24,7 +29,12 @@ interface EmpDetail {
     andamento: number | null; dataEntrega: string | null; segmento: string | null;
     situacaoObra: string | null; foto: string | null; logo: string | null;
     endereco: string | null; bairro: string | null; cidade: string | null;
-    estado: string | null; latitude: string | null; longitude: string | null;
+    estado: string | null; numero: string | null; cep: string | null;
+    regiao: string | null; sigla: string | null;
+    area_construida: string | null; area_privativa: string | null;
+    nome_empresa: string | null; periodo_venda_inicio: string | null;
+    disponivel: string | null;
+    latitude: string | null; longitude: string | null;
     raw: Record<string, unknown>;
   };
   unidades: Unidade[];
@@ -53,6 +63,8 @@ const STATUS_STYLE: Record<string, { bg: string; border: string; text: string; d
   Disponivel: { bg: 'bg-emerald-500/15', border: 'border-emerald-500/30', text: 'text-emerald-300', dot: 'bg-emerald-400' },
   Reservado:  { bg: 'bg-amber-500/15',   border: 'border-amber-500/30',   text: 'text-amber-300',   dot: 'bg-amber-400'   },
   Vendido:    { bg: 'bg-sky-500/15',     border: 'border-sky-500/30',     text: 'text-sky-300',     dot: 'bg-sky-400'     },
+  Bloqueado:  { bg: 'bg-purple-500/15',  border: 'border-purple-500/30',  text: 'text-purple-300',  dot: 'bg-purple-400'  },
+  EmProcesso: { bg: 'bg-orange-500/15',  border: 'border-orange-500/30',  text: 'text-orange-300',  dot: 'bg-orange-400'  },
 }
 
 function StatusBar({ disp, res, vend, total }: { disp: number; res: number; vend: number; total: number }) {
@@ -64,6 +76,23 @@ function StatusBar({ disp, res, vend, total }: { disp: number; res: number; vend
       <div style={{ width: `${(vend/t)*100}%`, background: '#0ea5e9' }} className="min-w-0 transition-all" />
     </div>
   )
+}
+
+// ── Helpers de status do mapa ─────────────────────────────────────────────────
+
+const MAPA_STATUS: Record<number, string> = {
+  1: 'Disponivel',
+  2: 'Reservado',
+  3: 'Vendido',
+  4: 'Bloqueado',
+  5: 'EmProcesso',
+}
+
+function getMapaStatus(u: Unidade): string {
+  if (u.situacao_mapa_disponibilidade != null && MAPA_STATUS[u.situacao_mapa_disponibilidade]) {
+    return MAPA_STATUS[u.situacao_mapa_disponibilidade]
+  }
+  return u.status
 }
 
 // ── Mapa de Disponibilidade ───────────────────────────────────────────────────
@@ -89,9 +118,10 @@ function MapaDisponibilidade({ unidades }: { unidades: Unidade[] }) {
               <p className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-2">{bloco || 'Sem Bloco'}</p>
               <div className="flex flex-wrap gap-1.5">
                 {unis.map(u => {
-                  const st = STATUS_STYLE[u.status] || { bg: 'bg-zinc-800', border: 'border-zinc-700', text: 'text-zinc-400', dot: 'bg-zinc-600' }
+                  const mapaStatus = getMapaStatus(u)
+                  const st = STATUS_STYLE[mapaStatus] || STATUS_STYLE[u.status] || { bg: 'bg-zinc-800', border: 'border-zinc-700', text: 'text-zinc-400', dot: 'bg-zinc-600' }
                   return (
-                    <div key={u.id} title={`${u.numero} — ${u.status === 'Disponivel' ? 'Disponível' : u.status}${u.valor ? ` — ${BRL(u.valor)}` : ''}${u.tipologia ? ` — ${u.tipologia}` : ''}`}
+                    <div key={u.id} title={`${u.numero} — ${getMapaStatus(u) === 'Disponivel' ? 'Disponível' : getMapaStatus(u)}${u.valor ? ` — ${BRL(u.valor)}` : ''}${u.tipologia ? ` — ${u.tipologia}` : ''}`}
                       className={`w-10 h-10 rounded-lg border flex items-center justify-center text-[10px] font-bold cursor-pointer hover:scale-110 transition-transform ${st.bg} ${st.border} ${st.text}`}>
                       {(u.numero||'').replace(/\D/g,'').slice(-3) || u.numero?.slice(0,3) || '?'}
                     </div>
@@ -102,7 +132,7 @@ function MapaDisponibilidade({ unidades }: { unidades: Unidade[] }) {
           )
         })}
         <div className="flex items-center gap-4 pt-2">
-          {[['Disponível','bg-emerald-400'],['Reservado','bg-amber-400'],['Vendido','bg-sky-400']].map(([l,c]) => (
+          {[['Disponível','bg-emerald-400'],['Reservado','bg-amber-400'],['Vendido','bg-sky-400'],['Bloqueado','bg-purple-400'],['Em Processo','bg-orange-400']].map(([l,c]) => (
             <div key={l} className="flex items-center gap-1.5"><div className={`w-2.5 h-2.5 rounded-full ${c}`}/><span className="text-[11px] text-zinc-500">{l}</span></div>
           ))}
         </div>
@@ -132,10 +162,11 @@ function MapaDisponibilidade({ unidades }: { unidades: Unidade[] }) {
             {andares.map(andar => (
               <tr key={andar}>
                 <td className="text-[10px] text-zinc-500 font-mono pr-2 text-right whitespace-nowrap">{andar}º</td>
-                {colunas.map(col => {
-                  const u = gridObj[`${andar}-${col}`]
-                  if (!u) return <td key={col} className="p-0.5"><div className="w-9 h-8" /></td>
-                  const st = STATUS_STYLE[u.status] || { bg: 'bg-zinc-800', border: 'border-zinc-700', text: 'text-zinc-400', dot: 'bg-zinc-600' }
+                  {colunas.map(col => {
+                    const u = gridObj[`${andar}-${col}`]
+                    if (!u) return <td key={col} className="p-0.5"><div className="w-9 h-8" /></td>
+                    const mapaStatus = getMapaStatus(u)
+                    const st = STATUS_STYLE[mapaStatus] || STATUS_STYLE[u.status] || { bg: 'bg-zinc-800', border: 'border-zinc-700', text: 'text-zinc-400', dot: 'bg-zinc-600' }
                   return (
                     <td key={col} className="p-0.5">
                       <div
@@ -162,15 +193,15 @@ function MapaDisponibilidade({ unidades }: { unidades: Unidade[] }) {
           {tooltip.unit.tipologia && <p className="text-zinc-400">{tooltip.unit.tipologia}</p>}
           {tooltip.unit.metragem  && <p className="text-zinc-400">{tooltip.unit.metragem} m²</p>}
           {tooltip.unit.valor     && <p className="text-emerald-400 font-semibold">{BRL(tooltip.unit.valor)}</p>}
-          <p className={`mt-0.5 font-semibold ${STATUS_STYLE[tooltip.unit.status]?.text || 'text-zinc-400'}`}>
-            {tooltip.unit.status === 'Disponivel' ? 'Disponível' : tooltip.unit.status}
+          <p className={`mt-0.5 font-semibold ${STATUS_STYLE[getMapaStatus(tooltip.unit)]?.text || 'text-zinc-400'}`}>
+            {getMapaStatus(tooltip.unit) === 'Disponivel' ? 'Disponível' : getMapaStatus(tooltip.unit)}
           </p>
         </div>
       )}
 
       {/* Legenda */}
       <div className="flex items-center gap-4 pt-3 justify-center">
-        {[['Disponível','bg-emerald-400'],['Reservado','bg-amber-400'],['Vendido','bg-sky-400']].map(([l,c]) => (
+        {[['Disponível','bg-emerald-400'],['Reservado','bg-amber-400'],['Vendido','bg-sky-400'],['Bloqueado','bg-purple-400'],['Em Processo','bg-orange-400']].map(([l,c]) => (
           <div key={l} className="flex items-center gap-1.5"><div className={`w-2.5 h-2.5 rounded-full ${c}`}/><span className="text-[11px] text-zinc-500">{l}</span></div>
         ))}
       </div>
@@ -192,14 +223,23 @@ function DetailPanel({ empId, dateRange, onClose, isAdmin }: {
   const [uploading, setUploading] = useState(false)
   const [matTipo,   setMatTipo]   = useState('outro')
   const [matNome,   setMatNome]   = useState('')
-  const [imgTs,     setImgTs]     = useState(Date.now())
+  const [imgTs,     setImgTs]     = useState(() => Date.now())
   const fileRef  = useRef<HTMLInputElement>(null)
   const imageRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    setLoading(true)
-    fetch(`/api/empreendimentos/${empId}`)
-      .then(r => r.json()).then(setData).catch(console.error).finally(() => setLoading(false))
+    async function load() {
+      setLoading(true)
+      try {
+        const r = await fetch(`/api/empreendimentos/${empId}`)
+        setData(await r.json())
+      } catch (e) {
+        console.error(e)
+      } finally {
+        setLoading(false)
+      }
+    }
+    void load()
   }, [empId])
 
   const refreshMateriais = () =>
@@ -269,9 +309,8 @@ function DetailPanel({ empId, dateRange, onClose, isAdmin }: {
         {/* Header com imagem */}
         <div className="relative h-44 shrink-0 bg-[#0E0E10]">
           {data?.empreendimento.imageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={`${data.empreendimento.imageUrl}${data.empreendimento.imageUrl.includes('?') ? '&' : '?'}t=${imgTs}`}
-              alt="" className="w-full h-full object-cover" />
+            <Image src={`${data.empreendimento.imageUrl}${data.empreendimento.imageUrl.includes('?') ? '&' : '?'}t=${imgTs}`}
+              alt="" fill className="object-cover" sizes="(max-width: 768px) 100vw, 768px" unoptimized />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
               <Building2 size={40} className="text-zinc-700" />
@@ -519,8 +558,7 @@ function DetailPanel({ empId, dateRange, onClose, isAdmin }: {
                           {(data.cvMateriais||[]).map(m => (
                             <div key={m.id} className="flex items-center gap-3 p-3 bg-[#121214]/60 border border-[#1E1E22] rounded-xl">
                               {m.tipo === 'planta' || (m.content_type||'').startsWith('image/')
-                                // eslint-disable-next-line @next/next/no-img-element
-                                ? <img src={m.downloadUrl} alt={m.nome} className="w-12 h-10 object-cover rounded-lg border border-[#1E1E22] shrink-0" />
+                                ? <Image src={m.downloadUrl} alt={m.nome} width={48} height={40} className="object-cover rounded-lg border border-[#1E1E22] shrink-0" unoptimized />
                                 : <FileText size={14} className="text-zinc-500 shrink-0" />}
                               <div className="min-w-0 flex-1">
                                 <p className="text-xs font-medium text-zinc-200 truncate">{m.nome}</p>
@@ -567,10 +605,10 @@ function DetailPanel({ empId, dateRange, onClose, isAdmin }: {
 
 export default function EmpreendimentosView() {
   const { estoque, filteredLeads, dateRange } = useData()
-  const { currentUser } = useUser()
-  const isAdmin = currentUser.role === 'Desenvolvedor' || currentUser.role === 'Diretoria' || !!currentUser.permissions?.isAdmin
+  const { currentUser, isLoading } = useUser()
+  const isAdmin = !isLoading && (currentUser?.role === 'Desenvolvedor' || currentUser?.role === 'Diretoria' || !!currentUser?.permissions?.isAdmin)
   const [selectedId, setSelectedId] = useState<number | null>(null)
-  const [imgTs] = useState(Date.now())
+  const [imgTs] = useState(() => Date.now())
 
   const empreendimentos = Array.isArray(estoque?.empreendimentos) ? estoque.empreendimentos : []
   const resumo          = Array.isArray(estoque?.resumo)          ? estoque.resumo          : []
@@ -598,22 +636,23 @@ export default function EmpreendimentosView() {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-        {empreendimentos.map((emp: { id: number; nome: string; situacao: string; tipo: string; raw?: Record<string, unknown> }) => {
+        {empreendimentos.map((emp: Empreendimento) => {
           const stats = (resumo.find((r: { id_empreendimento: number }) => r.id_empreendimento === emp.id) || { total:0,disponivel:0,reservado:0,vendido:0,vgv_disponivel:0,vgv_vendido:0 }) as { total:number;disponivel:number;reservado:number;vendido:number;vgv_disponivel:number;vgv_vendido:number }
           const leads = (leadCountByProject as Record<string, number>)[emp.nome] ?? 0
-          const fotoUrl = (emp.raw?.foto as string) || null
+          const fotoUrl = emp.foto || ((emp.raw?.foto as string) ?? null)
+          const location = [emp.cidade, emp.bairro, emp.estado].filter(Boolean).join(', ')
 
           return (
             <div key={emp.id} onClick={() => setSelectedId(emp.id)}
               className="group bg-[#121214]/60 border border-[#1E1E22] rounded-2xl overflow-hidden cursor-pointer hover:border-zinc-700 transition-all shadow-lg hover:shadow-xl">
               <div className="relative h-44 bg-[#0E0E10]">
                 {fotoUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={`/api/empreendimentos/${emp.id}/image?t=${imgTs}`}
-                    alt="" className="w-full h-full object-cover"
+                  <Image src={`/api/empreendimentos/${emp.id}/image?t=${imgTs}`}
+                    alt="" fill className="object-cover"
+                    sizes="(max-width: 768px) 100vw, 400px" unoptimized
                     onError={e => {
-                      const img = e.target as HTMLImageElement
-                      if (!img.dataset.fallback) { img.dataset.fallback = '1'; img.src = fotoUrl }
+                      const img = e.currentTarget
+                      if (!img.dataset.fallback) { img.dataset.fallback = '1'; (img as HTMLImageElement).src = fotoUrl }
                     }} />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
@@ -621,15 +660,17 @@ export default function EmpreendimentosView() {
                   </div>
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none" />
-                <div className="absolute bottom-3 left-3 right-3">
-                  <p className="text-sm font-bold text-white leading-tight truncate">{emp.nome}</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    {emp.situacao && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/10 text-white">{emp.situacao}</span>}
-                    {(emp.raw?.andamento as number | undefined) ? <span className="text-[10px] text-zinc-300">{emp.raw!.andamento as number}% obra</span> : null}
+                  <div className="absolute bottom-3 left-3 right-3">
+                    <p className="text-sm font-bold text-white leading-tight truncate">{emp.nome}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      {emp.situacao && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/10 text-white">{emp.situacao}</span>}
+                      {emp.tipo && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/10 text-zinc-300">{emp.tipo}</span>}
+                      {emp.andamento != null ? <span className="text-[10px] text-zinc-300">{emp.andamento}% obra</span> : null}
+                    </div>
                   </div>
-                </div>
               </div>
               <div className="p-4 space-y-3">
+                {location && <p className="text-[11px] text-zinc-500 truncate">{location}</p>}
                 <StatusBar disp={stats.disponivel} res={stats.reservado} vend={stats.vendido} total={stats.total} />
                 <div className="grid grid-cols-3 gap-2 text-center">
                   {([['Disp.',stats.disponivel,'text-emerald-400'],['Res.',stats.reservado,'text-amber-400'],['Vend.',stats.vendido,'text-sky-400']] as [string,number,string][]).map(([l,v,c]) => (
@@ -641,8 +682,10 @@ export default function EmpreendimentosView() {
                     <p className="text-[10px] text-zinc-500">VGV Disponível</p>
                     <p className="text-xs font-semibold text-emerald-400">{BRL(stats.vgv_disponivel)}</p>
                   </div>
-                  {leads > 0 && <span className="text-[11px] px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20">{leads} lead{leads!==1?'s':''}</span>}
-                  <p className="text-[10px] text-zinc-500 font-mono">{stats.total} un.</p>
+                  <div className="flex items-center gap-3">
+                    {leads > 0 && <span className="text-[11px] px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20">{leads} lead{leads!==1?'s':''}</span>}
+                    <p className="text-[10px] text-zinc-500 font-mono">{stats.total} un.</p>
+                  </div>
                 </div>
               </div>
             </div>

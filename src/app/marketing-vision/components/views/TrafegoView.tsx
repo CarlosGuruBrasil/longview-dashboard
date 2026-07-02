@@ -53,8 +53,8 @@ export default function TrafegoView() {
 
   const monthly = metaData?.monthly ?? []
   const daily   = metaData?.daily ?? []
-  const campaigns = metaData?.campaigns ?? []
-  const platforms = metaData?.platforms ?? []
+  const campaigns = useMemo(() => metaData?.campaigns ?? [], [metaData])
+  const platforms = useMemo(() => metaData?.platforms ?? [], [metaData])
 
   const now = new Date()
   const curYM  = ym(now)

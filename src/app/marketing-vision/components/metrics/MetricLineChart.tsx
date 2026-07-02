@@ -51,7 +51,10 @@ const METRIC_CONFIG = {
 const TICK_COLOR = '#71717a'
 const GRID_COLOR = 'rgba(255,255,255,0.05)'
 
-function CustomTooltip({ active, payload }: any) {
+type TooltipPayloadEntry = { value: number; color: string; payload: { period: string; totalLeads?: number } }
+type CustomTooltipProps = { active?: boolean; payload?: TooltipPayloadEntry[] }
+
+function CustomTooltip({ active, payload }: CustomTooltipProps) {
   if (!active || !payload?.length) return null;
   const item = payload[0];
   const rate = item.value ?? 0;

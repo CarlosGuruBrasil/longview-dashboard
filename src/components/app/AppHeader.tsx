@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { CloudRain, CloudSun, LogOut, UserCircle } from 'lucide-react';
@@ -244,8 +245,7 @@ export default function AppHeader({
                   {online.map(u => (
                     <div key={u.userId} className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-white/[0.04]">
                       {u.avatarUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={u.avatarUrl} alt={u.name} className="w-7 h-7 rounded-full object-cover border border-[#1E1E22] shrink-0" />
+                        <Image src={u.avatarUrl} alt={u.name} width={28} height={28} className="rounded-full object-cover border border-[#1E1E22] shrink-0" unoptimized />
                       ) : (
                         <div className="w-7 h-7 rounded-full bg-emerald-800/30 border border-emerald-700/20 flex items-center justify-center text-[10px] font-bold text-emerald-300 shrink-0">
                           {getInitials(u.name)}

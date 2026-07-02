@@ -1,5 +1,7 @@
 'use client'
 
+/* eslint-disable react-hooks/static-components */
+
 import { useMemo, useState } from 'react'
 import {
   LineChart,

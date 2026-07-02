@@ -117,8 +117,8 @@ export default function AudienciasView() {
       <GlassCard title="Status da Integração Meta">
         {statusLoading ? (
           <div className="flex items-center gap-2 py-2">
-            <RefreshCw size={14} className="animate-spin opacity-50" style={{ color: 'var(--text-secondary)' }} />
-            <span className="text-sm opacity-60" style={{ color: 'var(--text-secondary)' }}>
+            <RefreshCw size={14} className="animate-spin opacity-50" style={{ color: '#71717a' }} />
+            <span className="text-sm opacity-60" style={{ color: '#71717a' }}>
               Verificando conexão com o Meta...
             </span>
           </div>
@@ -126,11 +126,11 @@ export default function AudienciasView() {
           <div className="flex items-center gap-3">
             <CheckCircle size={18} style={{ color: '#10b981' }} />
             <div>
-              <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+              <p className="text-sm font-medium" style={{ color: '#e4e4e7' }}>
                 Conectado ao Meta Ads
               </p>
               {(metaStatus.accountName || metaStatus.accountId) && (
-                <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                <p className="text-xs mt-0.5" style={{ color: '#71717a' }}>
                   {metaStatus.accountName ?? metaStatus.accountId}
                 </p>
               )}
@@ -140,11 +140,11 @@ export default function AudienciasView() {
           <div className="flex items-center gap-3">
             <AlertCircle size={18} style={{ color: '#f43f5e' }} />
             <div>
-              <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+              <p className="text-sm font-medium" style={{ color: '#e4e4e7' }}>
                 Meta Ads não conectado
               </p>
               {metaStatus?.error && (
-                <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                <p className="text-xs mt-0.5" style={{ color: '#71717a' }}>
                   {metaStatus.error}
                 </p>
               )}
@@ -172,7 +172,7 @@ export default function AudienciasView() {
                     <Icon size={18} style={{ color: seg.color }} />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                    <p className="text-sm font-semibold" style={{ color: '#e4e4e7' }}>
                       {seg.label}
                     </p>
                   </div>
@@ -183,7 +183,7 @@ export default function AudienciasView() {
                   <p className="text-3xl font-bold tracking-tight" style={{ color: seg.color }}>
                     {seg.count.toLocaleString('pt-BR')}
                   </p>
-                  <p className="text-xs mt-1 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                  <p className="text-xs mt-1 leading-relaxed" style={{ color: '#71717a' }}>
                     {seg.description}
                   </p>
                 </div>

@@ -1,35 +1,101 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parseCrmDate } from '@/lib/dateUtils';
 
+type NamedValue = {
+  nome?: string;
+};
+
+type CvRecord = Record<string, unknown> & {
+  id?: string | number;
+  idlead?: string | number;
+  idvenda?: string | number;
+  idunidade?: string | number;
+  idempreendimento?: string | number;
+  referencia?: string | number;
+  nome?: string;
+  name?: string;
+  email?: string;
+  telefone?: string;
+  celular?: string;
+  phone?: string;
+  origem?: NamedValue | string;
+  origin?: string;
+  empreendimento?: unknown;
+  produto?: unknown;
+  responsavel?: NamedValue;
+  corretor?: NamedValue;
+  gestor?: NamedValue;
+  autor_ultima_alteracao?: string;
+  status?: string;
+  situacao?: string | (NamedValue & {
+    situacao_para_venda?: string | number;
+    reservada?: unknown;
+    vendida?: unknown;
+    vendida_idsituacao?: string | number;
+  });
+  valor_venda?: string | number;
+  valor?: string | number;
+  metragem_real?: string | number;
+  bloco_nome?: string;
+  bloco?: string;
+  numero?: string;
+  status_venda?: string | number;
+  score?: unknown;
+  temperatura?: unknown;
+  data_venda?: string | number | Date;
+  data_cad?: string;
+  data_cadastro?: string;
+  data_atualizacao?: string;
+};
+
+type CvWebhookBody = CvRecord & {
+  lead?: CvRecord;
+  venda?: CvRecord;
+  unidade?: CvRecord;
+};
+
+function asRecord(value: unknown): CvRecord {
+  return value && typeof value === 'object' ? value as CvRecord : {};
+}
+
+function sqlScalar(value: unknown): string | number | boolean | null {
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value;
+  return value == null ? null : String(value);
+}
+
+function situacaoNome(value: CvRecord['situacao']): string | null {
+  return typeof value === 'object' && value ? value.nome ?? null : typeof value === 'string' ? value : null;
+}
+
 /**
  * Busca o lead completo no CV CRM. Necessário porque os webhooks estão
  * configurados com forma_envio="id" — o CV manda só o id, não o objeto.
  */
-async function fetchLeadById(id: string | number): Promise<any | null> {
+async function fetchLeadById(id: string | number): Promise<CvRecord | null> {
   const email = process.env.CV_CRM_EMAIL, token = process.env.CV_CRM_TOKEN;
   if (!email || !token) return null;
   try {
     const res = await fetch(
       `https://longviewempreendimentos.cvcrm.com.br/api/v1/comercial/leads?limit=1&idlead=${encodeURIComponent(String(id))}`,
-      { headers: { email, token, Accept: 'application/json' } as any }
+      { headers: { email, token, Accept: 'application/json' } }
     );
-    const data = await res.json();
+    const data = await res.json() as { leads?: CvRecord[] };
     const leads = data?.leads ?? [];
     return Array.isArray(leads) && leads[0] ? leads[0] : null;
   } catch { return null; }
 }
 
 /** empreendimento pode vir como array de objetos — normaliza pra texto */
-function empreendimentoText(emp: any): string | null {
+function empreendimentoText(emp: unknown): string | null {
   if (!emp) return null;
-  if (Array.isArray(emp)) return emp.map((e: any) => e?.nome ?? e).filter(Boolean).join(', ') || null;
-  if (typeof emp === 'object') return emp.nome ?? null;
+  if (Array.isArray(emp)) return emp.map((e) => asRecord(e).nome ?? e).filter(Boolean).join(', ') || null;
+  if (typeof emp === 'object') return asRecord(emp).nome ?? null;
   return String(emp);
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const body = await request.json() as CvWebhookBody;
 
     // CV CRM envia payload em várias chaves (lead, venda, unidade) dependendo do evento
     const lead = body?.lead ?? body;
@@ -42,11 +108,12 @@ export async function POST(request: NextRequest) {
     // -- Tratar Evento de Venda --
     if (venda?.idvenda || body?.idvenda) {
       const v = venda || body;
+      const vendaId = v.idvenda ?? body.idvenda ?? null;
       const dVenda = v.data_venda ? new Date(v.data_venda) : null;
-      const valor = v.valor_venda ? parseFloat(v.valor_venda) : null;
+      const valor = v.valor_venda ? parseFloat(String(v.valor_venda)) : null;
       await sql`
         INSERT INTO cv_vendas (id, id_empreendimento, id_unidade, valor, data_venda, status, raw, synced_at)
-        VALUES (${v.idvenda}, ${v.idempreendimento ?? null}, ${v.idunidade ?? null}, ${valor}, ${dVenda}, ${v.situacao ?? null}, ${JSON.stringify(v)}, NOW())
+        VALUES (${vendaId}, ${v.idempreendimento ?? null}, ${v.idunidade ?? null}, ${valor}, ${dVenda}, ${sqlScalar(v.situacao)}, ${JSON.stringify(v)}, NOW())
         ON CONFLICT (id) DO UPDATE SET
           id_empreendimento = EXCLUDED.id_empreendimento, id_unidade = EXCLUDED.id_unidade, valor = EXCLUDED.valor,
           data_venda = EXCLUDED.data_venda, status = EXCLUDED.status, raw = EXCLUDED.raw, synced_at = EXCLUDED.synced_at
@@ -58,19 +125,20 @@ export async function POST(request: NextRequest) {
     // -- Tratar Evento de Unidade --
     if (unidade?.idunidade || body?.idunidade) {
       const u = unidade || body;
-      const sitObj = u.situacao || {};
+      const unidadeId = u.idunidade ?? body.idunidade ?? null;
+      const sitObj = asRecord(u.situacao);
       const statusVenda = Number(sitObj.situacao_para_venda ?? u.status_venda ?? 0);
       let statusText = 'Desconhecido';
       if (statusVenda === 1) statusText = 'Disponivel';
       else if (statusVenda === 2 || statusVenda === 5 || sitObj.reservada != null) statusText = 'Reservado';
       else if (statusVenda === 3 || sitObj.vendida != null || sitObj.vendida_idsituacao === 3) statusText = 'Vendido';
 
-      const valor = parseFloat(u.valor) || null;
-      const metragem = parseFloat(u.metragem_real) || null;
+      const valor = parseFloat(String(u.valor)) || null;
+      const metragem = parseFloat(String(u.metragem_real)) || null;
 
       await sql`
         INSERT INTO cv_unidades (id, id_empreendimento, bloco, numero, status, status_venda, valor, metragem, raw, synced_at)
-        VALUES (${u.idunidade}, ${u.idempreendimento ?? null}, ${u.bloco_nome ?? u.bloco ?? null}, ${u.nome ?? u.numero ?? null}, ${statusText}, ${statusVenda}, ${valor}, ${metragem}, ${JSON.stringify(u)}, NOW())
+        VALUES (${unidadeId}, ${u.idempreendimento ?? null}, ${u.bloco_nome ?? u.bloco ?? null}, ${u.nome ?? u.numero ?? null}, ${statusText}, ${statusVenda}, ${valor}, ${metragem}, ${JSON.stringify(u)}, NOW())
         ON CONFLICT (id) DO UPDATE SET
           status = EXCLUDED.status, status_venda = EXCLUDED.status_venda, valor = EXCLUDED.valor, raw = EXCLUDED.raw, synced_at = EXCLUDED.synced_at
       `;
@@ -93,7 +161,7 @@ export async function POST(request: NextRequest) {
     }
 
     const id          = String(full.idlead ?? full.id ?? leadId);
-    const statusNomeV = full.situacao?.nome ?? full.status ?? null;
+    const statusNomeV = situacaoNome(full.situacao) ?? full.status ?? null;
 
     // Histórico de etapa: detecta mudança comparando com o status já salvo
     if (statusNomeV) {
@@ -119,11 +187,11 @@ export async function POST(request: NextRequest) {
         ${full.nome ?? full.name ?? null},
         ${full.email ?? null},
         ${full.telefone ?? full.celular ?? full.phone ?? null},
-        ${typeof full.origem === 'object' ? full.origem?.nome : (full.origem ?? full.origin ?? null)},
+        ${typeof full.origem === 'object' ? full.origem?.nome ?? null : (full.origem ?? full.origin ?? null)},
         ${statusNomeV},
         ${empreendimentoText(full.empreendimento ?? full.produto)},
-        ${full.score ?? null},
-        ${full.temperatura ?? null},
+        ${sqlScalar(full.score)},
+        ${sqlScalar(full.temperatura)},
         ${parseCrmDate(full.data_cad ?? full.data_cadastro)},
         ${parseCrmDate(full.data_atualizacao)},
         ${JSON.stringify(full)}::jsonb,

@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 // Histórico de movimentação de etapa de um lead (tabela lead_stage_history)
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -19,7 +23,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       ORDER BY changed_at DESC
     `;
     return NextResponse.json({ ok: true, history: rows });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: 500 });
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 500 });
   }
 }

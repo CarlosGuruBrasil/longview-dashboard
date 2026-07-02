@@ -5,7 +5,7 @@ import {
   X, Save, Trash2, Paperclip, MessageSquare, CheckSquare, Clock,
   Upload, Download, FileText, Send, Plus, Check, Loader2,
 } from 'lucide-react';
-import { Task, ChangeLog, Comment, Subtask, TaskDocumentMeta } from '@/lib/db-kv';
+import { Task, Comment, Subtask, TaskDocumentMeta } from '@/lib/db-kv';
 import { useUser } from '@/context/UserContext';
 
 interface Props {
@@ -79,9 +79,14 @@ export default function TaskDrawer({ taskId, onClose, onUpdate }: Props) {
   const isDeletable = ['Desenvolvedor', 'Diretoria', 'Operador'].includes(currentUser.role) || currentUser.permissions?.deleteTasks === true;
 
   useEffect(() => {
-    if (!taskId) { setTask(null); return; }
+    if (!taskId) {
+      const id = window.setTimeout(() => setTask(null), 0);
+      return () => window.clearTimeout(id);
+    }
     let active = true;
-    setTask(null); setEditMode(false); setLoading(true); setTab('detalhes');
+    const timer = window.setTimeout(() => {
+      setTask(null); setEditMode(false); setLoading(true); setTab('detalhes');
+    }, 0);
     fetch(`/api/tasks/${taskId}`)
       .then(r => r.json())
       .then(d => {
@@ -98,17 +103,18 @@ export default function TaskDrawer({ taskId, onClose, onUpdate }: Props) {
       })
       .catch(console.error)
       .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
+    return () => { active = false; window.clearTimeout(timer); };
   }, [taskId]);
 
   useEffect(() => {
     if (!taskId || tab !== 'arquivos') return;
-    setDocsLoading(true);
+    const timer = window.setTimeout(() => setDocsLoading(true), 0);
     fetch(`/api/tasks/${taskId}/documents`)
       .then(r => r.json())
       .then(d => setDocs(d.documents ?? []))
       .catch(console.error)
       .finally(() => setDocsLoading(false));
+    return () => window.clearTimeout(timer);
   }, [taskId, tab]);
 
   const handleSave = async () => {

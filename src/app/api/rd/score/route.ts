@@ -9,6 +9,29 @@ const SCORE_TIERS = [
   { min: 0,  label: 'frio',   conversion_id: 'lead_frio_longview'   },
 ];
 
+type ScoreBody = {
+  email?: string;
+  score?: string | number;
+  nome?: string;
+  telefone?: string;
+  origem?: string;
+};
+
+type RDContactResponse = {
+  uuid?: string;
+  name?: string;
+  cf_score_intencao?: string | null;
+  cf_temperatura_lead?: string | null;
+  cf_origem_captacao?: string | null;
+  cf_data_score?: string | null;
+  tags?: unknown[];
+  lead_score?: unknown;
+};
+
+function axiosDetails(err: unknown) {
+  return axios.isAxiosError(err) ? err.response?.data || err.message : err;
+}
+
 function getTier(score: number) {
   return SCORE_TIERS.find(t => score >= t.min) ?? SCORE_TIERS[SCORE_TIERS.length - 1];
 }
@@ -21,7 +44,7 @@ export async function POST(request: NextRequest) {
   const rl = await rateLimit(`rd_score:${ip}`, 60, 60);
   if (!rl.success) return NextResponse.json({ error: 'Rate limit atingido' }, { status: 429 });
 
-  const body = await request.json();
+  const body = await request.json() as ScoreBody;
   const { email, score, nome, telefone, origem } = body;
 
   if (!email || score === undefined) {
@@ -33,7 +56,7 @@ export async function POST(request: NextRequest) {
 
   const tier = getTier(Number(score));
 
-  const payload: Record<string, any> = {
+  const payload: Record<string, unknown> = {
     conversion_identifier: tier.conversion_id,
     email,
     cf_score_intencao:    String(score),
@@ -59,10 +82,11 @@ export async function POST(request: NextRequest) {
       success: true, email, score: Number(score),
       temperatura: tier.label, conversion_sent: tier.conversion_id, rd_response: res.data,
     });
-  } catch (err: any) {
-    console.error('[rd/score]', err.response?.data || err.message);
+  } catch (err: unknown) {
+    const details = axiosDetails(err);
+    console.error('[rd/score]', details);
     return NextResponse.json(
-      { error: 'Erro ao enviar score', details: err.response?.data || err.message },
+      { error: 'Erro ao enviar score', details },
       { status: 500 }
     );
   }
@@ -80,7 +104,7 @@ export async function GET(request: NextRequest) {
   if (!token) return NextResponse.json({ error: 'RD_TOKEN_PRIVATE não configurado' }, { status: 500 });
 
   try {
-    const res = await axios.get(
+    const res = await axios.get<RDContactResponse>(
       `https://api.rd.services/platform/contacts/email:${encodeURIComponent(email)}`,
       { headers: { Authorization: `Bearer ${token}` }, timeout: 10000 }
     );
@@ -97,7 +121,8 @@ export async function GET(request: NextRequest) {
         lead_score_nativo: c.lead_score          || null,
       },
     });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.response?.data || err.message }, { status: err.response?.status || 500 });
+  } catch (err: unknown) {
+    const status = axios.isAxiosError(err) ? err.response?.status || 500 : 500;
+    return NextResponse.json({ error: axiosDetails(err) }, { status });
   }
 }

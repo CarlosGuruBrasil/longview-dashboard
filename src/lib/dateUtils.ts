@@ -1,4 +1,4 @@
-export function parseCrmDate(val: any): Date | null {
+export function parseCrmDate(val: unknown): Date | null {
   if (!val) return null;
   const str = String(val).trim();
   if (str.includes('/')) {

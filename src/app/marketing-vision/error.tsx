@@ -1,0 +1,63 @@
+'use client';
+
+import React, { useEffect, useState } from 'react';
+
+export default function Error({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string };
+  reset: () => void;
+}) {
+  const [showDetails, setShowDetails] = useState(false);
+
+  useEffect(() => {
+    console.error('[marketing-vision] Error caught:', {
+      message: error.message,
+      digest: error.digest,
+      stack: error.stack,
+    });
+  }, [error]);
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[50vh] p-6 text-center bg-[#09090b] border border-red-500/10 rounded-2xl lv-card">
+      <div className="p-3 bg-red-500/10 text-red-400 rounded-full border border-red-500/20 mb-4">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        </svg>
+      </div>
+      <h2 className="text-base font-bold text-white mb-2">Falha no Marketing Vision</h2>
+      <p className="text-xs text-zinc-500 max-w-sm mb-6 leading-relaxed">
+        Não foi possível carregar o dashboard de marketing e leads. O restante do dashboard continua disponível.
+      </p>
+      {error.digest && (
+        <button
+          onClick={() => setShowDetails(v => !v)}
+          className="text-[11px] text-zinc-600 hover:text-zinc-400 mb-4 underline underline-offset-2 transition-colors"
+        >
+          {showDetails ? 'Ocultar' : 'Mostrar'} detalhes do erro
+        </button>
+      )}
+      {showDetails && error.digest && (
+        <div className="mb-4 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-[11px] text-zinc-500 font-mono max-w-full overflow-auto">
+          <p>ID: {error.digest}</p>
+          {error.message && <p className="mt-1 text-zinc-400">{error.message}</p>}
+        </div>
+      )}
+      <div className="flex gap-3">
+        <button
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 text-xs font-semibold text-zinc-400 hover:text-white bg-zinc-900 border border-zinc-800 rounded-lg transition-colors"
+        >
+          Recarregar
+        </button>
+        <button
+          onClick={() => reset()}
+          className="px-4 py-2 text-xs font-semibold text-black bg-white hover:bg-zinc-200 rounded-lg transition-colors"
+        >
+          Tentar Novamente
+        </button>
+      </div>
+    </div>
+  );
+}

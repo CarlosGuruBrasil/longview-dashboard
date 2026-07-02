@@ -17,7 +17,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
   const doc  = docs.find(d => d.id === docId);
   if (!doc) return NextResponse.json({ error: 'Documento não encontrado' }, { status: 404 });
 
-  const b64 = (doc as any).contentB64 as string | undefined;
+  const b64 = doc.contentB64;
   if (!b64) return NextResponse.json({ error: 'Conteúdo não disponível' }, { status: 404 });
 
   const buffer = Buffer.from(b64, 'base64');

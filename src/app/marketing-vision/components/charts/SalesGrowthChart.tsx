@@ -1,5 +1,7 @@
 'use client'
 
+/* eslint-disable react-hooks/static-components */
+
 import {
   LineChart,
   Line,
@@ -20,6 +22,10 @@ interface SalesGrowthChartProps {
   mode: 'month' | 'year'
   onModeChange: (mode: 'month' | 'year') => void
 }
+
+type ChartPoint = Record<string, unknown> & { label: string }
+type TooltipPayloadEntry = { dataKey: string; value: number; color: string; payload: ChartPoint }
+type ChartTooltipProps = { active?: boolean; payload?: TooltipPayloadEntry[]; label?: string }
 
 const TICK_COLOR = '#71717a'
 const GRID_COLOR = 'rgba(255,255,255,0.05)'
@@ -79,12 +85,14 @@ function buildYearData(leads: Lead[]) {
 }
 
 export default function SalesGrowthChart({ allLeads, mode, onModeChange }: SalesGrowthChartProps) {
-  const { data, years } = mode === 'month' ? buildMonthData(allLeads) : buildYearData(allLeads)
+  const { data, years } = (mode === 'month' ? buildMonthData(allLeads) : buildYearData(allLeads)) as {
+    data: ChartPoint[]; years: number[]
+  }
 
   // CustomTooltip com closure sobre `data` para acessar VGV sem séries extras
-  function CustomTooltip({ active, payload, label }: any) {
+  function CustomTooltip({ active, payload, label }: ChartTooltipProps) {
     if (!active || !payload?.length) return null
-    const point = data.find((d: any) => d.label === label)
+    const point = data.find(d => d.label === label)
     if (!point) return null
 
     return (
@@ -99,8 +107,8 @@ export default function SalesGrowthChart({ allLeads, mode, onModeChange }: Sales
         <p style={{ color: '#e4e4e7', marginBottom: 8, fontWeight: 600 }}>{label}</p>
         {mode === 'month' ? (
           years.map((y, i) => {
-            const qty = (point as any)[`qty_${y}`] as number
-            const vgv = (point as any)[`vgv_${y}`] as number
+            const qty = point[`qty_${y}`] as number
+            const vgv = point[`vgv_${y}`] as number
             return (
               <div key={y} style={{ marginBottom: 6 }}>
                 <p style={{ color: CHART_PALETTE[i % CHART_PALETTE.length], fontWeight: 600, marginBottom: 2 }}>
@@ -118,10 +126,10 @@ export default function SalesGrowthChart({ allLeads, mode, onModeChange }: Sales
         ) : (
           <>
             <p style={{ color: '#a1a1aa', marginBottom: 2 }}>
-              Qtd: <strong style={{ color: '#e4e4e7' }}>{(point as any).qty}</strong> vendas
+              Qtd: <strong style={{ color: '#e4e4e7' }}>{point.qty as number}</strong> vendas
             </p>
             <p style={{ color: '#a1a1aa' }}>
-              VGV: <strong style={{ color: '#e4e4e7' }}>{formatCurrency((point as any).vgv)}</strong>
+              VGV: <strong style={{ color: '#e4e4e7' }}>{formatCurrency(point.vgv as number)}</strong>
             </p>
           </>
         )}

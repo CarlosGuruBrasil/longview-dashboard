@@ -17,59 +17,136 @@ const PAGE_ID   = '259079394232614';
 const ACT_ID    = process.env.META_ACT_ID;
 const CACHE_TTL = 900; // 15 min
 
+type MetaPageTokenResponse = { access_token?: string };
+type MetaListResponse<T> = { data?: T[] };
+type MetaLeadForm = Record<string, unknown> & {
+  id: string;
+  name?: string;
+  status?: string;
+};
+type MetaLeadField = {
+  name?: string;
+  values?: string[];
+};
+type MetaLead = Record<string, unknown> & {
+  id?: string;
+  field_data?: MetaLeadField[];
+};
+type MetaLeadWithForm = MetaLead & {
+  _form_name?: string;
+  _crm_match?: CrmMatch | null;
+};
+type CrmLead = Record<string, unknown> & {
+  id?: string | number;
+  nome?: string;
+  telefone?: string;
+  email?: string;
+  situacao?: { nome?: string };
+  etapa?: { nome?: string };
+  corretor?: { nome?: string };
+  valor_negocio?: unknown;
+  data_cad?: unknown;
+};
+type CrmLeadsResponse = { leads?: CrmLead[] };
+type CrmMatch = {
+  id: string | number | undefined;
+  nome: string | undefined;
+  situacao: string;
+  etapa: string;
+  corretor: string;
+  valor: unknown;
+  data_cad: unknown;
+  link: string;
+};
+type LeadsByForm = {
+  form_id: string;
+  form_name: string | undefined;
+  leads: MetaLead[];
+  _error?: boolean;
+};
+type MetaLeadsResult = {
+  forms: MetaLeadForm[];
+  leads: MetaLeadWithForm[];
+  leads_by_form: LeadsByForm[];
+  total_leads: number;
+  crm_stats: {
+    total_crm_leads: number;
+    matched: number;
+    not_matched: number;
+    match_rate: number;
+  };
+  updatedAt: string;
+};
+type MetaErrorData = { error?: { message?: string } };
+
 function metaAuth() {
   return { access_token: process.env.META_TOKEN };
+}
+
+function errorMessage(err: unknown): string {
+  if (axios.isAxiosError<MetaErrorData>(err)) {
+    return err.response?.data?.error?.message ?? err.message;
+  }
+  return err instanceof Error ? err.message : String(err);
+}
+
+function errorData(err: unknown): unknown {
+  return axios.isAxiosError(err) ? err.response?.data ?? err.message : errorMessage(err);
+}
+
+function leadFieldValue(fields: MetaLeadField[], keys: string[]): string {
+  return fields.find(f => keys.some(k => (f.name || '').toLowerCase().includes(k)))?.values?.[0] ?? '';
 }
 
 // Buscar page access token dinamicamente (necessário para leadgen_forms)
 async function getPageAccessToken(): Promise<string | null> {
   try {
-    const res = await axios.get(`${META_BASE}/${PAGE_ID}`, {
+    const res = await axios.get<MetaPageTokenResponse>(`${META_BASE}/${PAGE_ID}`, {
       params: { fields: 'access_token', ...metaAuth() },
       timeout: 10000,
     });
-    return (res as any).data?.access_token || null;
+    return res.data.access_token || null;
   } catch {
     return null;
   }
 }
 
 // Buscar formulários de leads — tenta via página, fallback via ad account
-async function fetchLeadForms(pageToken: string | null): Promise<any[]> {
+async function fetchLeadForms(pageToken: string | null): Promise<MetaLeadForm[]> {
   const token = pageToken || process.env.META_TOKEN;
 
   // Tentativa 1: via página com page token
   try {
-    const res = await axios.get(`${META_BASE}/${PAGE_ID}/leadgen_forms`, {
+    const res = await axios.get<MetaListResponse<MetaLeadForm>>(`${META_BASE}/${PAGE_ID}/leadgen_forms`, {
       params: { fields: 'id,name,status,leads_count,created_time,questions', limit: 100, access_token: token },
       timeout: 15000,
     });
-    const forms = (res as any).data?.data ?? [];
+    const forms = res.data.data ?? [];
     if (forms.length >= 0) return forms; // retorna mesmo se vazio
-  } catch (err: any) {
-    console.warn('[meta/leads] leadgen_forms via página falhou:', err.response?.data?.error?.message);
+  } catch (err: unknown) {
+    console.warn('[meta/leads] leadgen_forms via página falhou:', errorMessage(err));
   }
 
   // Tentativa 2: via ad account
   try {
-    const res = await axios.get(`${META_BASE}/${ACT_ID}/leadgen_forms`, {
+    const res = await axios.get<MetaListResponse<MetaLeadForm>>(`${META_BASE}/${ACT_ID}/leadgen_forms`, {
       params: { fields: 'id,name,status,leads_count,created_time,questions', limit: 100, ...metaAuth() },
       timeout: 15000,
     });
-    return (res as any).data?.data ?? [];
-  } catch (err: any) {
-    console.warn('[meta/leads] leadgen_forms via ad account falhou:', err.response?.data?.error?.message);
+    return res.data.data ?? [];
+  } catch (err: unknown) {
+    console.warn('[meta/leads] leadgen_forms via ad account falhou:', errorMessage(err));
   }
 
   return [];
 }
 
 // Cruzar lead Meta com leads do CRM por nome/telefone/email
-function crossMatchWithCRM(metaLead: any, crmLeads: any[]): any | null {
+function crossMatchWithCRM(metaLead: MetaLead, crmLeads: CrmLead[]): CrmLead | null {
   const fd = metaLead.field_data || [];
-  const getName  = (keys: string[]) => fd.find((f: any) => keys.some((k: string) => (f.name || '').toLowerCase().includes(k)))?.values?.[0]?.toLowerCase()?.trim() || '';
-  const getPhone = (keys: string[]) => (fd.find((f: any) => keys.some((k: string) => (f.name || '').toLowerCase().includes(k)))?.values?.[0] || '').replace(/\D/g, '');
-  const getEmail = (keys: string[]) => fd.find((f: any) => keys.some((k: string) => (f.name || '').toLowerCase().includes(k)))?.values?.[0]?.toLowerCase()?.trim() || '';
+  const getName  = (keys: string[]) => leadFieldValue(fd, keys).toLowerCase().trim();
+  const getPhone = (keys: string[]) => leadFieldValue(fd, keys).replace(/\D/g, '');
+  const getEmail = (keys: string[]) => leadFieldValue(fd, keys).toLowerCase().trim();
 
   const metaNome  = getName(['name', 'nome', 'full_name']);
   const metaTel   = getPhone(['phone', 'telefone', 'cel', 'whatsapp']);
@@ -111,7 +188,7 @@ export async function GET(request: NextRequest) {
 
   if (!forceRefresh) {
     try {
-      const cached = await kv.get<any>(cacheKey);
+      const cached = await kv.get<MetaLeadsResult>(cacheKey);
       if (cached) return NextResponse.json({ ...cached, _cached: true });
     } catch { /* non-critical */ }
   }
@@ -124,26 +201,26 @@ export async function GET(request: NextRequest) {
   const forms = await fetchLeadForms(pageToken);
 
   // 3. Buscar leads do CRM para cruzamento
-  let crmLeads: any[] = [];
+  let crmLeads: CrmLead[] = [];
   try {
-    const crmRes = await axios.get('https://longviewempreendimentos.cvcrm.com.br/api/v1/comercial/leads', {
+    const crmRes = await axios.get<CrmLeadsResponse>('https://longviewempreendimentos.cvcrm.com.br/api/v1/comercial/leads', {
       params: { limit: 200, offset: 0 },
       headers: { email: process.env.CV_CRM_EMAIL, token: process.env.CV_CRM_TOKEN, Accept: 'application/json' },
       timeout: 15000,
     });
     crmLeads = crmRes.data?.leads || [];
-  } catch (err: any) {
-    console.warn('[meta/leads] CRM leads falhou:', err.message);
+  } catch (err: unknown) {
+    console.warn('[meta/leads] CRM leads falhou:', errorMessage(err));
   }
 
   // 4. Buscar leads dos formulários
-  let allMetaLeads: any[] = [];
-  let leadsPerForm: any[] = [];
+  let allMetaLeads: MetaLeadWithForm[] = [];
+  let leadsPerForm: LeadsByForm[] = [];
 
   try {
     if (formId) {
       // Formulário específico
-      const leadsRes = await axios.get(`${META_BASE}/${formId}/leads`, {
+      const leadsRes = await axios.get<MetaListResponse<MetaLead>>(`${META_BASE}/${formId}/leads`, {
         params: {
           fields: 'id,created_time,field_data,ad_id,ad_name,adset_id,adset_name,campaign_id,campaign_name,form_id',
           limit: 500,
@@ -152,33 +229,33 @@ export async function GET(request: NextRequest) {
         },
         timeout: 20000,
       });
-      allMetaLeads = (leadsRes as any).data?.data ?? [];
+      allMetaLeads = leadsRes.data.data ?? [];
     } else {
       // Todos os formulários ativos (máx 5 mais recentes)
-      const activeForms = forms.filter((f: any) => f.status !== 'ARCHIVED').slice(0, 5);
-      const promises = activeForms.map((form: any) =>
-        axios.get(`${META_BASE}/${form.id}/leads`, {
+      const activeForms = forms.filter(f => f.status !== 'ARCHIVED').slice(0, 5);
+      const promises = activeForms.map((form) =>
+        axios.get<MetaListResponse<MetaLead>>(`${META_BASE}/${form.id}/leads`, {
           params: {
             fields: 'id,created_time,field_data,ad_id,ad_name,adset_id,adset_name,campaign_id,campaign_name,form_id',
             limit: 200,
             access_token: tokenUsed,
           },
           timeout: 20000,
-        }).then((r: any) => ({ form_id: form.id, form_name: form.name, leads: r.data?.data ?? [] }))
-          .catch((err: any) => {
-            console.warn(`[meta/leads] Form ${form.id} falhou:`, err.response?.data?.error?.message);
+        }).then((r): LeadsByForm => ({ form_id: form.id, form_name: form.name, leads: r.data?.data ?? [] }))
+          .catch((err: unknown): LeadsByForm => {
+            console.warn(`[meta/leads] Form ${form.id} falhou:`, errorMessage(err));
             return { form_id: form.id, form_name: form.name, leads: [], _error: true };
           })
       );
       leadsPerForm   = await Promise.all(promises);
-      allMetaLeads   = leadsPerForm.flatMap((f: any) => f.leads.map((l: any) => ({ ...l, _form_name: f.form_name })));
+      allMetaLeads   = leadsPerForm.flatMap((f) => f.leads.map((l) => ({ ...l, _form_name: f.form_name })));
     }
-  } catch (err: any) {
-    console.error('[meta/leads] Erro ao buscar leads:', err.response?.data || err.message);
+  } catch (err: unknown) {
+    console.error('[meta/leads] Erro ao buscar leads:', errorData(err));
   }
 
   // 5. Cruzar leads Meta com CRM
-  const leadsComCruzamento = allMetaLeads.map((lead: any) => {
+  const leadsComCruzamento = allMetaLeads.map((lead): MetaLeadWithForm => {
     const crmMatch = crossMatchWithCRM(lead, crmLeads);
     return {
       ...lead,
@@ -195,10 +272,10 @@ export async function GET(request: NextRequest) {
     };
   });
 
-  const matchCount   = leadsComCruzamento.filter((l: any) => l._crm_match).length;
+  const matchCount   = leadsComCruzamento.filter((l) => l._crm_match).length;
   const noMatchCount = leadsComCruzamento.length - matchCount;
 
-  const result = {
+  const result: MetaLeadsResult = {
     forms,
     leads:         leadsComCruzamento,
     leads_by_form: leadsPerForm,

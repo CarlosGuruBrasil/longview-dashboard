@@ -2,13 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  Building2,
-  TrendingUp,
-  FolderOpen,
   ArrowRight,
-  Clock,
-  CheckCircle2,
-  AlertTriangle,
   RefreshCw,
   Plus,
   X,
@@ -89,7 +83,7 @@ export default function ProjectsPage() {
         throw new Error(err.error ?? `Erro ${res.status}`);
       }
       // força cache-bust adicionando timestamp
-      const url = `/api/projects/${projId}/banner?t=${Date.now()}`;
+      const url = `/api/projects/${projId}/banner?t=${new Date().getTime()}`;
       setProjects(prev => prev.map(p => p.id === projId ? { ...p, banner: url } : p));
     } catch (err: unknown) {
       alert(`Não foi possível atualizar a foto: ${err instanceof Error ? err.message : 'Erro desconhecido'}`);
@@ -365,6 +359,7 @@ export default function ProjectsPage() {
                     {/* Preview de Banner */}
                     <div className="w-28 h-20 rounded-lg overflow-hidden border border-[#2B2B30] relative bg-[#09090B] flex items-center justify-center shrink-0">
                       {newBanner ? (
+                        // eslint-disable-next-line @next/next/no-img-element
                         <img 
                           src={newBanner} 
                           alt="Banner Preview" 

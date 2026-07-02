@@ -15,8 +15,53 @@ import crypto from 'crypto';
 const META_BASE = 'https://graph.facebook.com/v21.0';
 const ACT_ID    = process.env.META_ACT_ID;
 
+type CRMContact = Record<string, unknown>;
+type CRMLeadsResponse = {
+  leads?: CRMContact[];
+  contratos?: CRMContact[];
+  data?: CRMContact[];
+  total?: number;
+};
+type MetaListResponse = { data?: Record<string, unknown>[] };
+type MetaIdResponse = { id?: string };
+type MetaUploadResponse = {
+  num_received?: number;
+  num_invalid_entries?: number;
+};
+type AudiencePipelineBody = {
+  type?: string;
+  create_lookalike?: boolean;
+};
+type AudienceEntry = {
+  id: string | undefined;
+  name: string;
+  type: string;
+};
+type AudiencePipelineResult = {
+  log: string[];
+  audiences: AudienceEntry[];
+  upload: { total: number; received: number; invalid: number } | null;
+  lookalike: { id: string | undefined; name: string } | null;
+};
+type MetaErrorData = { error?: { message?: string } };
+
 function metaAuth() {
   return { access_token: process.env.META_TOKEN };
+}
+
+function text(value: unknown): string {
+  return typeof value === 'string' ? value : value == null ? '' : String(value);
+}
+
+function errorPayload(err: unknown): unknown {
+  return axios.isAxiosError(err) ? err.response?.data || err.message : err instanceof Error ? err.message : String(err);
+}
+
+function metaErrorMessage(err: unknown): string {
+  if (axios.isAxiosError<MetaErrorData>(err)) {
+    return err.response?.data?.error?.message || err.message;
+  }
+  return err instanceof Error ? err.message : String(err);
 }
 
 // SHA-256 hash normalizado para upload Meta
@@ -36,7 +81,7 @@ function hashPhone(phone: string): string {
 }
 
 // Busca clientes do CV CRM
-async function fetchCRMContacts(filter: string): Promise<any[]> {
+async function fetchCRMContacts(filter: string): Promise<CRMContact[]> {
   const email  = process.env.CV_CRM_EMAIL;
   const token  = process.env.CV_CRM_TOKEN;
   const base   = 'https://longviewempreendimentos.cvcrm.com.br/api/v1';
@@ -45,16 +90,16 @@ async function fetchCRMContacts(filter: string): Promise<any[]> {
   // Busca via endpoint de clientes (compradores com contrato)
   if (filter === 'compradores') {
     try {
-      const res = await axios.get(`${base}/comercial/contratos`, {
+      const res = await axios.get<CRMLeadsResponse | CRMContact[]>(`${base}/comercial/contratos`, {
         headers,
         params: { limit: 1000, situacao: 'ativo' },
         timeout: 20000,
       });
-      const contratos = res.data?.contratos || res.data?.data || res.data || [];
+      const contratos = Array.isArray(res.data) ? res.data : res.data.contratos || res.data.data || [];
       return Array.isArray(contratos) ? contratos : [];
     } catch {
       // fallback: leads com situação "Vendido"
-      const res = await axios.get(`${base}/comercial/leads`, {
+      const res = await axios.get<CRMLeadsResponse>(`${base}/comercial/leads`, {
         headers,
         params: { limit: 2000, situacao: 'Vendido' },
         timeout: 20000,
@@ -64,7 +109,7 @@ async function fetchCRMContacts(filter: string): Promise<any[]> {
   }
 
   // Todos os leads
-  const initial = await axios.get(`${base}/comercial/leads`, {
+  const initial = await axios.get<CRMLeadsResponse>(`${base}/comercial/leads`, {
     headers,
     params: { limit: 1 },
     timeout: 15000,
@@ -73,7 +118,7 @@ async function fetchCRMContacts(filter: string): Promise<any[]> {
   const maxLeads  = Math.min(total, 5000);
   const pages     = Math.ceil(maxLeads / 500);
   const promises  = Array.from({ length: pages }, (_, i) =>
-    axios.get(`${base}/comercial/leads`, {
+    axios.get<CRMLeadsResponse>(`${base}/comercial/leads`, {
       headers,
       params: { limit: 500, offset: i * 500, ...(filter === 'ativos' ? { situacao: 'Ativo' } : {}) },
       timeout: 20000,
@@ -82,25 +127,25 @@ async function fetchCRMContacts(filter: string): Promise<any[]> {
   const results = await Promise.allSettled(promises);
   return results
     .filter(r => r.status === 'fulfilled')
-    .flatMap((r: any) => r.value.data?.leads || []);
+    .flatMap((r) => r.status === 'fulfilled' ? r.value.data.leads || [] : []);
 }
 
 // Normaliza contato CRM para schema Meta
-function normalizeContact(c: any): { fn: string; email: string; phone: string } {
+function normalizeContact(c: CRMContact): { fn: string; email: string; phone: string } {
   return {
-    fn:    (c.nome || c.name || c.nome_completo || '').trim(),
-    email: (c.email || c.email_principal || '').toLowerCase().trim(),
-    phone: (c.telefone || c.celular || c.fone || c.phone || '').replace(/\D/g, ''),
+    fn:    text(c.nome || c.name || c.nome_completo).trim(),
+    email: text(c.email || c.email_principal).toLowerCase().trim(),
+    phone: text(c.telefone || c.celular || c.fone || c.phone).replace(/\D/g, ''),
   };
 }
 
 // ─── GET: lista audiências existentes ─────────────────────────────────────────
-export async function GET(request: NextRequest) {
+export async function GET() {
   const admin = await verifyAdminAuth();
   if (!admin) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
 
   try {
-    const res = await axios.get(`${META_BASE}/${ACT_ID}/customaudiences`, {
+    const res = await axios.get<MetaListResponse>(`${META_BASE}/${ACT_ID}/customaudiences`, {
       params: {
         fields: 'id,name,description,approximate_count_lower_bound,approximate_count_upper_bound,subtype,delivery_status,operation_status,time_created,time_updated',
         limit: 100,
@@ -109,8 +154,8 @@ export async function GET(request: NextRequest) {
       timeout: 15000,
     });
     return NextResponse.json({ audiences: res.data?.data || [] });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.response?.data || err.message }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: errorPayload(err) }, { status: 500 });
   }
 }
 
@@ -125,12 +170,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Muitas requisições. Aguarde 5 minutos.' }, { status: 429 });
   }
 
-  const body = await request.json();
+  const body = await request.json() as AudiencePipelineBody;
   const filter          = body.type || 'compradores';
   const createLookalike = body.create_lookalike !== false;
 
   const log: string[] = [];
-  const result: any   = { log, audiences: [], upload: null, lookalike: null };
+  const result: AudiencePipelineResult = { log, audiences: [], upload: null, lookalike: null };
 
   try {
     // 1. Buscar contatos do CRM
@@ -161,7 +206,7 @@ export async function POST(request: NextRequest) {
 
     log.push(`[META] Criando audiência: ${audienceName}`);
 
-    const createRes = await axios.post(
+    const createRes = await axios.post<MetaIdResponse>(
       `${META_BASE}/${ACT_ID}/customaudiences`,
       {
         name:                 audienceName,
@@ -195,7 +240,7 @@ export async function POST(request: NextRequest) {
         hashPhone(c.phone),
       ]);
 
-      const uploadRes = await axios.post(
+      const uploadRes = await axios.post<MetaUploadResponse>(
         `${META_BASE}/${audienceId}/users`,
         {
           payload: {
@@ -220,7 +265,7 @@ export async function POST(request: NextRequest) {
     if (createLookalike && filter === 'compradores') {
       log.push(`[META] Criando Lookalike 1% a partir da audiência de compradores`);
 
-      const llRes = await axios.post(
+      const llRes = await axios.post<MetaIdResponse>(
         `${META_BASE}/${ACT_ID}/customaudiences`,
         {
           name:            'LV | Lookalike 1% Compradores | HBM',
@@ -244,7 +289,7 @@ export async function POST(request: NextRequest) {
 
       // Também cria audiência de exclusão com a base completa se for compradores
       log.push(`[META] Criando audiência de exclusão (base completa CRM)`);
-      const exclRes = await axios.post(
+      const exclRes = await axios.post<MetaIdResponse>(
         `${META_BASE}/${ACT_ID}/customaudiences`,
         {
           name:                 'LV | Base CRM Completa | Exclusão',
@@ -264,9 +309,9 @@ export async function POST(request: NextRequest) {
     log.push(`[✓] Pipeline concluído com sucesso`);
     return NextResponse.json(result);
 
-  } catch (err: any) {
-    const metaErr = err.response?.data?.error;
-    log.push(`[ERRO] ${metaErr?.message || err.message}`);
-    return NextResponse.json({ ...result, error: metaErr?.message || err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const message = metaErrorMessage(err);
+    log.push(`[ERRO] ${message}`);
+    return NextResponse.json({ ...result, error: message }, { status: 500 });
   }
 }

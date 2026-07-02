@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { RefreshCw, ArrowLeft, SlidersHorizontal, X, Search, Plus, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { Task, Project } from '@/lib/db';
-import TaskDrawer from '@/components/TaskDrawer';
+import TaskDrawer from '../../components/TaskDrawer';
 import { useUser } from '@/context/UserContext';
 
 export default function ProjectDetailPage() {
@@ -66,7 +66,7 @@ export default function ProjectDetailPage() {
   const [filterUrgencia, setFilterUrgencia] = useState('Todos');
   const [filterContratacao, setFilterContratacao] = useState('Todos');
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const resP = await fetch('/api/projects');
@@ -82,11 +82,11 @@ export default function ProjectDetailPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
   useEffect(() => {
     Promise.resolve().then(() => { fetchData(); });
-  }, [id]);
+  }, [fetchData]);
 
   // Opções únicas para filtros
   const sectors = ['Todos', ...Array.from(new Set(tasks.map(t => t.sector).filter(Boolean))).sort()];

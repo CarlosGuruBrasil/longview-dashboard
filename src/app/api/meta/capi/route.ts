@@ -58,9 +58,16 @@ export interface CAPIEvent {
   source_url?: string;
 }
 
+type CAPILogEntry = {
+  event: string;
+  event_id: string;
+  email: string;
+  ts: string;
+};
+
 // Função exportada para uso interno pelos cron jobs (sem HTTP)
 export async function sendCAPIEvents(events: CAPIEvent[]): Promise<{
-  sent: number; errors: number; details: any[]
+  sent: number; errors: number; details: unknown[]
 }> {
   if (!PIXEL_ID || !process.env.META_TOKEN) {
     return { sent: 0, errors: events.length, details: [{ error: 'META_PIXEL_ID ou META_TOKEN não configurado' }] };
@@ -74,7 +81,7 @@ export async function sendCAPIEvents(events: CAPIEvent[]): Promise<{
     if (ev.phone)      userData.ph  = hashPhone(ev.phone);
     if (ev.first_name) userData.fn  = hash(ev.first_name.split(' ')[0]);
 
-    const data: Record<string, any> = {
+    const data: Record<string, unknown> = {
       event_name:        ev.event_name,
       event_time:        ev.event_time || now,
       event_id:          ev.event_id   || `${ev.event_name}_${now}_${Math.random().toString(36).slice(2)}`,
@@ -108,7 +115,7 @@ export async function sendCAPIEvents(events: CAPIEvent[]): Promise<{
 
     // Salvar log no KV (últimos 100 eventos)
     try {
-      const existing: any[] = (await kv.get('meta:capi:log')) || [];
+      const existing = (await kv.get<CAPILogEntry[]>('meta:capi:log')) || [];
       const newEntries = events.map(ev => ({
         event:    ev.event_name,
         event_id: ev.event_id || '',
@@ -128,8 +135,8 @@ export async function sendCAPIEvents(events: CAPIEvent[]): Promise<{
     }
 
     return { sent, errors: 0, details: [result] };
-  } catch (err: any) {
-    const detail = err.response?.data || err.message;
+  } catch (err: unknown) {
+    const detail = axios.isAxiosError(err) ? err.response?.data || err.message : err instanceof Error ? err.message : String(err);
     console.error('[capi] Erro ao enviar eventos:', detail);
     return { sent: 0, errors: events.length, details: [detail] };
   }

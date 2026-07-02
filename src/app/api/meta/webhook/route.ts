@@ -25,10 +25,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
 import { createCrmLead } from '@/lib/cvcrm';
-import { parseCrmDate } from '@/lib/dateUtils';
 
 const META_BASE    = 'https://graph.facebook.com/v21.0';
-const PAGE_ID      = process.env.META_PAGE_ID ?? '259079394232614';
 const VERIFY_TOKEN = process.env.META_WEBHOOK_VERIFY_TOKEN ?? '';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -229,7 +227,7 @@ export async function POST(request: NextRequest) {
       for (const change of changes) {
         if (change?.field !== 'leadgen') continue;
 
-        const { leadgen_id, form_id, ad_id, ad_name, campaign_id, campaign_name, page_id } = change.value ?? {};
+        const { leadgen_id, form_id, ad_id, ad_name, campaign_name } = change.value ?? {};
 
         if (!leadgen_id) {
           console.warn('[meta/webhook] change sem leadgen_id');

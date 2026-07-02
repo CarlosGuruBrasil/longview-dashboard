@@ -6,6 +6,10 @@ import { rateLimit, getClientIp } from '@/lib/rateLimit';
 const JWT_SECRET    = process.env.JWT_SECRET || 'secret-longview-key';
 const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 
+type AuthUser = {
+  userId?: string;
+};
+
 // MIME types permitidos para upload
 const ALLOWED_MIME_TYPES = new Set([
   'image/jpeg',
@@ -17,12 +21,12 @@ const ALLOWED_MIME_TYPES = new Set([
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 ]);
 
-async function verifyAuth(): Promise<any | null> {
+async function verifyAuth(): Promise<AuthUser | null> {
   try {
     const cookieStore = await cookies();
     const token = cookieStore.get('auth_token')?.value;
     if (!token) return null;
-    return jwt.verify(token, JWT_SECRET);
+    return jwt.verify(token, JWT_SECRET) as AuthUser;
   } catch {
     return null;
   }

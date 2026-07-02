@@ -8,8 +8,6 @@ import {
   Users,
   TrendingUp,
   BarChart2,
-  Smartphone,
-  Globe,
   Search,
 } from 'lucide-react'
 import { useData } from '../../context/DataContext'

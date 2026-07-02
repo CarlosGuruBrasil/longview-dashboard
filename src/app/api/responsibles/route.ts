@@ -6,6 +6,30 @@ import axios from 'axios';
 const CACHE_KEY = 'cv_responsibles_cache';
 const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutos
 
+type ResponsiblesCache = {
+  responsibles?: Responsible[];
+  updatedAt?: string;
+};
+
+type CvCorretor = {
+  idcorretor: string | number;
+  nome: string;
+  celular?: string;
+  telefone?: string;
+  email?: string;
+  corretor_parceiro?: string;
+  imobiliaria?: {
+    nome_fantasia?: string;
+  };
+  imagem_perfil?: {
+    avatar_imagem?: string;
+  };
+};
+
+type ResponsibleBody = Pick<Responsible, 'name' | 'phone' | 'email' | 'company'> & {
+  photo?: string;
+};
+
 async function readCache(): Promise<Responsible[] | null> {
   if (!process.env.DATABASE_URL) return null;
   try {
@@ -13,7 +37,7 @@ async function readCache(): Promise<Responsible[] | null> {
     await ensureSchema();
     const rows = await sql`SELECT data FROM project_state WHERE key = ${CACHE_KEY} LIMIT 1`;
     if (!rows[0]) return null;
-    const d = rows[0].data as any;
+    const d = rows[0].data as ResponsiblesCache;
     if (d?.updatedAt && Date.now() - new Date(d.updatedAt).getTime() > CACHE_TTL_MS) {
       return null; // cache expirado
     }
@@ -56,14 +80,14 @@ async function fetchCvcrmCorretores(): Promise<Responsible[]> {
   try {
     console.log('[responsibles/route] Buscando corretores do CV CRM (V1)...');
     const headers = { email, token, Accept: 'application/json' };
-    const response = await axios.get('https://longviewempreendimentos.cvcrm.com.br/api/v1/cadastros/corretores', {
+    const response = await axios.get<CvCorretor[]>('https://longviewempreendimentos.cvcrm.com.br/api/v1/cadastros/corretores', {
       headers,
       params: { limit: 1000 },
       timeout: 15000
     });
 
     const list = response.data || [];
-    const mapped: Responsible[] = list.map((c: any) => {
+    const mapped: Responsible[] = list.map((c) => {
       const phone = c.celular || c.telefone || '';
       let company = 'LongView';
       if (c.corretor_parceiro === 'S') {
@@ -85,13 +109,14 @@ async function fetchCvcrmCorretores(): Promise<Responsible[]> {
 
     await saveCache(mapped);
     return mapped;
-  } catch (e: any) {
-    console.error('[responsibles/route] Erro ao buscar corretores no CV CRM:', e.message);
+  } catch (e: unknown) {
+    const message = axios.isAxiosError(e) ? e.message : e;
+    console.error('[responsibles/route] Erro ao buscar corretores no CV CRM:', message);
     return [];
   }
 }
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const user = await verifyAuth();
     if (!user) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
@@ -138,7 +163,7 @@ export async function POST(request: NextRequest) {
     const user = await verifyAuth();
     if (!user) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
 
-    const body = await request.json();
+    const body = await request.json() as ResponsibleBody;
     let newResponsible: Responsible | undefined;
 
     await mutateProjectData((db) => {

@@ -11,7 +11,6 @@ import {
   ResponsiveContainer,
   ReferenceLine,
   ReferenceArea,
-  Legend,
 } from 'recharts'
 import type { Lead } from '../../types'
 import { calculateMetricsByPeriod, type PeriodMetrics } from '../../utils/metrics'

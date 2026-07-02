@@ -1,7 +1,7 @@
 'use client';
 import React, { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
 import type { Lead, MetaData, EstoqueData, MetaLeadForm, MetaPageInfo, DateRange, ActiveView } from '../types';
-import { toISODate, getLeadDate } from '../utils/leads';
+import { toISODate } from '../utils/leads';
 
 interface DataContextValue {
   // raw data
@@ -15,6 +15,14 @@ interface DataContextValue {
   loading: boolean;
   dataError: string | null;
   metaValidation: { orphanedLeads: unknown[]; totalMetaLeads: number; error: string | null } | null;
+
+  // detailed leads paginated
+  detailedLeads: Lead[];
+  detailedPage: number;
+  detailedLimit: number;
+  detailedTotal: number;
+  detailedLoading: boolean;
+  fetchDetailedLeads: (page: number, limit?: number, rangeOverride?: DateRange) => Promise<void>;
 
   // filtered
   filteredLeads: Lead[];
@@ -50,7 +58,7 @@ interface DataProviderProps {
     leadForms: MetaLeadForm[];
     page: MetaPageInfo | null;
     updatedAt: string;
-    metaValidation?: { orphanedLeads: any[]; totalMetaLeads: number; error: string | null } | null;
+    metaValidation?: { orphanedLeads: unknown[]; totalMetaLeads: number; error: string | null } | null;
   };
 }
 
@@ -79,10 +87,19 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
   const [dateRange, setDateRange] = useState<DateRange>(monthToDate());
   const [activeView, setActiveView] = useState<ActiveView>('dashboard');
 
+  // Detailed leads pagination states
+  const [detailedLeads, setDetailedLeads] = useState<Lead[]>([]);
+  const [detailedPage, setDetailedPage] = useState(1);
+  const [detailedLimit, setDetailedLimit] = useState(50);
+  const [detailedTotal, setDetailedTotal] = useState(0);
+  const [detailedLoading, setDetailedLoading] = useState(false);
+
   const filteredLeads = useMemo(() => {
     if (!dateRange.start && !dateRange.end) return allLeads;
     return allLeads.filter(lead => {
-      const d = toISODate(getLeadDate(lead));
+      const raw = lead.data_cad || lead.data_cadastro || lead.data_cadastramento;
+      if (!raw) return false;
+      const d = toISODate(raw);
       if (!d) return false;
       if (dateRange.start && d < dateRange.start) return false;
       if (dateRange.end && d > dateRange.end) return false;
@@ -90,17 +107,31 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
     });
   }, [allLeads, dateRange]);
 
-  const clearFilters = useCallback(() => setDateRange(DEFAULT_DATE), []);
-
-  // Auto-fetch se SSR não trouxe leads (Postgres vazio, cold start, falha de conexão…)
-  // Não depende de !initialData: SSR pode retornar initialData com leads [] se
-  // a tabela ainda está vazia (ex: primeiro deploy antes do sync rodar).
-  useEffect(() => {
-    if (allLeads.length === 0) {
-      refresh();
+  const fetchDetailedLeads = useCallback(async (page: number, limit = 50, rangeOverride?: DateRange) => {
+    setDetailedLoading(true);
+    try {
+      const r = rangeOverride ?? dateRange;
+      const params = new URLSearchParams();
+      params.set('detailed', 'true');
+      params.set('page', String(page));
+      params.set('limit', String(limit));
+      if (r.start) params.set('start', r.start);
+      if (r.end) params.set('end', r.end);
+      const url = `/api/data?${params.toString()}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const leads = data.leads?.leads ?? data.leads ?? [];
+      setDetailedLeads(Array.isArray(leads) ? leads : []);
+      setDetailedTotal(data.leads?.crmTotal ?? leads.length);
+      setDetailedPage(page);
+      setDetailedLimit(limit);
+    } catch (e) {
+      console.error('[DataContext] fetchDetailedLeads error:', e);
+    } finally {
+      setDetailedLoading(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [dateRange]);
 
   const refresh = useCallback(async (force = false, rangeOverride?: DateRange, options?: { validateMeta?: boolean }) => {
     setLoading(true);
@@ -126,6 +157,9 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
       setMetaValidation(data.metaValidation ?? null);
       setUpdatedAt(data.updatedAt ?? new Date().toISOString());
       setDataError(null);
+
+      // Auto trigger detailed fetch on refresh to match dates
+      await fetchDetailedLeads(1, detailedLimit, r);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Erro ao carregar dados';
       console.error('[DataContext] refresh error:', msg);
@@ -133,12 +167,34 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
     } finally {
       setLoading(false);
     }
-  }, [dateRange]);
+  }, [dateRange, detailedLimit, fetchDetailedLeads]);
+
+  const clearFilters = useCallback(() => {
+    setDateRange(DEFAULT_DATE);
+  }, []);
+
+  // Initial load — fetches data once on mount
+  useEffect(() => {
+    let active = true;
+    const id = window.setTimeout(async () => {
+      if (allLeads.length === 0) {
+        await refresh(); // refresh already awaits fetchDetailedLeads internally
+      } else if (active) {
+        await fetchDetailedLeads(1, detailedLimit);
+      }
+    }, 0);
+    return () => {
+      active = false;
+      window.clearTimeout(id);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <DataContext.Provider value={{
       allLeads, metaData, estoque, leadForms, metaPage,
       crmTotal, updatedAt, loading, dataError, metaValidation,
+      detailedLeads, detailedPage, detailedLimit, detailedTotal, detailedLoading, fetchDetailedLeads,
       filteredLeads,
       dateRange, setDateRange, clearFilters,
       activeView, setActiveView,

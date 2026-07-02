@@ -62,7 +62,6 @@ export default function ReportsPage() {
   const total = filteredTasks.length;
   const finalizadas = filteredTasks.filter(t => t.statusAndamento === 'Finalizado').length;
   const emAndamento = filteredTasks.filter(t => t.statusAndamento === 'Em andamento').length;
-  const naoIniciadas = filteredTasks.filter(t => t.statusAndamento === 'Não iniciado').length;
 
   const NOW = new Date();
   const atrasadas = filteredTasks.filter(t => {

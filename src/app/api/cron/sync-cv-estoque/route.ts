@@ -6,6 +6,54 @@ import { isCronAuthorized, unauthorizedJson } from '@/lib/internal-auth';
 export const maxDuration = 300;
 export const runtime = 'nodejs';
 
+type NamedValue = {
+  nome?: string | null;
+};
+
+type CvProject = Record<string, unknown> & {
+  idempreendimento?: string | number;
+  nome?: string;
+  empreendimento?: string;
+  tipo_empreendimento?: NamedValue[];
+  situacao_comercial?: NamedValue[];
+};
+
+type CvUnit = Record<string, unknown> & {
+  idunidade?: string | number;
+  situacao?: {
+    situacao_para_venda?: string | number;
+    reservada?: unknown;
+    vendida?: unknown;
+    vendida_idsituacao?: string | number;
+    situacao_mapa_disponibilidade?: string | number;
+  };
+  valor?: string | number;
+  metragem_real?: string | number;
+  _bloco_nome?: string;
+  nome?: string;
+  andar?: string | number;
+  coluna?: string | number;
+  tipologia?: string;
+  tipo?: string;
+};
+
+type CvBlock = {
+  nome?: string;
+  unidades?: CvUnit[];
+};
+
+type CvStage = {
+  blocos?: CvBlock[];
+};
+
+type CvProjectDetails = {
+  etapas?: CvStage[];
+};
+
+function errorMessage(error: unknown): string {
+  return axios.isAxiosError(error) ? error.message : error instanceof Error ? error.message : String(error);
+}
+
 export async function POST(request: NextRequest) {
   if (!isCronAuthorized(request)) return unauthorizedJson();
 
@@ -15,11 +63,11 @@ export async function POST(request: NextRequest) {
   const headers = { email: CV_EMAIL, token: CV_TOKEN, Accept: 'application/json' };
 
   try {
-    const projRes = await axios.get('https://longviewempreendimentos.cvcrm.com.br/api/v1/cadastros/empreendimentos', { headers, timeout: 20000 });
+    const projRes = await axios.get<CvProject[]>('https://longviewempreendimentos.cvcrm.com.br/api/v1/cadastros/empreendimentos', { headers, timeout: 20000 });
     const projects = Array.isArray(projRes.data) ? projRes.data : [];
     
     // Filtra projetos válidos
-    const validProjects = projects.filter((p: any) => 
+    const validProjects = projects.filter((p) =>
       p.tipo_empreendimento?.[0]?.nome !== null && 
       p.situacao_comercial?.[0]?.nome !== null
     );
@@ -49,14 +97,14 @@ export async function POST(request: NextRequest) {
 
       // Buscar unidades detalhadas deste empreendimento
       try {
-        const detRes = await axios.get(`https://longviewempreendimentos.cvcrm.com.br/api/v1/cadastros/empreendimentos/${idEmp}`, { 
+        const detRes = await axios.get<CvProjectDetails>(`https://longviewempreendimentos.cvcrm.com.br/api/v1/cadastros/empreendimentos/${idEmp}`, {
           params: { limite_dados_unidade: 1000 }, 
           headers, 
           timeout: 20000 
         });
         
         const rawData = detRes.data;
-        const unidadesList: any[] = [];
+        const unidadesList: CvUnit[] = [];
 
         // Parsing similar to EmpreendimentosView logic
         if (Array.isArray(rawData?.etapas)) {
@@ -83,14 +131,15 @@ export async function POST(request: NextRequest) {
 
           const sitObj = uni.situacao || {};
           const statusVenda = Number(sitObj.situacao_para_venda ?? 0);
+          const _situacao_mapa_disponibilidade = (sitObj.situacao_mapa_disponibilidade != null) ? Number(sitObj.situacao_mapa_disponibilidade) : null;
           
           let statusText = 'Desconhecido';
           if (statusVenda === 1) statusText = 'Disponivel';
           else if (statusVenda === 2 || statusVenda === 5 || sitObj.reservada != null) statusText = 'Reservado';
           else if (statusVenda === 3 || sitObj.vendida != null || sitObj.vendida_idsituacao === 3) statusText = 'Vendido';
 
-          const valor = parseFloat(uni.valor) || null;
-          const metragem = parseFloat(uni.metragem_real) || null;
+          const valor = parseFloat(String(uni.valor)) || null;
+          const metragem = parseFloat(String(uni.metragem_real)) || null;
           const blocoNome = uni._bloco_nome || null;
           const num = uni.nome || null;
 
@@ -109,14 +158,15 @@ export async function POST(request: NextRequest) {
           `;
           upsertedUnidades++;
         }
-      } catch (detErr: any) {
-        console.error(`[cron/sync-cv-estoque] Erro ao buscar detalhes do emp ${idEmp}:`, detErr.message);
+      } catch (detErr: unknown) {
+        console.error(`[cron/sync-cv-estoque] Erro ao buscar detalhes do emp ${idEmp}:`, errorMessage(detErr));
       }
     }
 
     return NextResponse.json({ ok: true, empreendimentos: upsertedEmp, unidades: upsertedUnidades });
-  } catch (error: any) {
-    console.error('[/cron/sync-cv-estoque] Erro:', error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const message = errorMessage(error);
+    console.error('[/cron/sync-cv-estoque] Erro:', message);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

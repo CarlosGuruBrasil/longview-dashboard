@@ -15,11 +15,33 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { kv } from '@/lib/kv';
 import axios from 'axios';
-import { sendCAPIEvents } from '@/app/api/meta/capi/route';
+import { sendCAPIEvents, type CAPIEvent } from '@/app/api/meta/capi/route';
 
 const META_BASE = 'https://graph.facebook.com/v21.0';
 const PAGE_ID   = '259079394232614';
-const ACT_ID    = process.env.META_ACT_ID;
+
+type MetaForm = { id: string; name: string; status: string };
+type MetaFieldDatum = { name?: string; values?: string[] };
+type MetaLead = {
+  id: string;
+  created_time: string;
+  field_data?: MetaFieldDatum[];
+  ad_id?: string;
+  adset_id?: string;
+  campaign_id?: string;
+  form_id?: string;
+  _form_name?: string;
+};
+type ProcessStats = {
+  startedAt: string;
+  finishedAt?: string;
+  error?: string;
+  newLeads: number;
+  sentToRD: number;
+  capiSent: number;
+  errors: number;
+  ok: boolean;
+};
 
 function metaAuth() {
   return { access_token: process.env.META_TOKEN };
@@ -35,7 +57,7 @@ function isCronRequest(request: NextRequest): boolean {
 // Pega page token para ler leadgen
 async function getPageToken(): Promise<string> {
   try {
-    const res = await axios.get(`${META_BASE}/${PAGE_ID}`, {
+    const res = await axios.get<{ access_token?: string }>(`${META_BASE}/${PAGE_ID}`, {
       params: { fields: 'access_token', ...metaAuth() }, timeout: 10000,
     });
     return res.data?.access_token || process.env.META_TOKEN || '';
@@ -45,25 +67,25 @@ async function getPageToken(): Promise<string> {
 }
 
 // Busca formulários
-async function fetchForms(pageToken: string): Promise<any[]> {
+async function fetchForms(pageToken: string): Promise<MetaForm[]> {
   try {
-    const res = await axios.get(`${META_BASE}/${PAGE_ID}/leadgen_forms`, {
+    const res = await axios.get<{ data?: MetaForm[] }>(`${META_BASE}/${PAGE_ID}/leadgen_forms`, {
       params: { fields: 'id,name,status', limit: 50, access_token: pageToken },
       timeout: 15000,
     });
-    return (res.data?.data || []).filter((f: any) => f.status !== 'ARCHIVED');
+    return (res.data?.data || []).filter(f => f.status !== 'ARCHIVED');
   } catch {
     return [];
   }
 }
 
 // Busca leads de um formulário desde determinado timestamp
-async function fetchLeadsFromForm(formId: string, since: number, pageToken: string): Promise<any[]> {
-  const leads: any[] = [];
+async function fetchLeadsFromForm(formId: string, since: number, pageToken: string): Promise<MetaLead[]> {
+  const leads: MetaLead[] = [];
   let cursor: string | null = null;
 
   do {
-    const params: any = {
+    const params: Record<string, string | number> = {
       fields: 'id,created_time,field_data,ad_id,adset_id,campaign_id,form_id',
       limit:  100,
       access_token: pageToken,
@@ -72,7 +94,9 @@ async function fetchLeadsFromForm(formId: string, since: number, pageToken: stri
     if (cursor) params.after = cursor;
 
     try {
-      const res = await axios.get(`${META_BASE}/${formId}/leads`, { params, timeout: 15000 });
+      const res = await axios.get<{ data?: MetaLead[]; paging?: { cursors?: { after?: string }; next?: string } }>(
+        `${META_BASE}/${formId}/leads`, { params, timeout: 15000 }
+      );
       leads.push(...(res.data?.data || []));
       cursor = res.data?.paging?.cursors?.after || null;
       const hasNext = !!res.data?.paging?.next;
@@ -86,13 +110,13 @@ async function fetchLeadsFromForm(formId: string, since: number, pageToken: stri
 }
 
 // Extrai campos do lead Meta
-function extractField(fieldData: any[], keys: string[]): string {
-  const entry = fieldData.find((f: any) => keys.some(k => (f.name || '').toLowerCase().includes(k)));
+function extractField(fieldData: MetaFieldDatum[], keys: string[]): string {
+  const entry = fieldData.find(f => keys.some(k => (f.name || '').toLowerCase().includes(k)));
   return entry?.values?.[0] || '';
 }
 
 // Calcula score básico para um lead recém-capturado (sem dados CRM ainda)
-function calcInitialScore(lead: any): number {
+function calcInitialScore(lead: MetaLead): number {
   let score = 15; // +15 por ser lead ad Meta
   const fields = lead.field_data || [];
   const phone = extractField(fields, ['phone', 'telefone', 'cel', 'whatsapp']);
@@ -109,7 +133,7 @@ function getTier(score: number) {
 }
 
 // Envia lead para o RD Station
-async function sendToRD(lead: any, score: number): Promise<boolean> {
+async function sendToRD(lead: MetaLead, score: number): Promise<boolean> {
   const apiKey = process.env.RD_TOKEN_PUBLIC;
   if (!apiKey) return false;
 
@@ -122,7 +146,7 @@ async function sendToRD(lead: any, score: number): Promise<boolean> {
 
   const tier    = getTier(score);
 
-  const payload: Record<string, any> = {
+  const payload: Record<string, unknown> = {
     conversion_identifier: tier.conversion_id,
     cf_score_intencao:    String(score),
     cf_temperatura_lead:  tier.label,
@@ -143,8 +167,8 @@ async function sendToRD(lead: any, score: number): Promise<boolean> {
       { params: { api_key: apiKey }, timeout: 15000 }
     );
     return true;
-  } catch (err: any) {
-    console.warn('[process-leads] RD error:', err.response?.data?.error || err.message);
+  } catch (err) {
+    console.warn('[process-leads] RD error:', axios.isAxiosError(err) ? err.response?.data?.error ?? err.message : err);
     return false;
   }
 }
@@ -156,7 +180,7 @@ export async function GET(request: NextRequest) {
 
   const startedAt = new Date().toISOString();
   const log: string[]  = [];
-  const stats: any     = { startedAt, newLeads: 0, sentToRD: 0, capiSent: 0, errors: 0, ok: false };
+  const stats: ProcessStats = { startedAt, newLeads: 0, sentToRD: 0, capiSent: 0, errors: 0, ok: false };
 
   try {
     // Timestamp da última execução (padrão: 2h atrás)
@@ -175,7 +199,7 @@ export async function GET(request: NextRequest) {
       (await kv.get<string[]>('meta:leads:processed')) || []
     );
 
-    const newLeads: any[] = [];
+    const newLeads: MetaLead[] = [];
     for (const form of forms) {
       const leads = await fetchLeadsFromForm(form.id, since, pageToken);
       for (const lead of leads) {
@@ -198,7 +222,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Processa cada lead novo
-    const capiEvents: any[] = [];
+    const capiEvents: CAPIEvent[] = [];
 
     for (const lead of newLeads) {
       try {
@@ -230,9 +254,9 @@ export async function GET(request: NextRequest) {
         processedSet.add(lead.id);
 
         log.push(`[OK] Lead ${lead.id} — score ${score} (${tier.label}) — RD: ${rdOk ? 'ok' : 'skip'}`);
-      } catch (err: any) {
+      } catch (err) {
         stats.errors++;
-        log.push(`[ERR] Lead ${lead.id}: ${err.message}`);
+        log.push(`[ERR] Lead ${lead.id}: ${err instanceof Error ? err.message : err}`);
       }
     }
 
@@ -258,12 +282,13 @@ export async function GET(request: NextRequest) {
     console.log('[cron/process-leads]', stats);
 
     return NextResponse.json({ ...stats, log });
-  } catch (err: any) {
-    stats.error      = err.message;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    stats.error      = msg;
     stats.finishedAt = new Date().toISOString();
-    log.push(`[ERRO FATAL] ${err.message}`);
+    log.push(`[ERRO FATAL] ${msg}`);
     await kv.set('meta:leads:lastStats', stats);
-    console.error('[cron/process-leads] Erro:', err.message);
+    console.error('[cron/process-leads] Erro:', msg);
     return NextResponse.json({ ...stats, log }, { status: 500 });
   }
 }

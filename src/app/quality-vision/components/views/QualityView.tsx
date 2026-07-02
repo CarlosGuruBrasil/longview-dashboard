@@ -176,16 +176,21 @@ export default function QualityView() {
   const [chartMode, setChartMode] = useState<'volume' | 'resultado'>('volume')
 
   useEffect(() => {
-    setLoading(true)
-    setError(null)
-    fetch(`/api/construpoint?startYear=${startYear}&endYear=${endYear}`)
-      .then(r => {
+    async function load() {
+      setLoading(true)
+      setError(null)
+      try {
+        const r = await fetch(`/api/construpoint?startYear=${startYear}&endYear=${endYear}`)
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
-        return r.json()
-      })
-      .then((d: QualityData) => setData(d))
-      .catch(e => setError(e.message))
-      .finally(() => setLoading(false))
+        const d = await r.json() as QualityData
+        setData(d)
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e))
+      } finally {
+        setLoading(false)
+      }
+    }
+    void load()
   }, [startYear, endYear])
 
   // Dados para gráfico de barras por tipo de ficha

@@ -16,6 +16,53 @@ import { kv } from '@/lib/kv';
 import axios from 'axios';
 import { getBearerToken } from '@/lib/internal-auth';
 
+// CV CRM retorna etapa/situacao ora como string, ora como { nome }.
+type NamedRef = { nome?: string } | string | null | undefined;
+
+type WebhookLead = {
+  idlead?: string | number;
+  id_lead?: string | number;
+  id?: string | number;
+  codigo?: string | number;
+  lead_id?: string | number;
+  referencia?: string | number;
+  nome?: string;
+  name?: string;
+  email?: string;
+  email_principal?: string;
+  telefone?: string;
+  celular?: string;
+  fone?: string;
+  etapa?: NamedRef;
+  etapa_nome?: string;
+  situacao?: NamedRef;
+};
+
+type WebhookBody = {
+  lead?: WebhookLead;
+  data?: { lead?: WebhookLead };
+  etapa_nome?: string;
+  evento?: string;
+  event?: string;
+  tipo?: string;
+} & WebhookLead;
+
+type WebhookLogEntry = {
+  ts: string;
+  leadId: string | number;
+  nome: string;
+  etapa: string;
+  evento: string;
+  triggered: boolean;
+  rdOk?: boolean;
+  rdError?: string;
+};
+
+function refName(v: NamedRef): string {
+  if (typeof v === 'string') return v;
+  return v?.nome ?? '';
+}
+
 // Possíveis nomes da etapa no CV CRM (case-insensitive)
 const SEM_CONEXAO_PATTERNS = [
   'sem conexão', 'sem conexao', 'semconexao', 'sem_conexao',
@@ -39,7 +86,7 @@ async function triggerRDSemConexao(lead: {
   if (!apiKey) return { ok: false, error: 'RD_TOKEN_PUBLIC não configurado' };
   if (!lead.email && !lead.telefone) return { ok: false, error: 'lead sem email nem telefone' };
 
-  const payload: Record<string, any> = {
+  const payload: Record<string, unknown> = {
     conversion_identifier: 'sem_conexao_longview',
     cf_etapa_crm:          lead.etapa     || 'Sem Conexão',
     cf_origem_captacao:    'crm_webhook',
@@ -60,21 +107,23 @@ async function triggerRDSemConexao(lead: {
       { params: { api_key: apiKey }, timeout: 12000 }
     );
     return { ok: true };
-  } catch (err: any) {
-    const detail = err.response?.data?.errors?.[0]?.message || err.message;
+  } catch (err) {
+    const detail = axios.isAxiosError(err)
+      ? err.response?.data?.errors?.[0]?.message || err.message
+      : err instanceof Error ? err.message : String(err);
     return { ok: false, error: detail };
   }
 }
 
 // Salva log no KV
-async function logEvent(event: any, triggered: boolean, rdResult?: { ok: boolean; error?: string }) {
+async function logEvent(event: WebhookBody & { etapa?: string }, triggered: boolean, rdResult?: { ok: boolean; error?: string }) {
   try {
-    const existing: any[] = (await kv.get('cv:webhook:log')) || [];
-    const entry = {
+    const existing = (await kv.get<WebhookLogEntry[]>('cv:webhook:log')) || [];
+    const entry: WebhookLogEntry = {
       ts:        new Date().toISOString(),
       leadId:    event.lead?.id || event.id || '?',
       nome:      event.lead?.nome || event.nome || '?',
-      etapa:     event.lead?.etapa?.nome || event.etapa || '?',
+      etapa:     refName(event.lead?.etapa) || event.etapa || '?',
       evento:    event.evento || event.event || event.tipo || 'unknown',
       triggered,
       rdOk:      rdResult?.ok,
@@ -94,7 +143,7 @@ async function logEvent(event: any, triggered: boolean, rdResult?: { ok: boolean
 
 // ─── POST: recebe evento do CV CRM ────────────────────────────────────────────
 export async function POST(request: NextRequest) {
-  let body: any;
+  let body: WebhookBody;
   try {
     body = await request.json();
   } catch {
@@ -115,8 +164,8 @@ export async function POST(request: NextRequest) {
 
   // Suporta múltiplos formatos de payload que o CV CRM pode enviar
   const lead     = body.lead    || body.data?.lead || body;
-  const etapa    = lead.etapa?.nome || lead.etapa || lead.etapa_nome || body.etapa_nome || '';
-  const situacao = lead.situacao?.nome || lead.situacao || '';
+  const etapa    = refName(lead.etapa) || lead.etapa_nome || body.etapa_nome || '';
+  const situacao = refName(lead.situacao);
   const leadId   = String(
     lead.idlead || lead.id_lead || lead.id || lead.codigo || lead.lead_id || lead.referencia || ''
   ).trim();
@@ -183,7 +232,7 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const [log, last, count] = await Promise.all([
-      kv.get<any[]>('cv:webhook:log'),
+      kv.get<WebhookLogEntry[]>('cv:webhook:log'),
       kv.get<string>('cv:webhook:last'),
       kv.get<number>('cv:webhook:sem_conexao_count'),
     ]);
@@ -194,7 +243,7 @@ export async function GET(request: NextRequest) {
       semConexaoTotal: count || 0,
       recentEvents:    (log || []).slice(0, 50),
     });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
   }
 }

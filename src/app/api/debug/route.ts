@@ -3,7 +3,20 @@ import { sql, ensureSchema } from '@/lib/pg';
 import { verifyAdminAuth } from '@/lib/auth';
 import axios from 'axios';
 
-function isSale(lead: any): boolean {
+type DebugLead = {
+  idlead?: string | number;
+  id?: string | number;
+  nome?: string;
+  situacao?: { nome?: string };
+  data_cadastro?: string;
+  data_cad?: string;
+  data_venda?: string;
+  qtde_reservas_associadas?: number;
+  valor_venda?: number;
+  valor_negocio?: number;
+};
+
+function isSale(lead: DebugLead): boolean {
   if (!lead.situacao?.nome) return false;
   const s = lead.situacao.nome.toLowerCase().trim();
   return (
@@ -26,11 +39,11 @@ export async function GET(request: NextRequest) {
     const idsParam = searchParams.get('ids'); // ex: ?ids=3217,3720
 
     // ── Dados do Postgres ──────────────────────────────────────────────────────
-    const rows = await sql`SELECT raw FROM leads`;
-    const leads = rows.map((r: any) => typeof r.raw === 'object' ? r.raw : JSON.parse(r.raw));
+    const rows = await sql<{ raw: unknown }[]>`SELECT raw FROM leads`;
+    const leads: DebugLead[] = rows.map(r => (typeof r.raw === 'object' ? r.raw : JSON.parse(String(r.raw))) as DebugLead);
     const sales = leads.filter(isSale);
 
-    const salesReport = sales.map((l: any) => ({
+    const salesReport = sales.map(l => ({
       idlead:          l.idlead,
       nome:            l.nome,
       situacao:        l.situacao?.nome,
@@ -42,7 +55,24 @@ export async function GET(request: NextRequest) {
     }));
 
     // ── Diagnóstico por IDs específicos ────────────────────────────────────────
-    let specificDiag: any[] = [];
+    type CrmDiag = {
+      idlead?: string | number;
+      nome?: string;
+      situacao?: string;
+      data_cadastro?: string;
+      data_venda?: string;
+      qtde_reservas?: number;
+      error?: string;
+    };
+    let specificDiag: {
+      id: string;
+      inDb: boolean;
+      dbSituacao: string | null;
+      dbDataVenda: string | null;
+      dbIsSale: boolean | null;
+      crm: CrmDiag;
+      mismatch: boolean | null;
+    }[] = [];
     if (idsParam) {
       const ids = idsParam.split(',').map(s => s.trim());
       const email = process.env.CV_CRM_EMAIL!;
@@ -50,11 +80,11 @@ export async function GET(request: NextRequest) {
       const headers = { email, token, Accept: 'application/json' };
 
       specificDiag = await Promise.all(ids.map(async id => {
-        const inDb = leads.find((l: any) => String(l.idlead) === id || String(l.id) === id);
+        const inDb = leads.find(l => String(l.idlead) === id || String(l.id) === id);
 
-        let fromCrm: any = null;
+        let fromCrm: CrmDiag;
         try {
-          const res = await axios.get(
+          const res = await axios.get<DebugLead>(
             `https://longviewempreendimentos.cvcrm.com.br/api/v1/comercial/leads/${id}`,
             { headers, timeout: 8000 }
           );
@@ -66,8 +96,8 @@ export async function GET(request: NextRequest) {
             data_venda:    res.data?.data_venda,
             qtde_reservas: res.data?.qtde_reservas_associadas,
           };
-        } catch (e: any) {
-          fromCrm = { error: e.message };
+        } catch (e) {
+          fromCrm = { error: e instanceof Error ? e.message : String(e) };
         }
 
         return {
@@ -85,25 +115,30 @@ export async function GET(request: NextRequest) {
     }
 
     // ── Dados do Project Vision ────────────────────────────────────────────────
+    type ProjectState = {
+      tasks?: unknown[];
+      projects?: { name?: string }[];
+      responsibles?: unknown[];
+    };
     const pvRows = await sql`SELECT data FROM project_state WHERE key = 'state'`;
-    const pv = pvRows[0]?.data as any;
+    const pv = pvRows[0]?.data as ProjectState | undefined;
     const projectVisionSummary = pv ? {
       tasks:        (pv.tasks || []).length,
-      projects:     (pv.projects || []).map((p: any) => p.name),
+      projects:     (pv.projects || []).map(p => p.name),
       responsibles: (pv.responsibles || []).length,
     } : null;
 
     return NextResponse.json({
       postgresTotalLeads:   leads.length,
       totalSalesInDb:       sales.length,
-      totalVendasByReserva: sales.reduce((s: number, l: any) => s + (l.qtde_reservas_associadas || 1), 0),
-      salesWithDataVenda:   sales.filter((s: any) => s.data_venda).length,
+      totalVendasByReserva: sales.reduce((s, l) => s + (l.qtde_reservas_associadas || 1), 0),
+      salesWithDataVenda:   sales.filter(s => s.data_venda).length,
       salesReport,
       projectVision: projectVisionSummary,
       ...(idsParam ? { specificDiag } : {}),
     });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }
 }
 

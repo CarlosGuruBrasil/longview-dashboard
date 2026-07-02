@@ -9,7 +9,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
   const user = await verifyAuth();
   if (!user) return new Response('Não autorizado', { status: 401 });
 
-  const { id: taskId, docId } = await params;
+  const { docId } = await params;
   const result = await getTaskDocumentData(docId);
   if (!result) return new Response('Não encontrado', { status: 404 });
 

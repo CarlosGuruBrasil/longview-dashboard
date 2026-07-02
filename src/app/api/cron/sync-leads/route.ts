@@ -10,6 +10,37 @@
 import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
 import { sql, ensureSchema } from '@/lib/pg';
+import { parseCrmDate } from '@/lib/dateUtils';
+
+type CrmLead = Record<string, unknown> & {
+  idlead?: string | number;
+  id?: string | number;
+  nome?: string;
+  name?: string;
+  email?: string;
+  telefone?: string;
+  celular?: string;
+  phone?: string;
+  origem?: unknown;
+  source?: unknown;
+  status?: string;
+  empreendimento?: { nome?: string } | string;
+  score?: string | number | null;
+  temperatura?: string;
+  temperatura_lead?: string;
+  data_cad?: string;
+  data_cadastro?: string;
+  created_at?: string;
+  createdAt?: string;
+  data_atualizacao?: string;
+  updated_at?: string;
+  updatedAt?: string;
+};
+
+type CrmLeadResponse = {
+  total?: number;
+  leads?: CrmLead[];
+};
 
 function isCron(request: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;
@@ -18,29 +49,35 @@ function isCron(request: NextRequest): boolean {
   return auth === `Bearer ${secret}`;
 }
 
-async function fetchAllLeadsFromCRM(email: string, token: string): Promise<{ leads: any[]; total: number }> {
+function scalar(value: unknown): string | number | boolean | null {
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value;
+  return value == null ? null : String(value);
+}
+
+function errorMessage(error: unknown): string {
+  return axios.isAxiosError(error) ? error.message : error instanceof Error ? error.message : String(error);
+}
+
+async function fetchAllLeadsFromCRM(email: string, token: string): Promise<{ leads: CrmLead[]; total: number }> {
   const base    = 'https://longviewempreendimentos.cvcrm.com.br/api/v1/comercial/leads';
   const headers = { email, token, Accept: 'application/json' };
   const limit   = 500;
 
-  const initial = await axios.get(base, { params: { limit: 1 }, headers, timeout: 10000 });
+  const initial = await axios.get<CrmLeadResponse>(base, { params: { limit: 1 }, headers, timeout: 10000 });
   const totalInCRM = initial.data.total || 0;
   const totalPages = Math.ceil(totalInCRM / limit);
 
   const pages = await Promise.allSettled(
     Array.from({ length: totalPages }, (_, i) =>
-      axios.get(base, { params: { limit, offset: i * limit }, headers, timeout: 20000 })
+      axios.get<CrmLeadResponse>(base, { params: { limit, offset: i * limit }, headers, timeout: 20000 })
     )
   );
 
   const leads = pages
-    .filter(r => r.status === 'fulfilled')
-    .flatMap((r: any) => r.value.data?.leads || []);
+    .flatMap((r) => r.status === 'fulfilled' ? r.value.data?.leads || [] : []);
 
   return { leads, total: totalInCRM };
 }
-
-import { parseCrmDate } from '@/lib/dateUtils';
 
 function parseDate(val: string | null | undefined): string | null {
   const d = parseCrmDate(val);
@@ -81,9 +118,11 @@ export async function GET(request: NextRequest) {
         const nome         = lead.nome || lead.name || null;
         const email_lead   = lead.email || null;
         const telefone     = lead.telefone || lead.celular || lead.phone || null;
-        const origem       = lead.origem || lead.source || null;
+        const origem       = scalar(lead.origem || lead.source);
         const status       = lead.status || null;
-        const empreend     = lead.empreendimento?.nome || lead.empreendimento || null;
+        const empreend     = typeof lead.empreendimento === 'object'
+          ? lead.empreendimento?.nome || null
+          : lead.empreendimento || null;
         const score        = lead.score != null ? Number(lead.score) : null;
         const temperatura  = lead.temperatura || lead.temperatura_lead || null;
         const dataCad      = parseDate(lead.data_cad || lead.data_cadastro || lead.created_at || lead.createdAt);
@@ -119,8 +158,9 @@ export async function GET(request: NextRequest) {
     console.log('[cron/sync-leads]', result);
     return NextResponse.json(result);
 
-  } catch (err: any) {
-    console.error('[cron/sync-leads] Erro:', err.message);
-    return NextResponse.json({ ok: false, startedAt, error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const message = errorMessage(err);
+    console.error('[cron/sync-leads] Erro:', message);
+    return NextResponse.json({ ok: false, startedAt, error: message }, { status: 500 });
   }
 }

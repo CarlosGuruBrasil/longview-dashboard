@@ -5,38 +5,19 @@ import AppShell from './AppShell';
 import { useData } from '../context/DataContext';
 import type { DashboardApiResponse } from '../types';
 
-// Lazy-load views to keep initial bundle small
 const DashboardView      = lazy(() => import('./views/DashboardView'));
 const LeadsView          = lazy(() => import('./views/LeadsView'));
-const OportunidadesView  = lazy(() => import('./views/OportunidadesView'));
-const EmpreendimentosView = lazy(() => import('./views/EmpreendimentosView'));
 const VendasView         = lazy(() => import('./views/VendasView'));
-const MetricsView        = lazy(() => import('./views/MetricsView'));
 const MarketingAdsView   = lazy(() => import('./views/MarketingAdsView'));
-const TrafegoView        = lazy(() => import('./views/TrafegoView'));
-const PublicarView       = lazy(() => import('./views/PublicarView'));
-const AudienciasView     = lazy(() => import('./views/AudienciasView'));
-const ScoreView          = lazy(() => import('./views/ScoreView'));
-const LinksView          = lazy(() => import('../LinksView'));
-const BiView             = lazy(() => import('./views/BiView'));
 
 function ViewRouter() {
   const { activeView } = useData();
 
   const viewMap: Record<string, React.ReactNode> = {
-    dashboard:       <DashboardView />,
-    leads:           <LeadsView />,
-    oportunidades:   <OportunidadesView />,
-    empreendimentos: <EmpreendimentosView />,
-    vendas:          <VendasView />,
-    insights:        <BiView />,
-    metrics:         <MetricsView />,
-    marketing:       <MarketingAdsView />,
-    trafego:         <TrafegoView />,
-    publicar:        <PublicarView />,
-    audiences:       <AudienciasView />,
-    links:           <LinksView />,
-    score:           <ScoreView />,
+    dashboard: <DashboardView />,
+    leads:     <LeadsView />,
+    vendas:    <VendasView />,
+    marketing: <MarketingAdsView />,
   };
 
   return (

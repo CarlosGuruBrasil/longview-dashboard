@@ -1,14 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { kv } from '@/lib/kv';
 
+type JsonObject = Record<string, unknown>;
+
+function obj(value: unknown): JsonObject {
+  return typeof value === 'object' && value !== null ? value as JsonObject : {};
+}
+
+function text(value: unknown): string {
+  return typeof value === 'string' ? value : value == null ? '' : String(value);
+}
+
 export async function POST(request: NextRequest) {
-  let body: any;
+  let body: JsonObject;
   try { body = await request.json(); } catch {
     return NextResponse.json({ error: 'JSON inválido' }, { status: 400 });
   }
 
-  const event_type = body.event_type || body.event?.type;
-  const email = body.primary_data?.email || body.data?.LeadData?.email || body.payload?.email;
+  const event = obj(body.event);
+  const primaryData = obj(body.primary_data);
+  const data = obj(body.data);
+  const leadData = obj(data.LeadData);
+  const payload = obj(body.payload);
+
+  const event_type = text(body.event_type || event.type);
+  const email = text(primaryData.email || leadData.email || payload.email);
 
   console.log(`[rd/webhook] ${event_type} | ${email || 'sem email'}`);
 
@@ -16,8 +32,8 @@ export async function POST(request: NextRequest) {
     try {
       await kv.set(`rd_event:${email}:${Date.now()}`, {
         event_type, email,
-        nome: body.primary_data?.name || body.data?.LeadData?.name,
-        uuid: body.primary_data?.uuid,
+        nome: primaryData.name || leadData.name,
+        uuid: primaryData.uuid,
         received_at: new Date().toISOString(),
         raw: body,
       }, { ex: 86400 });
@@ -35,7 +51,7 @@ export async function GET(request: NextRequest) {
     const keys = await kv.keys(pattern);
     const events = await Promise.all(keys.slice(-20).map(k => kv.get(k)));
     return NextResponse.json({ events: events.filter(Boolean), count: events.length });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
   }
 }

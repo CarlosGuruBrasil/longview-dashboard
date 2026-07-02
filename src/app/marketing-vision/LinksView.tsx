@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Image from 'next/image';
 import QRCode from 'qrcode';
 import { Link2, Copy, Check, Trash2, Plus, Loader2, ExternalLink, MousePointerClick, QrCode, Download, X } from 'lucide-react';
 
@@ -33,8 +34,6 @@ export default function LinksView() {
   const [qrFor, setQrFor] = useState<LinkItem | null>(null);
   const [qrData, setQrData] = useState('');
 
-  useEffect(() => { setOrigin(window.location.origin); load(); }, []);
-
   async function load() {
     setLoading(true);
     try {
@@ -42,12 +41,20 @@ export default function LinksView() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Erro ao carregar links.');
       setLinks(data.links || []);
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      setOrigin(window.location.origin);
+      void load();
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, []);
 
   const shortUrlOf = (s: string) => `${origin}/l/${s}`;
 
@@ -72,8 +79,8 @@ export default function LinksView() {
       setTitle(''); setUrl(''); setSlug('');
       setLinks(prev => [data.link, ...prev]);
       if (wantQr) openQr(data.link);
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setSubmitting(false);
     }
@@ -207,8 +214,8 @@ export default function LinksView() {
             </button>
             <h3 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 4px' }}>{qrFor.title}</h3>
             <p style={{ fontSize: 12, color: '#71717a', margin: '0 0 16px', wordBreak: 'break-all' }}>{shortUrlOf(qrFor.slug)}</p>
-            {qrData
-              ? <img src={qrData} alt="QR Code" style={{ width: 220, height: 220, background: '#fff', borderRadius: 8, padding: 8 }} />
+              {qrData
+                ? <Image src={qrData} alt="QR Code" width={220} height={220} unoptimized style={{ background: '#fff', borderRadius: 8, padding: 8 }} />
               : <Loader2 size={22} className="animate-spin" />}
             <a href={qrData} download={`qr-${qrFor.slug}.png`} style={{ marginTop: 16, display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 18px', borderRadius: 8, background: '#0ea5e9', color: '#fff', textDecoration: 'none', fontWeight: 700, fontSize: 14 }}>
               <Download size={16} /> Baixar QR Code

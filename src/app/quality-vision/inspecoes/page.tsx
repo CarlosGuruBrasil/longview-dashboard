@@ -35,16 +35,21 @@ export default function InspecoesPage() {
   const [error,     setError]     = useState<string | null>(null)
 
   useEffect(() => {
-    setLoading(true)
-    setError(null)
-    fetch(`/api/construpoint?startYear=${startYear}&endYear=${endYear}`)
-      .then(r => {
+    async function load() {
+      setLoading(true)
+      setError(null)
+      try {
+        const r = await fetch(`/api/construpoint?startYear=${startYear}&endYear=${endYear}`)
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
-        return r.json()
-      })
-      .then(d => setInspecoes(d.ultimasInspecoes || []))
-      .catch(e => setError(e.message))
-      .finally(() => setLoading(false))
+        const d = await r.json()
+        setInspecoes(d.ultimasInspecoes || [])
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e))
+      } finally {
+        setLoading(false)
+      }
+    }
+    void load()
   }, [startYear, endYear])
 
   return (

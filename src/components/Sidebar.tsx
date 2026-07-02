@@ -13,7 +13,6 @@ import {
   Users, 
   FolderArchive, 
   BarChart3, 
-  Settings,
   ChevronDown,
   Menu,
   X,

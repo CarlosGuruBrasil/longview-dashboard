@@ -55,7 +55,13 @@ export default function CadastroPage() {
     fetch('/api/admin/registrations').then(r => r.json()).then(d => setRegs(d.registrations ?? [])).finally(() => setLr(false));
   }, []);
 
-  useEffect(() => { fetchInvite(); fetchRegs(); }, [fetchInvite, fetchRegs]);
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      fetchInvite();
+      fetchRegs();
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [fetchInvite, fetchRegs]);
 
   const generateLink = async () => {
     setGl(true);

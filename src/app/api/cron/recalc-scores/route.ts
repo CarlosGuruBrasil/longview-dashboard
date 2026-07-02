@@ -14,7 +14,64 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { kv } from '@/lib/kv';
 import axios from 'axios';
-import { sendCAPIEvents } from '@/app/api/meta/capi/route';
+import { sendCAPIEvents, type CAPIEvent } from '@/app/api/meta/capi/route';
+
+// CV CRM retorna etapa/situacao ora como string, ora como { nome }.
+type NamedRef = { nome?: string } | string | null | undefined;
+
+type CrmLead = {
+  id?: string | number;
+  idlead?: string | number;
+  id_lead?: string | number;
+  codigo?: string | number;
+  lead_id?: string | number;
+  referencia?: string | number;
+  nome?: string;
+  email?: string;
+  email_principal?: string;
+  telefone?: string;
+  celular?: string;
+  fone?: string;
+  etapa?: NamedRef;
+  situacao?: NamedRef;
+  situacao_etapa?: string;
+  corretor?: unknown;
+  responsavel?: unknown;
+  vendedor?: unknown;
+  data_ultimo_contato?: string;
+  updated_at?: string;
+  created_at?: string;
+};
+
+type MetaLead = {
+  id?: string;
+  ad_id?: string;
+  created_time?: string;
+  field_data?: { name?: string; values?: string[] }[];
+};
+
+type CronStats = {
+  startedAt: string;
+  finishedAt?: string;
+  ok: boolean;
+  error?: string;
+  total: number;
+  quentes: number;
+  mornos: number;
+  frios: number;
+  sentToRD: number;
+  capiSent: number;
+  errors: number;
+  semConexao: number;
+  semConexaoSentRD: number;
+  semConexaoSkipped?: number;
+  semConexaoSeeded?: number;
+};
+
+function refName(v: NamedRef): string {
+  if (typeof v === 'string') return v;
+  return v?.nome ?? '';
+}
 
 function isCronRequest(request: NextRequest): boolean {
   const cronSecret = process.env.CRON_SECRET;
@@ -24,14 +81,14 @@ function isCronRequest(request: NextRequest): boolean {
 }
 
 // ── Score engine (igual ao marketing-vision/page.tsx) ────────────────────────
-function calcScore(crmLead: any, metaMatch: any | null): number {
+function calcScore(crmLead: CrmLead, metaMatch: MetaLead | null): number {
   let score = 0;
 
   if (metaMatch)                    score += 30; // Match Meta × CRM
   if (metaMatch?.ad_id)             score += 15; // Origem Lead Ad
 
   // Etapa no funil
-  const etapa = (crmLead.etapa || crmLead.situacao_etapa || '').toLowerCase();
+  const etapa = (refName(crmLead.etapa) || crmLead.situacao_etapa || '').toLowerCase();
   if (/qualific|proposta|negoci|contrato/i.test(etapa)) score += 20;
   else if (/atend|interest|triag/i.test(etapa))         score += 15;
 
@@ -79,7 +136,7 @@ const SEM_CONEXAO_DEDUP_TTL = 90 * 86400;
  * O RD Station identifica contatos por email, entao email e a chave primaria.
  * Inclui idlead/referencia porque o CV CRM nao retorna "id" em todos os endpoints.
  */
-function getSemConexaoDedupKey(lead: any): string | null {
+function getSemConexaoDedupKey(lead: CrmLead): string | null {
   const email = String(lead.email || lead.email_principal || '').toLowerCase().trim();
   const phone = String(lead.telefone || lead.celular || lead.fone || '').replace(/\D/g, '');
   const leadId = String(
@@ -91,7 +148,7 @@ function getSemConexaoDedupKey(lead: any): string | null {
   return null;
 }
 
-async function fetchActiveLeads(): Promise<any[]> {
+async function fetchActiveLeads(): Promise<CrmLead[]> {
   const email   = process.env.CV_CRM_EMAIL;
   const token   = process.env.CV_CRM_TOKEN;
   const base    = 'https://longviewempreendimentos.cvcrm.com.br/api/v1';
@@ -100,15 +157,15 @@ async function fetchActiveLeads(): Promise<any[]> {
   const since60 = new Date(Date.now() - 60 * 86400000).toISOString().split('T')[0];
 
   try {
-    const res = await axios.get(`${base}/comercial/leads`, {
+    const res = await axios.get<{ leads?: CrmLead[] }>(`${base}/comercial/leads`, {
       headers,
       params: { limit: 1000, situacao: 'Ativo', data_criacao_inicio: since60 },
       timeout: 25000,
     });
     return res.data?.leads || [];
-  } catch (err: any) {
+  } catch {
     // fallback sem filtro de data
-    const res = await axios.get(`${base}/comercial/leads`, {
+    const res = await axios.get<{ leads?: CrmLead[] }>(`${base}/comercial/leads`, {
       headers, params: { limit: 1000, situacao: 'Ativo' }, timeout: 25000,
     });
     return res.data?.leads || [];
@@ -116,7 +173,7 @@ async function fetchActiveLeads(): Promise<any[]> {
 }
 
 // Busca todos os leads dos últimos 30 dias (incluindo sem conexão)
-async function fetchAllRecentLeads(): Promise<any[]> {
+async function fetchAllRecentLeads(): Promise<CrmLead[]> {
   const email   = process.env.CV_CRM_EMAIL;
   const token   = process.env.CV_CRM_TOKEN;
   const base    = 'https://longviewempreendimentos.cvcrm.com.br/api/v1';
@@ -124,7 +181,7 @@ async function fetchAllRecentLeads(): Promise<any[]> {
   const since30 = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
 
   try {
-    const res = await axios.get(`${base}/comercial/leads`, {
+    const res = await axios.get<{ leads?: CrmLead[] }>(`${base}/comercial/leads`, {
       headers,
       params: { limit: 1000, data_criacao_inicio: since30 }, // sem filtro de situacao
       timeout: 25000,
@@ -136,14 +193,14 @@ async function fetchAllRecentLeads(): Promise<any[]> {
 }
 
 // Dispara gatilho "Sem Conexão" no RD Station
-async function triggerSemConexaoRD(lead: any): Promise<boolean> {
+async function triggerSemConexaoRD(lead: CrmLead): Promise<boolean> {
   const apiKey  = process.env.RD_TOKEN_PUBLIC;
   const email   = lead.email?.toLowerCase()?.trim();
   const phone   = lead.telefone || lead.celular || '';
   if (!apiKey || (!email && !phone)) return false;
 
-  const etapa = lead.etapa?.nome || lead.etapa || 'Sem Conexão';
-  const payload: Record<string, any> = {
+  const etapa = refName(lead.etapa) || 'Sem Conexão';
+  const payload: Record<string, unknown> = {
     conversion_identifier: 'sem_conexao_longview',
     cf_etapa_crm:          etapa,
     cf_origem_captacao:    'crm_cron',
@@ -163,13 +220,13 @@ async function triggerSemConexaoRD(lead: any): Promise<boolean> {
       { params: { api_key: apiKey }, timeout: 12000 }
     );
     return true;
-  } catch (err: any) {
-    console.warn('[recalc] sem_conexao RD error:', err.response?.data || err.message);
+  } catch (err) {
+    console.warn('[recalc] sem_conexao RD error:', axios.isAxiosError(err) ? err.response?.data ?? err.message : err);
     return false;
   }
 }
 
-async function fetchRecentMetaLeads(): Promise<any[]> {
+async function fetchRecentMetaLeads(): Promise<MetaLead[]> {
   const PAGE_ID   = '259079394232614';
   const META_BASE = 'https://graph.facebook.com/v21.0';
 
@@ -177,22 +234,22 @@ async function fetchRecentMetaLeads(): Promise<any[]> {
   const since14 = Math.floor((Date.now() - 14 * 86400000) / 1000);
 
   try {
-    const pageRes = await axios.get(`${META_BASE}/${PAGE_ID}`, {
+    const pageRes = await axios.get<{ access_token?: string }>(`${META_BASE}/${PAGE_ID}`, {
       params: { fields: 'access_token', access_token: process.env.META_TOKEN },
       timeout: 10000,
     });
     const pageToken = pageRes.data?.access_token || process.env.META_TOKEN;
 
-    const formsRes = await axios.get(`${META_BASE}/${PAGE_ID}/leadgen_forms`, {
+    const formsRes = await axios.get<{ data?: { id: string }[] }>(`${META_BASE}/${PAGE_ID}/leadgen_forms`, {
       params: { fields: 'id', limit: 20, access_token: pageToken },
       timeout: 10000,
     });
     const forms = formsRes.data?.data || [];
 
-    const allLeads: any[] = [];
+    const allLeads: MetaLead[] = [];
     for (const form of forms.slice(0, 5)) { // top 5 forms
       try {
-        const res = await axios.get(`${META_BASE}/${form.id}/leads`, {
+        const res = await axios.get<{ data?: MetaLead[] }>(`${META_BASE}/${form.id}/leads`, {
           params: {
             fields:     'id,field_data,created_time',
             limit:      100,
@@ -210,16 +267,16 @@ async function fetchRecentMetaLeads(): Promise<any[]> {
   }
 }
 
-function crossMatch(crmLead: any, metaLeads: any[]): any | null {
+function crossMatch(crmLead: CrmLead, metaLeads: MetaLead[]): MetaLead | null {
   const crmPhone = (crmLead.telefone || crmLead.celular || '').replace(/\D/g, '');
   const crmEmail = (crmLead.email || '').toLowerCase().trim();
   const crmNome  = (crmLead.nome  || '').toLowerCase().trim();
 
   return metaLeads.find(ml => {
     const fields = ml.field_data || [];
-    const mlPhone = (fields.find((f: any) => /phone|tel|cel|whats/i.test(f.name))?.values?.[0] || '').replace(/\D/g, '');
-    const mlEmail = (fields.find((f: any) => /email/i.test(f.name))?.values?.[0] || '').toLowerCase().trim();
-    const mlNome  = (fields.find((f: any) => /name|nome/i.test(f.name))?.values?.[0] || '').toLowerCase().trim();
+    const mlPhone = (fields.find(f => /phone|tel|cel|whats/i.test(f.name ?? ''))?.values?.[0] || '').replace(/\D/g, '');
+    const mlEmail = (fields.find(f => /email/i.test(f.name ?? ''))?.values?.[0] || '').toLowerCase().trim();
+    const mlNome  = (fields.find(f => /name|nome/i.test(f.name ?? ''))?.values?.[0] || '').toLowerCase().trim();
 
     if (mlEmail && crmEmail && mlEmail === crmEmail) return true;
     if (mlPhone && crmPhone && mlPhone.slice(-8) === crmPhone.slice(-8)) return true;
@@ -228,7 +285,7 @@ function crossMatch(crmLead: any, metaLeads: any[]): any | null {
   }) || null;
 }
 
-async function sendScoreToRD(lead: any, score: number): Promise<boolean> {
+async function sendScoreToRD(lead: CrmLead, score: number): Promise<boolean> {
   const apiKey = process.env.RD_TOKEN_PUBLIC;
   if (!apiKey) return false;
 
@@ -237,7 +294,7 @@ async function sendScoreToRD(lead: any, score: number): Promise<boolean> {
   if (!email && !phone) return false;
 
   const tier    = getTier(score);
-  const payload: Record<string, any> = {
+  const payload: Record<string, unknown> = {
     conversion_identifier: tier.conversion_id,
     cf_score_intencao:    String(score),
     cf_temperatura_lead:  tier.label,
@@ -269,7 +326,7 @@ export async function GET(request: NextRequest) {
   }
 
   const startedAt = new Date().toISOString();
-  const stats: any = {
+  const stats: CronStats = {
     startedAt, ok: false,
     total: 0, quentes: 0, mornos: 0, frios: 0,
     sentToRD: 0, capiSent: 0, errors: 0,
@@ -286,8 +343,8 @@ export async function GET(request: NextRequest) {
     stats.total = crmLeads.length;
     console.log(`[recalc-scores] ${crmLeads.length} leads CRM, ${metaLeads.length} leads Meta`);
 
-    const rdQueue: any[]    = [];
-    const capiQueue: any[]  = [];
+    const rdQueue: { lead: CrmLead; score: number }[] = [];
+    const capiQueue: CAPIEvent[] = [];
     const distribution: Record<string, number> = { quente: 0, morno: 0, frio: 0 };
 
     for (const lead of crmLeads) {
@@ -341,11 +398,9 @@ export async function GET(request: NextRequest) {
     }
 
     // ── Fallback: detecta leads "Sem Conexão" não capturados pelo webhook ──
-    const semConexaoLeads = allRecentLeads.filter(lead => {
-      const etapaNome    = lead.etapa?.nome    || lead.etapa    || '';
-      const situacaoNome = lead.situacao?.nome || lead.situacao || '';
-      return isSemConexaoEtapa(etapaNome) || isSemConexaoEtapa(situacaoNome);
-    });
+    const semConexaoLeads = allRecentLeads.filter(lead =>
+      isSemConexaoEtapa(refName(lead.etapa)) || isSemConexaoEtapa(refName(lead.situacao))
+    );
 
     stats.semConexao = semConexaoLeads.length;
     console.log(`[recalc-scores] ${semConexaoLeads.length} leads Sem Conexão encontrados`);
@@ -379,12 +434,12 @@ export async function GET(request: NextRequest) {
           stats.semConexaoSentRD++;
           await kv.set(dedupKey, new Date().toISOString(), { ex: SEM_CONEXAO_DEDUP_TTL });
           // Log no webhook KV para aparecer no painel
-          const existing: any[] = (await kv.get('cv:webhook:log')) || [];
+          const existing = (await kv.get<unknown[]>('cv:webhook:log')) || [];
           const entry = {
             ts:        new Date().toISOString(),
             leadId:    dedupKey.split(':').pop(),
             nome:      lead.nome || '?',
-            etapa:     lead.etapa?.nome || lead.etapa || 'Sem Conexão',
+            etapa:     refName(lead.etapa) || 'Sem Conexão',
             evento:    'sem_conexao_cron',
             triggered: true,
             rdOk:      true,
@@ -404,11 +459,12 @@ export async function GET(request: NextRequest) {
 
     console.log('[recalc-scores] Concluído:', stats);
     return NextResponse.json(stats);
-  } catch (err: any) {
-    stats.error      = err.message;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    stats.error      = msg;
     stats.finishedAt = new Date().toISOString();
     await kv.set('meta:scores:lastStats', stats);
-    console.error('[recalc-scores] Erro:', err.message);
+    console.error('[recalc-scores] Erro:', msg);
     return NextResponse.json(stats, { status: 500 });
   }
 }

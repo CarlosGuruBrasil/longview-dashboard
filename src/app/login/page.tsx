@@ -34,9 +34,9 @@ export default function LoginPage() {
       // Redireciona para a tela de seleção de aplicativo
       router.push('/select-app');
       router.refresh();
-    } catch (err: any) {
+    } catch (err) {
       console.error('Erro de login:', err);
-      setError(err.message || 'Erro ao conectar ao servidor.');
+      setError(err instanceof Error ? err.message : 'Erro ao conectar ao servidor.');
     } finally {
       setLoading(false);
     }

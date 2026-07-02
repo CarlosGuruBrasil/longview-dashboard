@@ -6,12 +6,18 @@
  * POST /api/rd/token/refresh
  * Força refresh manual do access_token via refresh_token
  */
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { verifyAdminAuth } from '@/lib/auth';
 import { kv } from '@/lib/kv';
 import axios from 'axios';
 
 const RD_TOKEN_URL = 'https://api.rd.services/auth/token';
+
+type RDTokenResponse = {
+  access_token: string;
+  refresh_token: string;
+  expires_in?: number;
+};
 
 export async function getValidRDToken(): Promise<string | null> {
   // 1. Tentar access_token do KV (salvo pelo callback OAuth2)
@@ -27,7 +33,7 @@ export async function getValidRDToken(): Promise<string | null> {
   if (!clientId || !clientSecret) return null;
 
   try {
-    const res = await axios.post(RD_TOKEN_URL, {
+    const res = await axios.post<RDTokenResponse>(RD_TOKEN_URL, {
       client_id:     clientId,
       client_secret: clientSecret,
       refresh_token: refreshToken,
@@ -42,13 +48,14 @@ export async function getValidRDToken(): Promise<string | null> {
 
     console.log('[rd/token] Token renovado via refresh_token');
     return access_token;
-  } catch (err: any) {
-    console.error('[rd/token] Erro no refresh:', err.response?.data || err.message);
+  } catch (err: unknown) {
+    const details = axios.isAxiosError(err) ? err.response?.data || err.message : err;
+    console.error('[rd/token] Erro no refresh:', details);
     return null;
   }
 }
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   const admin = await verifyAdminAuth();
   if (!admin) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
 

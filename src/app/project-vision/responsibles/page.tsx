@@ -5,23 +5,16 @@ import {
   Users, 
   Search, 
   RefreshCw, 
-  Briefcase, 
-  CheckCircle2, 
-  Clock, 
-  AlertTriangle,
   ExternalLink,
   Plus,
-  Phone,
-  Mail,
-  Building,
   Upload,
   X,
   Sliders
 } from 'lucide-react';
-import { Task, Project, Responsible } from '@/lib/db';
+import { Task, Responsible } from '@/lib/db';
 import { useUser } from '@/context/UserContext';
-import ResponsibleModal from '@/components/ResponsibleModal';
-import TaskDrawer from '@/components/TaskDrawer';
+import ResponsibleModal from '../components/ResponsibleModal';
+import TaskDrawer from '../components/TaskDrawer';
 
 interface CombinedStats extends Responsible {
   total: number;
@@ -268,6 +261,7 @@ export default function ResponsiblesPage() {
                 <div className="flex items-start gap-4">
                   {stats.photo ? (
                     <div className="w-11 h-11 rounded-full border border-[#2B2B30] overflow-hidden relative shrink-0">
+                      {/* eslint-disable-next-line @next/next/no-img-element -- zoom/pan via transform CSS não é compatível com next/image */}
                       <img 
                         src={stats.photo} 
                         alt={stats.name} 
@@ -455,6 +449,7 @@ export default function ResponsiblesPage() {
                       <span className="text-[8px] font-bold text-zinc-500 uppercase">Preview</span>
                       {newPhoto ? (
                         <div className="w-20 h-20 rounded-full border border-[#1E1E22] overflow-hidden relative bg-black/30">
+                          {/* eslint-disable-next-line @next/next/no-img-element -- data URL de preview com zoom/pan via transform CSS */}
                           <img 
                             src={newPhoto} 
                             alt="Crop Preview" 

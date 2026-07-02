@@ -10,6 +10,12 @@ import axios from 'axios';
 
 const RD_TOKEN_URL = 'https://api.rd.services/auth/token';
 
+type RDTokenResponse = {
+  access_token: string;
+  refresh_token: string;
+  expires_in?: number;
+};
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const code  = searchParams.get('code');
@@ -39,7 +45,7 @@ export async function GET(request: NextRequest) {
 
   try {
     // Trocar code por tokens
-    const res = await axios.post(RD_TOKEN_URL, {
+    const res = await axios.post<RDTokenResponse>(RD_TOKEN_URL, {
       client_id:     clientId,
       client_secret: clientSecret,
       code,
@@ -66,10 +72,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(
       new URL('/marketing-vision?rd_auth=success', request.url)
     );
-  } catch (err: any) {
-    console.error('[rd/callback] Erro ao trocar code:', err.response?.data || err.message);
+  } catch (err: unknown) {
+    const detailRaw = axios.isAxiosError(err) ? err.response?.data || err.message : err instanceof Error ? err.message : String(err);
+    console.error('[rd/callback] Erro ao trocar code:', detailRaw);
     const detail = encodeURIComponent(
-      JSON.stringify(err.response?.data || err.message)
+      JSON.stringify(detailRaw)
     );
     return NextResponse.redirect(
       new URL(`/marketing-vision?rd_error=${detail}`, request.url)

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
 import { readProjectData, mutateProjectData, Project } from '@/lib/db-kv';
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const user = await verifyAuth();
     if (!user) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });

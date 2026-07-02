@@ -52,12 +52,14 @@ function GlassCard({ title, children }: { title?: string; children: React.ReactN
   )
 }
 
-function CustomTooltip({ active, payload, label }: any) {
+type TooltipPayload = { name?: string; value?: number | string; color?: string }
+
+function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: TooltipPayload[]; label?: string }) {
   if (!active || !payload?.length) return null
   return (
     <div className="rounded-xl border border-[#1E1E22] bg-[#121214] p-3 text-xs min-w-[140px]">
       <p className="text-zinc-300 font-semibold mb-2">{label}</p>
-      {payload.map((p: any, i: number) => (
+      {payload.map((p, i) => (
         <p key={i} style={{ color: p.color }} className="mb-1">
           {p.name}: <strong className="text-zinc-100">{p.value}</strong>
         </p>
@@ -75,16 +77,21 @@ export default function RelatoriosPage() {
   const [error,     setError]     = useState<string | null>(null)
 
   useEffect(() => {
-    setLoading(true)
-    setError(null)
-    fetch(`/api/construpoint?startYear=${startYear}&endYear=${endYear}`)
-      .then(r => {
+    async function load() {
+      setLoading(true)
+      setError(null)
+      try {
+        const r = await fetch(`/api/construpoint?startYear=${startYear}&endYear=${endYear}`)
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
-        return r.json()
-      })
-      .then(d => setData(d))
-      .catch(e => setError(e.message))
-      .finally(() => setLoading(false))
+        const d = await r.json() as QualityData
+        setData(d)
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e))
+      } finally {
+        setLoading(false)
+      }
+    }
+    void load()
   }, [startYear, endYear])
 
   const tipoBarData = useMemo(() => {

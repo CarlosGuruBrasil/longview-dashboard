@@ -6,6 +6,10 @@ import { getBearerToken, isSecretAuthorized, unauthorizedJson } from '@/lib/inte
 export const maxDuration = 300; // 5 minutes
 export const runtime = 'nodejs';
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const querySecret = url.searchParams.get('secret');
@@ -148,8 +152,9 @@ export async function GET(request: NextRequest) {
       verificacoes: upsertedVerifications
     });
 
-  } catch (error: any) {
-    console.error('[cron/sync-construpoint] Erro:', error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const message = errorMessage(error);
+    console.error('[cron/sync-construpoint] Erro:', message);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

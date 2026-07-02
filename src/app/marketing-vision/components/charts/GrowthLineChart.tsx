@@ -22,6 +22,17 @@ interface GrowthLineChartProps {
   onModeChange: (mode: 'month' | 'year') => void
 }
 
+type ChartPoint = Record<string, unknown> & { label: string }
+type CustomTooltipProps = {
+  active?: boolean
+  payload?: unknown[]
+  label?: string
+  data: ChartPoint[]
+  years: number[]
+  hasSpend: boolean
+  mode: 'month' | 'year'
+}
+
 const TICK_COLOR = '#71717a'
 const GRID_COLOR = 'rgba(255,255,255,0.05)'
 const COLOR_SPEND = '#f59e0b' // amarelo — investimento
@@ -45,9 +56,9 @@ function buildSpendByMonth(daily: MetaDailyInsight[]): { byMonth: number[]; byYe
   return { byMonth, byYear }
 }
 
-function CustomTooltip({ active, payload, label, data, years, hasSpend, mode }: any) {
+function CustomTooltip({ active, payload, label, data, years, hasSpend, mode }: CustomTooltipProps) {
   if (!active || !payload?.length) return null
-  const point = data.find((d: any) => d.label === label)
+  const point = data.find(d => d.label === label)
   if (!point) return null
 
   return (
@@ -62,20 +73,20 @@ function CustomTooltip({ active, payload, label, data, years, hasSpend, mode }: 
       <p style={{ color: '#e4e4e7', marginBottom: 8, fontWeight: 600 }}>{label}</p>
       {mode === 'month' ? (
         <>
-          {years.map((y: number, i: number) => (
+          {years.map((y, i) => (
             <div key={y} style={{ marginBottom: 6 }}>
               <p style={{ color: CHART_PALETTE[i % CHART_PALETTE.length], fontWeight: 600, marginBottom: 2 }}>
                 {y}
               </p>
               <p style={{ color: '#a1a1aa', paddingLeft: 8 }}>
-                Leads: <strong style={{ color: '#e4e4e7' }}>{(point as any)[`qty_${y}`] ?? 0}</strong>
+                Leads: <strong style={{ color: '#e4e4e7' }}>{(point[`qty_${y}`] as number) ?? 0}</strong>
               </p>
             </div>
           ))}
           {hasSpend && (
             <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
               <p style={{ color: COLOR_SPEND }}>
-                Investimento: <strong>{formatCurrency((point as any).spend ?? 0)}</strong>
+                Investimento: <strong>{formatCurrency((point.spend as number) ?? 0)}</strong>
               </p>
             </div>
           )}
@@ -83,11 +94,11 @@ function CustomTooltip({ active, payload, label, data, years, hasSpend, mode }: 
       ) : (
         <>
           <p style={{ color: '#a1a1aa', marginBottom: 4 }}>
-            Leads: <strong style={{ color: '#e4e4e7' }}>{(point as any).qty}</strong>
+            Leads: <strong style={{ color: '#e4e4e7' }}>{point.qty as number}</strong>
           </p>
           {hasSpend && (
             <p style={{ color: COLOR_SPEND }}>
-              Investimento: <strong>{formatCurrency((point as any).spend ?? 0)}</strong>
+              Investimento: <strong>{formatCurrency((point.spend as number) ?? 0)}</strong>
             </p>
           )}
         </>
@@ -102,8 +113,8 @@ export default function GrowthLineChart({ leads, daily = [], mode, onModeChange 
   const { byMonth: spendByMonth, byYear: spendByYear } = buildSpendByMonth(daily)
   const hasSpend = daily.length > 0
 
-  const monthData = MONTHS_PT.map((label, i) => {
-    const entry: Record<string, unknown> = { label }
+  const monthData: ChartPoint[] = MONTHS_PT.map((label, i) => {
+    const entry: ChartPoint = { label }
     years.forEach(y => { entry[`qty_${y}`] = byYearMonth[y]?.[i] ?? 0 })
     if (hasSpend) entry.spend = spendByMonth[i]
     return entry

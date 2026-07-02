@@ -7,8 +7,9 @@
  * - App NÃO está rodando em modo standalone (já instalado)
  * - Usuário não dispensou o banner nesta sessão
  */
+import Image from 'next/image';
 import { useEffect, useState } from 'react';
-import { X, Download } from 'lucide-react';
+import { X } from 'lucide-react';
 
 type Platform = 'ios' | 'android' | null;
 
@@ -33,13 +34,16 @@ export default function PWAInstallBanner() {
   const [dismissed, setDismissed] = useState(true); // começa oculto até detectar
 
   useEffect(() => {
-    if (isStandalone()) return; // já instalado, não mostra nada
-    const p = detectPlatform();
-    if (!p) return; // desktop, não mostra
-    const key = 'pwa-banner-dismissed-v1';
-    if (sessionStorage.getItem(key) === '1') return; // dispensado nesta sessão
-    setPlatform(p);
-    setDismissed(false);
+    const id = window.setTimeout(() => {
+      if (isStandalone()) return; // já instalado, não mostra nada
+      const p = detectPlatform();
+      if (!p) return; // desktop, não mostra
+      const key = 'pwa-banner-dismissed-v1';
+      if (sessionStorage.getItem(key) === '1') return; // dispensado nesta sessão
+      setPlatform(p);
+      setDismissed(false);
+    }, 0);
+    return () => window.clearTimeout(id);
   }, []);
 
   const dismiss = () => {
@@ -56,9 +60,8 @@ export default function PWAInstallBanner() {
     >
       <div className="flex items-start gap-3 rounded-2xl border border-white/10 bg-[#18181b]/95 p-4 shadow-2xl backdrop-blur-xl">
         {/* Ícone do app */}
-        <div className="shrink-0 w-10 h-10 rounded-xl overflow-hidden border border-white/10">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/icon-192.png" alt="LongView" className="w-full h-full object-cover" />
+        <div className="shrink-0 w-10 h-10 rounded-xl overflow-hidden border border-white/10 relative">
+          <Image src="/icon-192.png" alt="LongView" fill className="object-cover" sizes="40px" />
         </div>
 
         <div className="flex-1 min-w-0">

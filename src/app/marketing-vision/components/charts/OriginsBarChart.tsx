@@ -23,7 +23,10 @@ interface OriginsBarChartProps {
 const TICK_COLOR = '#71717a'
 const GRID_COLOR = 'rgba(255,255,255,0.05)'
 
-function CustomTooltip({ active, payload, label }: any) {
+type TooltipPayloadEntry = { dataKey: string; name: string; value: number; color: string }
+type CustomTooltipProps = { active?: boolean; payload?: TooltipPayloadEntry[]; label?: string }
+
+function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
   if (!active || !payload?.length) return null
   return (
     <div style={{
@@ -34,7 +37,7 @@ function CustomTooltip({ active, payload, label }: any) {
       fontSize: 12,
     }}>
       <p style={{ color: '#e4e4e7', fontWeight: 600, marginBottom: 6 }}>{label}</p>
-      {payload.map((p: any) => (
+      {payload.map(p => (
         <p key={p.dataKey} style={{ color: p.color, marginBottom: 2 }}>
           {p.name}: {p.dataKey === 'vgv' ? formatCurrency(p.value) : p.value?.toLocaleString('pt-BR')}
         </p>
@@ -94,7 +97,7 @@ export default function OriginsBarChart({ data, title, height = 320 }: OriginsBa
               dataKey="quantidade"
               position="top"
               style={{ fill: '#a1a1aa', fontSize: 10 }}
-              formatter={(v: any) => {
+              formatter={(v: unknown) => {
                 const num = typeof v === 'number' ? v : 0
                 const pct = totalQtd > 0 ? ((num / totalQtd) * 100).toFixed(0) : '0'
                 return `${num} (${pct}%)`

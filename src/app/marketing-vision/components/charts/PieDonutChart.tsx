@@ -18,6 +18,7 @@ interface PieDonutChartProps {
   height?: number
 }
 
+
 interface TooltipPayload {
   name: string
   value: number
@@ -27,30 +28,6 @@ interface TooltipPayload {
 interface CustomTooltipProps {
   active?: boolean
   payload?: TooltipPayload[]
-}
-
-function CustomTooltip({ active, payload }: CustomTooltipProps) {
-  if (!active || !payload?.length) return null
-  const total = payload[0]?.payload?.value
-  const item = payload[0]
-  if (!item) return null
-  // We don't have the total here easily, so just show value and name
-  return (
-    <div
-      style={{
-        backgroundColor: '#18181b',
-        border: '1px solid rgba(255,255,255,0.1)',
-        borderRadius: 8,
-        padding: '8px 12px',
-        fontSize: 12,
-      }}
-    >
-      <p style={{ color: '#e4e4e7', marginBottom: 2 }}>{item.name}</p>
-      <p style={{ color: '#a1a1aa' }}>
-        {item.value.toLocaleString('pt-BR')}
-      </p>
-    </div>
-  )
 }
 
 function CustomTooltipWithPercent({
@@ -88,7 +65,7 @@ export default function PieDonutChart({
 }: PieDonutChartProps) {
   const total = data.reduce((acc, d) => acc + d.value, 0)
 
-  const renderLegendText = (value: string, entry: any) => {
+  const renderLegendText = (value: string, entry: { payload?: { value?: number } }) => {
     const itemVal = entry.payload?.value ?? 0
     const pct = total > 0 ? ((itemVal / total) * 100).toFixed(1) : '0.0'
     return (

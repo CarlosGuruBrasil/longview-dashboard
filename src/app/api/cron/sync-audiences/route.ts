@@ -16,10 +16,33 @@ import { NextRequest, NextResponse } from 'next/server';
 import { kv } from '@/lib/kv';
 import axios from 'axios';
 import crypto from 'crypto';
-import { sendCAPIEvents } from '@/app/api/meta/capi/route';
+import { sendCAPIEvents, type CAPIEvent } from '@/app/api/meta/capi/route';
 
 const META_BASE = 'https://graph.facebook.com/v21.0';
 const ACT_ID    = process.env.META_ACT_ID;
+
+type CrmContact = {
+  nome?: string;
+  name?: string;
+  nome_completo?: string;
+  email?: string;
+  email_principal?: string;
+  telefone?: string;
+  celular?: string;
+  fone?: string;
+};
+type NormalizedContact = { fn: string; email: string; phone: string };
+type MetaAudience = { id: string; name: string };
+type SyncResult = {
+  startedAt: string;
+  finishedAt?: string;
+  error?: string;
+  log: string[];
+  audiences: Record<string, unknown>[];
+  capi?: { sent: number; errors: number; details: unknown[] };
+  totalContacts?: { buyers: number; all: number };
+  ok: boolean;
+};
 
 function metaAuth() {
   return { access_token: process.env.META_TOKEN };
@@ -44,7 +67,7 @@ function isCronRequest(request: NextRequest): boolean {
   return auth === `Bearer ${cronSecret}`;
 }
 
-async function fetchCRMContacts(filter: 'compradores' | 'todos'): Promise<any[]> {
+async function fetchCRMContacts(filter: 'compradores' | 'todos'): Promise<CrmContact[]> {
   const email   = process.env.CV_CRM_EMAIL;
   const token   = process.env.CV_CRM_TOKEN;
   const base    = 'https://longviewempreendimentos.cvcrm.com.br/api/v1';
@@ -52,13 +75,15 @@ async function fetchCRMContacts(filter: 'compradores' | 'todos'): Promise<any[]>
 
   if (filter === 'compradores') {
     try {
-      const res = await axios.get(`${base}/comercial/contratos`, {
-        headers, params: { limit: 1000, situacao: 'ativo' }, timeout: 25000,
-      });
-      const data = res.data?.contratos || res.data?.data || res.data || [];
+      const res = await axios.get<{ contratos?: CrmContact[]; data?: CrmContact[] } | CrmContact[]>(
+        `${base}/comercial/contratos`,
+        { headers, params: { limit: 1000, situacao: 'ativo' }, timeout: 25000 }
+      );
+      const body = res.data;
+      const data = Array.isArray(body) ? body : (body?.contratos || body?.data || []);
       return Array.isArray(data) ? data : [];
     } catch {
-      const res = await axios.get(`${base}/comercial/leads`, {
+      const res = await axios.get<{ leads?: CrmContact[] }>(`${base}/comercial/leads`, {
         headers, params: { limit: 2000, situacao: 'Vendido' }, timeout: 25000,
       });
       return res.data?.leads || [];
@@ -66,23 +91,23 @@ async function fetchCRMContacts(filter: 'compradores' | 'todos'): Promise<any[]>
   }
 
   // Base completa (paginada)
-  const initial = await axios.get(`${base}/comercial/leads`, {
+  const initial = await axios.get<{ total?: number }>(`${base}/comercial/leads`, {
     headers, params: { limit: 1 }, timeout: 15000,
   });
   const total = Math.min(initial.data?.total || 500, 5000);
   const pages = Math.ceil(total / 500);
   const promises = Array.from({ length: pages }, (_, i) =>
-    axios.get(`${base}/comercial/leads`, {
+    axios.get<{ leads?: CrmContact[] }>(`${base}/comercial/leads`, {
       headers, params: { limit: 500, offset: i * 500 }, timeout: 25000,
     })
   );
   const results = await Promise.allSettled(promises);
   return results
     .filter(r => r.status === 'fulfilled')
-    .flatMap((r: any) => r.value.data?.leads || []);
+    .flatMap(r => r.value.data?.leads || []);
 }
 
-function normalizeContact(c: any) {
+function normalizeContact(c: CrmContact): NormalizedContact {
   return {
     fn:    (c.nome || c.name || c.nome_completo || '').trim(),
     email: (c.email || c.email_principal || '').toLowerCase().trim(),
@@ -93,15 +118,15 @@ function normalizeContact(c: any) {
 async function findOrCreateAudience(name: string, description: string): Promise<string> {
   // Tenta encontrar audiência existente pelo nome
   try {
-    const res = await axios.get(`${META_BASE}/${ACT_ID}/customaudiences`, {
+    const res = await axios.get<{ data?: MetaAudience[] }>(`${META_BASE}/${ACT_ID}/customaudiences`, {
       params: { fields: 'id,name', limit: 100, ...metaAuth() },
       timeout: 15000,
     });
-    const existing = (res.data?.data || []).find((a: any) => a.name === name);
+    const existing = (res.data?.data || []).find(a => a.name === name);
     if (existing) return existing.id;
   } catch { /* ignora, cria nova */ }
 
-  const res = await axios.post(
+  const res = await axios.post<{ id: string }>(
     `${META_BASE}/${ACT_ID}/customaudiences`,
     {
       name, description,
@@ -115,7 +140,7 @@ async function findOrCreateAudience(name: string, description: string): Promise<
   return res.data.id;
 }
 
-async function uploadContactsToAudience(audienceId: string, contacts: any[]): Promise<{ received: number; invalid: number }> {
+async function uploadContactsToAudience(audienceId: string, contacts: NormalizedContact[]): Promise<{ received: number; invalid: number }> {
   const BATCH = 500;
   let received = 0;
   let invalid  = 0;
@@ -127,7 +152,7 @@ async function uploadContactsToAudience(audienceId: string, contacts: any[]): Pr
       hashPhone(c.phone),
     ]);
     try {
-      const res = await axios.post(
+      const res = await axios.post<{ num_received?: number; num_invalid_entries?: number }>(
         `${META_BASE}/${audienceId}/users`,
         {
           payload: { schema: ['FN', 'EMAIL', 'PHONE'], data: batch, is_raw: false },
@@ -137,8 +162,8 @@ async function uploadContactsToAudience(audienceId: string, contacts: any[]): Pr
       );
       received += res.data?.num_received   || batch.length;
       invalid  += res.data?.num_invalid_entries || 0;
-    } catch (err: any) {
-      console.error('[sync] upload batch erro:', err.response?.data?.error?.message);
+    } catch (err) {
+      console.error('[sync] upload batch erro:', axios.isAxiosError(err) ? err.response?.data?.error?.message : err);
       invalid += batch.length;
     }
   }
@@ -152,7 +177,7 @@ export async function GET(request: NextRequest) {
 
   const startedAt = new Date().toISOString();
   const log: string[] = [];
-  const result: any   = { startedAt, log, audiences: [], ok: false };
+  const result: SyncResult = { startedAt, log, audiences: [], ok: false };
 
   try {
     log.push(`[${new Date().toISOString()}] Iniciando sync semanal de audiências`);
@@ -174,13 +199,13 @@ export async function GET(request: NextRequest) {
     // ── 2. Lookalike 1% a partir dos compradores ────────────────────────────
     try {
       const llName = 'LV | Lookalike 1% Compradores | HBM';
-      const existRes = await axios.get(`${META_BASE}/${ACT_ID}/customaudiences`, {
+      const existRes = await axios.get<{ data?: MetaAudience[] }>(`${META_BASE}/${ACT_ID}/customaudiences`, {
         params: { fields: 'id,name', limit: 100, ...metaAuth() }, timeout: 10000,
       });
-      const existingLL = (existRes.data?.data || []).find((a: any) => a.name === llName);
+      const existingLL = (existRes.data?.data || []).find(a => a.name === llName);
 
       if (!existingLL) {
-        const llRes = await axios.post(
+        const llRes = await axios.post<{ id: string }>(
           `${META_BASE}/${ACT_ID}/customaudiences`,
           {
             name: llName,
@@ -198,8 +223,9 @@ export async function GET(request: NextRequest) {
         log.push(`[META] Lookalike já existe (ID ${existingLL.id}) — sem alteração`);
         result.audiences.push({ id: existingLL.id, name: llName, type: 'lookalike', existing: true });
       }
-    } catch (err: any) {
-      log.push(`[META] Aviso — lookalike: ${err.response?.data?.error?.message || err.message}`);
+    } catch (err) {
+      const msg = axios.isAxiosError(err) ? err.response?.data?.error?.message || err.message : String(err);
+      log.push(`[META] Aviso — lookalike: ${msg}`);
     }
 
     // ── 3. Base completa (exclusão) ─────────────────────────────────────────
@@ -218,7 +244,7 @@ export async function GET(request: NextRequest) {
 
     // ── 4. CAPI: envia eventos Purchase para compradores (educa o algoritmo) ─
     log.push('[CAPI] Enviando eventos Purchase para compradores...');
-    const capiEvents = buyers
+    const capiEvents: CAPIEvent[] = buyers
       .filter(b => b.email || b.phone)
       .slice(0, 200) // limita batch CAPI
       .map((b, idx) => ({
@@ -246,12 +272,13 @@ export async function GET(request: NextRequest) {
     console.log('[cron/sync-audiences] Concluído:', result.totalContacts);
 
     return NextResponse.json(result);
-  } catch (err: any) {
-    result.error     = err.message;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    result.error     = msg;
     result.finishedAt = new Date().toISOString();
-    log.push(`[ERRO] ${err.message}`);
+    log.push(`[ERRO] ${msg}`);
     await kv.set('meta:sync:last', result);
-    console.error('[cron/sync-audiences] Erro:', err.message);
+    console.error('[cron/sync-audiences] Erro:', msg);
     return NextResponse.json(result, { status: 500 });
   }
 }

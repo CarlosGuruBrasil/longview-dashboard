@@ -2,6 +2,48 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sql, ensureSchema } from '@/lib/pg';
 import { getBearerToken } from '@/lib/internal-auth';
 
+type ConstrupointPayload = Record<string, unknown> & {
+  Id?: string | number;
+  id?: string | number;
+  Code?: string;
+  code?: string;
+  Model?: { Name?: string };
+  Work?: { Name?: string };
+  Location?: { Name?: string };
+  Inspector?: { Name?: string };
+  Status?: { Name?: string };
+  modelo?: string;
+  obra?: string;
+  local?: string;
+  inspetor?: string;
+  status?: string;
+  CreateDate?: string | number | Date;
+  data_criacao?: string | number | Date;
+  ScheduleDate?: string | number | Date;
+  data_agendamento?: string | number | Date;
+  UpdateDate?: string | number | Date;
+  data_atualizacao?: string | number | Date;
+  WeightedGrade?: string | number;
+  nota?: string | number;
+};
+
+function asPayload(value: unknown): ConstrupointPayload {
+  return value && typeof value === 'object' ? value as ConstrupointPayload : {};
+}
+
+function sqlScalar(value: unknown): string | number | boolean | null {
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value;
+  return value == null ? null : String(value);
+}
+
+function parseDate(value: unknown): Date | null {
+  return value ? new Date(value as string | number | Date) : null;
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export async function POST(request: NextRequest) {
   try {
     const secret = process.env.CONSTRUPOINT_WEBHOOK_SECRET;
@@ -14,9 +56,9 @@ export async function POST(request: NextRequest) {
     }
 
     const rawBody = await request.text();
-    let body: any;
+    let body: ConstrupointPayload;
     try {
-      body = JSON.parse(rawBody);
+      body = asPayload(JSON.parse(rawBody));
     } catch {
       return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
     }
@@ -36,9 +78,9 @@ export async function POST(request: NextRequest) {
       const inspetor = body.Inspector?.Name || body.inspetor || null;
       const status = body.Status?.Name || body.status || null;
       
-      const dCriacao = body.CreateDate || body.data_criacao ? new Date(body.CreateDate || body.data_criacao) : null;
-      const dAgend = body.ScheduleDate || body.data_agendamento ? new Date(body.ScheduleDate || body.data_agendamento) : null;
-      const dAtualiz = body.UpdateDate || body.data_atualizacao ? new Date(body.UpdateDate || body.data_atualizacao) : null;
+      const dCriacao = parseDate(body.CreateDate || body.data_criacao);
+      const dAgend = parseDate(body.ScheduleDate || body.data_agendamento);
+      const dAtualiz = parseDate(body.UpdateDate || body.data_atualizacao);
       
       const nota = body.WeightedGrade || body.nota || null;
 
@@ -47,8 +89,8 @@ export async function POST(request: NextRequest) {
           id, code, modelo, obra, local, inspetor, status, data_criacao,
           data_agendamento, data_atualizacao, nota, raw, synced_at
         ) VALUES (
-          ${id}, ${code}, ${modelo}, ${obra}, ${local}, ${inspetor}, ${status},
-          ${dCriacao}, ${dAgend}, ${dAtualiz}, ${nota}, ${JSON.stringify(body)}, NOW()
+          ${sqlScalar(id)}, ${code}, ${modelo}, ${obra}, ${local}, ${inspetor}, ${status},
+          ${dCriacao}, ${dAgend}, ${dAtualiz}, ${nota ?? null}, ${JSON.stringify(body)}, NOW()
         ) ON CONFLICT (id) DO UPDATE SET
           code = EXCLUDED.code,
           modelo = EXCLUDED.modelo,
@@ -69,8 +111,8 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ ok: true });
-  } catch (error: any) {
-    console.error('[webhook/construpoint] Erro:', error.message);
+  } catch (error: unknown) {
+    console.error('[webhook/construpoint] Erro:', errorMessage(error));
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }

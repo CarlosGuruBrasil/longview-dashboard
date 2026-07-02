@@ -1,5 +1,7 @@
 'use client';
 
+/* eslint-disable react-hooks/static-components */
+
 import { useMemo, useState, useRef, useEffect } from 'react';
 import type { Lead } from '../../types';
 import {
@@ -14,6 +16,12 @@ import LeadDrawer from './LeadDrawer';
 
 interface LeadsTableProps {
   leads: Lead[];
+  page: number;
+  limit: number;
+  total: number;
+  loading: boolean;
+  onPageChange: (page: number, limit?: number) => void;
+  allLeadsForDropdowns: Lead[];
 }
 
 const MAX_ROWS = 200;
@@ -27,7 +35,15 @@ const chip     = 'shrink-0 h-9 px-3 rounded-full text-[13px] font-medium transit
 const chipIdle = `${chip} border border-white/12 bg-white/[0.03] text-zinc-400 focus:outline-none focus:border-white/30`;
 const chipActive = `${chip} bg-white/90 text-zinc-900 border-transparent`;
 
-export default function LeadsTable({ leads }: LeadsTableProps) {
+export default function LeadsTable({
+  leads,
+  page,
+  limit,
+  total,
+  loading,
+  onPageChange,
+  allLeadsForDropdowns,
+}: LeadsTableProps) {
   // ── Filter states ────────────────────────────────────────────────────────
   const [filterNome, setFilterNome]                   = useState('');
   const [filterDate, setFilterDate]                   = useState('');
@@ -60,14 +76,14 @@ export default function LeadsTable({ leads }: LeadsTableProps) {
 
   // ── Dropdown options ──────────────────────────────────────────────────────
   const options = useMemo(() => ({
-    origens:         unique(leads.map((l) => getOrigin(l))),
-    corretores:      unique(leads.map((l) => l.corretor?.nome)),
-    gestores:        unique(leads.map((l) => l.gestor?.nome)),
-    imobiliarias:    unique(leads.map((l) => l.imobiliaria?.nome)),
-    empreendimentos: unique(leads.flatMap((l) => l.empreendimento?.map((e) => e.nome) ?? [])),
-    etapas:          unique(leads.map((l) => l.situacao?.nome)),
-    tags:            unique(leads.flatMap((l) => getLeadTags(l))),
-  }), [leads]);
+    origens:         unique(allLeadsForDropdowns.map((l) => getOrigin(l))),
+    corretores:      unique(allLeadsForDropdowns.map((l) => l.corretor?.nome)),
+    gestores:        unique(allLeadsForDropdowns.map((l) => l.gestor?.nome)),
+    imobiliarias:    unique(allLeadsForDropdowns.map((l) => l.imobiliaria?.nome)),
+    empreendimentos: unique(allLeadsForDropdowns.flatMap((l) => l.empreendimento?.map((e) => e.nome) ?? [])),
+    etapas:          unique(allLeadsForDropdowns.map((l) => l.situacao?.nome)),
+    tags:            unique(allLeadsForDropdowns.flatMap((l) => getLeadTags(l))),
+  }), [allLeadsForDropdowns]);
 
   // ── Filtering logic ───────────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -299,7 +315,7 @@ export default function LeadsTable({ leads }: LeadsTableProps) {
       </p>
 
       {/* ── MOBILE CARDS ─────────────────────────────────────────────────── */}
-      <div className="sm:hidden flex flex-col gap-2">
+      <div className={`sm:hidden flex flex-col gap-2 transition-opacity ${loading ? 'opacity-40 pointer-events-none' : ''}`}>
         {displayed.length === 0 ? (
           <p className="text-center py-8 text-sm" style={{ color: 'var(--text-secondary)' }}>
             Nenhum lead encontrado.
@@ -339,7 +355,7 @@ export default function LeadsTable({ leads }: LeadsTableProps) {
       </div>
 
       {/* ── DESKTOP TABLE ────────────────────────────────────────────────── */}
-      <div className="hidden sm:block overflow-x-auto rounded-xl border border-white/10">
+      <div className={`hidden sm:block overflow-x-auto rounded-xl border border-white/10 transition-opacity ${loading ? 'opacity-40 pointer-events-none' : ''}`}>
         <table className="w-full text-xs border-collapse">
           <thead>
             <tr className="border-b border-white/10 bg-white/5">
@@ -422,6 +438,43 @@ export default function LeadsTable({ leads }: LeadsTableProps) {
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* ── PAGINAÇÃO ── */}
+      <div className="flex flex-col sm:flex-row gap-4 items-center justify-between mt-2 p-4 rounded-xl border border-white/10 bg-white/5 backdrop-blur-md">
+        <div className="text-xs text-zinc-400">
+          Mostrando <span className="text-white font-semibold">{total > 0 ? (page - 1) * limit + 1 : 0}</span> a <span className="text-white font-semibold">{Math.min(page * limit, total)}</span> de <span className="text-white font-semibold">{total}</span> leads
+        </div>
+
+        <div className="flex gap-2 items-center">
+          <button
+            onClick={() => onPageChange(page - 1, limit)}
+            disabled={page === 1 || loading}
+            className={`px-4 h-9 rounded-full text-xs font-semibold border border-white/12 transition-all ${
+              page === 1 || loading
+                ? 'opacity-40 cursor-not-allowed bg-transparent text-zinc-500'
+                : 'bg-white/[0.03] text-white hover:bg-white/10 active:scale-95'
+            }`}
+          >
+            Anterior
+          </button>
+
+          <span className="text-xs text-zinc-400 px-2">
+            Página <span className="text-white font-semibold">{page}</span> de <span className="text-white font-semibold">{Math.ceil(total / limit) || 1}</span>
+          </span>
+
+          <button
+            onClick={() => onPageChange(page + 1, limit)}
+            disabled={page * limit >= total || loading}
+            className={`px-4 h-9 rounded-full text-xs font-semibold border border-white/12 transition-all ${
+              page * limit >= total || loading
+                ? 'opacity-40 cursor-not-allowed bg-transparent text-zinc-500'
+                : 'bg-white/[0.03] text-white hover:bg-white/10 active:scale-95'
+            }`}
+          >
+            Próximo
+          </button>
+        </div>
       </div>
 
       {/* ── Drawer de detalhes do lead ───────────────────────────────────── */}

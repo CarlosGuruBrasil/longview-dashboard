@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Image from 'next/image';
 import {
   ArrowLeft, Save, Loader2, Check, User, Phone, Building2, MapPin,
   Heart, Lock, AlertCircle, FileText, Upload, Trash2, Download,
@@ -320,10 +321,11 @@ export default function ColaboradorPage() {
   // ── Load documents ─────────────────────────────────────────────────────────
   useEffect(() => {
     if (!id || id === 'me') return;
-    setDocsLoading(true);
+    const timer = window.setTimeout(() => setDocsLoading(true), 0);
     fetch(`/api/admin/users/${id}/documents`)
       .then(r => r.json()).then(d => setDocs(d.docs ?? []))
       .catch(() => {}).finally(() => setDocsLoading(false));
+    return () => window.clearTimeout(timer);
   }, [id]);
 
   // ── Save profile ───────────────────────────────────────────────────────────
@@ -463,8 +465,7 @@ export default function ColaboradorPage() {
         <div className="flex items-center gap-4 mb-2">
           <div className="relative shrink-0">
             {avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={avatarUrl} alt={user.name} className="w-16 h-16 rounded-full object-cover border border-[#1E1E22]" />
+              <Image src={avatarUrl} alt={user.name} width={64} height={64} className="rounded-full object-cover border border-[#1E1E22]" unoptimized />
             ) : (
               <div className="w-16 h-16 rounded-full bg-emerald-800/30 border border-emerald-700/20 flex items-center justify-center text-xl font-bold text-emerald-300">
                 {(user.name || '').split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase() || '?'}
@@ -584,7 +585,7 @@ export default function ColaboradorPage() {
               <p className="text-[11px] text-red-400 mt-1">⚠ Registro vencido</p>
             )}
             {profIdExpiry && (() => {
-              const days = Math.ceil((new Date(profIdExpiry).getTime() - Date.now()) / 86400000);
+              const days = Math.ceil((new Date(profIdExpiry).getTime() - new Date().getTime()) / 86400000);
               return days > 0 && days <= 60
                 ? <p className="text-[11px] text-amber-400 mt-1">⚠ Vence em {days} dias</p>
                 : null;

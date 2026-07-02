@@ -22,7 +22,10 @@ interface StatusBarChartProps {
 const TICK_COLOR = '#71717a'
 const GRID_COLOR = 'rgba(255,255,255,0.05)'
 
-function CustomTooltip({ active, payload }: any) {
+type TooltipPayloadEntry = { value: number; payload: { name: string; value: number } }
+type CustomTooltipProps = { active?: boolean; payload?: TooltipPayloadEntry[] }
+
+function CustomTooltip({ active, payload }: CustomTooltipProps) {
   if (!active || !payload?.length) return null
   const item = payload[0]
   return (
@@ -68,7 +71,7 @@ export default function StatusBarChart({ data, title, height = 320 }: StatusBarC
           <Tooltip content={<CustomTooltip />} />
           <Bar dataKey="value" radius={[0, 4, 4, 0]} label={{
             position: 'right',
-            formatter: (v: any) => {
+            formatter: (v: unknown) => {
               const num = typeof v === 'number' ? v : 0
               const pct = total > 0 ? ((num / total) * 100).toFixed(0) : '0'
               return `${num} (${pct}%)`

@@ -5,16 +5,8 @@ import Image from 'next/image';
 import {
   LayoutDashboard,
   Users,
-  TrendingUp,
-  Building2,
   DollarSign,
-  BarChart3,
   Megaphone,
-  Gauge,
-  Send,
-  UsersRound,
-  Link as LinkIcon,
-  BrainCircuit,
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import type { ActiveView } from '../types';
@@ -27,18 +19,10 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { icon: LayoutDashboard, label: 'Dashboard',       view: 'dashboard'      },
-  { icon: Users,           label: 'Leads',           view: 'leads'          },
-  { icon: TrendingUp,      label: 'Oportunidades',   view: 'oportunidades'  },
-  { icon: Building2,       label: 'Empreendimentos', view: 'empreendimentos'},
-  { icon: DollarSign,      label: 'Vendas',          view: 'vendas'         },
-  { icon: BrainCircuit,    label: 'BI Insights',     view: 'insights'       },
-  { icon: BarChart3,       label: 'Métricas',        view: 'metrics'        },
-  { icon: Gauge,           label: 'Tráfego',         view: 'trafego'        },
-  { icon: Megaphone,       label: 'Marketing ADS',   view: 'marketing'      },
-  { icon: Send,            label: 'Publicar',        view: 'publicar'       },
-  { icon: UsersRound,      label: 'Audiências CRM',  view: 'audiences'      },
-  { icon: LinkIcon,        label: 'Links & QR',      view: 'links'          },
+  { icon: LayoutDashboard, label: 'Smart Dashboard', view: 'dashboard' },
+  { icon: Users,           label: 'Leads & Pipeline', view: 'leads'      },
+  { icon: DollarSign,      label: 'Vendas & Projetos',view: 'vendas'     },
+  { icon: Megaphone,       label: 'Marketing',       view: 'marketing'  },
 ];
 
 export default function Sidebar() {

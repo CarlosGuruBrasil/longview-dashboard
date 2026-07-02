@@ -3,9 +3,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import {
-  LayoutDashboard, Users, TrendingUp, Building2, DollarSign,
-  Megaphone, Send, UsersRound, Link as LinkIcon, X,
-  BarChart2, ChevronRight, RefreshCw, Gauge,
+  LayoutDashboard, Users, DollarSign, Megaphone, X,
+  ChevronRight, RefreshCw,
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import type { ActiveView } from '../types';
@@ -16,10 +15,9 @@ import AppHeader from '@/components/app/AppHeader';
 import SidebarFooter from '@/components/app/SidebarFooter';
 import PWAInstallBanner from '@/components/app/PWAInstallBanner';
 
-// ── Pull-to-refresh hook (HIG: padrão obrigatório para conteúdo atualizável) ─
 function usePullToRefresh(onRefresh: () => Promise<void>) {
   const scrollRef = useRef<HTMLElement>(null);
-  const [pullY, setPullY] = useState(0);        // 0-80px
+  const [pullY, setPullY] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const startY = useRef(0);
   const THRESHOLD = 64;
@@ -62,42 +60,33 @@ function usePullToRefresh(onRefresh: () => Promise<void>) {
 }
 
 const VIEW_TITLES: Record<ActiveView, string> = {
-  dashboard:       'Dashboard',
-  leads:           'Leads',
+  dashboard:       'Smart Dashboard',
+  leads:           'Leads & Pipeline',
   oportunidades:   'Oportunidades',
   empreendimentos: 'Empreendimentos',
-  vendas:          'Vendas',
+  vendas:          'Vendas & Projetos',
   insights:        'BI Insights',
   metrics:         'Métricas',
   trafego:         'Tráfego',
-  marketing:       'Marketing ADS',
+  marketing:       'Marketing',
   publicar:        'Publicar',
   audiences:       'Audiências CRM',
   links:           'Links & QR',
   score:           'Score',
 };
 
-// 5 primary tabs + drawer for rest
 const PRIMARY_NAV = [
-  { icon: LayoutDashboard, label: 'Dashboard',    view: 'dashboard'     as ActiveView },
-  { icon: Users,           label: 'Leads',        view: 'leads'         as ActiveView },
-  { icon: TrendingUp,      label: 'Opor.',        view: 'oportunidades' as ActiveView },
-  { icon: Megaphone,       label: 'Ads',          view: 'marketing'     as ActiveView },
-  { icon: DollarSign,      label: 'Vendas',       view: 'vendas'        as ActiveView },
+  { icon: LayoutDashboard, label: 'Dashboard', view: 'dashboard' as ActiveView },
+  { icon: Users,           label: 'Leads',     view: 'leads'     as ActiveView },
+  { icon: DollarSign,      label: 'Vendas',    view: 'vendas'    as ActiveView },
+  { icon: Megaphone,       label: 'Marketing', view: 'marketing' as ActiveView },
 ] as const;
 
 const DRAWER_NAV = [
-  { icon: LayoutDashboard, label: 'Dashboard',       view: 'dashboard'       as ActiveView },
-  { icon: Users,           label: 'Leads',           view: 'leads'           as ActiveView },
-  { icon: TrendingUp,      label: 'Oportunidades',   view: 'oportunidades'   as ActiveView },
-  { icon: Building2,       label: 'Empreendimentos', view: 'empreendimentos' as ActiveView },
-  { icon: DollarSign,      label: 'Vendas',          view: 'vendas'          as ActiveView },
-  { icon: Megaphone,       label: 'Marketing ADS',   view: 'marketing'       as ActiveView },
-  { icon: Gauge,           label: 'Tráfego',         view: 'trafego'         as ActiveView },
-  { icon: BarChart2,       label: 'Score de Leads',  view: 'score'           as ActiveView },
-  { icon: Send,            label: 'Publicar',        view: 'publicar'        as ActiveView },
-  { icon: UsersRound,      label: 'Audiências CRM',  view: 'audiences'       as ActiveView },
-  { icon: LinkIcon,        label: 'Links & QR',      view: 'links'           as ActiveView },
+  { icon: LayoutDashboard, label: 'Smart Dashboard',  view: 'dashboard' as ActiveView },
+  { icon: Users,           label: 'Leads & Pipeline',  view: 'leads'     as ActiveView },
+  { icon: DollarSign,      label: 'Vendas & Projetos', view: 'vendas'    as ActiveView },
+  { icon: Megaphone,       label: 'Marketing',        view: 'marketing' as ActiveView },
 ] as const;
 
 function useCurrentUser() {
@@ -129,7 +118,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const title = VIEW_TITLES[activeView] ?? 'Dashboard';
 
-  // HIG: pull-to-refresh para conteúdo atualizável
   const { scrollRef, pullY, refreshing, THRESHOLD } = usePullToRefresh(
     useCallback(() => refresh(true), [refresh])
   );
@@ -137,7 +125,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex bg-[#09090b] overflow-hidden" style={{ height: '100dvh' }}>
 
-      {/* Banner de erro de carregamento */}
       {dataError && !loading && (
         <div className="fixed top-0 inset-x-0 z-[100] bg-red-900/90 border-b border-red-700/50 px-4 py-2 flex items-center justify-between text-xs text-red-100 backdrop-blur-sm">
           <span>⚠️ Erro ao carregar dados: {dataError}</span>
@@ -147,24 +134,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      {/* ── Desktop sidebar (unchanged) ─────────────────────── */}
       <div className="hidden lg:block">
         <Sidebar />
       </div>
 
-      {/* ── Mobile drawer overlay ────────────────────────────── */}
       <div
         className={`lg:hidden fixed inset-0 z-50 transition-opacity duration-200 ${drawerOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
         style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)' }}
         onClick={() => setDrawerOpen(false)}
       />
 
-      {/* ── Mobile drawer panel ──────────────────────────────── */}
       <aside
         className={`lg:hidden fixed inset-y-0 left-0 z-50 w-[280px] flex flex-col bg-[#0d0d0f] transition-transform duration-[240ms] ${drawerOpen ? 'translate-x-0' : '-translate-x-full'}`}
         style={{ borderRight: '1px solid rgba(255,255,255,0.06)' }}
       >
-        {/* Drawer header */}
         <div className="flex items-center justify-between px-5 pt-safe pb-3 border-b border-white/[0.06]" style={{ paddingTop: 'max(env(safe-area-inset-top), 52px)' }}>
           <div>
             <p className="text-[11px] font-bold tracking-[0.15em] uppercase text-orange-400">Marketing Vision</p>
@@ -178,7 +161,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </button>
         </div>
 
-        {/* Drawer nav */}
         <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-0.5">
           {DRAWER_NAV.map(({ icon: Icon, label, view }) => {
             const active = activeView === view;
@@ -200,17 +182,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        {/* Drawer footer */}
         <div className="px-4 pb-safe border-t border-white/[0.06] pt-4" style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 16px)' }}>
           <SidebarFooter currentModule="marketing" mobile onNavigate={() => setDrawerOpen(false)} />
         </div>
       </aside>
 
-      {/* ── Main area ────────────────────────────────────────── */}
-      {/* md:pl-[220px] removido: sidebar é static no flex, já ocupa os 220px */}
       <div className="flex-1 flex flex-col min-w-0 overflow-x-hidden">
-
-        {/* Mobile top bar */}
         <header
           className="lg:hidden shrink-0 flex items-center gap-3 px-4 bg-[#09090b]/95"
           style={{
@@ -221,7 +198,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             WebkitBackdropFilter: 'blur(16px)',
           }}
         >
-          {/* Logo */}
           <div className="relative w-24 h-7 shrink-0">
             <Image src="/logolongview.png" alt="LongView" fill style={{ objectFit: 'contain', objectPosition: 'left' }} priority />
           </div>
@@ -232,7 +208,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
           <span className="text-sm font-semibold text-zinc-100 flex-1 truncate">{title}</span>
 
-          {/* User avatar — opens drawer */}
           <button
             onClick={() => setDrawerOpen(true)}
             className="no-tap w-8 h-8 rounded-full bg-orange-500/20 border border-orange-500/30 flex items-center justify-center text-orange-400 text-xs font-bold shrink-0 active:scale-95 transition-transform"
@@ -249,12 +224,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           actions={<DateFilter />}
         />
 
-        {/* Scrollable content */}
         <main
           ref={scrollRef as React.RefObject<HTMLElement>}
           className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain"
         >
-          {/* Pull-to-refresh indicator (HIG: aparece ao puxar, gira quando ativo) */}
           <div
             className="lg:hidden flex items-center justify-center transition-all duration-150 overflow-hidden"
             style={{
@@ -269,7 +242,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             />
           </div>
 
-          {/* Mobile DateFilter — sticky abaixo do header, compacto */}
           <div className="lg:hidden sticky top-0 z-20 px-4 pt-2.5 pb-2 bg-[#09090b]/96 backdrop-blur-md border-b border-white/[0.05]">
             <DateFilter />
           </div>
@@ -282,12 +254,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </main>
       </div>
 
-      {/* ── Banner de permissão de notificação (FCM) ──────────── */}
       <NotificationBanner />
-
       <PWAInstallBanner />
 
-      {/* ── Mobile bottom tab bar ─────────────────────────────── */}
       <nav
         className="lg:hidden fixed inset-x-0 bottom-0 z-30 no-tap"
         style={{
@@ -309,7 +278,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 className="no-tap flex-1 flex flex-col items-center justify-center pb-2 gap-1 relative transition-transform active:scale-90"
                 style={{ paddingTop: '6px' }}
               >
-                {/* Active background capsule */}
                 {active && (
                   <span
                     className="absolute inset-x-2"
@@ -321,7 +289,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     }}
                   />
                 )}
-                {/* HIG: tab bar icons 25pt ≈ 24px; labels Caption 2 = 11px mínimo */}
                 <Icon
                   size={active ? 24 : 22}
                   strokeWidth={active ? 2.2 : 1.5}
@@ -334,7 +301,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             );
           })}
 
-          {/* Mais */}
           <button
             onClick={() => setDrawerOpen(true)}
             className="no-tap flex-1 flex flex-col items-center justify-center pb-2 gap-1 active:scale-90 transition-transform"

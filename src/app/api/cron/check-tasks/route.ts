@@ -19,7 +19,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sql, ensureSchema } from '@/lib/pg';
 import { sendFCMMulticast } from '@/lib/firebase-admin';
 import { readProjectData } from '@/lib/db-kv';
-import type { Task, Project } from '@/lib/db-kv';
+import type { Task } from '@/lib/db-kv';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 const DEDUP_TASK_MS  = 4  * 60 * 60 * 1000;  // 4h — regras 1, 2, 3

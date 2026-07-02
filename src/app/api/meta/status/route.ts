@@ -12,6 +12,47 @@ import axios from 'axios';
 const META_BASE = 'https://graph.facebook.com/v21.0';
 const ACT_ID    = process.env.META_ACT_ID;
 
+type SyncData = {
+  ok?: boolean;
+  totalContacts?: { buyers?: number; all?: number };
+  audiences?: unknown[];
+};
+
+type LeadStats = {
+  ok?: boolean;
+  newLeads?: number;
+  sentToRD?: number;
+  capiSent?: number;
+};
+
+type ScoreStats = {
+  ok?: boolean;
+  total?: number;
+  quentes?: number;
+  mornos?: number;
+  frios?: number;
+  sentToRD?: number;
+  capiSent?: number;
+};
+
+type TimedLog = {
+  ts?: string;
+  triggered?: boolean;
+  [key: string]: unknown;
+};
+
+type MetaAudienceRaw = {
+  id?: string;
+  name?: string;
+  subtype?: string;
+  operation_status?: { code?: number; description?: string };
+  approximate_count_lower_bound?: number;
+  approximate_count_upper_bound?: number;
+  time_updated?: number;
+};
+
+type MetaAudiencesResponse = { data?: MetaAudienceRaw[] };
+
 function metaAuth() {
   return { access_token: process.env.META_TOKEN };
 }
@@ -35,20 +76,20 @@ export async function GET(request: NextRequest) {
       cvWebhookLast,
       cvSemConexaoCount,
     ] = await Promise.allSettled([
-      kv.get('meta:sync:last'),
-      kv.get('meta:sync:lastRun'),
-      kv.get('meta:leads:lastRun'),
-      kv.get('meta:leads:lastStats'),
-      kv.get('meta:scores:lastRun'),
-      kv.get('meta:scores:lastStats'),
-      kv.get('meta:capi:log'),
-      kv.get('meta:capi:last'),
-      kv.get('cv:webhook:log'),
-      kv.get('cv:webhook:last'),
-      kv.get('cv:webhook:sem_conexao_count'),
+      kv.get<SyncData>('meta:sync:last'),
+      kv.get<string>('meta:sync:lastRun'),
+      kv.get<string>('meta:leads:lastRun'),
+      kv.get<LeadStats>('meta:leads:lastStats'),
+      kv.get<string>('meta:scores:lastRun'),
+      kv.get<ScoreStats>('meta:scores:lastStats'),
+      kv.get<TimedLog[]>('meta:capi:log'),
+      kv.get<string>('meta:capi:last'),
+      kv.get<TimedLog[]>('cv:webhook:log'),
+      kv.get<string>('cv:webhook:last'),
+      kv.get<number>('cv:webhook:sem_conexao_count'),
     ]);
 
-    const get = (r: PromiseSettledResult<any>) => r.status === 'fulfilled' ? r.value : null;
+    const get = <T>(r: PromiseSettledResult<T>) => r.status === 'fulfilled' ? r.value : null;
 
     // Próximas execuções baseadas na última + intervalo
     function nextRun(lastRun: string | null, intervalHours: number): string {
@@ -63,9 +104,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Audiências no Meta (consulta live se possível)
-    let audiences: any[] = [];
+    let audiences: unknown[] = [];
     try {
-      const res = await axios.get(`${META_BASE}/${ACT_ID}/customaudiences`, {
+      const res = await axios.get<MetaAudiencesResponse>(`${META_BASE}/${ACT_ID}/customaudiences`, {
         params: {
           fields: 'id,name,approximate_count_lower_bound,approximate_count_upper_bound,subtype,operation_status,time_updated',
           limit: 50,
@@ -74,8 +115,8 @@ export async function GET(request: NextRequest) {
         timeout: 10000,
       });
       audiences = (res.data?.data || [])
-        .filter((a: any) => a.name.startsWith('LV |'))
-        .map((a: any) => ({
+        .filter((a) => a.name?.startsWith('LV |'))
+        .map((a) => ({
           id:          a.id,
           name:        a.name,
           subtype:     a.subtype,
@@ -86,16 +127,16 @@ export async function GET(request: NextRequest) {
         }));
     } catch { /* retorna vazio */ }
 
-    const syncData    = get(syncLast) as any;
-    const leadsStats  = get(leadsLastStats) as any;
-    const scoresStats = get(scoresLastStats) as any;
-    const capiEvents  = (get(capiLog) as any[]) || [];
+    const syncData    = get(syncLast);
+    const leadsStats  = get(leadsLastStats);
+    const scoresStats = get(scoresLastStats);
+    const capiEvents  = get(capiLog) || [];
 
     const today = new Date().toISOString().split('T')[0];
-    const capiToday = capiEvents.filter((e: any) => e.ts?.startsWith(today)).length;
+    const capiToday = capiEvents.filter((e) => e.ts?.startsWith(today)).length;
 
-    const cvLog    = (get(cvWebhookLog) as any[]) || [];
-    const cvToday  = cvLog.filter((e: any) => e.ts?.startsWith(today) && e.triggered).length;
+    const cvLog    = get(cvWebhookLog) || [];
+    const cvToday  = cvLog.filter((e) => e.ts?.startsWith(today) && e.triggered).length;
 
     return NextResponse.json({
       semConexao: {
@@ -139,7 +180,7 @@ export async function GET(request: NextRequest) {
       },
       audiences,
     });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
   }
 }

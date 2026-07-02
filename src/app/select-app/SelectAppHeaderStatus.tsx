@@ -29,7 +29,6 @@ export default function SelectAppHeaderStatus() {
   const [weather, setWeather] = useState<{ temp: number; code: number } | null>(null);
 
   useEffect(() => {
-    setNow(new Date());
     const id = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(id);
   }, []);

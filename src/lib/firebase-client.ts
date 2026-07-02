@@ -1,6 +1,6 @@
 // Firebase Client SDK — push notifications (FCM) no navegador
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
-import { getMessaging, getToken, onMessage, isSupported, type Messaging } from 'firebase/messaging';
+import { getMessaging, getToken, onMessage, isSupported, type Messaging, type MessagePayload } from 'firebase/messaging';
 
 const firebaseConfig = {
   apiKey:            process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -52,7 +52,7 @@ export async function requestNotificationToken(): Promise<string | null> {
 }
 
 /** Listener de mensagens com o app em foreground. */
-export async function onForegroundMessage(callback: (payload: any) => void): Promise<() => void> {
+export async function onForegroundMessage(callback: (payload: MessagePayload) => void): Promise<() => void> {
   const messaging = await getMessagingInstance();
   if (!messaging) return () => {};
   return onMessage(messaging, callback);

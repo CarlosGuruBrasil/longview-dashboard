@@ -1,25 +1,21 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
-  Building2, 
   Clock, 
   AlertOctagon, 
   CheckCircle2, 
   TrendingUp, 
-  Users,
   Activity,
-  Bell,
   ArrowRight,
   ShieldAlert,
   SlidersHorizontal,
-  RefreshCw,
-  FileCheck
+  RefreshCw
 } from 'lucide-react';
 import { Task, Project } from '@/lib/db';
 import Link from 'next/link';
-import TaskDrawer from '@/components/TaskDrawer';
-import ResponsibleModal from '@/components/ResponsibleModal';
+import TaskDrawer from './components/TaskDrawer';
+import ResponsibleModal from './components/ResponsibleModal';
 
 // Componentes do Recharts importados dinamicamente para evitar erro de hidratação no Next.js
 import {
@@ -32,10 +28,6 @@ import {
   PieChart,
   Pie,
   Cell,
-  AreaChart,
-  Area,
-  LineChart,
-  Line,
   Legend
 } from 'recharts';
 
@@ -51,7 +43,7 @@ export default function Home() {
   // Notificações simuladas do sistema
   const [notifications, setNotifications] = useState<{ id: string; text: string; type: 'urgent' | 'info'; taskId?: string }[]>([]);
 
-  const generateNotifications = (allTasks: Task[]) => {
+  const generateNotifications = useCallback((allTasks: Task[]) => {
     const list: typeof notifications = [];
     
     // Regra de urgência: SE urgência = emergencial -> Alerta imediato
@@ -84,9 +76,9 @@ export default function Home() {
     });
 
     setNotifications(list.slice(0, 5));
-  };
+  }, []);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const resTasks = await fetch('/api/tasks');
@@ -105,14 +97,14 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [generateNotifications]);
 
   useEffect(() => {
     Promise.resolve().then(() => {
       setMounted(true);
       fetchData();
     });
-  }, []);
+  }, [fetchData]);
 
 
   // Filtrar tarefas baseadas no filtro de projetos
@@ -124,10 +116,6 @@ export default function Home() {
   const totalTasks = filteredTasks.length;
   const completedTasks = filteredTasks.filter(t => t.statusAndamento === 'Finalizado').length;
   const inProgressTasks = filteredTasks.filter(t => t.statusAndamento === 'Em andamento').length;
-  const pendingContratações = filteredTasks.filter(t => 
-    t.statusContratacao.toLowerCase().includes('orçamento') || 
-    t.statusContratacao.toLowerCase().includes('indefinido')
-  ).length;
   
   // Cálculo de tarefas atrasadas (não finalizadas e previsão de entrega já passou)
   const SIMULATED_NOW = new Date();

@@ -1,21 +1,19 @@
 'use client';
 
-import { Bell, BellOff, X } from 'lucide-react';
+import { Bell, X } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useState, useEffect } from 'react';
 
 export default function NotificationBanner() {
   const { status, requestPermission } = useNotifications();
-  const [dismissed, setDismissed] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const [dismissed, setDismissed] = useState(true);
 
   useEffect(() => {
-    setMounted(true);
-    // Verifica se o usuário já dispensou antes
-    if (localStorage.getItem('notif-dismissed') === '1') setDismissed(true);
+    const id = window.setTimeout(() => {
+      setDismissed(localStorage.getItem('notif-dismissed') === '1');
+    }, 0);
+    return () => window.clearTimeout(id);
   }, []);
-
-  if (!mounted) return null;
 
   // Não mostrar se: não suportado, já concedido, negado, ou dispensado
   if (status === 'unsupported' || status === 'granted' || status === 'denied' || dismissed) return null;

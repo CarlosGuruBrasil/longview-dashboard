@@ -11,8 +11,23 @@ import { getOrigin } from '../../utils/leads'
 
 type SubTab = 'crm' | 'meta-validation' | 'score'
 
+type OrphanedLead = { id: string; name?: string; email?: string; phone?: string; formName?: string; createdTime: string }
+
 export default function LeadsView() {
-  const { filteredLeads, metaData, metaValidation, loading, refresh } = useData()
+  const { 
+    allLeads,
+    filteredLeads, 
+    metaData, 
+    metaValidation, 
+    loading, 
+    refresh,
+    detailedLeads,
+    detailedPage,
+    detailedLimit,
+    detailedTotal,
+    detailedLoading,
+    fetchDetailedLeads
+  } = useData()
   const [activeTab, setActiveTab] = useState<SubTab>('crm')
   const [growthMode, setGrowthMode] = useState<'month' | 'year'>('month')
 
@@ -114,7 +129,15 @@ export default function LeadsView() {
           </div>
 
           {/* Leads table */}
-          <LeadsTable leads={filteredLeads} />
+          <LeadsTable 
+            leads={detailedLeads} 
+            page={detailedPage}
+            limit={detailedLimit}
+            total={detailedTotal}
+            loading={detailedLoading}
+            onPageChange={fetchDetailedLeads}
+            allLeadsForDropdowns={allLeads}
+          />
         </div>
       )}
 
@@ -191,7 +214,7 @@ export default function LeadsView() {
                           </td>
                         </tr>
                       ) : (
-                        metaValidation.orphanedLeads.map((lead: any) => (
+                        (metaValidation.orphanedLeads as OrphanedLead[]).map(lead => (
                           <tr key={lead.id} className="border-b border-white/5 hover:bg-white/5 transition-colors text-zinc-300">
                             <td className="py-2.5 px-3 font-medium text-white">{lead.name || 'Sem Nome'}</td>
                             <td className="py-2.5 px-3 font-mono text-xs">{lead.email || '—'}</td>

@@ -8,6 +8,9 @@ const nextConfig: NextConfig = {
   // firebase-admin é Node.js puro — não pode ser bundado pelo Turbopack/Webpack
   // Isso faz o Next.js usar o require() nativo em vez de fazer bundle
   serverExternalPackages: ['firebase-admin'],
+  turbopack: {
+    root: process.cwd(),
+  },
   images: {
     remotePatterns: [
       {

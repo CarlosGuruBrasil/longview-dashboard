@@ -77,7 +77,7 @@ const _checks: [
 
 // Exporta como prova de que o módulo é válido (usada pelo health check)
 export const PROJECT_VISION_CONTRACT_VERSION = '2.0.0';
-export type { Task, Project, Responsible, Subtask, Comment, ChangeLog, TaskDocumentMeta, ProjectDatabaseState };
+export type { Task, Project, Responsible, Subtask, Comment, ChangeLog, TaskDocumentMeta, ProjectDatabaseState, _AssertTask, _AssertProject, _AssertDocMeta };
 export {
   readTasks, readTaskById, nextTaskId, upsertTask, deleteTask,
   readProjectData, mutateProjectData,

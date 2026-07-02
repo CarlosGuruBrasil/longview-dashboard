@@ -352,15 +352,16 @@ export default function VendasView() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
       setCvdwVendas(data.vendas ?? [])
-    } catch (e: any) {
-      setVendaError(e.message)
+    } catch (e: unknown) {
+      setVendaError(e instanceof Error ? e.message : String(e))
     } finally {
       setLoadingVendas(false)
     }
   }
 
   useEffect(() => {
-    fetchVendas()
+    const id = window.setTimeout(() => { void fetchVendas() }, 0)
+    return () => window.clearTimeout(id)
   }, [])
 
   // Fallback: usa leads do contexto para KPIs quando CVDW ainda não carregou
