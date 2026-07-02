@@ -179,17 +179,58 @@ Alterações nos seguintes arquivos:
 
 Warnings eliminados: 4 (2 `exhaustive-deps` + 2 `unused eslint-disable`). Restam 42 warnings, todos `no-unused-vars` (21 no `public/marketing-vision-script.js`, 21 nas APIs).
 
+## Sessão 2026-07-02 (Parte 3) — Inteligência de Marketing funcional e verificada
+
+Contexto: uma sessão intermediária criou `IntelligenceView`, `FunnelVisualization`, `MetricsView` (gauges do PDF "PROJETO GUI LONGVIEW"), `FilterBar`, `CostPerLeadCard` etc., mas parou no meio (LeadsView quebrado) e com bugs de dados. Esta sessão fechou o ciclo e **verificou tudo no browser com dados reais**.
+
+### Consertos
+
+1. **LeadsView compilando de novo** — a troca `StageSummary` → `FunnelVisualization` estava incompleta (tsc quebrado). Concluída; funil por etapa renderiza na aba Leads.
+2. **`/api/bi/intelligence` — atribuição Meta × CRM corrigida**:
+   - Antes: toda campanha casava com TODOS os leads de origem meta/fb/ig → summary inflado N×.
+   - Agora: cada lead é atribuído a NO MÁXIMO 1 campanha (melhor match de nome, normalizado sem acento, mín. 4 chars). Summary usa totais reais deduplicados.
+   - `meta_cache` lido com parse de string jsonb (antes vinha 0 campanhas; agora 71).
+   - `getLeadValue` local (quebrado, inflava 100× valores "793518.00") substituído por `getLeadValueNumber` de `utils/leads`.
+   - ROAS geral = receita ATRIBUÍDA ÷ spend (não receita histórica total); ROAS por campanha zerado se spend < R$50 (evita 377M×).
+   - `cv_vendas` com try/catch (tabela pode não existir).
+   - Novas recomendações: % de leads ativos sem atendimento por empreendimento (marketing gera / comercial não absorve) e campanhas ativas com leads no Meta mas zero rastreados no CRM (macros `{{adset.name}}`).
+3. **Posts completos** — API devolvia só `bestPost`; agora `socialMedia.posts[]` inteiro. UI lista todos (20 IG hoje) com likes, comentários, taxa de engajamento, data, legenda, ordenação Engajamento/Recentes e link "Ver post ↗".
+4. **Aba Público** — card "🎯 Seu público principal" (ex.: Masculino 25-34, 16,8%; split 55/45 M/F) + tabela ordenada por impressões com barras de %.
+5. **Overflow de KPIs** — `truncate` + `min-w-0` + `title` nos KpiTiles do Dashboard (KpiCard/StatBox já tinham).
+6. **FilterBar no Dashboard** (Leads e Métricas já tinham). LeadsTable já tem 10 filtros + LeadDrawer com histórico de etapas e interações.
+7. **CPL do card "Custo de LEAD - MKT"** — dividia gasto all-time pelos leads CRM do mês filtrado (dava R$62k de CPL). Agora usa leads das campanhas Meta (mesma janela do gasto): CPL real R$39,30.
+
+### Verificação executada (browser + curl com JWT dev assinado localmente)
+
+- `/api/bi/intelligence`: 200 — spend R$62.257, 3.795 leads, CPL R$16,40, 30 vendas, receita R$75,3M, ROAS 121×, 71 campanhas, 21 faixas demográficas, 20 posts, 4 oportunidades acionáveis.
+- Views Inteligência (4 abas), Métricas (gauges + CPL) e Leads (funil + tabela) renderizando com dados reais.
+- `tsc` 0 erros · lint 0 errors/3 warnings · build 79 rotas ✓.
+
+### Dica operacional
+
+Para testar autenticado sem senha: assinar JWT com `JWT_SECRET` do `.env.local` (payload role `Desenvolvedor`) e setar cookie `auth_token`. O dev server do Carlos costuma estar na porta 3000 — Next 16 recusa segundo `next dev`; usar `next start` ou o server já ativo.
+
+## Sessão 2026-07-02 (Parte 4) — Empreendimentos completos (Nautic × HUB)
+
+1. **`/api/bi/intelligence` — developmentIntelligence enriquecido**: cada empreendimento agora casa suas campanhas Meta por nome (tokens ≥3 chars + iniciais, ex.: HUB Beira Mar → "hub"/"beira"/"hbm") e traz `campaignsCount`, `activeCampaigns`, `spend`, `metaLeads`, `impressions`, `clicks`, `cpl`, `roas`.
+   - Verificado com dados reais: Nautic = 21 campanhas/R$22k/424 leads CRM/1.136 leads Meta/CPL R$51/63 visitas/20 vendas/VGV R$51,8M · HUB = 31 campanhas/R$28k/521 leads/33 visitas/8 vendas/VGV R$20,4M.
+2. **Ruído filtrado**: entradas do CRM que não são empreendimento (ex.: "Assistência Tecnica South beach", 1 lead) saem da lista (`leads >= 5 || campanha casada`) e insights de conversão só disparam com ≥30 leads. Novo insight comparativo de CPL entre empreendimentos (dispara se um CPL for 2× o outro).
+3. **UI aba Empreendimentos**: um card completo por empreendimento (comercial em cima, marketing embaixo: campanhas/investido/CPL/ROAS + impressões/cliques/leads Meta/ciclo/ticket) + tabela "Comparativo — Comercial × Marketing" com 11 colunas.
+4. **Período padrão do painel**: era "mês até hoje" (no dia 2 mostrava 1 lead); agora janela móvel de 90 dias (`defaultRange()` no DataContext) — abre com 409 leads.
+5. **Preview**: config `longview-prod` no launch.json do DUOLIFE roda `next start -p 3010` (o `next dev` do Carlos na 3000 impede segundo dev server — Next 16 trava por diretório). Verificado no browser em produção local.
+
+Insight de negócio que o painel agora mostra sozinho: HUB gera mais leads que Nautic (521×424) com investimento similar, mas converte 4× menos (2%×5%) e tem ciclo 2× maior (81d×38d) — gargalo comercial, não de mídia.
+
 ## Pedido sugerido para nova IA
 
 ```text
-Continue o LongView Dashboard v2 a partir de docs/session-checkpoint-2026-07-02.md.
-O projeto compila e o linter está limpo (0 errors, 42 warnings não-bloqueantes).
-A paginação SQL da tabela de leads foi implementada.
-Todos os `<img>` foram convertidos para `next/image`.
-`react-hooks/exhaustive-deps` foram corrigidos.
-Próximos alvos:
-- opção C: limpar os no-unused-vars restantes nos arquivos de API.
-- opção D: testar visualmente a paginação acessando /marketing-vision.
+Continue o LongView Dashboard v2 a partir de docs/session-checkpoint-2026-07-02.md (Parte 4).
+Estado: tsc/lint/build verdes; Inteligência, Métricas e Leads verificados no browser com dados reais.
+Próximos alvos possíveis:
+- Períodos coerentes no Meta: cache é all-time; filtros de data do front não afetam spend/insights (CPL do Dashboard mistura janelas).
+- Atribuição por adset: mídia dos leads costuma ser o nome do ADSET, não da campanha — cruzar com metaData.adsets aumentaria a cobertura (hoje só 23/3795 leads atribuídos por nome).
+- Insights de posts IG com alcance real (media_insights) em vez de alcance estimado.
+- Aba Score (LeadsView) ainda é placeholder "Em desenvolvimento".
 ```
 
 

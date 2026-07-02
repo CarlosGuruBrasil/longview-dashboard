@@ -330,7 +330,8 @@ export type ActiveView =
   | 'score'
   | 'trafego'
   | 'metrics'
-  | 'insights';
+  | 'insights'
+  | 'intelligence';
 
 // ── BI / Star Schema ──────────────────────────────────────────────────────────
 

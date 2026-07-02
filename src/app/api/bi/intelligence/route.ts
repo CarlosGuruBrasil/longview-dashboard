@@ -11,7 +11,8 @@ import { cookies } from 'next/headers';
 import jwt from 'jsonwebtoken';
 import { sql, ensureSchema } from '@/lib/pg';
 import type { MetaData, Lead, CvdwVenda } from '@/app/marketing-vision/types';
-import { getOrigin } from '@/app/marketing-vision/utils/leads';
+import { getOrigin, isSale, isLoss, getLeadValueNumber } from '@/app/marketing-vision/utils/leads';
+import { getLeadStage } from '@/app/marketing-vision/utils/metrics';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secret-longview-key';
 export const runtime = 'nodejs';
@@ -57,6 +58,15 @@ interface DevelopmentIntelligence {
   conversionPct: number
   topCampaigns: string[]
   avgDaysToSale: number | null
+  // Lado marketing — campanhas Meta casadas ao empreendimento por nome
+  campaignsCount: number
+  activeCampaigns: number
+  spend: number
+  metaLeads: number
+  impressions: number
+  clicks: number
+  cpl: number
+  roas: number
 }
 
 interface SocialMediaPost {
@@ -114,6 +124,7 @@ interface MarketingIntelligence {
     totalEngagement: number
     avgEngagementRate: number
     bestPost: SocialMediaPost | null
+    posts: SocialMediaPost[]
     postsByPlatform: { facebook: number; instagram: number }
   }
   audience: AudienceInsight[]
@@ -133,12 +144,9 @@ function calcEngagementRate(likes: number, comments: number, _reach?: number): n
   return estimatedReach > 0 ? (likes + comments) / estimatedReach : 0
 }
 
-function getLeadValue(lead: Lead): number {
-  const raw = lead.valor_venda ?? lead.valor_negocio ?? 0
-  if (typeof raw === 'number') return raw
-  const cleaned = String(raw).replace(/\./g, '').replace(',', '.')
-  return parseFloat(cleaned) || 0
-}
+// getLeadValueNumber (utils/leads) trata os dois formatos de moeda ("500.000,00"
+// e "793518.00") — a versão local antiga removia pontos de valores US e inflava 100×.
+const getLeadValue = getLeadValueNumber
 
 function getEmpreendimentoNome(lead: Lead): string {
   const emp = lead.empreendimento
@@ -156,11 +164,11 @@ export async function GET() {
   try {
     await ensureSchema();
 
-    // 1. Buscar Meta Cache
+    // 1. Buscar Meta Cache (jsonb pode vir como string dependendo do driver)
     const cacheRows = await sql`SELECT data FROM project_state WHERE key = 'meta_cache' LIMIT 1`;
-    const metaCache = cacheRows.length > 0
-      ? (cacheRows[0] as { data: { data?: Partial<MetaData> } }).data
-      : null;
+    const rawCache: unknown = cacheRows[0]?.data;
+    const metaCache = (typeof rawCache === 'string' ? JSON.parse(rawCache) : rawCache) as
+      { data?: Partial<MetaData> } | null | undefined;
     const metaData: Partial<MetaData> | null = metaCache?.data ?? null;
 
     // 2. Buscar leads do Postgres
@@ -169,11 +177,14 @@ export async function GET() {
       typeof r.raw === 'object' ? r.raw as Lead : JSON.parse(String(r.raw))
     );
 
-    // 3. Buscar vendas do CVDW
-    const vendaRows = await sql`SELECT raw FROM cv_vendas ORDER BY data_venda DESC NULLS LAST`;
-    const allVendas: CvdwVenda[] = (vendaRows as unknown as { raw: unknown }[]).map(r =>
-      typeof r.raw === 'object' ? r.raw as CvdwVenda : JSON.parse(String(r.raw))
-    );
+    // 3. Buscar vendas do CVDW (tabela pode não existir em ambientes novos)
+    let allVendas: CvdwVenda[] = [];
+    try {
+      const vendaRows = await sql`SELECT raw FROM cv_vendas ORDER BY data_venda DESC NULLS LAST`;
+      allVendas = (vendaRows as unknown as { raw: unknown }[]).map(r =>
+        typeof r.raw === 'object' ? r.raw as CvdwVenda : JSON.parse(String(r.raw))
+      );
+    } catch { /* segue só com leads */ }
 
     // 4. Construir mapa de midia por lead
     const midiaToLeads = new Map<string, Lead[]>()
@@ -195,10 +206,38 @@ export async function GET() {
       midiaToVendas.set(midia, arr)
     }
 
-    // 6. Campaign attribution: cruzar campanhas Meta com leads e vendas
+    // 6. Campaign attribution: cruzar campanhas Meta com leads e vendas.
+    // Cada lead é atribuído a NO MÁXIMO uma campanha (melhor match de nome na
+    // mídia/origem do lead) — sem isso, todo lead "meta/facebook" contava em
+    // todas as campanhas e o summary inflava N vezes.
     const campaigns = metaData?.campaigns ?? []
     const campaignDetails = metaData?.campaignDetails ?? []
     const detailsMap = new Map(campaignDetails.map(d => [d.id, d]))
+
+    const normalize = (s: string) =>
+      s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim()
+
+    const normalizedCampaigns = campaigns.map(c => ({ c, name: normalize(c.campaign_name) }))
+    const leadsByCampaign = new Map<string, Lead[]>()
+
+    for (const lead of allLeads) {
+      const origin = normalize(getOrigin(lead))
+      if (!origin || origin === 'desconhecido') continue
+      let bestId: string | null = null
+      let bestScore = 0
+      for (const { c, name } of normalizedCampaigns) {
+        // match nos dois sentidos: mídia contém nome da campanha, ou vice-versa
+        let score = 0
+        if (name.length >= 4 && origin.includes(name)) score = name.length
+        else if (origin.length >= 4 && name.includes(origin)) score = origin.length
+        if (score > bestScore) { bestScore = score; bestId = c.campaign_id }
+      }
+      if (bestId) {
+        const arr = leadsByCampaign.get(bestId) ?? []
+        arr.push(lead)
+        leadsByCampaign.set(bestId, arr)
+      }
+    }
 
     const campaignAttribution: CampaignAttribution[] = campaigns.map(c => {
       const detail = detailsMap.get(c.campaign_id)
@@ -213,17 +252,8 @@ export async function GET() {
           .reduce((s, a) => s + Number(a.value || 0), 0)
       )
 
-      // Cruzar com CRM pelo nome da campanha / midia
-      const campaignName = c.campaign_name.toLowerCase()
-      const matchingLeads = allLeads.filter(l => {
-        const origin = getOrigin(l).toLowerCase()
-        return origin.includes(campaignName) || origin.includes('meta') || origin.includes('facebook') || origin.includes('instagram')
-      })
-      const matchingSales = matchingLeads.filter(l => {
-        const sit = l.situacao
-        const nome = (typeof sit === 'object' && sit ? sit.nome : sit) || ''
-        return nome.toLowerCase().includes('venda') || nome.toLowerCase().includes('negócio') || nome.toLowerCase().includes('negocio')
-      })
+      const matchingLeads = leadsByCampaign.get(c.campaign_id) ?? []
+      const matchingSales = matchingLeads.filter(isSale)
       const revenue = matchingSales.reduce((s, l) => s + getLeadValue(l), 0)
 
       return {
@@ -238,7 +268,8 @@ export async function GET() {
         salesInCrm: matchingSales.length,
         revenue,
         cpl: matchingLeads.length > 0 ? spend / matchingLeads.length : 0,
-        roas: spend > 0 ? revenue / spend : 0,
+        // ROAS só com spend relevante — spend ~R$0 com venda de milhões gera número absurdo
+        roas: spend >= 50 ? revenue / spend : 0,
       }
     })
 
@@ -255,11 +286,7 @@ export async function GET() {
     const channelPerformance: ChannelPerformance[] = Array.from(midias).map(midia => {
       const leads = midiaToLeads.get(midia) ?? []
       const vendas = midiaToVendas.get(midia) ?? []
-      const salesCount = leads.filter(l => {
-        const sit = l.situacao
-        const nome = (typeof sit === 'object' && sit ? sit.nome : sit) || ''
-        return nome.toLowerCase().includes('venda') || nome.toLowerCase().includes('negócio') || nome.toLowerCase().includes('negocio')
-      }).length
+      const salesCount = leads.filter(isSale).length
       const revenue = vendas.reduce((s, v) => s + (v.valor_contrato ?? 0), 0)
 
       // Estimar spend: rateio proporcional ao número de leads se não tiver dados exatos
@@ -290,16 +317,34 @@ export async function GET() {
       }
     }
 
+    // Casa campanhas Meta com o empreendimento pelo nome: tokens do nome
+    // (≥3 chars) e iniciais de nomes compostos (HUB Beira Mar → "hbm").
+    const campaignLeadActions = (c: (typeof campaigns)[number]) => Math.round(
+      (c.actions ?? []).filter(a => a.action_type === 'lead' || a.action_type === 'onsite_conversion.lead_grouped')
+        .reduce((s, a) => s + Number(a.value || 0), 0)
+    )
+    const matchCampaignsForDev = (nome: string) => {
+      const tokens = normalize(nome).split(/[^a-z0-9]+/).filter(t => t.length >= 3)
+      const words = nome.trim().split(/\s+/)
+      const initials = words.length >= 2 ? normalize(words.map(w => w[0]).join('')) : ''
+      return campaigns.filter(c => {
+        const n = normalize(c.campaign_name)
+        return tokens.some(t => n.includes(t)) || (initials.length >= 3 && n.includes(initials))
+      })
+    }
+
     const developmentIntelligence: DevelopmentIntelligence[] = Array.from(devMap.entries()).map(([nome, leads]) => {
+      const devCampaigns = matchCampaignsForDev(nome)
+      const spend = devCampaigns.reduce((s, c) => s + Number(c.spend ?? 0), 0)
+      const metaLeads = devCampaigns.reduce((s, c) => s + campaignLeadActions(c), 0)
+      const impressions = devCampaigns.reduce((s, c) => s + Number(c.impressions ?? 0), 0)
+      const clicks = devCampaigns.reduce((s, c) => s + Number(c.clicks ?? 0), 0)
+      const activeCount = devCampaigns.filter(c => detailsMap.get(c.campaign_id)?.status === 'ACTIVE').length
       const visits = leads.filter(l => {
         const stage = l.situacao?.nome?.toLowerCase() || ''
         return stage.includes('visita') || stage.includes('simula') || stage.includes('reserva') || stage.includes('proposta')
       }).length
-      const sales = leads.filter(l => {
-        const sit = l.situacao
-        const nomeSit = (typeof sit === 'object' && sit ? sit.nome : sit) || ''
-        return nomeSit.toLowerCase().includes('venda') || nomeSit.toLowerCase().includes('negócio') || nomeSit.toLowerCase().includes('negocio')
-      })
+      const sales = leads.filter(isSale)
       const vgv = sales.reduce((s, l) => s + getLeadValue(l), 0)
       const avgTicket = sales.length > 0 ? vgv / sales.length : 0
 
@@ -335,8 +380,20 @@ export async function GET() {
         conversionPct: leads.length > 0 ? Math.round((sales.length / leads.length) * 100) : 0,
         topCampaigns,
         avgDaysToSale: daysArray.length > 0 ? Math.round(daysArray.reduce((s, d) => s + d, 0) / daysArray.length) : null,
+        campaignsCount: devCampaigns.length,
+        activeCampaigns: activeCount,
+        spend,
+        metaLeads,
+        impressions,
+        clicks,
+        cpl: leads.length > 0 && spend > 0 ? spend / leads.length : 0,
+        roas: spend >= 50 ? vgv / spend : 0,
       }
-    }).sort((a, b) => b.vgv - a.vgv)
+    })
+      // Ruído do CRM (ex.: "Assistência Tecnica South beach" com 1 lead) não é
+      // empreendimento — só entra quem tem volume real ou campanha casada.
+      .filter(d => d.leads >= 5 || d.campaignsCount > 0)
+      .sort((a, b) => b.vgv - a.vgv)
 
     // 9. Audience insights (from Meta demographics)
     const demographics = metaData?.demographics ?? []
@@ -449,14 +506,26 @@ export async function GET() {
       .map(c => c.channel)
 
     const oportunidadesIdentificadas: string[] = []
-    if (developmentIntelligence.length > 0) {
-      const worstDev = developmentIntelligence[developmentIntelligence.length - 1]
+    // Só empreendimentos com volume real geram alerta de conversão — 1 lead sem
+    // venda não é "baixa conversão", é ruído.
+    const significantDevs = developmentIntelligence.filter(d => d.leads >= 30)
+    if (significantDevs.length > 0) {
+      const worstDev = [...significantDevs].sort((a, b) => a.conversionPct - b.conversionPct)[0]
       if (worstDev && worstDev.conversionPct < 3) {
-        oportunidadesIdentificadas.push(`Baixa conversão em "${worstDev.nome}": apenas ${worstDev.conversionPct}% — revisar abordagem comercial`)
+        oportunidadesIdentificadas.push(`Baixa conversão em "${worstDev.nome}": ${worstDev.conversionPct}% em ${worstDev.leads} leads — revisar abordagem comercial`)
       }
-      const bestDev = developmentIntelligence[0]
+      const bestDev = significantDevs[0]
       if (bestDev && bestDev.avgDaysToSale && bestDev.avgDaysToSale < 30) {
         oportunidadesIdentificadas.push(`"${bestDev.nome}" tem o ciclo de venda mais rápido (${bestDev.avgDaysToSale}d) — usar como referência`)
+      }
+      // Comparativo de eficiência de mídia entre empreendimentos
+      const withSpend = significantDevs.filter(d => d.spend > 500 && d.leads > 0)
+      if (withSpend.length >= 2) {
+        const byCpl = [...withSpend].sort((a, b) => a.cpl - b.cpl)
+        const cheap = byCpl[0], expensive = byCpl[byCpl.length - 1]
+        if (cheap.cpl > 0 && expensive.cpl > cheap.cpl * 2) {
+          oportunidadesIdentificadas.push(`CPL de "${expensive.nome}" (R$${expensive.cpl.toFixed(0)}) é ${(expensive.cpl / cheap.cpl).toFixed(1)}× o de "${cheap.nome}" (R$${cheap.cpl.toFixed(0)}) — revisar criativos/segmentação ou realocar verba`)
+        }
       }
     }
     const zeroSalesCampaigns = campaignAttribution.filter(c => c.spend > 500 && c.salesInCrm === 0)
@@ -468,10 +537,35 @@ export async function GET() {
       oportunidadesIdentificadas.push(`${lowAttendanceChannels.length} canal(is) geram leads mas zero vendas — avaliar qualidade do lead e atendimento`)
     }
 
-    const totalSpend = campaignAttribution.reduce((s, c) => s + c.spend, 0)
-    const totalLeads = campaignAttribution.reduce((s, c) => s + c.leadsInCrm, 0)
-    const totalSales = campaignAttribution.reduce((s, c) => s + c.salesInCrm, 0)
-    const totalRevenue = campaignAttribution.reduce((s, c) => s + c.revenue, 0)
+    // Falha comercial: leads ativos parados sem atendimento, por empreendimento
+    for (const [nome, leads] of devMap.entries()) {
+      const ativos = leads.filter(l => !isSale(l) && !isLoss(l))
+      if (ativos.length < 15) continue
+      const semAtendimento = ativos.filter(l => getLeadStage(l) === 'new' || getLeadStage(l) === 'none').length
+      const pct = Math.round((semAtendimento / ativos.length) * 100)
+      if (pct >= 50) {
+        oportunidadesIdentificadas.push(`"${nome}": ${pct}% dos ${ativos.length} leads ativos ainda sem atendimento — marketing gera, comercial não absorve`)
+      }
+    }
+
+    // Falha de atribuição: campanha gastando sem nenhum lead rastreado no CRM
+    const untracked = campaignAttribution.filter(c => c.status === 'ACTIVE' && c.spend > 300 && c.leadsInCrm === 0 && c.leadsFromAds > 0)
+    if (untracked.length > 0) {
+      oportunidadesIdentificadas.push(`${untracked.length} campanha(s) ativa(s) geram leads no Meta mas nenhum rastreado no CRM — revisar integração/macros de mídia (ex.: {{adset.name}})`)
+    }
+
+    // Summary com totais reais (deduplicados) — não somar por campanha,
+    // que só enxerga leads atribuídos por nome.
+    const totalSpend = metaData?.global?.spend
+      ? Number(metaData.global.spend)
+      : campaignAttribution.reduce((s, c) => s + c.spend, 0)
+    const totalLeads = allLeads.length
+    const allSalesLeads = allLeads.filter(isSale)
+    const totalSales = allSalesLeads.length
+    const totalRevenue = allSalesLeads.reduce((s, l) => s + getLeadValue(l), 0)
+    // ROAS geral usa só receita ATRIBUÍDA às campanhas — receita total da base
+    // inclui anos de histórico e canais fora do Meta, o que distorceria o número.
+    const attributedRevenue = campaignAttribution.reduce((s, c) => s + c.revenue, 0)
 
     const response: MarketingIntelligence = {
       summary: {
@@ -479,7 +573,7 @@ export async function GET() {
         totalLeads,
         totalSales,
         totalRevenue,
-        overallRoas: totalSpend > 0 ? totalRevenue / totalSpend : 0,
+        overallRoas: totalSpend > 0 ? attributedRevenue / totalSpend : 0,
         overallCpl: totalLeads > 0 ? totalSpend / totalLeads : 0,
         activeCampaigns: campaignAttribution.filter(c => c.status === 'ACTIVE').length,
         totalCampaigns: campaignAttribution.length,
@@ -492,6 +586,7 @@ export async function GET() {
         totalEngagement,
         avgEngagementRate,
         bestPost: socialPosts[0] ?? null,
+        posts: socialPosts,
         postsByPlatform: {
           facebook: socialPosts.filter(p => p.platform === 'facebook').length,
           instagram: socialPosts.filter(p => p.platform === 'instagram').length,

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import {
-  LayoutDashboard, Users, DollarSign, BarChart3, Megaphone, X,
+  LayoutDashboard, Users, DollarSign, BarChart3, Megaphone, Lightbulb, X,
   ChevronRight, RefreshCw,
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
@@ -69,6 +69,7 @@ const VIEW_TITLES: Record<ActiveView, string> = {
   metrics:         'Métricas',
   trafego:         'Tráfego',
   marketing:       'Marketing',
+  intelligence:    'Inteligência',
   publicar:        'Publicar',
   audiences:       'Audiências CRM',
   links:           'Links & QR',
@@ -84,11 +85,12 @@ const PRIMARY_NAV = [
 ] as const;
 
 const DRAWER_NAV = [
-  { icon: LayoutDashboard, label: 'Smart Dashboard',  view: 'dashboard' as ActiveView },
-  { icon: Users,           label: 'Leads & Pipeline',  view: 'leads'     as ActiveView },
-  { icon: DollarSign,      label: 'Vendas & Projetos', view: 'vendas'    as ActiveView },
-  { icon: BarChart3,       label: 'Métricas',         view: 'metrics'   as ActiveView },
-  { icon: Megaphone,       label: 'Marketing',        view: 'marketing' as ActiveView },
+  { icon: LayoutDashboard, label: 'Smart Dashboard',  view: 'dashboard'    as ActiveView },
+  { icon: Users,           label: 'Leads & Pipeline',  view: 'leads'        as ActiveView },
+  { icon: DollarSign,      label: 'Vendas & Projetos', view: 'vendas'       as ActiveView },
+  { icon: BarChart3,       label: 'Métricas',         view: 'metrics'      as ActiveView },
+  { icon: Lightbulb,       label: 'Inteligência',     view: 'intelligence' as ActiveView },
+  { icon: Megaphone,       label: 'Marketing',        view: 'marketing'    as ActiveView },
 ] as const;
 
 function useCurrentUser() {

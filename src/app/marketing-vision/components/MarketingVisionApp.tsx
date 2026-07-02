@@ -10,16 +10,18 @@ const LeadsView          = lazy(() => import('./views/LeadsView'));
 const VendasView         = lazy(() => import('./views/VendasView'));
 const MetricsView        = lazy(() => import('./views/MetricsView'));
 const MarketingAdsView   = lazy(() => import('./views/MarketingAdsView'));
+const IntelligenceView   = lazy(() => import('./views/IntelligenceView'));
 
 function ViewRouter() {
   const { activeView } = useData();
 
   const viewMap: Record<string, React.ReactNode> = {
-    dashboard: <DashboardView />,
-    leads:     <LeadsView />,
-    vendas:    <VendasView />,
-    metrics:   <MetricsView />,
-    marketing: <MarketingAdsView />,
+    dashboard:    <DashboardView />,
+    leads:        <LeadsView />,
+    vendas:       <VendasView />,
+    metrics:      <MetricsView />,
+    marketing:    <MarketingAdsView />,
+    intelligence: <IntelligenceView />,
   };
 
   return (

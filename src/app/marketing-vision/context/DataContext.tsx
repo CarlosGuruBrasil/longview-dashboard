@@ -72,13 +72,18 @@ interface DataProviderProps {
 
 const DEFAULT_DATE: DateRange = { start: '', end: '' };
 
-/** Mês atual até hoje (MTD), em ISO local (YYYY-MM-DD) para não dar erro de fuso. */
-function monthToDate(): DateRange {
+/**
+ * Janela móvel de 90 dias, em ISO local (YYYY-MM-DD) para não dar erro de fuso.
+ * "Mês até hoje" deixava o painel quase vazio no início do mês
+ * (ex.: dia 2 mostrava 1 lead de 3.795 na base).
+ */
+function defaultRange(): DateRange {
+  const iso = (dt: Date) =>
+    `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
   const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const d = String(now.getDate()).padStart(2, '0');
-  return { start: `${y}-${m}-01`, end: `${y}-${m}-${d}` };
+  const start = new Date(now);
+  start.setDate(start.getDate() - 90);
+  return { start: iso(start), end: iso(now) };
 }
 
 export function DataProvider({ children, initialData }: DataProviderProps) {
@@ -92,7 +97,7 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
   const [updatedAt, setUpdatedAt] = useState(initialData?.updatedAt ?? '');
   const [loading, setLoading] = useState(!initialData);
   const [dataError, setDataError] = useState<string | null>(null);
-  const [dateRange, setDateRange] = useState<DateRange>(monthToDate());
+  const [dateRange, setDateRange] = useState<DateRange>(defaultRange());
   const [leadFilters, setLeadFilters] = useState<LeadFilters>({});
   const [activeView, setActiveView] = useState<ActiveView>('dashboard');
 

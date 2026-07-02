@@ -27,11 +27,6 @@ export default function CostPerLeadCard({ leads, metaData, loading = false }: Co
     return parseFloat(metaData.global.spend) || 0
   }, [metaData])
 
-  // Calculate CPL metric
-  const cplMetric = useMemo(() => {
-    return calculateCostPerLead(leads, totalMetaSpend)
-  }, [leads, totalMetaSpend])
-
   // Build campaign-level breakdown
   const campaignCPL = useMemo(() => {
     if (!metaData?.campaigns || metaData.campaigns.length === 0) return []
@@ -54,6 +49,17 @@ export default function CostPerLeadCard({ leads, metaData, loading = false }: Co
       .filter(c => c.spend > 0)
       .sort((a, b) => b.spend - a.spend)
   }, [metaData])
+
+  // CPL geral: gasto e leads das campanhas Meta cobrem o MESMO período (all-time
+  // do cache). Dividir o gasto total pelos leads CRM do período filtrado misturava
+  // janelas e gerava CPL absurdo (ex.: R$62k com 1 lead no mês).
+  const cplMetric = useMemo(() => {
+    const metaLeads = campaignCPL.reduce((s, c) => s + c.leads, 0)
+    if (metaLeads > 0) {
+      return { totalLeads: metaLeads, totalSpend: totalMetaSpend, cpl: totalMetaSpend / metaLeads }
+    }
+    return calculateCostPerLead(leads, totalMetaSpend)
+  }, [campaignCPL, leads, totalMetaSpend])
 
   return (
     <GlassCard title="Custo de LEAD - MKT">

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useData } from '../../context/DataContext'
 import GlassCard from '../ui/GlassCard'
-import StageSummary from '../ui/StageSummary'
+import FunnelVisualization from '../ui/FunnelVisualization'
 import LeadsTable from '../ui/LeadsTable'
 import GrowthLineChart from '../charts/GrowthLineChart'
 import PieDonutChart from '../charts/PieDonutChart'
@@ -101,8 +101,10 @@ export default function LeadsView() {
           {/* Filters */}
           <FilterBar />
 
-          {/* Stage summary */}
-          <StageSummary leads={filteredLeads} />
+          {/* Funil por etapa */}
+          <GlassCard>
+            <FunnelVisualization leads={filteredLeads} />
+          </GlassCard>
 
           {/* Growth line chart */}
           <GrowthLineChart

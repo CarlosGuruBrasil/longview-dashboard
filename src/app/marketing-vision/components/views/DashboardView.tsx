@@ -15,6 +15,7 @@ import { generateInsights, type Insight } from '../../utils/insights'
 import { isSale, getLeadValueNumber } from '../../utils/leads'
 import { formatCurrency, formatNumber } from '../../utils/formatters'
 import GlassCard from '../ui/GlassCard'
+import FilterBar from '../ui/FilterBar'
 import type { BiInsights } from '../../types'
 
 const TICK = '#71717a'
@@ -79,23 +80,23 @@ function SmartKpi({
   const TrendIcon = trend === 'up' ? TrendingUp : trend === 'down' ? TrendingDown : NoTrendIcon
 
   return (
-    <div className="bg-white/5 border border-white/10 rounded-2xl p-3.5 sm:p-5 flex flex-col gap-2 relative overflow-hidden">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+    <div className="bg-white/5 border border-white/10 rounded-2xl p-3.5 sm:p-5 flex flex-col gap-2 relative overflow-hidden min-w-0">
+      <div className="flex items-center justify-between min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
           <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${color}20` }}>
             <Icon size={15} style={{ color }} />
           </div>
           <span className="text-[12px] text-zinc-400 font-medium truncate">{label}</span>
         </div>
         {trend && (
-          <span className="flex items-center gap-0.5 text-[11px] font-semibold" style={{ color: trendColor }}>
+          <span className="flex items-center gap-0.5 text-[11px] font-semibold shrink-0" style={{ color: trendColor }}>
             <TrendIcon size={11} />
             {trendLabel}
           </span>
         )}
       </div>
-      <p className="text-2xl sm:text-3xl font-bold tracking-tight text-white">{value}</p>
-      {sub && <p className="text-[11px] text-zinc-500 truncate">{sub}</p>}
+      <p className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight text-white truncate" title={String(value)}>{value}</p>
+      {sub && <p className="text-[11px] text-zinc-500 truncate" title={sub}>{sub}</p>}
       {vsPrev !== undefined && (
         <div className="flex items-center gap-2 text-[10px] text-zinc-600 mt-0.5">
           <span>vs mês passado:</span>
@@ -378,6 +379,9 @@ export default function DashboardView() {
 
   return (
     <div className="flex flex-col gap-5 sm:gap-6">
+
+      {/* ── Filtros ── */}
+      <FilterBar />
 
       {/* ── Alertas Inteligentes ── */}
       {insights.length > 0 && (
