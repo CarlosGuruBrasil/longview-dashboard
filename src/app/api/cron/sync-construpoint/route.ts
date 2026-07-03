@@ -48,8 +48,6 @@ export async function GET(request: NextRequest) {
 
         if (!Array.isArray(res) || res.length === 0) continue;
 
-      if (!Array.isArray(res) || res.length === 0) continue;
-
       for (const insp of res) {
         const id = cpField<number>(insp, 'Id', 'id');
         if (!id) continue;
@@ -73,7 +71,7 @@ export async function GET(request: NextRequest) {
             ${dAgend},
             ${dAtualiz},
             null,
-            ${JSON.stringify(insp)},
+            ${sql.json(insp as never)},
             NOW()
           ) ON CONFLICT (id) DO UPDATE SET
             code = EXCLUDED.code,
@@ -137,7 +135,7 @@ export async function GET(request: NextRequest) {
             ${d},
             ${cpField<number>(v, 'NotaDaInspecao', 'NotaDaInspeção') ?? null},
             ${cpField<number>(v, 'NotaDoItem') ?? null},
-            ${JSON.stringify(v)},
+            ${sql.json(v as never)},
             NOW()
           )
         `;

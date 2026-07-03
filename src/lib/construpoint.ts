@@ -17,17 +17,22 @@ const AUTH_URL  = 'https://Authenticate.construpoint.com.br/api/Token';
 const BASE_URL  = 'https://apiext.construpoint.com.br/api/RelatorioCKL';
 const MODEL_REPORT_ENDPOINT = `InspecoesPorModeloCustom${String.fromCharCode(81, 117, 97, 108, 105, 100, 97, 100, 101)}`;
 
-/** A API retorna datas em "DD/MM/AAAA" ou "DD/MM/AAAA HH:mm:ss" — new Date() do JS interpreta errado (assume MM/DD). */
+/**
+ * A API retorna datas em "DD/MM/AAAA", "DD/MM/AAAA HH:mm" ou "DD/MM/AAAA HH:mm:ss" —
+ * new Date() do JS interpreta errado (assume MM/DD), então strings com "/" NUNCA
+ * caem no fallback. Segundos são opcionais (inspeções vêm só com HH:mm).
+ */
 export function parseConstrupointDate(value: unknown): Date | null {
   if (!value) return null;
   const str = String(value).trim();
-  const m = str.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:[ T](\d{2}):(\d{2}):(\d{2}))?$/);
+  const m = str.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$/);
   if (m) {
     const [, day, month, year, hh = '00', mm = '00', ss = '00'] = m;
     const d = new Date(Number(year), Number(month) - 1, Number(day), Number(hh), Number(mm), Number(ss));
     return isNaN(d.getTime()) ? null : d;
   }
-  const fallback = new Date(str);
+  if (str.includes('/')) return null; // formato BR não reconhecido — melhor NULL que data trocada
+  const fallback = new Date(str); // ISO e afins
   return isNaN(fallback.getTime()) ? null : fallback;
 }
 

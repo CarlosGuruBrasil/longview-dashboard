@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
           data_agendamento, data_atualizacao, nota, raw, synced_at
         ) VALUES (
           ${sqlScalar(id)}, ${code}, ${modelo}, ${obra}, ${local}, ${inspetor}, ${status},
-          ${dCriacao}, ${dAgend}, ${dAtualiz}, ${nota ?? null}, ${JSON.stringify(body)}, NOW()
+          ${dCriacao}, ${dAgend}, ${dAtualiz}, ${nota ?? null}, ${sql.json(body as never)}, NOW()
         ) ON CONFLICT (id) DO UPDATE SET
           code = EXCLUDED.code,
           modelo = EXCLUDED.modelo,
