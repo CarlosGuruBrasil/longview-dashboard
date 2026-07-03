@@ -51,21 +51,31 @@ export interface ConstrupointToken {
   token_type: string;
 }
 
-export interface Inspecao {
-  Id: number;
-  Codigo?: string;
-  Modelo?: { Id: number; Nome: string };
-  Obra?: { Id: number; Nome: string };
-  Local?: { Id: number; Nome: string };
-  Inspetor?: { Id: number; Nome: string };
-  Status?: { Id: number; Nome: string };
-  Criacao?: string;
-  PrimeiraInspecao?: string;
-  PrimeiraVistoria?: string;
-  DataReinspecao?: string;
-  QuantidadeReinspecao?: number;
-  Aceito?: string;
-  PendenteAprovacao?: string;
+/**
+ * A API retorna chaves ACENTUADAS ("Código", "Criação", "Verificação"...) —
+ * confirmado nos prints reais do Postman da doc oficial. Os tipos abaixo são
+ * Record e o consumo usa cpField()/cpName(), que aceitam as duas grafias.
+ */
+export type Inspecao = Record<string, unknown>;
+
+/** Primeiro valor não-vazio entre as variações de chave (com/sem acento). */
+export function cpField<T = unknown>(obj: Record<string, unknown>, ...keys: string[]): T | undefined {
+  for (const k of keys) {
+    const v = obj[k];
+    if (v !== undefined && v !== null && v !== '') return v as T;
+  }
+  return undefined;
+}
+
+/** Campos de nome vêm ora como string, ora como objeto { Id, Nome } / { Id, Name }. */
+export function cpName(value: unknown): string | null {
+  if (typeof value === 'string') return value;
+  if (value && typeof value === 'object') {
+    const o = value as Record<string, unknown>;
+    if (typeof o.Nome === 'string') return o.Nome;
+    if (typeof o.Name === 'string') return o.Name;
+  }
+  return null;
 }
 
 export interface InspecaoPorRange {
@@ -84,22 +94,7 @@ export interface InspecaoPorRange {
   WeightedGrade?: number;
 }
 
-export interface Verificacao {
-  Modelo?: string;
-  Codigo?: string;
-  Verificacoes?: string;
-  Resultado?: 'Aprovado' | 'Reprovado' | 'Não se aplica';
-  Parceiro?: string;
-  Obra?: string;
-  Local?: string;
-  Inspetor?: string;
-  ProblemaEncontrado?: string;
-  SolucaoIndicada?: string;
-  Verificacao?: string;
-  Peso?: number;
-  NotaDaInspecao?: number;
-  NotaDoItem?: number;
-}
+export type Verificacao = Record<string, unknown>;
 
 // --- Cache de token em memória (válido por duration-60s) ---
 let _cachedToken: string | null = null;

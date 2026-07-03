@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql, ensureSchema } from '@/lib/pg';
-import { getInspections, getVerifications, parseConstrupointDate, MODEL_TYPES, type ModelTypeKey } from '@/lib/construpoint';
+import { getInspections, getVerifications, parseConstrupointDate, cpField, cpName, MODEL_TYPES, type ModelTypeKey } from '@/lib/construpoint';
 import { getBearerToken, isSecretAuthorized, unauthorizedJson } from '@/lib/internal-auth';
 
 export const maxDuration = 300; // 5 minutes
@@ -51,23 +51,24 @@ export async function GET(request: NextRequest) {
       if (!Array.isArray(res) || res.length === 0) continue;
 
       for (const insp of res) {
-        if (!insp.Id) continue;
-        const dCriacao = parseConstrupointDate(insp.Criacao);
-        const dAgend = parseConstrupointDate(insp.PrimeiraVistoria);
-        const dAtualiz = parseConstrupointDate(insp.DataReinspecao);
+        const id = cpField<number>(insp, 'Id', 'id');
+        if (!id) continue;
+        const dCriacao = parseConstrupointDate(cpField(insp, 'Criacao', 'Criação'));
+        const dAgend = parseConstrupointDate(cpField(insp, 'PrimeiraVistoria', 'PrimeiraInspecao', 'PrimeiraInspeção'));
+        const dAtualiz = parseConstrupointDate(cpField(insp, 'DataReinspecao', 'DataReinspeção'));
 
         await sql`
           INSERT INTO construpoint_inspecoes (
             id, code, modelo, obra, local, inspetor, status, data_criacao,
             data_agendamento, data_atualizacao, nota, raw, synced_at
           ) VALUES (
-            ${insp.Id},
-            ${insp.Codigo ?? null},
-            ${insp.Modelo?.Nome ?? key},
-            ${insp.Obra?.Nome ?? null},
-            ${insp.Local?.Nome ?? null},
-            ${insp.Inspetor?.Nome ?? null},
-            ${insp.Status?.Nome ?? null},
+            ${id},
+            ${cpField<string>(insp, 'Codigo', 'Código') ?? null},
+            ${cpName(cpField(insp, 'Modelo')) ?? key},
+            ${cpName(cpField(insp, 'Obra')) ?? null},
+            ${cpName(cpField(insp, 'Local')) ?? null},
+            ${cpName(cpField(insp, 'Inspetor')) ?? null},
+            ${cpName(cpField(insp, 'Status')) ?? null},
             ${dCriacao},
             ${dAgend},
             ${dAtualiz},
@@ -118,24 +119,24 @@ export async function GET(request: NextRequest) {
         if (!Array.isArray(items) || items.length === 0) continue;
 
       for (const v of items) {
-        const d = parseConstrupointDate(v.Verificacao);
+        const d = parseConstrupointDate(cpField(v, 'Verificacao', 'Verificação'));
         await sql`
           INSERT INTO construpoint_verificacoes (
             codigo, modelo, verificacao, resultado, obra, local, inspetor,
             problema, solucao, data, nota_inspecao, nota_item, raw, synced_at
           ) VALUES (
-            ${v.Codigo ?? null},
-            ${v.Modelo ?? key},
-            ${v.Verificacoes ?? null},
-            ${v.Resultado ?? null},
-            ${v.Obra ?? null},
-            ${v.Local ?? null},
-            ${v.Inspetor ?? null},
-            ${v.ProblemaEncontrado ?? null},
-            ${v.SolucaoIndicada ?? null},
+            ${cpField<string>(v, 'Codigo', 'Código') ?? null},
+            ${cpName(cpField(v, 'Modelo')) ?? key},
+            ${cpField<string>(v, 'Verificacoes', 'Verificações') ?? null},
+            ${cpField<string>(v, 'Resultado') ?? null},
+            ${cpName(cpField(v, 'Obra')) ?? null},
+            ${cpName(cpField(v, 'Local')) ?? null},
+            ${cpName(cpField(v, 'Inspetor')) ?? null},
+            ${cpField<string>(v, 'ProblemaEncontrado') ?? null},
+            ${cpField<string>(v, 'SolucaoIndicada') ?? null},
             ${d},
-            ${v.NotaDaInspecao ?? null},
-            ${v.NotaDoItem ?? null},
+            ${cpField<number>(v, 'NotaDaInspecao', 'NotaDaInspeção') ?? null},
+            ${cpField<number>(v, 'NotaDoItem') ?? null},
             ${JSON.stringify(v)},
             NOW()
           )
