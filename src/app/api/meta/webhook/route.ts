@@ -51,13 +51,46 @@ interface MetaLeadFull {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Extrai valor de field_data pela chave (suporta variações de nome) */
+/** Grava erro de webhook na tabela webhook_errors */
+async function logWebhookError(source: string, error: string, payload: unknown): Promise<void> {
+  if (!process.env.DATABASE_URL) return;
+  try {
+    const { sql } = await import('@/lib/pg');
+    await sql`
+      INSERT INTO webhook_errors (source, error, payload, created_at)
+      VALUES (${source}, ${error}, ${JSON.stringify(payload)}::jsonb, NOW())
+    `;
+  } catch (e) {
+    console.error('[meta/webhook] Falha ao logar erro no banco:', e);
+  }
+}
+
+/** Obtém Page Access Token da Meta dinamicamente */
+async function getPageAccessToken(): Promise<string> {
+  const token = process.env.META_TOKEN;
+  if (!token) return '';
+  const PAGE_ID = '259079394232614';
+  try {
+    const res = await axios.get(`${META_BASE}/${PAGE_ID}`, {
+      params: { fields: 'access_token', access_token: token },
+      timeout: 8000,
+    });
+    return res.data?.access_token || token;
+  } catch (err: any) {
+    console.warn('[meta/webhook] Erro ao obter page access token:', err.message);
+    return token;
+  }
+}
+
+/** Extrai valor de field_data pela chave (suporta variações de nome por substring) */
 function getField(fields: MetaFieldData[], ...keys: string[]): string {
   for (const key of keys) {
-    const found = fields.find(f =>
-      f.name?.toLowerCase().replace(/[^a-z0-9]/g, '') ===
-      key.toLowerCase().replace(/[^a-z0-9]/g, '')
-    );
+    const searchKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const found = fields.find(f => {
+      if (!f.name) return false;
+      const normalizedName = f.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+      return normalizedName === searchKey || normalizedName.includes(searchKey) || searchKey.includes(normalizedName);
+    });
     if (found?.values?.[0]) return found.values[0].trim();
   }
   return '';
@@ -65,15 +98,14 @@ function getField(fields: MetaFieldData[], ...keys: string[]): string {
 
 /** Busca lead completo na Meta API usando page access token */
 async function fetchMetaLead(leadgenId: string): Promise<MetaLeadFull | null> {
-  const token = process.env.META_TOKEN;
-  if (!token) return null;
-
   try {
-    // Tenta com page access token primeiro (necessário para leadgen_forms de página)
+    const pageToken = await getPageAccessToken();
+    if (!pageToken) return null;
+
     const res = await axios.get(`${META_BASE}/${leadgenId}`, {
       params: {
         fields: 'id,created_time,field_data,ad_id,ad_name,adset_id,adset_name,campaign_id,campaign_name,form_id',
-        access_token: token,
+        access_token: pageToken,
       },
       timeout: 10_000,
     });
@@ -81,6 +113,7 @@ async function fetchMetaLead(leadgenId: string): Promise<MetaLeadFull | null> {
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Erro desconhecido';
     console.warn(`[meta/webhook] fetchMetaLead ${leadgenId} falhou:`, msg);
+    await logWebhookError('meta_webhook', `fetchMetaLead falhou para leadgenId ${leadgenId}: ${msg}`, { leadgenId });
     return null;
   }
 }
@@ -246,12 +279,12 @@ export async function POST(request: NextRequest) {
         const fields = metaLead.field_data ?? [];
 
         // 2. Parseia campos do formulário
-        const nome          = getField(fields, 'full_name', 'nome', 'name', 'first_name');
+        const nome          = getField(fields, 'full_name', 'nome', 'name', 'first_name', 'completo');
         const sobrenome     = getField(fields, 'last_name', 'sobrenome');
         const nomeCompleto  = sobrenome ? `${nome} ${sobrenome}`.trim() : nome;
         const email         = getField(fields, 'email', 'email_address', 'e-mail');
-        const telefone      = getField(fields, 'phone_number', 'telefone', 'phone', 'celular', 'whatsapp');
-        const empreendimento = getField(fields, 'empreendimento', 'produto', 'product', 'interest', 'interesse');
+        const telefone      = getField(fields, 'phone_number', 'telefone', 'phone', 'celular', 'whatsapp', 'tel');
+        const empreendimento = getField(fields, 'empreendimento', 'produto', 'product', 'interest', 'interesse', 'lote', 'opcao');
         const mensagem      = getField(fields, 'message', 'mensagem', 'observacao', 'comments');
 
         const campanha      = campaign_name ?? metaLead.campaign_name ?? '';
@@ -261,6 +294,7 @@ export async function POST(request: NextRequest) {
 
         if (!nomeCompleto && !email && !telefone) {
           console.warn(`[meta/webhook] Lead ${leadgen_id} sem dados de contato — ignorado`);
+          await logWebhookError('meta_webhook', 'Lead descartado por falta de dados de contato básicos (nome, email ou telefone)', { leadgen_id, fields });
           continue;
         }
 
@@ -289,7 +323,7 @@ export async function POST(request: NextRequest) {
 
         if (!crmResult.ok) {
           console.warn(`[meta/webhook] CV CRM falhou para ${leadgen_id}: ${crmResult.error}`);
-          // Não aborta — os outros passos continuam
+          await logWebhookError('meta_webhook', `CV CRM falhou: ${crmResult.error}`, { leadgen_id, parsed });
         }
 
         // 5. RD Station em background (para e-mail e nutrição)
