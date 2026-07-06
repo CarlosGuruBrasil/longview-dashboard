@@ -356,6 +356,63 @@ export default function KpiGaugeHistoryCard({
     }
   }, [dateRange.start, granularity])
 
+  // ── Cálculo dinâmico para Novos Leads MoM no período equivalente anterior ──
+  const dynamicNewLeads = useMemo(() => {
+    if (metric !== 'novos_leads') return null
+
+    let startStr = dateRange.start
+    let endStr = dateRange.end
+
+    if (!startStr) {
+      const now = new Date()
+      const year = now.getFullYear()
+      const month = String(now.getMonth() + 1).padStart(2, '0')
+      startStr = `${year}-${month}-01`
+    }
+
+    // Datas do período atual
+    const startMs = new Date(startStr + 'T00:00:00').getTime()
+    const endMs = endStr 
+      ? new Date(endStr + 'T23:59:59').getTime() 
+      : new Date().getTime()
+
+    // Datas do período equivalente anterior (deslocado 1 mês para trás)
+    const dStart = new Date(startStr + 'T00:00:00')
+    dStart.setMonth(dStart.getMonth() - 1)
+    const startMsPrev = dStart.getTime()
+
+    let endMsPrev: number
+    if (endStr) {
+      const dEnd = new Date(endStr + 'T23:59:59')
+      dEnd.setMonth(dEnd.getMonth() - 1)
+      endMsPrev = dEnd.getTime()
+    } else {
+      const dEnd = new Date()
+      dEnd.setMonth(dEnd.getMonth() - 1)
+      endMsPrev = dEnd.getTime()
+    }
+
+    let currentCount = 0
+    let prevCount = 0
+
+    leads.forEach(l => {
+      if (!l.data_cadastro) return
+      const d = new Date(l.data_cadastro)
+      if (isNaN(d.getTime())) return
+      const t = d.getTime()
+
+      if (t >= startMs && t <= endMs) {
+        currentCount++
+      } else if (t >= startMsPrev && t <= endMsPrev) {
+        prevCount++
+      }
+    })
+
+    const rate = prevCount > 0 ? currentCount / prevCount : 1
+
+    return { rate, currentCount, prevCount }
+  }, [leads, metric, dateRange])
+
   // Obtém o registro de período correspondente
   const currentPeriodEntry = useMemo(() => {
     if (selectedPeriod) {
@@ -365,8 +422,21 @@ export default function KpiGaugeHistoryCard({
     return periodData.length > 0 ? periodData[periodData.length - 1] : null
   }, [periodData, selectedPeriod])
 
-  const currentValue = currentPeriodEntry ? (currentPeriodEntry[valueKey] as number) ?? 0 : 0
-  const currentLabel = currentPeriodEntry ? formatPeriodLabel(currentPeriodEntry.period) : '—'
+  const currentValue = useMemo(() => {
+    if (metric === 'novos_leads') {
+      return effectiveMode === 'taxa' 
+        ? dynamicNewLeads?.rate ?? 0 
+        : dynamicNewLeads?.currentCount ?? 0
+    }
+    return currentPeriodEntry ? (currentPeriodEntry[valueKey] as number) ?? 0 : 0
+  }, [metric, effectiveMode, dynamicNewLeads, currentPeriodEntry, valueKey])
+
+  const currentLabel = useMemo(() => {
+    if (metric === 'novos_leads' && dateRange.start) {
+      return 'Período Filtrado vs Mês Ant.'
+    }
+    return currentPeriodEntry ? formatPeriodLabel(currentPeriodEntry.period) : '—'
+  }, [metric, dateRange.start, currentPeriodEntry])
 
   // Gauge scale max: max of (historical values, target × 1.5)
   const historicalMax = chartData.reduce((m, d) => Math.max(m, d.value), 0)
