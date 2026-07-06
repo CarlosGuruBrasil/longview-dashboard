@@ -174,10 +174,19 @@ async function readLeadsFromPg(
           LIMIT ${limit} OFFSET ${(page - 1) * limit}
         `;
       } else {
+        // Modo dashboard: expande para trazer também o mês passado completo
+        let adjustedStart = startDate;
+        try {
+          const d = new Date(startDate);
+          d.setMonth(d.getMonth() - 1);
+          d.setDate(1);
+          adjustedStart = d.toISOString().split('T')[0];
+        } catch (e) {}
+
         rows = await sql`
           SELECT ${selectFields}
           FROM leads
-          WHERE data_cadastro >= ${startDate}::date
+          WHERE data_cadastro >= ${adjustedStart}::date
             AND data_cadastro <  (${endDate}::date + INTERVAL '1 day')
           ORDER BY data_cadastro DESC NULLS LAST
           LIMIT 5000
@@ -193,10 +202,19 @@ async function readLeadsFromPg(
           LIMIT ${limit} OFFSET ${(page - 1) * limit}
         `;
       } else {
+        // Modo dashboard: expande para trazer também o mês passado completo
+        let adjustedStart = startDate;
+        try {
+          const d = new Date(startDate);
+          d.setMonth(d.getMonth() - 1);
+          d.setDate(1);
+          adjustedStart = d.toISOString().split('T')[0];
+        } catch (e) {}
+
         rows = await sql`
           SELECT ${selectFields}
           FROM leads
-          WHERE data_cadastro >= ${startDate}::date
+          WHERE data_cadastro >= ${adjustedStart}::date
           ORDER BY data_cadastro DESC NULLS LAST
           LIMIT 5000
         `;
