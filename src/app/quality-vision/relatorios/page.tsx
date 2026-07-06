@@ -6,6 +6,7 @@ import {
   Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell,
 } from 'recharts'
 import { AlertCircle, Calendar } from 'lucide-react'
+import logger from '@/lib/logger'
 
 // ---------- tipos ----------
 interface MonthlyPoint {
@@ -86,6 +87,7 @@ export default function RelatoriosPage() {
         const d = await r.json() as QualityData
         setData(d)
       } catch (e) {
+        logger.error({ err: e }, '[relatorios] fetch dados Construpoint falhou');
         setError(e instanceof Error ? e.message : String(e))
       } finally {
         setLoading(false)

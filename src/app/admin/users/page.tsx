@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import logger from '@/lib/logger'
 import { 
   Users, 
   UserPlus, 
@@ -49,6 +50,7 @@ export default function AdminUsersPage() {
       if (!res.ok) throw new Error(data.error || 'Erro ao carregar usuários.');
       setUsers(data.users || []);
     } catch (err: unknown) {
+      logger.error({ err }, '[admin/users] fetchUsers');
       setError(err instanceof Error ? err.message : 'Erro desconhecido');
     } finally {
       setLoading(false);
@@ -71,6 +73,7 @@ export default function AdminUsersPage() {
         if (!res.ok) throw new Error(data.error || 'Erro ao carregar usuários.');
         if (mounted) setUsers(data.users || []);
       } catch (err: unknown) {
+        logger.error({ err }, '[admin/users] fetchUsers mount');
         if (mounted) setError(err instanceof Error ? err.message : 'Erro desconhecido');
       } finally {
         if (mounted) setLoading(false);
@@ -222,6 +225,7 @@ export default function AdminUsersPage() {
       handleCancelEdit();
       void fetchUsers();
     } catch (err: unknown) {
+      logger.error({ err }, '[admin/users] salvar');
       setError(err instanceof Error ? err.message : 'Erro desconhecido');
     } finally {
       setSubmitLoading(false);
@@ -245,6 +249,7 @@ export default function AdminUsersPage() {
       setSuccess(`Usuário "${name}" foi removido com sucesso.`);
       void fetchUsers();
     } catch (err: unknown) {
+      logger.error({ err }, '[admin/users] deletar');
       setError(err instanceof Error ? err.message : 'Erro desconhecido');
     }
   };

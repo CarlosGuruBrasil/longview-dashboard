@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation';
 import { CloudRain, CloudSun, LogOut, UserCircle } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { type ModuleKey } from './moduleNavigation';
+import logger from '@/lib/logger'
 
 type Accent = 'blue' | 'orange' | 'sky' | 'emerald' | 'teal' | 'violet';
 
@@ -114,7 +115,7 @@ interface PresenceEntry { userId: string; name: string; role: string; avatarUrl?
 
 function useHeartbeat() {
   useEffect(() => {
-    const ping = () => fetch('/api/user/heartbeat', { method: 'POST' }).catch(() => {});
+    const ping = () => fetch('/api/user/heartbeat', { method: 'POST' }).catch(() => logger.warn('[heartbeat] falhou'));
     ping();
     const id = window.setInterval(() => {
       if (document.visibilityState === 'visible') ping();
@@ -126,7 +127,7 @@ function useHeartbeat() {
 function usePresence() {
   const [online, setOnline] = useState<PresenceEntry[]>([]);
   useEffect(() => {
-    const load = () => fetch('/api/user/presence').then(r => r.json()).then(d => setOnline(d.online ?? [])).catch(() => {});
+    const load = () => fetch('/api/user/presence').then(r => r.json()).then(d => setOnline(d.online ?? [])).catch(() => logger.warn('[presence] falhou'));
     load();
     const id = window.setInterval(load, 30_000);
     return () => window.clearInterval(id);

@@ -15,6 +15,7 @@ import GlassCard from '../ui/GlassCard'
 import FilterBar from '../ui/FilterBar'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import type { BiInsights } from '../../types'
+import logger from '@/lib/logger'
 
 
 const TICK = '#71717a'
@@ -110,7 +111,7 @@ export default function DashboardView() {
     fetch('/api/bi/insights')
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (active) setBiData(d) })
-      .catch(() => {})
+      .catch(() => logger.warn('[DashboardView] BI insights falhou'))
       .finally(() => { if (active) setBiLoading(false) })
     return () => { active = false }
   }, [])

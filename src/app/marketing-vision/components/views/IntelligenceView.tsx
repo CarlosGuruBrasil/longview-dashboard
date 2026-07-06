@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { TrendingUp, DollarSign, Target, AlertTriangle, Lightbulb, Users, BarChart3, ThumbsUp, MessageCircle, Globe } from 'lucide-react'
 import GlassCard from '../ui/GlassCard'
+import logger from '@/lib/logger'
 
 // ── Types (copied from API response) ─────────────────────────────────────────
 
@@ -107,7 +108,7 @@ export default function IntelligenceView() {
     fetch('/api/bi/intelligence')
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (active) setData(d) })
-      .catch(() => {})
+      .catch(() => logger.warn('[IntelligenceView] dados falhou'))
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
   }, [])

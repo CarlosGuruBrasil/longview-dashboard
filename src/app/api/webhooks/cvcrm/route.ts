@@ -83,7 +83,7 @@ async function fetchLeadById(id: string | number): Promise<CvRecord | null> {
     const data = await res.json() as { leads?: CvRecord[] };
     const leads = data?.leads ?? [];
     return Array.isArray(leads) && leads[0] ? leads[0] : null;
-  } catch { return null; }
+  } catch { logger.warn('[webhook/cvcrm] fetchLeadById falhou'); return null; }
 }
 
 /** empreendimento pode vir como array de objetos — normaliza pra texto */
@@ -230,7 +230,7 @@ export async function POST(request: NextRequest) {
             roles: ['Desenvolvedor', 'Diretoria', 'Gestor'],
             data: { url: '/marketing-vision', type: 'venda' },
           }),
-        }).catch(() => {});
+        }).catch(() => logger.warn('[webhook/cvcrm] notificação FCM falhou'));
       } catch { /* não bloqueia o webhook */ }
     }
 
@@ -246,7 +246,7 @@ export async function POST(request: NextRequest) {
         INSERT INTO webhook_errors (source, payload, error, created_at)
         VALUES ('cvcrm', ${{} as never}, ${msg}, NOW())
         ON CONFLICT DO NOTHING
-      `.catch(() => {}); // ignora se tabela não existe ainda
+      `.catch(() => logger.warn('[webhook/cvcrm] webhook_errors insert falhou')); // ignora se tabela não existe ainda
     } catch { /* não bloqueia resposta */ }
     return NextResponse.json({ ok: true, warning: 'processed with errors' });
   }

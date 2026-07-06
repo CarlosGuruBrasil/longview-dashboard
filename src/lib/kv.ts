@@ -45,7 +45,7 @@ export const kv = {
       if (!rows[0]) return null;
       if (rows[0].expires_at && new Date(rows[0].expires_at) < new Date()) {
         // Expirado — limpa e retorna null
-        await sql`DELETE FROM kv_store WHERE key = ${key}`.catch(() => { });
+        await sql`DELETE FROM kv_store WHERE key = ${key}`.catch(() => logger.warn('[kv] erro ao deletar chave expirada'));
         return null;
       }
       const value = rows[0].value;
@@ -128,6 +128,7 @@ export const kv = {
       const result = await sql`DELETE FROM kv_store WHERE expires_at < NOW()`;
       return (result as unknown as { count: number }).count ?? 0;
     } catch {
+      logger.warn('[kv] purgeExpired falhou');
       return 0;
     }
   },
@@ -203,7 +204,7 @@ export const kv = {
       const diffMs = new Date(expires_at).getTime() - Date.now();
       if (diffMs < 0) {
         // Já expirou
-        await sql`DELETE FROM kv_store WHERE key = ${key}`.catch(() => {});
+        await sql`DELETE FROM kv_store WHERE key = ${key}`.catch(() => logger.warn('[kv] erro ao deletar chave expirada em ttl'));
         return -2;
       }
       return Math.ceil(diffMs / 1000);

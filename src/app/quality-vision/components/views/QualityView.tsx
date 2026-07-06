@@ -9,6 +9,7 @@ import {
   ClipboardCheck, CheckCircle2, XCircle, AlertCircle,
   TrendingUp, RefreshCw, Calendar,
 } from 'lucide-react'
+import logger from '@/lib/logger'
 
 // ---------- tipos ----------
 interface KpiData {
@@ -185,6 +186,7 @@ export default function QualityView() {
         const d = await r.json() as QualityData
         setData(d)
       } catch (e) {
+        logger.error({ err: e }, '[QualityView] fetch dados Construpoint falhou');
         setError(e instanceof Error ? e.message : String(e))
       } finally {
         setLoading(false)
@@ -231,7 +233,7 @@ export default function QualityView() {
         <p className="text-sm text-zinc-300 font-medium">Erro ao buscar dados Construpoint</p>
         <p className="text-xs text-zinc-500">{error}</p>
         <button
-          onClick={() => { setLoading(true); setError(null); fetch(`/api/construpoint?startYear=${startYear}&endYear=${endYear}`).then(r=>r.json()).then(setData).catch(e=>setError(e.message)).finally(()=>setLoading(false)) }}
+          onClick={() => { setLoading(true); setError(null); fetch(`/api/construpoint?startYear=${startYear}&endYear=${endYear}`).then(r=>r.json()).then(setData).catch(e => { logger.error({ err: e }, '[QualityView] retry fetch falhou'); setError(e.message); }).finally(()=>setLoading(false)) }}
           className="mt-2 px-4 py-2 text-xs rounded-lg bg-[#121214]/60 border border-[#1E1E22] text-zinc-300 hover:bg-white/10 transition flex items-center gap-2"
         >
           <RefreshCw size={12} /> Tentar novamente

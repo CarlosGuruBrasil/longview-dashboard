@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { Globe, Share2 } from 'lucide-react'
 import GlassCard from './GlassCard'
+import logger from '@/lib/logger'
 
 const TICK = '#71717a'
 
@@ -38,7 +39,7 @@ export default function SocialPanel() {
     fetch('/api/meta/page-insights')
       .then(r => r.json())
       .then(d => setData(d))
-      .catch(() => {})
+      .catch(() => logger.warn('[SocialPanel] page-insights falhou'))
       .finally(() => setLoading(false))
   }, [])
 

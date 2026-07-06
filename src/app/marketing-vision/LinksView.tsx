@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
 import QRCode from 'qrcode';
 import { Link2, Copy, Check, Trash2, Plus, Loader2, ExternalLink, MousePointerClick, QrCode, Download, X } from 'lucide-react';
+import logger from '@/lib/logger';
 
 interface LinkItem {
   slug: string;
@@ -42,6 +43,7 @@ export default function LinksView() {
       if (!res.ok) throw new Error(data.error || 'Erro ao carregar links.');
       setLinks(data.links || []);
     } catch (e: unknown) {
+      logger.error({ err: e }, '[LinksView] fetch links falhou');
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
@@ -80,6 +82,7 @@ export default function LinksView() {
       setLinks(prev => [data.link, ...prev]);
       if (wantQr) openQr(data.link);
     } catch (e: unknown) {
+      logger.error({ err: e }, '[LinksView] criar link falhou');
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setSubmitting(false);

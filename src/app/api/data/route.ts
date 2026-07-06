@@ -944,7 +944,7 @@ export async function GET(request: NextRequest) {
     if (!isFiltered) {
       import('@/lib/pg').then(({ sql }) =>
         sql`INSERT INTO project_state (key, data) VALUES ('meta_cache', ${{ data: metaData, updatedAt: new Date().toISOString() } as never})
-            ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data`.catch(() => {})
+            ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data`.catch(() => logger.warn('[api/data] meta_cache persist falhou'))
       );
     }
   }

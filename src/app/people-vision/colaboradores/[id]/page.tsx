@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import PasswordInput from '@/components/app/PasswordInput';
+import logger from '@/lib/logger'
 
 // ── CPF validation ────────────────────────────────────────────────────────────
 function validateCPF(raw: string): boolean {
@@ -273,6 +274,7 @@ export default function ColaboradorPage() {
       setPermsSaved(true);
       setTimeout(() => setPermsSaved(false), 3000);
     } catch (e: unknown) {
+      logger.error({ err: e }, '[colaborador] salvar permissões falhou');
       setError(e instanceof Error ? e.message : 'Erro ao salvar permissões');
     } finally { setPermsSaving(false); }
   };
@@ -314,7 +316,7 @@ export default function ColaboradorPage() {
       setEcName(u.profile?.emergencyContact?.name ?? '');
       setEcPhone(u.profile?.emergencyContact?.phone ?? '');
       setEcRel(u.profile?.emergencyContact?.relationship ?? '');
-    }).catch(() => setError('Colaborador não encontrado')).finally(() => setLoading(false));
+    }).catch((err) => { logger.warn('[colaborador] fetch falhou', err); setError('Colaborador não encontrado'); }).finally(() => setLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -324,7 +326,7 @@ export default function ColaboradorPage() {
     const timer = window.setTimeout(() => setDocsLoading(true), 0);
     fetch(`/api/admin/users/${id}/documents`)
       .then(r => r.json()).then(d => setDocs(d.docs ?? []))
-      .catch(() => {}).finally(() => setDocsLoading(false));
+      .catch(() => logger.warn('[colaborador] documentos falhou')).finally(() => setDocsLoading(false));
     return () => window.clearTimeout(timer);
   }, [id]);
 
@@ -372,6 +374,7 @@ export default function ColaboradorPage() {
       setSaved(true); setCurrentPwd(''); setNewPwd(''); setConfirmPwd('');
       setTimeout(() => setSaved(false), 3000);
     } catch (e: unknown) {
+      logger.error({ err: e }, '[colaborador] salvar perfil falhou');
       setError(e instanceof Error ? e.message : 'Erro ao salvar');
     } finally { setSaving(false); }
   };
@@ -386,6 +389,7 @@ export default function ColaboradorPage() {
       if (!res.ok) throw new Error(d.error ?? 'Erro');
       setAvatarUrl(d.avatarUrl);
     } catch (e: unknown) {
+      logger.error({ err: e }, '[colaborador] upload avatar falhou');
       setError(e instanceof Error ? e.message : 'Erro no upload da foto');
     } finally { setAvatarUploading(false); }
   };
@@ -406,6 +410,7 @@ export default function ColaboradorPage() {
       setDocs(prev => [d.doc, ...prev]);
       setDocName(''); setDocExpiry(''); setShowDocForm(false);
     } catch (e: unknown) {
+      logger.error({ err: e }, '[colaborador] upload documento falhou');
       setError(e instanceof Error ? e.message : 'Erro no upload');
     } finally { setDocUploading(false); }
   };

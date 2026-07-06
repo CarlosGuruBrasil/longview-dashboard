@@ -12,6 +12,7 @@ import Sidebar from './Sidebar';
 import DateFilter from './DateFilter';
 import NotificationBanner from '@/components/NotificationBanner';
 import AppHeader from '@/components/app/AppHeader';
+import logger from '@/lib/logger'
 import SidebarFooter from '@/components/app/SidebarFooter';
 import PWAInstallBanner from '@/components/app/PWAInstallBanner';
 
@@ -115,7 +116,7 @@ const DRAWER_NAV = [
 function useCurrentUser() {
   const [user, setUser] = useState<{ name?: string; role?: string } | null>(null);
   useEffect(() => {
-    fetch('/api/auth/me').then(r => r.ok ? r.json() : null).then(d => d && setUser(d)).catch(() => {});
+    fetch('/api/auth/me').then(r => r.ok ? r.json() : null).then(d => d && setUser(d)).catch(() => logger.warn('[AppShell] auth/me falhou'));
   }, []);
   return user;
 }

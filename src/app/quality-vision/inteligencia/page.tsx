@@ -9,6 +9,7 @@ import {
   AlertTriangle, AlertCircle, Info, Flame, TrendingUp, TrendingDown,
   Lightbulb, RefreshCw, ClipboardCheck, ListChecks, Percent,
 } from 'lucide-react'
+import logger from '@/lib/logger'
 
 // ---------- tipos (espelham /api/construpoint/intelligence) ----------
 interface Comparativos {
@@ -124,6 +125,7 @@ export default function InteligenciaQualidadePage() {
       if (!r.ok) throw new Error(`HTTP ${r.status}`)
       setData(await r.json() as IntelligenceData)
     } catch (e) {
+      logger.error({ err: e }, '[inteligencia] fetch inteligência falhou');
       setError(e instanceof Error ? e.message : String(e))
     } finally {
       setLoading(false)

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { AlertTriangle, CheckCircle2, FileSpreadsheet, Loader2, UploadCloud } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
+import logger from '@/lib/logger';
 
 interface ImportReport {
   source: string;
@@ -70,6 +71,7 @@ export default function ProjectSheetImportPanel() {
       setReport(data.report);
       if (!dryRun) setSuccess('Planilha importada');
     } catch (err) {
+      logger.error({ err }, '[ProjectSheetImportPanel] processar planilha falhou');
       setError(err instanceof Error ? err.message : 'Falha ao processar planilha.');
     } finally {
       setLoading(false);
@@ -87,6 +89,7 @@ export default function ProjectSheetImportPanel() {
       if (!res.ok) throw new Error(data.error || 'Falha ao diagnosticar dados.');
       setHealth(data);
     } catch (err) {
+      logger.error({ err }, '[ProjectSheetImportPanel] health check falhou');
       setError(err instanceof Error ? err.message : 'Falha ao diagnosticar dados.');
     } finally {
       setCheckingHealth(false);
@@ -104,6 +107,7 @@ export default function ProjectSheetImportPanel() {
       setSuccess(`Dados restaurados: ${data.restored.tasks} tarefas`);
       await checkHealth();
     } catch (err) {
+      logger.error({ err }, '[ProjectSheetImportPanel] restaurar dados falhou');
       setError(err instanceof Error ? err.message : 'Falha ao restaurar dados.');
     } finally {
       setRestoring(false);

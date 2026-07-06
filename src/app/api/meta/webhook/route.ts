@@ -219,7 +219,7 @@ function sendFCMPush(nome: string, empreendimento: string, campanha: string): vo
       roles: ['Desenvolvedor', 'Diretoria', 'Gestor', 'Operador'],
       data:  { url: '/marketing-vision', type: 'novo_lead' },
     }),
-  }).catch(() => {});
+  }).catch(() => logger.warn('[meta/webhook] FCM push falhou'));
 }
 
 // ─── GET — verificação do webhook pela Meta ───────────────────────────────────

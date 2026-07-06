@@ -129,7 +129,7 @@ export default function LeadDrawer({ lead, onClose }: Props) {
     fetch(`/api/leads/${leadId}/history`)
       .then((r) => r.json())
       .then((d) => { if (active) setHistory(d.history ?? []); })
-      .catch(() => { if (active) setHistory([]); });
+      .catch(() => { if (active) { setHistory([]); logger.warn('[LeadDrawer] history falhou'); } });
 
     return () => {
       active = false;

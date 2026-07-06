@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { UserPlus, AlertCircle, Check, Loader2, ChevronDown } from 'lucide-react';
 import PasswordInput from '@/components/app/PasswordInput';
+import logger from '@/lib/logger';
 
 interface Approver {
   id: string;
@@ -77,7 +78,7 @@ function RegisterForm({ token }: { token: string }) {
         setApprovers(d.approvers ?? []);
         if (d.approvers?.length > 0) setApproverId(d.approvers[0].id);
       })
-      .catch(() => setTokenValid(false));
+      .catch((err) => { logger.warn('[cadastro] token validation falhou', err); setTokenValid(false); });
   }, [token]);
 
   const handleSubmit = async (e: React.FormEvent) => {
