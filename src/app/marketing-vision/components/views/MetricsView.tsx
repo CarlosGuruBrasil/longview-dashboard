@@ -22,7 +22,7 @@ type MediaStatRow = {
 
 
 export default function MetricsView() {
-  const { filteredLeads, metaData, loading } = useData()
+  const { allLeads, filteredLeads, metaData, loading } = useData()
   const [activeTab, setActiveTab] = useState<'dashboard' | 'data'>('dashboard')
 
   // Agrupa os leads filtrados por mídia e calcula a conversão de cada estágio
@@ -105,10 +105,10 @@ export default function MetricsView() {
               Funil de Conversão
             </h2>
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-              <KpiGaugeHistoryCard metric="novos_leads"  leads={filteredLeads} loading={loading} />
-              <KpiGaugeHistoryCard metric="atendimento"  leads={filteredLeads} loading={loading} />
-              <KpiGaugeHistoryCard metric="agendamento"  leads={filteredLeads} loading={loading} />
-              <KpiGaugeHistoryCard metric="visitas"      leads={filteredLeads} loading={loading} />
+              <KpiGaugeHistoryCard metric="novos_leads"  leads={allLeads} loading={loading} />
+              <KpiGaugeHistoryCard metric="atendimento"  leads={allLeads} loading={loading} />
+              <KpiGaugeHistoryCard metric="agendamento"  leads={allLeads} loading={loading} />
+              <KpiGaugeHistoryCard metric="visitas"      leads={allLeads} loading={loading} />
             </div>
           </section>
 
@@ -118,8 +118,8 @@ export default function MetricsView() {
               Resultados Comerciais
             </h2>
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-              <KpiGaugeHistoryCard metric="proposta" leads={filteredLeads} loading={loading} />
-              <KpiGaugeHistoryCard metric="vendas"   leads={filteredLeads} loading={loading} />
+              <KpiGaugeHistoryCard metric="proposta" leads={allLeads} loading={loading} />
+              <KpiGaugeHistoryCard metric="vendas"   leads={allLeads} loading={loading} />
             </div>
           </section>
 

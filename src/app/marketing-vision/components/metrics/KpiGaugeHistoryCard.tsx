@@ -15,6 +15,7 @@ import {
 import type { Lead } from '../../types'
 import { calculateMetricsByPeriod, type PeriodMetrics } from '../../utils/metrics'
 import GlassCard from '../ui/GlassCard'
+import { useData } from '../../context/DataContext'
 
 // ─────────────────────────────────────────────
 // Types
@@ -304,6 +305,7 @@ export default function KpiGaugeHistoryCard({
   loading = false,
 }: KpiGaugeHistoryCardProps) {
   const config = METRIC_CONFIGS[metric]
+  const { dateRange } = useData()
   const [granularity, setGranularity] = useState<Granularity>('month')
   const [displayMode, setDisplayMode] = useState<DisplayMode>('taxa')
 
@@ -319,7 +321,7 @@ export default function KpiGaugeHistoryCard({
 
   const valueKey = effectiveMode === 'taxa' ? config.rateKey : config.bruteKey
 
-  // Compute period data — already date-filtered by the caller
+  // Compute period data over the leads provided (which will be allLeads for full history)
   const periodData = useMemo(
     () => calculateMetricsByPeriod(leads, granularity),
     [leads, granularity]
@@ -335,8 +337,36 @@ export default function KpiGaugeHistoryCard({
     return raw.map((d, i) => ({ ...d, mediaMovel: movAvg[i] }))
   }, [periodData, valueKey])
 
-  // Current period value (last entry)
-  const currentValue = chartData.length > 0 ? chartData[chartData.length - 1].value : 0
+  // Identifica o período correspondente ao filtro ativo
+  const selectedPeriod = useMemo(() => {
+    if (!dateRange.start) return null
+    const parts = dateRange.start.split('-')
+    if (parts.length < 2) return null
+    const year = parts[0]
+    const month = parts[1]
+
+    if (granularity === 'month') {
+      return `${year}-${month}`
+    } else if (granularity === 'trimestre') {
+      const m = parseInt(month, 10)
+      const q = Math.ceil(m / 3)
+      return `${year}-Q${q}`
+    } else {
+      return year
+    }
+  }, [dateRange.start, granularity])
+
+  // Obtém o registro de período correspondente
+  const currentPeriodEntry = useMemo(() => {
+    if (selectedPeriod) {
+      const found = periodData.find(p => p.period === selectedPeriod)
+      if (found) return found
+    }
+    return periodData.length > 0 ? periodData[periodData.length - 1] : null
+  }, [periodData, selectedPeriod])
+
+  const currentValue = currentPeriodEntry ? (currentPeriodEntry[valueKey] as number) ?? 0 : 0
+  const currentLabel = currentPeriodEntry ? formatPeriodLabel(currentPeriodEntry.period) : '—'
 
   // Gauge scale max: max of (historical values, target × 1.5)
   const historicalMax = chartData.reduce((m, d) => Math.max(m, d.value), 0)
@@ -431,7 +461,7 @@ export default function KpiGaugeHistoryCard({
             isAbsolute={isAbsolute}
           />
           <p className="text-[10px] text-zinc-500 text-center">
-            {chartData.length > 0 ? chartData[chartData.length - 1].period : '—'}
+            {currentLabel}
           </p>
         </div>
 
