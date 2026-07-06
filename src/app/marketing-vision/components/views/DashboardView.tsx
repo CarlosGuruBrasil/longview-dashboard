@@ -13,7 +13,9 @@ import { isSale, getLeadValueNumber, getStatusColor, getOrigin } from '../../uti
 import { formatCurrency, formatNumber } from '../../utils/formatters'
 import GlassCard from '../ui/GlassCard'
 import FilterBar from '../ui/FilterBar'
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import type { BiInsights } from '../../types'
+
 
 const TICK = '#71717a'
 const GRID = 'rgba(255,255,255,0.05)'
@@ -257,6 +259,12 @@ export default function DashboardView() {
       .sort((a, b) => b.count - a.count);
   }, [filteredLeads]);
 
+  // Mix de leads (mídia paga Meta vs orgânicos)
+  const mixData = useMemo(() => [
+    { name: 'Meta Ads', value: metaLeads.length, color: '#3b82f6' },
+    { name: 'Canais Orgânicos / Outros', value: outrosLeads.length, color: '#a855f7' }
+  ], [metaLeads, outrosLeads]);
+
   const insights = useMemo(() => generateInsights(biData, allLeads, metaData), [biData, allLeads, metaData])
 
   if (loading && allLeads.length === 0) {
@@ -395,7 +403,7 @@ export default function DashboardView() {
         
         {/* ── Seção B: Funil de Vendas e Etapas do CRM ── */}
         <GlassCard title={`Linha do Tempo CRM — Distribuição por Etapas (${filteredLeads.length} leads)`}>
-          <div className="flex flex-col gap-3 max-h-[360px] overflow-y-auto pr-1">
+          <div className="flex flex-col gap-3 max-h-[380px] overflow-y-auto pr-1">
             {etapasCrmData.length === 0 ? (
               <p className="text-zinc-500 text-center text-xs py-8">Sem leads para distribuir nas etapas.</p>
             ) : (
@@ -427,39 +435,94 @@ export default function DashboardView() {
           </div>
         </GlassCard>
 
-        {/* ── Seção C: Outros Canais de Captação (Orgânicos / Manuais) ── */}
-        <GlassCard title={`Captação Orgânica & Outros Canais (${outrosLeads.length} leads)`}>
-          <div className="flex flex-col gap-3 max-h-[360px] overflow-y-auto pr-1">
-            {outrosCanaisData.length === 0 ? (
-              <p className="text-zinc-500 text-center text-xs py-8">Nenhum lead captado fora do tráfego pago no período.</p>
-            ) : (
-              outrosCanaisData.map((c, i) => (
-                <div
-                  key={c.name}
-                  onClick={() => filterAndNavigate({ origem: c.name })}
-                  className="flex flex-col gap-1.5 p-3 rounded-xl bg-white/[0.01] border border-white/5 hover:bg-white/5 cursor-pointer transition-all"
-                >
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="font-semibold text-zinc-200 flex items-center gap-2">
-                      <Compass size={14} className="text-zinc-500 shrink-0" />
-                      {c.name}
-                    </span>
-                    <span className="text-zinc-400">
-                      <strong className="text-white font-bold">{c.count}</strong> lead{c.count !== 1 ? 's' : ''} ({c.percentage}%)
-                    </span>
-                  </div>
-                  {/* Barra de Progresso com Paleta */}
-                  <div className="h-2 bg-white/5 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full rounded-full transition-all duration-500" 
-                      style={{ width: `${c.percentage}%`, backgroundColor: PALETTE[i % PALETTE.length] }}
+        {/* Coluna Direita: Donut Chart + Lista de Canais Orgânicos */}
+        <div className="flex flex-col gap-6">
+          
+          {/* 📊 Novo Gráfico: Mix de Captação */}
+          <GlassCard title="Mix de Captação (Mídia Paga vs Orgânico)">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-6 py-2 min-h-[140px] relative">
+              <div className="w-[120px] h-[120px] flex-shrink-0 relative flex items-center justify-center">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={mixData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={42}
+                      outerRadius={54}
+                      paddingAngle={3}
+                      dataKey="value"
+                    >
+                      {mixData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#18181b', borderColor: '#27272a', borderRadius: '8px', fontSize: '11px' }}
+                      itemStyle={{ color: '#fff' }}
                     />
-                  </div>
+                  </PieChart>
+                </ResponsiveContainer>
+                {/* Texto Centralizado */}
+                <div className="absolute flex flex-col items-center justify-center">
+                  <span className="text-lg font-bold text-white leading-none">{formatNumber(filteredLeads.length)}</span>
+                  <span className="text-[8px] text-zinc-500 font-semibold uppercase mt-0.5">Leads</span>
                 </div>
-              ))
-            )}
-          </div>
-        </GlassCard>
+              </div>
+
+              {/* Legenda Detalhada */}
+              <div className="flex flex-col gap-2 text-xs">
+                {mixData.map(d => {
+                  const pct = filteredLeads.length > 0 ? ((d.value / filteredLeads.length) * 100).toFixed(1) : '0.0';
+                  return (
+                    <div key={d.name} className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
+                      <div className="flex flex-col">
+                        <span className="text-zinc-200 font-semibold leading-tight">{d.name}</span>
+                        <span className="text-[10px] text-zinc-500">{formatNumber(d.value)} leads ({pct}%)</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </GlassCard>
+
+          {/* ── Seção C: Outros Canais de Captação (Orgânicos / Manuais) ── */}
+          <GlassCard title={`Captação Orgânica & Outros Canais (${outrosLeads.length} leads)`}>
+            <div className="flex flex-col gap-3 max-h-[220px] overflow-y-auto pr-1">
+              {outrosCanaisData.length === 0 ? (
+                <p className="text-zinc-500 text-center text-xs py-8">Nenhum lead captado fora do tráfego pago no período.</p>
+              ) : (
+                outrosCanaisData.map((c, i) => (
+                  <div
+                    key={c.name}
+                    onClick={() => filterAndNavigate({ origem: c.name })}
+                    className="flex flex-col gap-1.5 p-3 rounded-xl bg-white/[0.01] border border-white/5 hover:bg-white/5 cursor-pointer transition-all"
+                  >
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="font-semibold text-zinc-200 flex items-center gap-2">
+                        <Compass size={14} className="text-zinc-500 shrink-0" />
+                        {c.name}
+                      </span>
+                      <span className="text-zinc-400">
+                        <strong className="text-white font-bold">{c.count}</strong> lead{c.count !== 1 ? 's' : ''} ({c.percentage}%)
+                      </span>
+                    </div>
+                    {/* Barra de Progresso com Paleta */}
+                    <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full rounded-full transition-all duration-500" 
+                        style={{ width: `${c.percentage}%`, backgroundColor: PALETTE[i % PALETTE.length] }}
+                      />
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </GlassCard>
+
+        </div>
 
       </div>
 
