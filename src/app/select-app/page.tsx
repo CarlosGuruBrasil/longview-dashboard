@@ -30,13 +30,88 @@ interface SelectAppJwtPayload {
   };
 }
 
+const APPS = [
+  {
+    key: 'project',
+    href: '/project-vision',
+    label: 'Project Vision',
+    tag: 'Gestão & Cronograma',
+    description: 'Projetos, rotas operacionais, cronograma de obras, Kanbans e andamentos das tarefas LongView.',
+    icon: Building2,
+    color: 'blue',
+    accent: 'bg-blue-500/12 border-blue-400/20 text-blue-300',
+    cardHover: 'hover:border-blue-300/30 hover:bg-blue-500/[0.045]',
+    cardBorder: 'border-blue-400/15',
+    tagColor: 'text-blue-300/80',
+    btnClass: 'bg-blue-500/90 hover:bg-blue-400 shadow-[0_12px_28px_rgba(59,130,246,0.18)]',
+    permKey: 'hasProjectAccess',
+  },
+  {
+    key: 'marketing',
+    href: '/marketing-vision',
+    label: 'Marketing Vision',
+    tag: 'Vendas & Ads',
+    description: 'Métricas do CRM CV, controle de leads, oportunidades, auditoria de campanhas Meta Ads e estoque de unidades.',
+    icon: TrendingUp,
+    color: 'orange',
+    accent: 'bg-orange-500/12 border-orange-400/20 text-orange-300',
+    cardHover: 'hover:border-orange-300/30 hover:bg-orange-500/[0.045]',
+    cardBorder: 'border-orange-400/15',
+    tagColor: 'text-orange-300/80',
+    btnClass: 'bg-orange-500/90 hover:bg-orange-400 shadow-[0_12px_28px_rgba(249,115,22,0.18)]',
+    permKey: 'hasMarketingAccess',
+  },
+  {
+    key: 'people',
+    href: '/people-vision',
+    label: 'People Vision',
+    tag: 'Pessoas & Acesso',
+    description: 'Gestão de colaboradores, cadastro via convite com fluxo de aprovação, notificações push e controle de acesso.',
+    icon: Users,
+    color: 'emerald',
+    accent: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400',
+    cardHover: 'hover:border-emerald-300/30 hover:bg-emerald-500/[0.045]',
+    cardBorder: 'border-emerald-400/15',
+    tagColor: 'text-emerald-300/80',
+    btnClass: 'bg-emerald-500/90 hover:bg-emerald-400 shadow-[0_12px_28px_rgba(16,185,129,0.18)]',
+    permKey: 'hasPeopleAccess',
+  },
+  {
+    key: 'quality',
+    href: '/quality-vision',
+    label: 'Quality Vision',
+    tag: 'Quality & Obras',
+    description: 'Inspeções e verificações integradas ao Construpoint. Fichas FVS, FVM, CHK, SEG, MA e EDU com série histórica.',
+    icon: ClipboardCheck,
+    color: 'violet',
+    accent: 'bg-violet-500/12 border-violet-400/20 text-violet-300',
+    cardHover: 'hover:border-violet-300/30 hover:bg-violet-500/[0.045]',
+    cardBorder: 'border-violet-400/15',
+    tagColor: 'text-violet-300/80',
+    btnClass: 'bg-violet-500/90 hover:bg-violet-400 shadow-[0_12px_28px_rgba(139,92,246,0.18)]',
+    permKey: 'hasQualityAccess',
+  },
+  {
+    key: 'sales',
+    href: '/sales-vision',
+    label: 'Sales Vision',
+    tag: 'VGV & Performance',
+    description: 'VGV por empreendimento, ticket médio, ciclo de venda, performance de corretores, reservas e contratos.',
+    icon: ShoppingBag,
+    color: 'sky',
+    accent: 'bg-sky-500/12 border-sky-400/20 text-sky-300',
+    cardHover: 'hover:border-sky-300/30 hover:bg-sky-500/[0.045]',
+    cardBorder: 'border-sky-400/15',
+    tagColor: 'text-sky-300/80',
+    btnClass: 'bg-sky-500/90 hover:bg-sky-400 shadow-[0_12px_28px_rgba(14,165,233,0.18)]',
+    permKey: 'hasSalesAccess',
+  },
+] as const;
+
 export default async function SelectAppPage() {
   const cookieStore = await cookies();
   const token = cookieStore.get('auth_token')?.value;
-
-  if (!token) {
-    redirect('/login');
-  }
+  if (!token) redirect('/login');
 
   let user: SelectAppJwtPayload | null = null;
   try {
@@ -46,18 +121,19 @@ export default async function SelectAppPage() {
   }
 
   const { role, permissions, name } = user;
-
-  // Verificar permissões
   const isDeveloper = role === 'Desenvolvedor';
-  const hasProjectAccess   = isDeveloper || permissions?.viewProjectVision === true;
-  const hasMarketingAccess = isDeveloper || permissions?.viewMarketingDashboard === true;
-  const hasPeopleAccess        = isDeveloper || permissions?.viewPeopleVision === true;
-  const hasQualityAccess   = isDeveloper || permissions?.viewQualityVision === true;
-  const hasSalesAccess     = isDeveloper || permissions?.viewSalesVision === true;
+
+  const access: Record<string, boolean> = {
+    hasProjectAccess:   isDeveloper || permissions?.viewProjectVision === true,
+    hasMarketingAccess: isDeveloper || permissions?.viewMarketingDashboard === true,
+    hasPeopleAccess:    isDeveloper || permissions?.viewPeopleVision === true,
+    hasQualityAccess:   isDeveloper || permissions?.viewQualityVision === true,
+    hasSalesAccess:     isDeveloper || permissions?.viewSalesVision === true,
+  };
 
   return (
     <main
-      className="min-h-screen bg-[#09090b] flex flex-col justify-between px-5 pb-8 relative overflow-hidden"
+      className="min-h-screen bg-[#09090b] flex flex-col px-5 pb-8 relative overflow-hidden"
       style={{ paddingTop: 'max(env(safe-area-inset-top), 16px)' }}
     >
       {/* Background Glows */}
@@ -65,12 +141,12 @@ export default async function SelectAppPage() {
       <div className="absolute bottom-[-30%] right-[-20%] w-[800px] h-[800px] rounded-full bg-blue-500/5 blur-[160px] pointer-events-none" />
 
       {/* Header */}
-      <header className="h-16 w-full relative z-10 shrink-0">
-        <div className="hidden md:block absolute left-0 top-1/2 -translate-y-1/2">
+      <header className="h-16 w-full relative z-10 shrink-0 flex items-center justify-between">
+        <div className="flex-1 flex justify-start">
           <SelectAppHeaderStatus />
         </div>
 
-        <div className="absolute left-1/2 top-1/2 h-[54px] w-[194px] -translate-x-1/2 -translate-y-1/2">
+        <div className="relative h-[54px] w-[194px] shrink-0">
           <Image
             src="/logolongview.png"
             alt="LongView"
@@ -81,7 +157,7 @@ export default async function SelectAppPage() {
           />
         </div>
 
-        <div className="absolute right-0 top-1/2 -translate-y-1/2">
+        <div className="flex-1 flex justify-end">
           <a
             href="/api/auth/logout"
             className="flex items-center gap-1.5 text-xs font-bold text-red-400 hover:text-red-300 bg-red-500/10 border border-red-500/20 hover:border-red-400/30 rounded-xl px-4 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-xl transition-all duration-200"
@@ -92,227 +168,76 @@ export default async function SelectAppPage() {
         </div>
       </header>
 
-      {/* Corpo Central */}
-      <div className="flex-1 flex flex-col items-center justify-center max-w-[1400px] w-full mx-auto relative z-10 my-4 md:my-8">
-        <div className="text-center mb-6 md:mb-10 max-w-4xl flex flex-col items-center">
-          <div className="flex flex-col items-center justify-center pt-4 md:-translate-y-14 md:-mt-10">
-            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white tracking-tight">
-              Olá, {name}
-            </h2>
-            <p className="text-sm text-zinc-400 mt-1.5 text-center lg:whitespace-nowrap">
-              Selecione qual aplicativo deseja acessar no momento de acordo com suas liberações:
-            </p>
-          </div>
-          <span className="inline-flex mt-6 text-[11px] uppercase font-bold tracking-wider px-2.5 py-1 rounded bg-white/5 border border-white/10 text-zinc-400">
-            Ambiente Integrado
-          </span>
-        </div>
+      {/* Greeting */}
+      <div className="relative z-10 text-center mt-6 mb-8">
+        <h2 className="text-2xl md:text-3xl font-bold text-white tracking-tight">
+          Olá, {name}
+        </h2>
+        <p className="text-sm text-zinc-500 mt-1.5">
+          Selecione o módulo que deseja acessar
+        </p>
+        <span className="inline-flex mt-4 text-[10px] uppercase font-bold tracking-wider px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-zinc-500">
+          Ambiente Integrado
+        </span>
+      </div>
 
-        {/* Grid dos Cards de Aplicativos */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 w-full max-w-[1400px] justify-center">
-          
-          {/* Card: Project Vision */}
-          <div className={`
-            bg-white/[0.035] border border-blue-400/15 rounded-2xl p-6.5 flex flex-col justify-between min-h-[260px] relative transition-all duration-300 group shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur-2xl
-            ${hasProjectAccess 
-              ? 'hover:border-blue-300/30 hover:bg-blue-500/[0.045]' 
-              : 'opacity-50'
-            }
-          `}>
-            <div>
-              <div className="w-12 h-12 rounded-xl bg-blue-500/12 border border-blue-400/20 text-blue-300 flex items-center justify-center mb-5">
-                <Building2 size={24} />
-              </div>
-              <h3 className="text-lg font-bold text-white group-hover:text-blue-300 transition-colors">
-                Project Vision
-              </h3>
-              <p className="text-[11px] text-blue-300/80 font-bold uppercase tracking-wider mt-1">Gestão & Cronograma</p>
-              <p className="text-xs leading-relaxed text-zinc-400 mt-2">
-                Acompanhamento e gestão de projetos, rotas operacionais, status de contratações, cronograma de obras, Kanbans e andamentos das tarefas LongView.
-              </p>
-            </div>
-
-            <div className="mt-6 flex items-center justify-between">
-              {hasProjectAccess ? (
-                <Link
-                  href="/project-vision"
-                  className="flex items-center gap-1.5 text-xs font-bold bg-blue-500/90 hover:bg-blue-400 text-white px-4.5 py-2.5 rounded-xl transition-all duration-200 cursor-pointer shadow-[0_12px_28px_rgba(59,130,246,0.18)]"
-                >
-                  <span>Entrar no App</span>
-                  <ArrowRight size={14} />
-                </Link>
-              ) : (
-                <div className="flex items-center gap-1.5 text-xs text-zinc-500 font-semibold bg-white/5 border border-white/5 px-4.5 py-2.5 rounded-xl">
-                  <Lock size={14} />
-                  <span>Acesso Restrito</span>
+      {/* Grid de Apps */}
+      <div className="relative z-10 flex-1 w-full max-w-5xl mx-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
+          {APPS.map((app) => {
+            const hasAccess = access[app.permKey];
+            const Icon = app.icon;
+            return (
+              <div
+                key={app.key}
+                className={`
+                  bg-white/[0.035] border ${app.cardBorder} rounded-2xl p-5 flex flex-col gap-4
+                  shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur-2xl
+                  transition-all duration-300 group
+                  ${hasAccess ? `${app.cardHover} cursor-default` : 'opacity-40'}
+                `}
+              >
+                {/* Icon + label */}
+                <div className="flex items-start gap-3">
+                  <div className={`w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 ${app.accent}`}>
+                    <Icon size={20} />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-base font-bold text-white leading-tight">{app.label}</h3>
+                    <p className={`text-[10px] font-bold uppercase tracking-wider mt-0.5 ${app.tagColor}`}>{app.tag}</p>
+                  </div>
                 </div>
-              )}
-            </div>
-          </div>
 
-          {/* Card: Marketing Vision */}
-          <div className={`
-            bg-white/[0.035] border border-orange-400/15 rounded-2xl p-6.5 flex flex-col justify-between min-h-[260px] relative transition-all duration-300 group shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur-2xl
-            ${hasMarketingAccess 
-              ? 'hover:border-orange-300/30 hover:bg-orange-500/[0.045]' 
-              : 'opacity-50'
-            }
-          `}>
-            <div>
-              <div className="w-12 h-12 rounded-xl bg-orange-500/12 border border-orange-400/20 text-orange-300 flex items-center justify-center mb-5">
-                <TrendingUp size={24} />
+                {/* Description */}
+                <p className="text-xs leading-relaxed text-zinc-400 flex-1">
+                  {app.description}
+                </p>
+
+                {/* Action */}
+                {hasAccess ? (
+                  <Link
+                    href={app.href}
+                    className={`flex items-center justify-center gap-1.5 text-xs font-bold text-white px-4 py-2.5 rounded-xl transition-all duration-200 ${app.btnClass}`}
+                  >
+                    <span>Entrar no App</span>
+                    <ArrowRight size={13} />
+                  </Link>
+                ) : (
+                  <div className="flex items-center justify-center gap-1.5 text-xs text-zinc-600 font-semibold bg-white/5 border border-white/5 px-4 py-2.5 rounded-xl">
+                    <Lock size={13} />
+                    <span>Acesso Restrito</span>
+                  </div>
+                )}
               </div>
-              <h3 className="text-lg font-bold text-white group-hover:text-orange-300 transition-colors">
-                Marketing Vision
-              </h3>
-              <p className="text-[11px] text-orange-300/80 font-bold uppercase tracking-wider mt-1">Vendas & Ads</p>
-              <p className="text-xs leading-relaxed text-zinc-400 mt-2">
-                Métricas e análise comercial do CRM CV, controle completo de leads, oportunidades e perdas, auditoria de campanhas Meta Ads e controle de estoque de unidades.
-              </p>
-            </div>
-
-            <div className="mt-6 flex items-center justify-between">
-              {hasMarketingAccess ? (
-                <Link
-                  href="/marketing-vision"
-                  className="flex items-center gap-1.5 text-xs font-bold bg-orange-500/90 hover:bg-orange-400 text-white px-4.5 py-2.5 rounded-xl transition-all duration-200 cursor-pointer shadow-[0_12px_28px_rgba(249,115,22,0.18)]"
-                >
-                  <span>Entrar no App</span>
-                  <ArrowRight size={14} />
-                </Link>
-              ) : (
-                <div className="flex items-center gap-1.5 text-xs text-zinc-500 font-semibold bg-white/5 border border-white/5 px-4.5 py-2.5 rounded-xl">
-                  <Lock size={14} />
-                  <span>Acesso Restrito</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Card: People Vision */}
-          <div className={`
-            bg-white/[0.035] border border-emerald-400/15 rounded-2xl p-6.5 flex flex-col justify-between min-h-[260px] relative transition-all duration-300 group shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur-2xl
-            ${hasPeopleAccess
-              ? 'hover:border-emerald-300/30 hover:bg-emerald-500/[0.045]'
-              : 'opacity-50'
-            }
-          `}>
-            <div>
-              <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mb-5">
-                <Users size={24} />
-              </div>
-              <h3 className="text-lg font-bold text-white group-hover:text-emerald-400 transition-colors">
-                People Vision
-              </h3>
-              <p className="text-[11px] text-emerald-300/80 font-bold uppercase tracking-wider mt-1">Pessoas & Acesso</p>
-              <p className="text-xs leading-relaxed text-zinc-400 mt-2">
-                Gestão de colaboradores, perfis completos, cadastro via convite com fluxo de aprovação, notificações push e controle de acesso ao sistema.
-              </p>
-            </div>
-
-            <div className="mt-6 flex items-center justify-between">
-              {hasPeopleAccess ? (
-                <Link
-                  href="/people-vision"
-                  className="flex items-center gap-1.5 text-xs font-bold bg-emerald-500/90 hover:bg-emerald-400 text-white px-4.5 py-2.5 rounded-xl transition-all duration-200 cursor-pointer shadow-[0_12px_28px_rgba(16,185,129,0.18)]"
-                >
-                  <span>Entrar no App</span>
-                  <ArrowRight size={14} />
-                </Link>
-              ) : (
-                <div className="flex items-center gap-1.5 text-xs text-zinc-500 font-semibold bg-white/5 border border-white/5 px-4.5 py-2.5 rounded-xl">
-                  <Lock size={14} />
-                  <span>Acesso Restrito</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Card: Quality Vision */}
-          <div className={`
-            bg-white/[0.035] border border-violet-400/15 rounded-2xl p-6.5 flex flex-col justify-between min-h-[260px] relative transition-all duration-300 group shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur-2xl
-            ${hasQualityAccess
-              ? 'hover:border-violet-300/30 hover:bg-violet-500/[0.045]'
-              : 'opacity-50'
-            }
-          `}>
-            <div>
-              <div className="w-12 h-12 rounded-xl bg-violet-500/12 border border-violet-400/20 text-violet-300 flex items-center justify-center mb-5">
-                <ClipboardCheck size={24} />
-              </div>
-              <h3 className="text-lg font-bold text-white group-hover:text-violet-300 transition-colors">
-                Quality Vision
-              </h3>
-              <p className="text-[11px] text-violet-300/80 font-bold uppercase tracking-wider mt-1">Quality & Obras</p>
-              <p className="text-xs leading-relaxed text-zinc-400 mt-2">
-                Painel de inspeções e verificações integrado ao Construpoint. Acompanhe fichas FVS, FVM, CHK, SEG, MA e EDU com série histórica, taxas de aprovação e relatórios por obra.
-              </p>
-            </div>
-
-            <div className="mt-6 flex items-center justify-between">
-              {hasQualityAccess ? (
-                <Link
-                  href="/quality-vision"
-                  className="flex items-center gap-1.5 text-xs font-bold bg-violet-500/90 hover:bg-violet-400 text-white px-4.5 py-2.5 rounded-xl transition-all duration-200 cursor-pointer shadow-[0_12px_28px_rgba(139,92,246,0.18)]"
-                >
-                  <span>Entrar no App</span>
-                  <ArrowRight size={14} />
-                </Link>
-              ) : (
-                <div className="flex items-center gap-1.5 text-xs text-zinc-500 font-semibold bg-white/5 border border-white/5 px-4.5 py-2.5 rounded-xl">
-                  <Lock size={14} />
-                  <span>Acesso Restrito</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Card: Sales Vision */}
-          <div className={`
-            bg-white/[0.035] border border-sky-400/15 rounded-2xl p-6.5 flex flex-col justify-between min-h-[260px] relative transition-all duration-300 group shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur-2xl
-            ${hasSalesAccess
-              ? 'hover:border-sky-300/30 hover:bg-sky-500/[0.045]'
-              : 'opacity-50'
-            }
-          `}>
-            <div>
-              <div className="w-12 h-12 rounded-xl bg-sky-500/12 border border-sky-400/20 text-sky-300 flex items-center justify-center mb-5">
-                <ShoppingBag size={24} />
-              </div>
-              <h3 className="text-lg font-bold text-white group-hover:text-sky-300 transition-colors">
-                Sales Vision
-              </h3>
-              <p className="text-[11px] text-sky-300/80 font-bold uppercase tracking-wider mt-1">VGV & Performance</p>
-              <p className="text-xs leading-relaxed text-zinc-400 mt-2">
-                Acompanhamento de vendas, VGV por empreendimento, ticket médio, ciclo de venda, performance de corretores e imobiliárias, reservas e contratos.
-              </p>
-            </div>
-
-            <div className="mt-6 flex items-center justify-between">
-              {hasSalesAccess ? (
-                <Link
-                  href="/sales-vision"
-                  className="flex items-center gap-1.5 text-xs font-bold bg-sky-500/90 hover:bg-sky-400 text-white px-4.5 py-2.5 rounded-xl transition-all duration-200 cursor-pointer shadow-[0_12px_28px_rgba(14,165,233,0.18)]"
-                >
-                  <span>Entrar no App</span>
-                  <ArrowRight size={14} />
-                </Link>
-              ) : (
-                <div className="flex items-center gap-1.5 text-xs text-zinc-500 font-semibold bg-white/5 border border-white/5 px-4.5 py-2.5 rounded-xl">
-                  <Lock size={14} />
-                  <span>Acesso Restrito</span>
-                </div>
-              )}
-            </div>
-          </div>
-
+            );
+          })}
         </div>
       </div>
 
       {/* Footer */}
-      <footer className="text-center relative z-10">
-        <p className="text-[11px] text-zinc-600 tracking-wider uppercase font-semibold lg:whitespace-nowrap">
-          LongView Empreendimentos • Hauzi Tecnologia • Desenvolvido por Carlos Guru em 06/2026 V.1.
+      <footer className="text-center relative z-10 mt-8">
+        <p className="text-[10px] text-zinc-700 tracking-wider uppercase font-semibold">
+          LongView Empreendimentos • Hauzi Tecnologia • V.1 2026
         </p>
       </footer>
     </main>
