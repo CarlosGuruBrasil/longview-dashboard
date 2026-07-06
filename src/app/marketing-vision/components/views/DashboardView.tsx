@@ -238,6 +238,15 @@ export default function DashboardView() {
       .sort((a, b) => b.count - a.count);
   }, [outrosLeads]);
 
+  // Lista amigável de onde vêm os leads orgânicos para o subtítulo
+  const outrosCanaisSub = useMemo(() => {
+    if (outrosCanaisData.length === 0) return 'Canais não-pagos no período';
+    return outrosCanaisData
+      .slice(0, 3)
+      .map(c => `${c.name}: ${c.count}`)
+      .join(' · ');
+  }, [outrosCanaisData]);
+
   // 3. Classificação de leads por Etapas Reais do CRM
   const etapasCrmData = useMemo(() => {
     const map = new Map<string, { count: number; colorObj: any }>();
@@ -326,7 +335,7 @@ export default function DashboardView() {
         />
         <SmartKpi
           icon={Compass} label="Outros Canais (Orgânicos)" value={formatNumber(outrosLeads.length)}
-          sub="Canais não-pagos no período" color="#a855f7"
+          sub={outrosCanaisSub} color="#a855f7"
           onClick={() => filterAndNavigate({ origem: 'Painel' })}
         />
         <SmartKpi
