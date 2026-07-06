@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import SelectAppHeaderStatus from './SelectAppHeaderStatus';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'secret-longview-key';
+const JWT_SECRET = process.env.JWT_SECRET ?? (() => { throw new Error('[LongView] JWT_SECRET nao configurado. Defina no .env.local') })();
 
 interface SelectAppJwtPayload {
   name: string;

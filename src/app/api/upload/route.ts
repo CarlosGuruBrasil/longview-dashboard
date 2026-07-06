@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import jwt from 'jsonwebtoken';
 import { rateLimit, getClientIp } from '@/lib/rateLimit';
 
-const JWT_SECRET    = process.env.JWT_SECRET || 'secret-longview-key';
+const JWT_SECRET    = process.env.JWT_SECRET ?? (() => { throw new Error('[LongView] JWT_SECRET nao configurado. Defina no .env.local') })();
 const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 
 type AuthUser = {

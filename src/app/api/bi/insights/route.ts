@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import jwt from 'jsonwebtoken';
 import { sql } from '@/lib/pg';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'secret-longview-key';
+const JWT_SECRET = process.env.JWT_SECRET ?? (() => { throw new Error('[LongView] JWT_SECRET nao configurado. Defina no .env.local') })();
 
 type AuthUser = { role?: string; email?: string };
 

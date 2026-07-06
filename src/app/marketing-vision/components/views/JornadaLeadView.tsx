@@ -3,11 +3,14 @@
 import { useState, useMemo } from 'react'
 import {
   MapPin, Clock, ArrowRight, ExternalLink, Filter,
-  Users, Megaphone, ShoppingBag, ChevronRight, Radio, Search
+  Users, Megaphone, ShoppingBag, ChevronRight, Radio, Search, Database
 } from 'lucide-react'
 import { useData } from '../../context/DataContext'
 import type { Lead } from '../../types'
 import FilterBar from '../ui/FilterBar'
+import DataTable from '../ui/DataTable'
+import { formatDate } from '../../utils/formatters'
+
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -195,6 +198,7 @@ function LeadJourneyRow({ lead }: { lead: Lead }) {
 export default function JornadaLeadView() {
   const { filteredLeads, loading } = useData()
   const [search, setSearch] = useState('')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'data'>('dashboard')
 
   const leads = useMemo(() => {
     const q = search.toLowerCase().trim()
@@ -229,51 +233,112 @@ export default function JornadaLeadView() {
         </div>
       </div>
 
-      {/* Filtro + busca */}
-      <div className="flex flex-col sm:flex-row gap-2">
-        <div className="relative flex-1">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
-          <input
-            type="text"
-            placeholder="Buscar por nome, email, origem ou empreendimento…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full h-9 pl-9 pr-4 text-sm bg-white/[0.03] border border-white/[0.08] rounded-xl text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-orange-500/40 focus:bg-white/[0.05] transition-all"
-          />
-        </div>
-        <FilterBar />
+      {/* Abas Superiores - Estilo Adidas */}
+      <div className="flex border-b border-white/10 -mb-px">
+        <button
+          onClick={() => setActiveTab('dashboard')}
+          className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors border-b-2 -mb-px ${
+            activeTab === 'dashboard'
+              ? 'border-sky-500 text-sky-400 bg-sky-500/10'
+              : 'border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-white/5'
+          }`}
+        >
+          Visualização em Linha do Tempo
+        </button>
+        <button
+          onClick={() => setActiveTab('data')}
+          className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors border-b-2 -mb-px flex items-center gap-1.5 ${
+            activeTab === 'data'
+              ? 'border-sky-500 text-sky-400 bg-sky-500/10'
+              : 'border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-white/5'
+          }`}
+        >
+          <Database size={14} /> Tabela de Dados
+        </button>
       </div>
 
-      {/* Legenda da jornada */}
-      <div className="flex items-center gap-2 flex-wrap">
-        {JOURNEY_STEPS.map((step, i) => (
-          <div key={step.key} className="flex items-center gap-1">
-            <span className="text-[10px] font-semibold px-2 py-0.5 rounded" style={{ backgroundColor: `${step.color}15`, color: step.color }}>
-              {step.label}
-            </span>
-            {i < JOURNEY_STEPS.length - 1 && <ArrowRight size={10} className="text-zinc-700" />}
+      {activeTab === 'dashboard' ? (
+        <>
+          {/* Filtro + busca */}
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="relative flex-1">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
+              <input
+                type="text"
+                placeholder="Buscar por nome, email, origem ou empreendimento…"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="w-full h-9 pl-9 pr-4 text-sm bg-white/[0.03] border border-white/[0.08] rounded-xl text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-orange-500/40 focus:bg-white/[0.05] transition-all"
+              />
+            </div>
+            <FilterBar />
           </div>
-        ))}
-      </div>
 
-      {/* Lista de leads com jornada */}
-      <div className="flex flex-col gap-2">
-        {leads.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 gap-3">
-            <Users size={32} className="text-zinc-700" />
-            <p className="text-zinc-500 text-sm">Nenhum lead encontrado com esses filtros</p>
+          {/* Legenda da jornada */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {JOURNEY_STEPS.map((step, i) => (
+              <div key={step.key} className="flex items-center gap-1">
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded" style={{ backgroundColor: `${step.color}15`, color: step.color }}>
+                  {step.label}
+                </span>
+                {i < JOURNEY_STEPS.length - 1 && <ArrowRight size={10} className="text-zinc-700" />}
+              </div>
+            ))}
           </div>
-        ) : (
-          leads.slice(0, 100).map(lead => (
-            <LeadJourneyRow key={lead.idlead ?? lead.id} lead={lead} />
-          ))
-        )}
-        {leads.length > 100 && (
-          <p className="text-xs text-zinc-500 text-center py-2">
-            Mostrando 100 de {leads.length} leads · Use filtros para refinar
-          </p>
-        )}
-      </div>
+
+          {/* Lista de leads com jornada */}
+          <div className="flex flex-col gap-2">
+            {leads.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 gap-3">
+                <Users size={32} className="text-zinc-700" />
+                <p className="text-zinc-500 text-sm">Nenhum lead encontrado com esses filtros</p>
+              </div>
+            ) : (
+              leads.slice(0, 100).map(lead => (
+                <LeadJourneyRow key={lead.idlead ?? lead.id} lead={lead} />
+              ))
+            )}
+            {leads.length > 100 && (
+              <p className="text-xs text-zinc-500 text-center py-2">
+                Mostrando 100 de {leads.length} leads · Use filtros para refinar
+              </p>
+            )}
+          </div>
+        </>
+      ) : (
+        <DataTable<any>
+          title="Tabela de Rastreamento e Atribuição de Mídia"
+          rows={leads}
+          exportFileName="jornada_atribuicao_leads"
+          searchFields={['nome', 'email', 'telefone', 'celular', 'midia_principal']}
+          searchPlaceholder="Buscar lead por nome, contato, mídia..."
+          defaultSortField="data_cadastro"
+          columns={[
+            { label: 'Nome', field: 'nome', render: row => <span className="font-semibold text-zinc-100">{row.nome || 'Sem Nome'}</span> },
+            { label: 'Contato', render: row => (
+                <div className="flex flex-col text-[11px] text-zinc-400">
+                  <span>{row.email || '—'}</span>
+                  <span>{row.celular || row.telefone || '—'}</span>
+                </div>
+              ),
+              csvValue: row => `${row.email || ''} / ${row.celular || row.telefone || ''}`
+            },
+            { label: 'Origem de Mídia', render: row => getLeadOrigin(row), csvValue: row => getLeadOrigin(row) },
+            { label: 'Mídia / Campanha', field: 'midia_principal', render: row => row.midia_principal || '—' },
+            { label: 'Etapa CRM', field: 'situacao', render: row => (
+                <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-white/5 border border-white/10 text-zinc-300">
+                  {row.situacao?.nome || 'Sem Situação'}
+                </span>
+              ),
+              csvValue: row => row.situacao?.nome || ''
+            },
+            { label: 'Lançamento', render: row => getLeadEmpreendimento(row), csvValue: row => getLeadEmpreendimento(row) },
+            { label: 'Corretor', render: row => row.corretor?.nome || '—', csvValue: row => row.corretor?.nome || '' },
+            { label: 'Temperatura', field: 'temperatura', render: row => row.temperatura || '—' },
+            { label: 'Cadastro', field: 'data_cadastro', render: row => formatDate(getLeadDate(row)) }
+          ]}
+        />
+      )}
     </div>
   )
 }

@@ -4,7 +4,7 @@ import { rateLimit, getClientIp } from '@/lib/rateLimit';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'secret-longview-key';
+const JWT_SECRET = process.env.JWT_SECRET ?? (() => { throw new Error('[LongView] JWT_SECRET nao configurado. Defina no .env.local') })();
 
 export async function POST(request: NextRequest) {
   // Rate limiting agressivo no login: 10 tentativas por 5 minutos por IP

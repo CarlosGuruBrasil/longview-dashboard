@@ -1,7 +1,8 @@
 'use client';
 import React, { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
-import type { Lead, MetaData, EstoqueData, MetaLeadForm, MetaPageInfo, DateRange, ActiveView, LeadSituacao } from '../types';
+import type { Lead, MetaData, EstoqueData, MetaLeadForm, MetaPageInfo, DateRange, ActiveView, LeadSituacao, LeadSummary } from '../types';
 import { toISODate, getOrigin } from '../utils/leads';
+
 
 export interface LeadFilters {
   origem?: string;
@@ -21,6 +22,10 @@ interface DataContextValue {
   loading: boolean;
   dataError: string | null;
   metaValidation: { orphanedLeads: unknown[]; totalMetaLeads: number; error: string | null } | null;
+
+  /** Dados pré-agregados pelo servidor (payload leve). Disponível logo no mount.
+   *  Use para cards de KPI e gráficos do dashboard. `null` enquanto carrega. */
+  leadSummary: LeadSummary | null;
 
   // detailed leads paginated
   detailedLeads: Lead[];
@@ -95,6 +100,9 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
   const [dateRange, setDateRange] = useState<DateRange>(defaultRange());
   const [leadFilters, setLeadFilters] = useState<LeadFilters>({});
   const [activeView, setActiveView] = useState<ActiveView>('dashboard');
+
+  // Lead summary (dados agregados — payload leve do servidor)
+  const [leadSummary, setLeadSummary] = useState<LeadSummary | null>(null);
 
   // Detailed leads pagination states
   const [detailedLeads, setDetailedLeads] = useState<Lead[]>([]);
@@ -184,9 +192,21 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
       if (options?.validateMeta) params.set('validateMeta', 'true');
       const qs = params.toString();
       const url = `/api/data${qs ? '?' + qs : ''}`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
+
+      // Busca dados principais + leadSummary em paralelo (sem bloquear um no outro)
+      const aggParams = new URLSearchParams({ aggregate: 'true' });
+      if (r.start) aggParams.set('start', r.start);
+      if (r.end)   aggParams.set('end', r.end);
+
+      const [res, aggRes] = await Promise.allSettled([
+        fetch(url),
+        fetch(`/api/data?${aggParams.toString()}`),
+      ]);
+
+      if (res.status !== 'fulfilled' || !res.value.ok)
+        throw new Error(`HTTP ${res.status === 'fulfilled' ? res.value.status : 'network error'}`);
+
+      const data = await res.value.json();
       const leads = data.leads?.leads ?? data.leads ?? [];
       setAllLeads(Array.isArray(leads) ? leads : []);
       setCrmTotal(data.leads?.crmTotal ?? leads.length);
@@ -197,6 +217,12 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
       setMetaValidation(data.metaValidation ?? null);
       setUpdatedAt(data.updatedAt ?? new Date().toISOString());
       setDataError(null);
+
+      // Popula leadSummary se o aggregate retornou OK (não bloqueia o fluxo principal)
+      if (aggRes.status === 'fulfilled' && aggRes.value.ok) {
+        const aggData = await aggRes.value.json();
+        if (aggData.leadSummary) setLeadSummary(aggData.leadSummary);
+      }
 
       // Auto trigger detailed fetch on refresh to match dates
       await fetchDetailedLeads(1, detailedLimit, r);
@@ -214,12 +240,34 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
     setLeadFilters({});
   }, []);
 
-  // Initial load — fetches data once on mount
+  /**
+   * Busca dados agregados (< 5 KB) explicitamente — útil para atualizar
+   * apenas o leadSummary sem fazer o refresh completo de leads.
+   * O mount inicial continua usando refresh() para garantir que o Meta
+   * seja buscado ao vivo quando o cache estiver stale.
+   */
+  const fetchAggregate = useCallback(async (rangeOverride?: DateRange) => {
+    try {
+      const r = rangeOverride ?? dateRange;
+      const params = new URLSearchParams({ aggregate: 'true' });
+      if (r.start) params.set('start', r.start);
+      if (r.end)   params.set('end', r.end);
+      const res = await fetch(`/api/data?${params.toString()}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.leadSummary) setLeadSummary(data.leadSummary);
+    } catch (e) {
+      console.warn('[DataContext] fetchAggregate error:', e);
+    }
+  }, [dateRange]);
+
+  // Initial load — comportamento original mantido (refresh ao vivo garante Meta atualizado).
+  // leadSummary é populado em paralelo dentro do refresh().
   useEffect(() => {
     let active = true;
     const id = window.setTimeout(async () => {
       if (allLeads.length === 0) {
-        await refresh(); // refresh already awaits fetchDetailedLeads internally
+        await refresh(); // refresh já chama fetchAggregate em paralelo internamente
       } else if (active) {
         await fetchDetailedLeads(1, detailedLimit);
       }
@@ -235,6 +283,7 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
     <DataContext.Provider value={{
       allLeads, metaData, estoque, leadForms, metaPage,
       crmTotal, updatedAt, loading, dataError, metaValidation,
+      leadSummary,
       detailedLeads, detailedPage, detailedLimit, detailedTotal, detailedLoading, fetchDetailedLeads,
       filteredLeads,
       dateRange, setDateRange, leadFilters, setLeadFilters, clearFilters,

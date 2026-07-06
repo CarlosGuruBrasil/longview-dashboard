@@ -5,7 +5,7 @@ import axios from 'axios';
 import { sql, ensureSchema } from '@/lib/pg';
 import { createCrmLead } from '@/lib/cvcrm';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'secret-longview-key';
+const JWT_SECRET = process.env.JWT_SECRET ?? (() => { throw new Error('[LongView] JWT_SECRET nao configurado. Defina no .env.local') })();
 const META_BASE = 'https://graph.facebook.com/v21.0';
 
 export const dynamic = 'force-dynamic';

@@ -313,6 +313,49 @@ export interface CvdwVenda {
   }>;
 }
 
+// ── Lead Summary (modo agregado, payload leve) ────────────────────────────────
+
+export interface LeadSummaryBySituacao {
+  nome: string;
+  total: number;
+}
+
+export interface LeadSummaryByOrigem {
+  origem: string;
+  total: number;
+}
+
+export interface LeadSummaryByEmpreendimento {
+  empreendimento: string;
+  total: number;
+}
+
+export interface LeadSummaryByCorretor {
+  corretor: string;
+  total: number;
+}
+
+export interface LeadSummaryMonthly {
+  mes: string; // YYYY-MM
+  total: number;
+}
+
+/** Dados analíticos pré-calculados no servidor — substitui o array bruto de leads
+ *  no carregamento inicial. Payload alvo: < 5 KB (vs ~8 MB do array bruto).
+ */
+export interface LeadSummary {
+  totalLeads: number;
+  totalLeadsFiltered: number;
+  avgScore: number | null;
+  pctBolsao: number;
+  bySituacao: LeadSummaryBySituacao[];
+  byOrigem: LeadSummaryByOrigem[];
+  byEmpreendimento: LeadSummaryByEmpreendimento[];
+  byCorretor: LeadSummaryByCorretor[];
+  monthly: LeadSummaryMonthly[];
+  topTemperatura: { temperatura: string; total: number }[];
+}
+
 // ── UI helpers ────────────────────────────────────────────────────────────────
 
 export interface StatusColor {

@@ -9,6 +9,7 @@ import {
   TrendingUp,
   BarChart2,
   Search,
+  Database
 } from 'lucide-react'
 import { useData } from '../../context/DataContext'
 import { getOrigin } from '../../utils/leads'
@@ -17,7 +18,8 @@ import KpiCard from '../ui/KpiCard'
 import GlassCard from '../ui/GlassCard'
 import PieDonutChart from '../charts/PieDonutChart'
 import MetaDailyChart from '../charts/MetaDailyChart'
-import type { MetaCampaignInsight } from '../../types'
+import DataTable from '../ui/DataTable'
+import type { MetaCampaignInsight, MetaAdset, MetaDemographic, MetaRegion } from '../../types'
 
 type DailyMetric = 'spend' | 'impressions' | 'clicks'
 
@@ -38,6 +40,8 @@ function sumActions(actions: Array<{ action_type: string; value: string }> | und
 export default function MarketingAdsView() {
   const { metaData, filteredLeads, leadForms } = useData()
   const [dailyMetric, setDailyMetric] = useState<DailyMetric>('spend')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'data'>('dashboard')
+  const [dataSubTab, setDataSubTab] = useState<'campaigns' | 'adsets' | 'demographics' | 'regions'>('campaigns')
 
   const ageData = useMemo(() => {
     if (!metaData?.demographics?.length) return []
@@ -156,211 +160,354 @@ export default function MarketingAdsView() {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* KPI Row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <KpiCard icon={DollarSign} label="Investimento" value={formatCurrency(spend)} color="#f59e0b" />
-        <KpiCard icon={Users} label="Alcance" value={reach.toLocaleString('pt-BR')} color="#0ea5e9" />
-        <KpiCard icon={Eye} label="Impressões" value={impressions.toLocaleString('pt-BR')} color="#a855f7" />
-        <KpiCard icon={MousePointerClick} label="Cliques" value={clicks.toLocaleString('pt-BR')} color="#10b981" />
-      </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <KpiCard icon={DollarSign} label="CPM" value={formatCurrency(cpm)} color="#f59e0b" />
-        <KpiCard icon={DollarSign} label="CPC" value={formatCurrency(cpc)} color="#f43f5e" />
-        <KpiCard icon={TrendingUp} label="CTR" value={`${ctr.toFixed(2)}%`} color="#06b6d4" />
-        <KpiCard icon={Users} label="Leads Meta" value={metaLeadsFromAds.toLocaleString('pt-BR')} color="#ec4899" />
-      </div>
-
-      {/* CRM vs Meta comparison */}
-      <GlassCard title="Comparativo CRM × Meta Ads">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="flex flex-col gap-1 p-4 rounded-xl bg-white/5 border border-white/10">
-            <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
-              Leads no CRM (origem Meta)
-            </span>
-            <span className="text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>
-              {metaLeadsInCrm.toLocaleString('pt-BR')}
-            </span>
-            <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-              Leads com origem facebook / instagram / meta
-            </span>
-          </div>
-          <div className="flex flex-col gap-1 p-4 rounded-xl bg-white/5 border border-white/10">
-            <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
-              Leads registrados no Meta Ads
-            </span>
-            <span className="text-3xl font-bold" style={{ color: '#ec4899' }}>
-              {metaLeadsFromAds.toLocaleString('pt-BR')}
-            </span>
-            <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-              Ações do tipo &quot;lead&quot; reportadas pelo Meta
-            </span>
-          </div>
-        </div>
-      </GlassCard>
-
-      {/* Daily chart */}
-      {metaData.daily.length > 0 && (
-        <MetaDailyChart
-          daily={metaData.daily}
-          metric={dailyMetric}
-          onMetricChange={setDailyMetric}
-        />
-      )}
-
-      {/* Demographics charts */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {genderData.length > 0 && (
-          <PieDonutChart title="Por Gênero" data={genderData} />
-        )}
-        {ageData.length > 0 && (
-          <PieDonutChart title="Por Faixa Etária" data={ageData} />
-        )}
-        {platformData.length > 0 && (
-          <PieDonutChart title="Por Plataforma" data={platformData} />
-        )}
-        {deviceData.length > 0 && (
-          <PieDonutChart title="Por Dispositivo" data={deviceData} />
-        )}
+      {/* Abas Superiores - Estilo Adidas */}
+      <div className="flex border-b border-white/10 -mb-px">
+        <button
+          onClick={() => setActiveTab('dashboard')}
+          className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors border-b-2 -mb-px ${
+            activeTab === 'dashboard'
+              ? 'border-sky-500 text-sky-400 bg-sky-500/10'
+              : 'border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-white/5'
+          }`}
+        >
+          Painel de Análise
+        </button>
+        <button
+          onClick={() => setActiveTab('data')}
+          className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors border-b-2 -mb-px flex items-center gap-1.5 ${
+            activeTab === 'data'
+              ? 'border-sky-500 text-sky-400 bg-sky-500/10'
+              : 'border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-white/5'
+          }`}
+        >
+          <Database size={14} /> Tabela de Dados
+        </button>
       </div>
 
-      {/* Lead Forms table */}
-      {leadForms && leadForms.length > 0 && (
-        <GlassCard title="Formulários de Lead da Meta (Leadgen Forms)">
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr style={{ color: 'var(--text-secondary)' }}>
-                  <th className="text-left py-2 px-3 font-medium">Nome do Formulário</th>
-                  <th className="text-left py-2 px-3 font-medium">ID da Meta</th>
-                  <th className="text-left py-2 px-3 font-medium">Status</th>
-                  <th className="text-left py-2 px-3 font-medium">Leads Cadastrados</th>
-                </tr>
-              </thead>
-              <tbody>
-                {leadForms.map(f => (
-                  <tr key={f.id} className="border-t border-white/5 hover:bg-white/5 transition-colors" style={{ color: 'var(--text-primary)' }}>
-                    <td className="py-2.5 px-3 font-medium">{f.name}</td>
-                    <td className="py-2.5 px-3 text-zinc-500 font-mono">{f.id}</td>
-                    <td className="py-2.5 px-3">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                        f.status === 'ACTIVE' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-500/20 text-zinc-400'
-                      }`}>
-                        {f.status}
-                      </span>
-                    </td>
-                    <td className="py-2.5 px-3 text-pink-400 font-bold">{f.leads_count ?? 0}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {activeTab === 'dashboard' ? (
+        <div className="flex flex-col gap-6">
+          {/* KPI Row */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <KpiCard icon={DollarSign} label="Investimento" value={formatCurrency(spend)} color="#f59e0b" />
+            <KpiCard icon={Users} label="Alcance" value={reach.toLocaleString('pt-BR')} color="#0ea5e9" />
+            <KpiCard icon={Eye} label="Impressões" value={impressions.toLocaleString('pt-BR')} color="#a855f7" />
+            <KpiCard icon={MousePointerClick} label="Cliques" value={clicks.toLocaleString('pt-BR')} color="#10b981" />
           </div>
-        </GlassCard>
-      )}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <KpiCard icon={DollarSign} label="CPM" value={formatCurrency(cpm)} color="#f59e0b" />
+            <KpiCard icon={DollarSign} label="CPC" value={formatCurrency(cpc)} color="#f43f5e" />
+            <KpiCard icon={TrendingUp} label="CTR" value={`${ctr.toFixed(2)}%`} color="#06b6d4" />
+            <KpiCard icon={Users} label="Leads Meta" value={metaLeadsFromAds.toLocaleString('pt-BR')} color="#ec4899" />
+          </div>
 
-      {/* Campaigns table */}
-      <GlassCard
-        title="Campanhas"
-        action={
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setStatusFilter(s => s === 'all' ? 'ACTIVE' : 'all')}
-              className={`px-2.5 py-1.5 text-xs rounded-lg font-medium transition-colors ${
-                statusFilter === 'ACTIVE'
-                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                  : 'bg-white/5 text-zinc-400 border border-white/10 hover:bg-white/10'
-              }`}
-            >
-              {statusFilter === 'ACTIVE' ? 'Só ativas' : 'Todas'}
-            </button>
-            <div className="relative">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 opacity-40" style={{ color: 'var(--text-primary)' }} />
-              <input
-                type="text"
-                placeholder="Filtrar campanha..."
-                value={campaignSearch}
-                onChange={e => setCampaignSearch(e.target.value)}
-                className="pl-8 pr-3 py-1.5 text-xs rounded-lg bg-white/5 border border-white/10 focus:outline-none focus:border-sky-500/40 w-48"
-                style={{ color: 'var(--text-primary)' }}
-              />
+          {/* CRM vs Meta comparison */}
+          <GlassCard title="Comparativo CRM × Meta Ads">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="flex flex-col gap-1 p-4 rounded-xl bg-white/5 border border-white/10">
+                <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
+                  Leads no CRM (origem Meta)
+                </span>
+                <span className="text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>
+                  {metaLeadsInCrm.toLocaleString('pt-BR')}
+                </span>
+                <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                  Leads com origem facebook / instagram / meta
+                </span>
+              </div>
+              <div className="flex flex-col gap-1 p-4 rounded-xl bg-white/5 border border-white/10">
+                <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
+                  Leads registrados no Meta Ads
+                </span>
+                <span className="text-3xl font-bold" style={{ color: '#ec4899' }}>
+                  {metaLeadsFromAds.toLocaleString('pt-BR')}
+                </span>
+                <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                  Ações do tipo &quot;lead&quot; reportadas pelo Meta
+                </span>
+              </div>
             </div>
+          </GlassCard>
+
+          {/* Daily chart */}
+          {metaData.daily.length > 0 && (
+            <MetaDailyChart
+              daily={metaData.daily}
+              metric={dailyMetric}
+              onMetricChange={setDailyMetric}
+            />
+          )}
+
+          {/* Demographics charts */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {genderData.length > 0 && (
+              <PieDonutChart title="Por Gênero" data={genderData} />
+            )}
+            {ageData.length > 0 && (
+              <PieDonutChart title="Por Faixa Etária" data={ageData} />
+            )}
+            {platformData.length > 0 && (
+              <PieDonutChart title="Por Plataforma" data={platformData} />
+            )}
+            {deviceData.length > 0 && (
+              <PieDonutChart title="Por Dispositivo" data={deviceData} />
+            )}
           </div>
-        }
-      >
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr style={{ color: 'var(--text-secondary)' }}>
-                {[
-                  { label: 'Campanha', field: 'campaign_name' as keyof MetaCampaignInsight },
-                  { label: 'Status', field: null },
-                  { label: 'Gasto', field: 'spend' as keyof MetaCampaignInsight },
-                  { label: 'Impressões', field: 'impressions' as keyof MetaCampaignInsight },
-                  { label: 'Cliques', field: 'clicks' as keyof MetaCampaignInsight },
-                  { label: 'CTR', field: 'ctr' as keyof MetaCampaignInsight },
-                  { label: 'CPM', field: 'cpm' as keyof MetaCampaignInsight },
-                  { label: 'CPC', field: 'cpc' as keyof MetaCampaignInsight },
-                  { label: 'Leads', field: null },
-                ].map(({ label, field }) => (
-                  <th
-                    key={label}
-                    className={`text-left py-2 px-3 font-medium whitespace-nowrap ${field ? 'cursor-pointer hover:text-white' : ''}`}
-                    onClick={() => field && toggleSort(field)}
-                  >
-                    {label}
-                    {field && sortField === field && (
-                      <span className="ml-1">{sortDir === 'desc' ? '↓' : '↑'}</span>
-                    )}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filteredCampaigns.length === 0 && (
-                <tr>
-                  <td colSpan={9} className="py-8 text-center opacity-50" style={{ color: 'var(--text-secondary)' }}>
-                    Nenhuma campanha encontrada
-                  </td>
-                </tr>
-              )}
-              {filteredCampaigns.map(c => {
-                const leads = Math.round(sumActions(c.actions, 'lead'))
-                const status = statusById.get(c.campaign_id)
-                return (
-                  <tr
-                    key={c.campaign_id}
-                    className="border-t border-white/5 hover:bg-white/5 transition-colors"
+
+          {/* Lead Forms table */}
+          {leadForms && leadForms.length > 0 && (
+            <GlassCard title="Formulários de Lead da Meta (Leadgen Forms)">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr style={{ color: 'var(--text-secondary)' }}>
+                      <th className="text-left py-2 px-3 font-medium">Nome do Formulário</th>
+                      <th className="text-left py-2 px-3 font-medium">ID da Meta</th>
+                      <th className="text-left py-2 px-3 font-medium">Status</th>
+                      <th className="text-left py-2 px-3 font-medium">Leads Cadastrados</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {leadForms.map(f => (
+                      <tr key={f.id} className="border-t border-white/5 hover:bg-white/5 transition-colors" style={{ color: 'var(--text-primary)' }}>
+                        <td className="py-2.5 px-3 font-medium">{f.name}</td>
+                        <td className="py-2.5 px-3 text-zinc-500 font-mono">{f.id}</td>
+                        <td className="py-2.5 px-3">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                            f.status === 'ACTIVE' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-500/20 text-zinc-400'
+                          }`}>
+                            {f.status}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-pink-400 font-bold">{f.leads_count ?? 0}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </GlassCard>
+          )}
+
+          {/* Campaigns table */}
+          <GlassCard
+            title="Campanhas"
+            action={
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setStatusFilter(s => s === 'all' ? 'ACTIVE' : 'all')}
+                  className={`px-2.5 py-1.5 text-xs rounded-lg font-medium transition-colors ${
+                    statusFilter === 'ACTIVE'
+                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                      : 'bg-white/5 text-zinc-400 border border-white/10 hover:bg-white/10'
+                  }`}
+                >
+                  {statusFilter === 'ACTIVE' ? 'Só ativas' : 'Todas'}
+                </button>
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 opacity-40" style={{ color: 'var(--text-primary)' }} />
+                  <input
+                    type="text"
+                    placeholder="Filtrar campanha..."
+                    value={campaignSearch}
+                    onChange={e => setCampaignSearch(e.target.value)}
+                    className="pl-8 pr-3 py-1.5 text-xs rounded-lg bg-white/5 border border-white/10 focus:outline-none focus:border-sky-500/40 w-48"
                     style={{ color: 'var(--text-primary)' }}
-                  >
-                    <td className="py-2.5 px-3 max-w-[200px] truncate">{c.campaign_name}</td>
-                    <td className="py-2.5 px-3">
-                      {status ? (
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                            status === 'ACTIVE'
-                              ? 'bg-emerald-500/20 text-emerald-400'
-                              : 'bg-zinc-500/20 text-zinc-400'
-                          }`}
-                        >
-                          {status}
-                        </span>
-                      ) : (
-                        <span className="opacity-30">—</span>
-                      )}
-                    </td>
-                    <td className="py-2.5 px-3 text-amber-400">{formatCurrency(Number(c.spend ?? 0))}</td>
-                    <td className="py-2.5 px-3">{Number(c.impressions ?? 0).toLocaleString('pt-BR')}</td>
-                    <td className="py-2.5 px-3">{Number(c.clicks ?? 0).toLocaleString('pt-BR')}</td>
-                    <td className="py-2.5 px-3">{Number(c.ctr ?? 0).toFixed(2)}%</td>
-                    <td className="py-2.5 px-3">{formatCurrency(Number(c.cpm ?? 0))}</td>
-                    <td className="py-2.5 px-3">{formatCurrency(Number(c.cpc ?? 0))}</td>
-                    <td className="py-2.5 px-3 text-pink-400 font-semibold">{leads}</td>
+                  />
+                </div>
+              </div>
+            }
+          >
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr style={{ color: 'var(--text-secondary)' }}>
+                    {[
+                      { label: 'Campanha', field: 'campaign_name' as keyof MetaCampaignInsight },
+                      { label: 'Status', field: null },
+                      { label: 'Gasto', field: 'spend' as keyof MetaCampaignInsight },
+                      { label: 'Impressões', field: 'impressions' as keyof MetaCampaignInsight },
+                      { label: 'Cliques', field: 'clicks' as keyof MetaCampaignInsight },
+                      { label: 'CTR', field: 'ctr' as keyof MetaCampaignInsight },
+                      { label: 'CPM', field: 'cpm' as keyof MetaCampaignInsight },
+                      { label: 'CPC', field: 'cpc' as keyof MetaCampaignInsight },
+                      { label: 'Leads', field: null },
+                    ].map(({ label, field }) => (
+                      <th
+                        key={label}
+                        className={`text-left py-2 px-3 font-medium whitespace-nowrap ${field ? 'cursor-pointer hover:text-white' : ''}`}
+                        onClick={() => field && toggleSort(field)}
+                      >
+                        {label}
+                        {field && sortField === field && (
+                          <span className="ml-1">{sortDir === 'desc' ? '↓' : '↑'}</span>
+                        )}
+                      </th>
+                    ))}
                   </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                </thead>
+                <tbody>
+                  {filteredCampaigns.length === 0 && (
+                    <tr>
+                      <td colSpan={9} className="py-8 text-center opacity-50" style={{ color: 'var(--text-secondary)' }}>
+                        Nenhuma campanha encontrada
+                      </td>
+                    </tr>
+                  )}
+                  {filteredCampaigns.map(c => {
+                    const leads = Math.round(sumActions(c.actions, 'lead'))
+                    const status = statusById.get(c.campaign_id)
+                    return (
+                      <tr
+                        key={c.campaign_id}
+                        className="border-t border-white/5 hover:bg-white/5 transition-colors"
+                        style={{ color: 'var(--text-primary)' }}
+                      >
+                        <td className="py-2.5 px-3 max-w-[200px] truncate">{c.campaign_name}</td>
+                        <td className="py-2.5 px-3">
+                          {status ? (
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                status === 'ACTIVE'
+                                  ? 'bg-emerald-500/20 text-emerald-400'
+                                  : 'bg-zinc-500/20 text-zinc-400'
+                              }`}
+                            >
+                              {status}
+                            </span>
+                          ) : (
+                            <span className="opacity-30">—</span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 text-amber-400">{formatCurrency(Number(c.spend ?? 0))}</td>
+                        <td className="py-2.5 px-3">{Number(c.impressions ?? 0).toLocaleString('pt-BR')}</td>
+                        <td className="py-2.5 px-3">{Number(c.clicks ?? 0).toLocaleString('pt-BR')}</td>
+                        <td className="py-2.5 px-3">{Number(c.ctr ?? 0).toFixed(2)}%</td>
+                        <td className="py-2.5 px-3">{formatCurrency(Number(c.cpm ?? 0))}</td>
+                        <td className="py-2.5 px-3">{formatCurrency(Number(c.cpc ?? 0))}</td>
+                        <td className="py-2.5 px-3 text-pink-400 font-semibold">{leads}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </GlassCard>
         </div>
-      </GlassCard>
+      ) : (
+        <div className="flex flex-col gap-6">
+          {/* Sub-abas de dados */}
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+            {[
+              { key: 'campaigns', label: 'Campanhas' },
+              { key: 'adsets', label: 'Conjuntos de Anúncios (Adsets)' },
+              { key: 'demographics', label: 'Dados Demográficos' },
+              { key: 'regions', label: 'Regiões' },
+            ].map(sub => (
+              <button
+                key={sub.key}
+                onClick={() => setDataSubTab(sub.key as any)}
+                className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-all whitespace-nowrap ${
+                  dataSubTab === sub.key
+                    ? 'bg-white text-zinc-900 border-transparent'
+                    : 'bg-white/5 text-zinc-400 border-white/10 hover:bg-white/10'
+                }`}
+              >
+                {sub.label}
+              </button>
+            ))}
+          </div>
+
+          <GlassCard>
+            {dataSubTab === 'campaigns' && (
+              <DataTable<any>
+                title="Campanhas de Marketing (Meta Ads)"
+                rows={metaData.campaigns || []}
+                exportFileName="campanhas_meta"
+                searchFields={['campaign_name', 'campaign_id']}
+                searchPlaceholder="Buscar por campanha..."
+                defaultSortField="spend"
+                columns={[
+                  { label: 'ID da Campanha', field: 'campaign_id', width: '120px' },
+                  { label: 'Campanha', field: 'campaign_name' },
+                  { label: 'Status', render: row => {
+                      const status = statusById.get(row.campaign_id)
+                      return (
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${status === 'ACTIVE' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-500/20 text-zinc-400'}`}>
+                          {status || 'Desconhecido'}
+                        </span>
+                      )
+                    }
+                  },
+                  { label: 'Gasto', field: 'spend', align: 'right', render: row => formatCurrency(Number(row.spend ?? 0)), csvValue: row => String(row.spend ?? 0) },
+                  { label: 'Impressões', field: 'impressions', align: 'right', render: row => Number(row.impressions ?? 0).toLocaleString('pt-BR') },
+                  { label: 'Cliques', field: 'clicks', align: 'right', render: row => Number(row.clicks ?? 0).toLocaleString('pt-BR') },
+                  { label: 'CTR', field: 'ctr', align: 'right', render: row => `${Number(row.ctr ?? 0).toFixed(2)}%` },
+                  { label: 'CPM', field: 'cpm', align: 'right', render: row => formatCurrency(Number(row.cpm ?? 0)) },
+                  { label: 'CPC', field: 'cpc', align: 'right', render: row => formatCurrency(Number(row.cpc ?? 0)) },
+                  { label: 'Leads', align: 'right', render: row => sumActions(row.actions, 'lead').toLocaleString('pt-BR'), csvValue: row => String(sumActions(row.actions, 'lead')) }
+                ]}
+              />
+            )}
+
+            {dataSubTab === 'adsets' && (
+              <DataTable<any>
+                title="Conjuntos de Anúncios (Adsets)"
+                rows={metaData.adsets || []}
+                exportFileName="adsets_meta"
+                searchFields={['adset_name', 'campaign_name']}
+                searchPlaceholder="Buscar adset ou campanha..."
+                defaultSortField="spend"
+                columns={[
+                  { label: 'Adset ID', field: 'adset_id', width: '120px' },
+                  { label: 'Conjunto de Anúncios', field: 'adset_name' },
+                  { label: 'Campanha', field: 'campaign_name' },
+                  { label: 'Gasto', field: 'spend', align: 'right', render: row => formatCurrency(Number(row.spend ?? 0)), csvValue: row => String(row.spend ?? 0) },
+                  { label: 'Impressões', field: 'impressions', align: 'right', render: row => Number(row.impressions ?? 0).toLocaleString('pt-BR') },
+                  { label: 'Cliques', field: 'clicks', align: 'right', render: row => Number(row.clicks ?? 0).toLocaleString('pt-BR') },
+                  { label: 'CTR', field: 'ctr', align: 'right', render: row => `${Number(row.ctr ?? 0).toFixed(2)}%` },
+                  { label: 'Leads', align: 'right', render: row => sumActions(row.actions, 'lead').toLocaleString('pt-BR'), csvValue: row => String(sumActions(row.actions, 'lead')) }
+                ]}
+              />
+            )}
+
+            {dataSubTab === 'demographics' && (
+              <DataTable<any>
+                title="Dados Demográficos (Idade e Gênero)"
+                rows={metaData.demographics || []}
+                exportFileName="demograficos_meta"
+                searchFields={['age', 'gender']}
+                searchPlaceholder="Buscar por faixa etária ou gênero..."
+                defaultSortField="impressions"
+                columns={[
+                  { label: 'Gênero', field: 'gender', render: row => row.gender === 'male' ? 'Masculino' : row.gender === 'female' ? 'Feminino' : row.gender || 'Não Informado' },
+                  { label: 'Faixa Etária', field: 'age' },
+                  { label: 'Gasto', field: 'spend', align: 'right', render: row => formatCurrency(Number(row.spend ?? 0)), csvValue: row => String(row.spend ?? 0) },
+                  { label: 'Impressões', field: 'impressions', align: 'right', render: row => Number(row.impressions ?? 0).toLocaleString('pt-BR') },
+                  { label: 'Cliques', field: 'clicks', align: 'right', render: row => Number(row.clicks ?? 0).toLocaleString('pt-BR') },
+                  { label: 'Leads', align: 'right', render: row => sumActions(row.actions, 'lead').toLocaleString('pt-BR'), csvValue: row => String(sumActions(row.actions, 'lead')) }
+                ]}
+              />
+            )}
+
+            {dataSubTab === 'regions' && (
+              <DataTable<any>
+                title="Desempenho por Região"
+                rows={metaData.regions || []}
+                exportFileName="regioes_meta"
+                searchFields={['region']}
+                searchPlaceholder="Buscar por região..."
+                defaultSortField="spend"
+                columns={[
+                  { label: 'Região', field: 'region' },
+                  { label: 'Gasto', field: 'spend', align: 'right', render: row => formatCurrency(Number(row.spend ?? 0)), csvValue: row => String(row.spend ?? 0) },
+                  { label: 'Impressões', field: 'impressions', align: 'right', render: row => Number(row.impressions ?? 0).toLocaleString('pt-BR') },
+                  { label: 'Cliques', field: 'clicks', align: 'right', render: row => Number(row.clicks ?? 0).toLocaleString('pt-BR') },
+                  { label: 'Leads', align: 'right', render: row => sumActions(row.actions, 'lead').toLocaleString('pt-BR'), csvValue: row => String(sumActions(row.actions, 'lead')) }
+                ]}
+              />
+            )}
+          </GlassCard>
+        </div>
+      )}
     </div>
   )
 }

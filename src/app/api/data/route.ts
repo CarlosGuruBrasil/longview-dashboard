@@ -8,7 +8,7 @@ import jwt from 'jsonwebtoken';
 import { rateLimit, getClientIp } from '@/lib/rateLimit';
 import type { MetaData, MetaLeadForm, MetaPageInfo } from '@/app/marketing-vision/types';
 
-const JWT_SECRET   = process.env.JWT_SECRET || 'secret-longview-key';
+const JWT_SECRET   = process.env.JWT_SECRET ?? (() => { throw new Error('[LongView] JWT_SECRET nao configurado. Defina no .env.local') })();
 const META_PAGE_ID = '259079394232614';
 // Cache nunca expira no caminho de leitura — cron ou ?refresh=true renovam.
 
@@ -316,6 +316,104 @@ async function readLeadsFromPg(
     return { leads, total: leads.length, crmTotal: totalCount };
   } catch (e: unknown) {
     console.warn('[/api/data] Postgres leads falhou:', e instanceof Error ? e.message : e);
+    return null;
+  }
+}
+
+/**
+ * Retorna dados analíticos pré-agregados via SQL — payload alvo < 5 KB.
+ * Usado no modo ?aggregate=true para o carregamento inicial do dashboard.
+ */
+async function readLeadsSummaryFromPg(
+  startDate?: string | null,
+  endDate?: string | null
+): Promise<import('@/app/marketing-vision/types').LeadSummary | null> {
+  if (!process.env.DATABASE_URL) return null;
+  try {
+    const { sql, ensureSchema } = await import('@/lib/pg');
+    await ensureSchema();
+
+    const [countRow] = await sql<{ count: string }[]>`SELECT COUNT(*) AS count FROM leads`;
+    const totalLeads = parseInt(countRow?.count ?? '0', 10);
+    if (totalLeads === 0) return null;
+
+    // Condição de data reutilizável
+    const dateWhere = (startDate || endDate)
+      ? sql`WHERE 1=1
+          ${startDate ? sql`AND data_cadastro >= ${startDate}::date` : sql``}
+          ${endDate   ? sql`AND data_cadastro < (${endDate}::date + INTERVAL '1 day')` : sql``}`
+      : sql`WHERE 1=1`;
+
+    const [filteredCountRow] = await sql<{ count: string }[]>`
+      SELECT COUNT(*)::int AS count FROM leads ${dateWhere}
+    `;
+    const totalLeadsFiltered = parseInt(filteredCountRow?.count ?? '0', 10);
+
+    // Agregações paralelas
+    const [situacoes, origens, empreendimentos, corretores, monthly, temperatura, scoreRow, bolsaoRow] =
+      await Promise.all([
+        sql<{ nome: string; total: number }[]>`
+          SELECT status AS nome, COUNT(*)::int AS total
+          FROM leads ${dateWhere}
+          GROUP BY status ORDER BY total DESC LIMIT 20
+        `,
+        sql<{ origem: string; total: number }[]>`
+          SELECT COALESCE(origem, 'Desconhecido') AS origem, COUNT(*)::int AS total
+          FROM leads ${dateWhere}
+          GROUP BY origem ORDER BY total DESC LIMIT 20
+        `,
+        sql<{ empreendimento: string; total: number }[]>`
+          SELECT COALESCE(empreendimento, 'Não informado') AS empreendimento, COUNT(*)::int AS total
+          FROM leads ${dateWhere}
+          GROUP BY empreendimento ORDER BY total DESC LIMIT 15
+        `,
+        sql<{ corretor: string; total: number }[]>`
+          SELECT
+            COALESCE(raw->>'corretor', 'Sem corretor') AS corretor,
+            COUNT(*)::int AS total
+          FROM leads ${dateWhere}
+          GROUP BY raw->>'corretor' ORDER BY total DESC LIMIT 10
+        `,
+        sql<{ mes: string; total: number }[]>`
+          SELECT
+            TO_CHAR(DATE_TRUNC('month', data_cadastro), 'YYYY-MM') AS mes,
+            COUNT(*)::int AS total
+          FROM leads
+          WHERE data_cadastro IS NOT NULL
+          ${startDate ? sql`AND data_cadastro >= ${startDate}::date` : sql``}
+          ${endDate   ? sql`AND data_cadastro < (${endDate}::date + INTERVAL '1 day')` : sql``}
+          GROUP BY DATE_TRUNC('month', data_cadastro)
+          ORDER BY mes DESC LIMIT 24
+        `,
+        sql<{ temperatura: string; total: number }[]>`
+          SELECT COALESCE(temperatura, 'Desconhecida') AS temperatura, COUNT(*)::int AS total
+          FROM leads ${dateWhere}
+          GROUP BY temperatura ORDER BY total DESC LIMIT 5
+        `,
+        sql<{ avg: string | null }[]>`
+          SELECT AVG(score)::numeric(5,2) AS avg FROM leads ${dateWhere} WHERE score IS NOT NULL
+        `,
+        sql<{ pct: string }[]>`
+          SELECT
+            ROUND(100.0 * COUNT(*) FILTER (WHERE raw->>'bolsao' = 'true' OR raw->>'bolsao' = '1') / NULLIF(COUNT(*), 0), 1)::text AS pct
+          FROM leads ${dateWhere}
+        `,
+      ]);
+
+    return {
+      totalLeads,
+      totalLeadsFiltered,
+      avgScore: scoreRow[0]?.avg != null ? parseFloat(scoreRow[0].avg) : null,
+      pctBolsao: parseFloat(bolsaoRow[0]?.pct ?? '0'),
+      bySituacao:         situacoes,
+      byOrigem:           origens,
+      byEmpreendimento:   empreendimentos,
+      byCorretor:         corretores,
+      monthly:            monthly.reverse(), // mais antigo → mais novo
+      topTemperatura:     temperatura,
+    };
+  } catch (e: unknown) {
+    console.warn('[/api/data] readLeadsSummaryFromPg falhou:', e instanceof Error ? e.message : e);
     return null;
   }
 }
@@ -681,6 +779,37 @@ export async function GET(request: NextRequest) {
   const page         = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
   const limit        = Math.max(1, Math.min(500, parseInt(searchParams.get('limit') || '50', 10)));
   const detailed     = searchParams.get('detailed') === 'true';
+  const aggregate    = searchParams.get('aggregate') === 'true';
+
+  // ── Modo agregado (payload leve — substituição do array bruto de leads) ──────
+  // ?aggregate=true → retorna dados pré-calculados por SQL em vez do array de leads.
+  // Payload esperado: < 5 KB (vs ~8 MB no modo padrão com 5000 leads).
+  if (aggregate && !syncForce && !forceRefresh) {
+    const [summary, pgEstoque, metaCache] = await Promise.all([
+      readLeadsSummaryFromPg(startDate, endDate),
+      readEstoqueFromPg(),
+      readPgCache<MetaCache>('meta_cache'),
+    ]);
+
+    type MetaDataShape = { leadForms?: unknown[]; page?: unknown; [k: string]: unknown };
+    const metaData: MetaDataShape | null = metaCache?.data ? metaCache.data as MetaDataShape : null;
+    const metaFinal = metaData ?? {
+      global: null, campaigns: [], campaignDetails: [], adsets: [],
+      demographics: [], regions: [], platforms: [], devices: [], daily: [],
+      leadForms: [], page: null,
+    };
+
+    return NextResponse.json({
+      aggregate:    true,
+      leadSummary:  summary,
+      meta:         metaFinal,
+      estoque:      pgEstoque ?? { empreendimentos: [], resumo: [], unidades: [] },
+      leadForms:    metaFinal.leadForms,
+      page:         metaFinal.page,
+      updatedAt:    new Date().toISOString(),
+      _cached:      !!metaCache,
+    });
+  }
 
   if (syncForce || forceRefresh) {
     const canForceSync = authUser.role === 'Desenvolvedor' || authUser.permissions?.isAdmin === true || authUser.role === 'Gestor' || authUser.role === 'Diretoria';

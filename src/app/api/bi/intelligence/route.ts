@@ -14,7 +14,7 @@ import type { MetaData, Lead, CvdwVenda } from '@/app/marketing-vision/types';
 import { getOrigin, isSale, isLoss, getLeadValueNumber } from '@/app/marketing-vision/utils/leads';
 import { getLeadStage } from '@/app/marketing-vision/utils/metrics';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'secret-longview-key';
+const JWT_SECRET = process.env.JWT_SECRET ?? (() => { throw new Error('[LongView] JWT_SECRET nao configurado. Defina no .env.local') })();
 export const runtime = 'nodejs';
 export const revalidate = 0;
 

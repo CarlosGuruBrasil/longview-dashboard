@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'secret-longview-key';
+const JWT_SECRET = process.env.JWT_SECRET ?? (() => { throw new Error('[LongView] JWT_SECRET nao configurado. Defina no .env.local') })();
 const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN || '';
 const META_AD_ACCOUNT_ID = process.env.META_AD_ACCOUNT_ID || '';
 const META_API_VERSION = 'v19.0';

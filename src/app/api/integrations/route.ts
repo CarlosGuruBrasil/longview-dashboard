@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import { sql, ensureSchema } from '@/lib/pg';
 import type { Integration, IntegrationPlatform, IntegrationStatus } from '@/app/marketing-vision/types';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'secret-longview-key';
+const JWT_SECRET = process.env.JWT_SECRET ?? (() => { throw new Error('[LongView] JWT_SECRET nao configurado. Defina no .env.local') })();
 export const runtime = 'nodejs';
 
 type AuthUser = { role?: string; email?: string };
