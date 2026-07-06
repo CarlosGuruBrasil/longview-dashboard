@@ -73,7 +73,7 @@ export default function FilterBar() {
         onChange={e => setLeadFilters({ ...leadFilters, empreendimento: e.target.value || undefined })}
         className="px-2.5 py-1.5 text-xs rounded-lg bg-white/5 border border-white/10 text-zinc-300 focus:outline-none focus:border-sky-500/40 max-w-[180px] truncate"
       >
-        <option value="">Projeto: todos</option>
+        <option value="">Empreendimento: todos</option>
         {empreendimentoOptions.map(e => (
           <option key={e} value={e}>{e}</option>
         ))}
