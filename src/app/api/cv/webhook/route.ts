@@ -64,15 +64,35 @@ function refName(v: NamedRef): string {
   return v?.nome ?? '';
 }
 
-// Possíveis nomes da etapa no CV CRM (case-insensitive)
-const SEM_CONEXAO_PATTERNS = [
-  'sem conexão', 'sem conexao', 'semconexao', 'sem_conexao',
-  'sem contato', 'inativo', 'lost contact', 'perdido contato',
-];
+function norm(s: string) { return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim(); }
 
-function isSemConexao(etapaNome: string): boolean {
-  const normalized = (etapaNome || '').toLowerCase().trim();
-  return SEM_CONEXAO_PATTERNS.some(p => normalized.includes(p));
+/** Busca gatilho RD para a etapa — lê do banco (dinâmico, sem hardcode) */
+async function getGatilhoRD(etapaNome: string): Promise<string | null> {
+  if (!etapaNome || !process.env.DATABASE_URL) return null;
+  try {
+    const { sql } = await import('@/lib/pg');
+    const n = norm(etapaNome);
+    const rows = await sql<{ gatilho_rd: string }[]>`
+      SELECT gatilho_rd FROM funil_etapas
+      WHERE ativa = true AND gatilho_rd IS NOT NULL
+        AND (nome_norm = ${n} OR ${n} LIKE '%' || nome_norm || '%' OR nome_norm LIKE '%' || ${n} || '%')
+      LIMIT 1
+    `;
+    return rows[0]?.gatilho_rd ?? null;
+  } catch { return null; }
+}
+
+/** Upsert automático de etapa desconhecida — apareceu no webhook, registra sem gatilho */
+async function upsertEtapa(etapaNome: string): Promise<void> {
+  if (!etapaNome || !process.env.DATABASE_URL) return;
+  try {
+    const { sql } = await import('@/lib/pg');
+    await sql`
+      INSERT INTO funil_etapas (nome, nome_norm, tipo)
+      VALUES (${etapaNome}, ${norm(etapaNome)}, 'lead')
+      ON CONFLICT (nome) DO NOTHING
+    `;
+  } catch { /* não bloqueia */ }
 }
 
 // Envia conversão ao RD Station para disparar o flow de e-mail
@@ -82,13 +102,14 @@ async function triggerRDSemConexao(lead: {
   email?: string;
   telefone?: string;
   etapa?: string;
+  gatilhoNome?: string;
 }): Promise<{ ok: boolean; error?: string }> {
   const apiKey = process.env.RD_TOKEN_PUBLIC;
   if (!apiKey) return { ok: false, error: 'RD_TOKEN_PUBLIC não configurado' };
   if (!lead.email && !lead.telefone) return { ok: false, error: 'lead sem email nem telefone' };
 
   const payload: Record<string, unknown> = {
-    conversion_identifier: 'sem_conexao_longview',
+    conversion_identifier: lead.gatilhoNome ?? 'sem_conexao_longview',
     cf_etapa_crm:          lead.etapa     || 'Sem Conexão',
     cf_origem_captacao:    'crm_webhook',
     cf_data_score:         new Date().toISOString().split('T')[0],
@@ -175,60 +196,63 @@ export async function POST(request: NextRequest) {
     lead.idlead || lead.id_lead || lead.id || lead.codigo || lead.lead_id || lead.referencia || ''
   ).trim();
 
-  // Verifica se é uma mudança de etapa para "Sem Conexão"
-  const semConexao = isSemConexao(etapa) || isSemConexao(situacao);
+  const etapaAtiva = etapa || situacao;
 
-  if (!semConexao) {
-    await logEvent({ ...body, lead, etapa, evento: 'outros' }, false);
-    return NextResponse.json({ ok: true, action: 'ignored', etapa });
+  // Registra etapa no banco se ainda não existe (autodiscovery)
+  if (etapaAtiva) await upsertEtapa(etapaAtiva);
+
+  // Busca gatilho RD dinamicamente no banco
+  const gatilhoRD = await getGatilhoRD(etapaAtiva);
+
+  if (!gatilhoRD) {
+    await logEvent({ ...body, lead, etapa: etapaAtiva, evento: 'outros' }, false);
+    return NextResponse.json({ ok: true, action: 'ignored', etapa: etapaAtiva });
   }
 
   // Identidade estavel para dedup: email > telefone > id do CRM.
-  // Mesma convencao de chave usada pelo cron recalc-scores.
   const leadEmail = String(lead.email || lead.email_principal || '').toLowerCase().trim();
   const leadPhone = String(lead.telefone || lead.celular || lead.fone || '').replace(/\D/g, '');
   const dedupKey =
-    leadEmail ? `cv:sem_conexao:sent:email:${leadEmail}` :
-    leadPhone ? `cv:sem_conexao:sent:phone:${leadPhone}` :
-    leadId    ? `cv:sem_conexao:sent:${leadId}` : null;
+    leadEmail ? `cv:rd_gatilho:sent:email:${leadEmail}:${gatilhoRD}` :
+    leadPhone ? `cv:rd_gatilho:sent:phone:${leadPhone}:${gatilhoRD}` :
+    leadId    ? `cv:rd_gatilho:sent:${leadId}:${gatilhoRD}` : null;
 
-  // Sem identidade nao ha como deduplicar nem como o RD identificar o contato
   if (!dedupKey) {
-    await logEvent({ ...body, lead, etapa, evento: 'sem_conexao_sem_identidade' }, false);
-    return NextResponse.json({ ok: true, action: 'skipped_no_identity', etapa });
+    await logEvent({ ...body, lead, etapa: etapaAtiva, evento: 'sem_identidade' }, false);
+    return NextResponse.json({ ok: true, action: 'skipped_no_identity', etapa: etapaAtiva });
   }
 
-  // Evita enviar duplicado para o mesmo contato (dedup por 90 dias)
   const alreadySent = await kv.get(dedupKey);
   if (alreadySent) {
-    logger.info(`[cv/webhook] Contato ${leadId} já processado — dedup`);
-    await logEvent({ ...body, lead, etapa, evento: 'sem_conexao_dedup' }, false);
+    logger.info(`[cv/webhook] Contato ${leadId} já processado para ${gatilhoRD} — dedup`);
+    await logEvent({ ...body, lead, etapa: etapaAtiva, evento: 'dedup' }, false);
     return NextResponse.json({ ok: true, action: 'dedup', leadId });
   }
 
-  // Dispara o gatilho no RD Station
+  // Dispara o gatilho dinâmico no RD Station
   const rdResult = await triggerRDSemConexao({
-    id:       leadId,
-    nome:     lead.nome || lead.name || '',
-    email:    leadEmail,
-    telefone: lead.telefone || lead.celular || lead.fone || '',
-    etapa,
+    id:            leadId,
+    nome:          lead.nome || lead.name || '',
+    email:         leadEmail,
+    telefone:      lead.telefone || lead.celular || lead.fone || '',
+    etapa:         etapaAtiva,
+    gatilhoNome:   gatilhoRD,
   });
 
-  // Marca como enviado por 90 dias
   if (rdResult.ok) {
     await kv.set(dedupKey, new Date().toISOString(), { ex: 90 * 86400 });
   }
 
-  await logEvent({ ...body, lead, etapa, evento: 'sem_conexao' }, true, rdResult);
+  await logEvent({ ...body, lead, etapa: etapaAtiva, evento: gatilhoRD }, true, rdResult);
 
-  logger.info(`[cv/webhook] Lead ${leadId} → RD: ${rdResult.ok ? 'OK' : rdResult.error}`);
+  logger.info(`[cv/webhook] Lead ${leadId} etapa=${etapaAtiva} → RD ${gatilhoRD}: ${rdResult.ok ? 'OK' : rdResult.error}`);
 
   return NextResponse.json({
     ok:      rdResult.ok,
-    action:  'sem_conexao_triggered',
+    action:  'rd_gatilho_triggered',
     leadId,
-    etapa,
+    etapa:   etapaAtiva,
+    gatilho: gatilhoRD,
     rd:      rdResult,
   });
 }

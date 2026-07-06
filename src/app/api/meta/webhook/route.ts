@@ -84,6 +84,22 @@ async function getPageAccessToken(): Promise<string> {
   }
 }
 
+/** Infere empreendimento pelo nome da campanha/conjunto/formulário */
+function empFromCampaign(text: string): string {
+  const s = (text || '').toLowerCase();
+  if (s.includes('nautic'))                        return 'Nautic';
+  if (s.includes('hub') || s.includes('beira mar') || s.includes('hbm')) return 'HUB Beira Mar';
+  if (s.includes('infiniti'))                      return 'Infiniti';
+  if (s.includes('sunclub') || s.includes('sun club')) return 'SunClub';
+  if (s.includes('gran reserva'))                  return 'Gran Reserva';
+  if (s.includes('le grand'))                      return 'Le Grand View';
+  if (s.includes('porto da lagoa'))                return 'Porto da Lagoa';
+  if (s.includes('south beach'))                   return 'South Beach';
+  if (s.includes('trindade'))                      return 'Trindade';
+  if (s.includes('exupery') || s.includes('exupéry')) return 'Exupéry';
+  return '';
+}
+
 /** Extrai valor de field_data pela chave (suporta variações de nome por substring) */
 function getField(fields: MetaFieldData[], ...keys: string[]): string {
   for (const key of keys) {
@@ -124,6 +140,7 @@ async function fetchMetaLead(leadgenId: string): Promise<MetaLeadFull | null> {
 async function saveToPostgres(lead: MetaLeadFull, parsed: {
   nome: string; email: string; telefone: string;
   empreendimento: string; midia: string; origem: string;
+  conhece_empreendimento?: string; procura_imovel_para?: string; cidade?: string;
 }): Promise<void> {
   if (!process.env.DATABASE_URL) return;
   try {
@@ -172,6 +189,7 @@ async function saveToPostgres(lead: MetaLeadFull, parsed: {
 function forwardToRDStation(parsed: {
   nome: string; email: string; telefone: string;
   empreendimento: string; midia: string;
+  conhece_empreendimento?: string; procura_imovel_para?: string; cidade?: string;
 }): void {
   const apiKey = process.env.RD_TOKEN_PUBLIC;
   if (!apiKey || !parsed.email) return;
@@ -308,12 +326,18 @@ export async function POST(request: NextRequest) {
         const nomeCompleto  = sobrenome ? `${nome} ${sobrenome}`.trim() : nome;
         const email         = getField(fields, 'email', 'email_address', 'e-mail');
         const telefone      = getField(fields, 'phone_number', 'telefone', 'phone', 'celular', 'whatsapp', 'tel');
-        const empreendimento = getField(fields, 'empreendimento', 'produto', 'product', 'interest', 'interesse', 'lote', 'opcao');
         const mensagem      = getField(fields, 'message', 'mensagem', 'observacao', 'comments');
 
+        // Campos extras do formulário (não usados como empreendimento)
+        const conheceEmp    = getField(fields, 'você_conhece_o_empreendimento', 'conhece_o_empreendimento');
+        const procuraImovel = getField(fields, 'você_procura_imóvel_para', 'procura_imovel_para', 'procura_para');
+        const cidadeForm    = getField(fields, 'city', 'cidade', 'qual_a_sua_cidade');
+
+        // Empreendimento inferido do nome da campanha (nunca do campo sim/não do form)
         const campanha      = campaign_name ?? metaLead.campaign_name ?? '';
         const conjunto      = metaLead.adset_name ?? '';
         const midia         = [campanha, conjunto].filter(Boolean).join(' › ');
+        const empreendimento = empFromCampaign(campanha || conjunto || (metaLead.form_id ?? ''));
         const origem        = 'Meta Lead Ads';
 
         if (!nomeCompleto && !email && !telefone) {
@@ -325,6 +349,9 @@ export async function POST(request: NextRequest) {
         const parsed = {
           nome: nomeCompleto || email || 'Lead Meta',
           email, telefone, empreendimento, midia, origem,
+          conhece_empreendimento: conheceEmp || undefined,
+          procura_imovel_para:    procuraImovel || undefined,
+          cidade:                 cidadeForm || undefined,
         };
 
         // 3. Salva no Postgres (background-safe)
