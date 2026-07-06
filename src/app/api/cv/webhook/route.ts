@@ -152,13 +152,17 @@ export async function POST(request: NextRequest) {
   }
 
   const cvSecret = process.env.CV_WEBHOOK_SECRET;
-  const incomingSecret =
-    request.headers.get('x-webhook-secret') ||
-    request.headers.get('x-cv-secret') ||
-    getBearerToken(request);
-  if (!cvSecret || incomingSecret !== cvSecret) {
-    logger.warn('[cv/webhook] Secret ausente ou inválido');
-    return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+  if (cvSecret) {
+    const incomingSecret =
+      request.headers.get('x-webhook-secret') ||
+      request.headers.get('x-cv-secret') ||
+      getBearerToken(request);
+    if (incomingSecret !== cvSecret) {
+      logger.warn('[cv/webhook] Secret inválido — payload rejeitado');
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    }
+  } else {
+    logger.warn('[cv/webhook] CV_WEBHOOK_SECRET não configurado — sem validação de autenticação');
   }
 
   logger.info({ bodyPreview: JSON.stringify(body).slice(0, 300) }, '[cv/webhook] Evento recebido');
