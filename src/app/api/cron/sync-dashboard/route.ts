@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
     };
 
     await sql`
-      INSERT INTO project_state (key, data) VALUES ('meta_cache', ${JSON.stringify({ data: metaData, updatedAt: new Date().toISOString() })})
+      INSERT INTO project_state (key, data) VALUES ('meta_cache', ${{ data: metaData, updatedAt: new Date().toISOString() } as never})
       ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data
     `;
     console.log('[sync-dashboard] Meta cache atualizado');
@@ -121,7 +121,7 @@ export async function GET(request: NextRequest) {
     });
 
     await sql`
-      INSERT INTO project_state (key, data) VALUES ('estoque_cache', ${JSON.stringify({ projects, estoque: estoqueMap, updatedAt: new Date().toISOString() })})
+      INSERT INTO project_state (key, data) VALUES ('estoque_cache', ${{ projects, estoque: estoqueMap, updatedAt: new Date().toISOString() } as never})
       ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data
     `;
     console.log('[sync-dashboard] Estoque cache atualizado');

@@ -18,6 +18,7 @@ import { formatCurrency, formatDate, CHART_PALETTE } from '../../utils/formatter
 import GlassCard from '../ui/GlassCard'
 import KpiCard from '../ui/KpiCard'
 import PieDonutChart from '../charts/PieDonutChart'
+import FilterBar from '../ui/FilterBar'
 
 // ── funnel stage buckets ────────────────────────────────────────────────────
 const FUNNEL_STAGES = [
@@ -172,6 +173,9 @@ export default function OportunidadesView() {
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Filters */}
+      <FilterBar />
+
       {/* KPI Row */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-4">
         <KpiCard

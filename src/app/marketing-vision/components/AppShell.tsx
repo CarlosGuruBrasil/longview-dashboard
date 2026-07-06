@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import {
   LayoutDashboard, Users, DollarSign, BarChart3, Megaphone, Lightbulb, X,
-  ChevronRight, RefreshCw,
+  ChevronRight, RefreshCw, GitMerge, Radio, MapPin, Cpu, Globe, Zap,
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import type { ActiveView } from '../types';
@@ -60,11 +60,21 @@ function usePullToRefresh(onRefresh: () => Promise<void>) {
 }
 
 const VIEW_TITLES: Record<ActiveView, string> = {
+  // ── Novas views refatoradas
+  comando:         'Central de Comando',
+  jornada:         'Jornada do Lead',
+  ads:             'Gestão de Ads',
+  assistente:      'Assistente de IA',
+  social:          'Central Social',
+  integracoes:     'Hub de Integrações',
+  // ── Funil e Vendas
+  funil:           'Funil Inteligente',
+  vendas:          'Vendas & Projetos',
+  // ── Legacy (mantidas)
   dashboard:       'Smart Dashboard',
   leads:           'Leads & Pipeline',
   oportunidades:   'Oportunidades',
   empreendimentos: 'Empreendimentos',
-  vendas:          'Vendas & Projetos',
   insights:        'BI Insights',
   metrics:         'Métricas',
   trafego:         'Tráfego',
@@ -76,21 +86,28 @@ const VIEW_TITLES: Record<ActiveView, string> = {
   score:           'Score',
 };
 
+// Nav móvel (5 botões principais da barra inferior)
 const PRIMARY_NAV = [
-  { icon: LayoutDashboard, label: 'Dashboard', view: 'dashboard' as ActiveView },
-  { icon: Users,           label: 'Leads',     view: 'leads'     as ActiveView },
-  { icon: DollarSign,      label: 'Vendas',    view: 'vendas'    as ActiveView },
-  { icon: BarChart3,       label: 'Métricas',  view: 'metrics'   as ActiveView },
-  { icon: Megaphone,       label: 'Marketing', view: 'marketing' as ActiveView },
+  { icon: Radio,         label: 'Comando',  view: 'comando'    as ActiveView },
+  { icon: MapPin,        label: 'Jornada',  view: 'jornada'    as ActiveView },
+  { icon: Megaphone,     label: 'Ads',      view: 'ads'        as ActiveView },
+  { icon: GitMerge,      label: 'Funil',    view: 'funil'      as ActiveView },
+  { icon: Cpu,           label: 'IA',       view: 'assistente' as ActiveView },
 ] as const;
 
+// Nav completo do drawer lateral
 const DRAWER_NAV = [
-  { icon: LayoutDashboard, label: 'Smart Dashboard',  view: 'dashboard'    as ActiveView },
-  { icon: Users,           label: 'Leads & Pipeline',  view: 'leads'        as ActiveView },
-  { icon: DollarSign,      label: 'Vendas & Projetos', view: 'vendas'       as ActiveView },
-  { icon: BarChart3,       label: 'Métricas',         view: 'metrics'      as ActiveView },
-  { icon: Lightbulb,       label: 'Inteligência',     view: 'intelligence' as ActiveView },
-  { icon: Megaphone,       label: 'Marketing',        view: 'marketing'    as ActiveView },
+  { icon: Radio,         label: 'Central de Comando',    view: 'comando'      as ActiveView },
+  { icon: MapPin,        label: 'Jornada do Lead',       view: 'jornada'      as ActiveView },
+  { icon: Megaphone,     label: 'Gestão de Ads',         view: 'ads'          as ActiveView },
+  { icon: Cpu,           label: 'Assistente de IA',      view: 'assistente'   as ActiveView },
+  { icon: Globe,         label: 'Central Social',        view: 'social'       as ActiveView },
+  { icon: GitMerge,      label: 'Funil Inteligente',     view: 'funil'        as ActiveView },
+  { icon: DollarSign,    label: 'Vendas & Projetos',     view: 'vendas'       as ActiveView },
+  { icon: Users,         label: 'Leads (Legacy)',        view: 'leads'        as ActiveView },
+  { icon: BarChart3,     label: 'Métricas',              view: 'metrics'      as ActiveView },
+  { icon: Lightbulb,     label: 'Inteligência',          view: 'intelligence' as ActiveView },
+  { icon: Zap,           label: 'Hub de Integrações',    view: 'integracoes'  as ActiveView },
 ] as const;
 
 function useCurrentUser() {
@@ -203,7 +220,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           }}
         >
           <div className="relative w-24 h-7 shrink-0">
-            <Image src="/logolongview.png" alt="LongView" fill style={{ objectFit: 'contain', objectPosition: 'left' }} priority />
+            <Image src="/logolongview.png" alt="LongView" fill style={{ objectFit: 'contain', objectPosition: 'left' }} priority sizes="96px" />
           </div>
 
           <div className="flex items-center gap-1 text-zinc-600 shrink-0">

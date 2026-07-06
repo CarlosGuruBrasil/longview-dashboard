@@ -8,6 +8,7 @@ import {
   TrendingUp,
   Users,
   ClipboardCheck,
+  ShoppingBag,
   Lock,
   ArrowRight,
   LogOut
@@ -24,6 +25,7 @@ interface SelectAppJwtPayload {
     viewMarketingDashboard?: boolean;
     viewPeopleVision?: boolean;
     viewQualityVision?: boolean;
+    viewSalesVision?: boolean;
     isAdmin?: boolean;
   };
 }
@@ -51,6 +53,7 @@ export default async function SelectAppPage() {
   const hasMarketingAccess = isDeveloper || permissions?.viewMarketingDashboard === true;
   const hasPeopleAccess        = isDeveloper || permissions?.viewPeopleVision === true;
   const hasQualityAccess   = isDeveloper || permissions?.viewQualityVision === true;
+  const hasSalesAccess     = isDeveloper || permissions?.viewSalesVision === true;
 
   return (
     <main
@@ -251,6 +254,45 @@ export default async function SelectAppPage() {
                 <Link
                   href="/quality-vision"
                   className="flex items-center gap-1.5 text-xs font-bold bg-violet-500/90 hover:bg-violet-400 text-white px-4.5 py-2.5 rounded-xl transition-all duration-200 cursor-pointer shadow-[0_12px_28px_rgba(139,92,246,0.18)]"
+                >
+                  <span>Entrar no App</span>
+                  <ArrowRight size={14} />
+                </Link>
+              ) : (
+                <div className="flex items-center gap-1.5 text-xs text-zinc-500 font-semibold bg-white/5 border border-white/5 px-4.5 py-2.5 rounded-xl">
+                  <Lock size={14} />
+                  <span>Acesso Restrito</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Card: Sales Vision */}
+          <div className={`
+            bg-white/[0.035] border border-sky-400/15 rounded-2xl p-6.5 flex flex-col justify-between min-h-[260px] relative transition-all duration-300 group shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur-2xl
+            ${hasSalesAccess
+              ? 'hover:border-sky-300/30 hover:bg-sky-500/[0.045]'
+              : 'opacity-50'
+            }
+          `}>
+            <div>
+              <div className="w-12 h-12 rounded-xl bg-sky-500/12 border border-sky-400/20 text-sky-300 flex items-center justify-center mb-5">
+                <ShoppingBag size={24} />
+              </div>
+              <h3 className="text-lg font-bold text-white group-hover:text-sky-300 transition-colors">
+                Sales Vision
+              </h3>
+              <p className="text-[11px] text-sky-300/80 font-bold uppercase tracking-wider mt-1">VGV & Performance</p>
+              <p className="text-xs leading-relaxed text-zinc-400 mt-2">
+                Acompanhamento de vendas, VGV por empreendimento, ticket médio, ciclo de venda, performance de corretores e imobiliárias, reservas e contratos.
+              </p>
+            </div>
+
+            <div className="mt-6 flex items-center justify-between">
+              {hasSalesAccess ? (
+                <Link
+                  href="/sales-vision"
+                  className="flex items-center gap-1.5 text-xs font-bold bg-sky-500/90 hover:bg-sky-400 text-white px-4.5 py-2.5 rounded-xl transition-all duration-200 cursor-pointer shadow-[0_12px_28px_rgba(14,165,233,0.18)]"
                 >
                   <span>Entrar no App</span>
                   <ArrowRight size={14} />

@@ -91,14 +91,17 @@ type MetaCache = { data?: Partial<MetaData>; updatedAt?: string };
 type LeadResult = { leads: DashboardLead[]; total: number; crmTotal: number };
 
 function parseJsonValue<T = unknown>(value: unknown): T {
-  if (typeof value === 'string') {
+  let current = value;
+  while (typeof current === 'string' && (current.trim().startsWith('{') || current.trim().startsWith('['))) {
     try {
-      return JSON.parse(value) as T;
+      const parsed = JSON.parse(current);
+      if (parsed === current) break;
+      current = parsed;
     } catch {
-      return value as T;
+      break;
     }
   }
-  return value as T;
+  return current as T;
 }
 
 function stringOrNull(value: unknown): string | null {
@@ -144,71 +147,25 @@ async function readLeadsFromPg(
     const count = parseInt(countRow?.count ?? '0', 10);
     if (count === 0) return null;
 
-    let selectFields;
-    if (detailed) {
-      selectFields = sql`
-        id,
-        raw->'idlead' AS idlead,
-        nome,
-        email,
-        telefone,
-        raw->'celular' AS celular,
-        raw->'midia_principal' AS midia_principal,
-        raw->'midia_visita' AS midia_visita,
-        raw->'origem' AS origem,
-        status,
-        raw->'situacao' AS situacao,
-        raw->'empreendimento' AS empreendimento,
-        raw->'corretor' AS corretor,
-        raw->'gestor' AS gestor,
-        raw->'imobiliaria' AS imobiliaria,
-        raw->'autor_ultima_alteracao' AS autor_ultima_alteracao,
-        temperatura,
-        score,
-        raw->'valor_negocio' AS valor_negocio,
-        raw->'valor_venda' AS valor_venda,
-        raw->'data_venda' AS data_venda,
-        raw->'qtde_reservas_associadas' AS qtde_reservas_associadas,
-        raw->'qtde_simulacoes_associadas' AS qtde_simulacoes_associadas,
-        raw->'motivo_cancelamento' AS motivo_cancelamento,
-        NULL::text AS cidade,
-        NULL::text AS bolsao,
-        raw->'tags' AS tags,
-        data_cadastro,
-        data_atualizacao
-      `;
-    } else {
-      selectFields = sql`
-        id,
-        raw->'idlead' AS idlead,
-        nome,
-        telefone,
-        raw->'celular' AS celular,
-        raw->'midia_principal' AS midia_principal,
-        raw->'origem' AS origem,
-        status,
-        raw->'situacao' AS situacao,
-        raw->'empreendimento' AS empreendimento,
-        raw->'corretor' AS corretor,
-        raw->'gestor' AS gestor,
-        raw->'imobiliaria' AS imobiliaria,
-        temperatura,
-        score,
-        raw->'valor_negocio' AS valor_negocio,
-        raw->'valor_venda' AS valor_venda,
-        raw->'data_venda' AS data_venda,
-        NULL::text AS cidade,
-        NULL::text AS bolsao,
-        raw->'tags' AS tags,
-        data_cadastro,
-        data_atualizacao
-      `;
-    }
+    const selectFields = sql`
+      id,
+      nome,
+      email,
+      telefone,
+      origem,
+      status,
+      empreendimento,
+      score,
+      temperatura,
+      data_cadastro,
+      data_atualizacao,
+      raw
+    `;
 
-    let rows: PgLeadRow[];
+    let rows: any[];
     if (startDate && endDate) {
       if (detailed) {
-        rows = await sql<PgLeadRow[]>`
+        rows = await sql`
           SELECT ${selectFields}
           FROM leads
           WHERE data_cadastro >= ${startDate}::date
@@ -217,17 +174,18 @@ async function readLeadsFromPg(
           LIMIT ${limit} OFFSET ${(page - 1) * limit}
         `;
       } else {
-        rows = await sql<PgLeadRow[]>`
+        rows = await sql`
           SELECT ${selectFields}
           FROM leads
           WHERE data_cadastro >= ${startDate}::date
             AND data_cadastro <  (${endDate}::date + INTERVAL '1 day')
           ORDER BY data_cadastro DESC NULLS LAST
+          LIMIT 5000
         `;
       }
     } else if (startDate) {
       if (detailed) {
-        rows = await sql<PgLeadRow[]>`
+        rows = await sql`
           SELECT ${selectFields}
           FROM leads
           WHERE data_cadastro >= ${startDate}::date
@@ -235,16 +193,17 @@ async function readLeadsFromPg(
           LIMIT ${limit} OFFSET ${(page - 1) * limit}
         `;
       } else {
-        rows = await sql<PgLeadRow[]>`
+        rows = await sql`
           SELECT ${selectFields}
           FROM leads
           WHERE data_cadastro >= ${startDate}::date
           ORDER BY data_cadastro DESC NULLS LAST
+          LIMIT 5000
         `;
       }
     } else if (endDate) {
       if (detailed) {
-        rows = await sql<PgLeadRow[]>`
+        rows = await sql`
           SELECT ${selectFields}
           FROM leads
           WHERE data_cadastro < (${endDate}::date + INTERVAL '1 day')
@@ -252,64 +211,91 @@ async function readLeadsFromPg(
           LIMIT ${limit} OFFSET ${(page - 1) * limit}
         `;
       } else {
-        rows = await sql<PgLeadRow[]>`
+        rows = await sql`
           SELECT ${selectFields}
           FROM leads
           WHERE data_cadastro < (${endDate}::date + INTERVAL '1 day')
           ORDER BY data_cadastro DESC NULLS LAST
+          LIMIT 5000
         `;
       }
     } else {
       if (detailed) {
-        rows = await sql<PgLeadRow[]>`
+        rows = await sql`
           SELECT ${selectFields}
           FROM leads
           ORDER BY data_cadastro DESC NULLS LAST
           LIMIT ${limit} OFFSET ${(page - 1) * limit}
         `;
       } else {
-        rows = await sql<PgLeadRow[]>`
+        rows = await sql`
           SELECT ${selectFields}
           FROM leads
           ORDER BY data_cadastro DESC NULLS LAST
+          LIMIT 5000
         `;
       }
     }
 
-    const leads: DashboardLead[] = rows.map((r) => {
+    const leads: DashboardLead[] = rows.map((r: any) => {
+      let leadObj: any = {};
+      try {
+        let currentRaw = r.raw;
+        while (typeof currentRaw === 'string') {
+          currentRaw = JSON.parse(currentRaw);
+        }
+        leadObj = currentRaw || {};
+      } catch (err) {
+        // ignore parse errors
+      }
+
+      let empVal = leadObj.empreendimento || r.empreendimento || [];
+      if (typeof empVal === 'string') {
+        try { empVal = JSON.parse(empVal); } catch { empVal = [{ nome: empVal }]; }
+      }
+      if (!Array.isArray(empVal)) {
+        empVal = typeof empVal === 'object' && empVal ? [empVal] : [];
+      }
+
+      let sitVal = leadObj.situacao || r.status || {};
+      if (typeof sitVal === 'string') {
+        try { sitVal = JSON.parse(sitVal); } catch { sitVal = { nome: sitVal }; }
+      }
+
       const base: DashboardLead = {
         id: r.id,
-        idlead: r.idlead,
-        midia_principal: r.midia_principal,
-        origem: parseJsonValue(r.origem),
-        status: r.status,
-        situacao: parseJsonValue(r.situacao),
-        empreendimento: parseJsonValue(r.empreendimento),
-        corretor: parseJsonValue(r.corretor),
-        imobiliaria: parseJsonValue(r.imobiliaria),
-        temperatura: r.temperatura,
-        score: r.score,
-        valor_negocio: r.valor_negocio,
-        valor_venda: r.valor_venda,
-        data_venda: r.data_venda,
-        cidade: r.cidade,
-        bolsao: r.bolsao,
-        data_cadastro: r.data_cadastro,
+        idlead: leadObj.idlead ?? r.id,
+        midia_principal: leadObj.midia_principal ?? null,
+        midia_visita: leadObj.midia_visita ?? null,
+        origem: leadObj.origem ?? r.origem ?? 'Desconhecido',
+        status: r.status || leadObj.situacao?.nome || 'Desconhecido',
+        situacao: sitVal,
+        empreendimento: empVal,
+        corretor: leadObj.corretor || null,
+        imobiliaria: leadObj.imobiliaria || null,
+        temperatura: r.temperatura || leadObj.temperatura || null,
+        score: r.score != null ? r.score : (leadObj.score != null ? Number(leadObj.score) : null),
+        valor_negocio: leadObj.valor_negocio ?? null,
+        valor_venda: leadObj.valor_venda ?? null,
+        data_venda: leadObj.data_venda ?? null,
+        cidade: leadObj.cidade ?? null,
+        bolsao: leadObj.bolsao ?? null,
+        data_cadastro: r.data_cadastro || leadObj.data_cad || leadObj.data_cadastro,
       };
 
       if (detailed) {
-        base.nome = r.nome ?? undefined;
-        base.email = r.email ?? undefined;
-        base.telefone = r.telefone ?? undefined;
-        base.celular = r.celular;
-        base.midia_visita = r.midia_visita;
-        base.gestor = parseJsonValue(r.gestor);
-        base.autor_ultima_alteracao = r.autor_ultima_alteracao;
-        base.qtde_reservas_associadas = r.qtde_reservas_associadas;
-        base.qtde_simulacoes_associadas = r.qtde_simulacoes_associadas;
-        base.motivo_cancelamento = parseJsonValue(r.motivo_cancelamento);
-        base.tags = parseJsonValue(r.tags);
-        base.data_atualizacao = r.data_atualizacao;
+        base.nome = r.nome || leadObj.nome || undefined;
+        base.email = r.email || leadObj.email || undefined;
+        base.telefone = r.telefone || leadObj.telefone || undefined;
+        base.celular = leadObj.celular ?? null;
+        base.midia_visita = leadObj.midia_visita ?? null;
+        base.gestor = leadObj.gestor || null;
+        base.autor_ultima_alteracao = leadObj.autor_ultima_alteracao ?? null;
+        base.qtde_reservas_associadas = leadObj.qtde_reservas_associadas ?? 0;
+        base.qtde_simulacoes_associadas = leadObj.qtde_simulacoes_associadas ?? 0;
+        base.motivo_cancelamento = leadObj.motivo_cancelamento || null;
+        base.tags = leadObj.tags || [];
+        base.data_atualizacao = r.data_atualizacao || leadObj.data_atualizacao;
       }
 
       return base;
@@ -457,7 +443,7 @@ async function fetchCRMEmpreendimentos(): Promise<{ empreendimentos: unknown[]; 
       // Upsert into Postgres for persistence
       await sql`
         INSERT INTO cv_empreendimentos (id, nome, situacao, tipo, raw, synced_at)
-        VALUES (${idEmp}, ${nome}, ${situacao}, ${tipo}, ${JSON.stringify(p)}, NOW())
+        VALUES (${idEmp}, ${nome}, ${situacao}, ${tipo}, ${p as never}, NOW())
         ON CONFLICT (id) DO UPDATE SET
           nome = EXCLUDED.nome, situacao = EXCLUDED.situacao, tipo = EXCLUDED.tipo,
           raw = EXCLUDED.raw, synced_at = EXCLUDED.synced_at
@@ -508,10 +494,16 @@ async function fetchCRMEmpreendimentos(): Promise<{ empreendimentos: unknown[]; 
 
           unidades.push({ id: idUni, id_empreendimento: idEmp, bloco: blocoNome, numero: num, status: statusText, valor, metragem, andar, coluna, tipologia, situacao_mapa_disponibilidade });
 
+          // andar/coluna/tipologia ficam só no raw — as colunas não existem no banco
+          // de produção (usuário sem permissão de ALTER) e a leitura já usa raw->>.
           await sql`
-            INSERT INTO cv_unidades (id, id_empreendimento, bloco, numero, status, status_venda, valor, metragem, andar, coluna, tipologia, raw, synced_at)
+            INSERT INTO cv_unidades (id, id_empreendimento, bloco, numero, status, status_venda, valor, metragem, raw, synced_at)
             VALUES (${idUni}, ${idEmp}, ${blocoNome}, ${num}, ${statusText}, ${statusVenda},
-              ${valor}, ${metragem}, ${andar}, ${coluna}, ${tipologia}, ${JSON.stringify(uni)}, NOW())
+              ${valor}, ${metragem}, ${uni as never}, NOW())
+            ON CONFLICT (id) DO UPDATE SET
+              id_empreendimento = EXCLUDED.id_empreendimento, bloco = EXCLUDED.bloco,
+              numero = EXCLUDED.numero, status = EXCLUDED.status, status_venda = EXCLUDED.status_venda,
+              valor = EXCLUDED.valor, metragem = EXCLUDED.metragem, raw = EXCLUDED.raw, synced_at = EXCLUDED.synced_at
           `;
         }
       } catch (detErr: unknown) {
@@ -690,10 +682,10 @@ export async function GET(request: NextRequest) {
   const limit        = Math.max(1, Math.min(500, parseInt(searchParams.get('limit') || '50', 10)));
   const detailed     = searchParams.get('detailed') === 'true';
 
-  if (syncForce) {
-    const canForceSync = authUser.role === 'Desenvolvedor' || authUser.permissions?.isAdmin === true;
+  if (syncForce || forceRefresh) {
+    const canForceSync = authUser.role === 'Desenvolvedor' || authUser.permissions?.isAdmin === true || authUser.role === 'Gestor' || authUser.role === 'Diretoria';
     if (!canForceSync) {
-      return NextResponse.json({ error: 'Apenas administradores podem forçar sincronização.' }, { status: 403 });
+      return NextResponse.json({ error: 'Apenas administradores, gestores ou diretoria podem atualizar os dados.' }, { status: 403 });
     }
 
     try {
@@ -719,7 +711,7 @@ export async function GET(request: NextRequest) {
               const email_lead = lead.email || null;
               const telefone = lead.telefone || lead.celular || lead.phone || null;
               const origem = stringOrNull(lead.origem || lead.source);
-              const status = lead.status || null;
+              const status = (lead.situacao as any)?.nome || lead.status || null;
               const empreend = typeof lead.empreendimento === 'object'
                 ? lead.empreendimento.nome ?? null
                 : lead.empreendimento ?? null;
@@ -735,7 +727,7 @@ export async function GET(request: NextRequest) {
                 VALUES
                   (${id}, ${nome}, ${email_lead}, ${telefone}, ${origem}, ${status},
                    ${empreend}, ${score}, ${temperatura}, ${dataCad}, ${dataAtual},
-                   ${JSON.stringify(lead)}::jsonb, NOW())
+                   ${lead as never}, NOW())
                 ON CONFLICT (id) DO UPDATE SET
                   nome             = EXCLUDED.nome,
                   email            = EXCLUDED.email,
@@ -784,7 +776,10 @@ export async function GET(request: NextRequest) {
     : Infinity;
   const cacheStale  = cacheAgeMin > 180;
 
-  const needMetaLive = forceRefresh || !metaData || cacheStale;
+  // Se o usuário selecionou datas específicas no dashboard, precisamos buscar
+  // os dados do Meta ao vivo para esse período específico para os números baterem exato!
+  const isFiltered = !!startDate || !!endDate;
+  const needMetaLive = forceRefresh || !metaData || cacheStale || isFiltered;
   if (cacheStale && metaData) console.warn(`[/api/data] meta_cache stale (${Math.round(cacheAgeMin)}min) — buscando ao vivo`);
 
   const CV_EMAIL = process.env.CV_CRM_EMAIL || '';
@@ -797,11 +792,13 @@ export async function GET(request: NextRequest) {
 
   if (needMetaLive && liveMetaResult.status === 'fulfilled' && liveMetaResult.value) {
     metaData = liveMetaResult.value as MetaDataShape;
-    // Persiste no banco (sem await) — próximos loads já vêm do Postgres
-    import('@/lib/pg').then(({ sql }) =>
-      sql`INSERT INTO project_state (key, data) VALUES ('meta_cache', ${JSON.stringify({ data: metaData, updatedAt: new Date().toISOString() })}::jsonb)
-          ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data`.catch(() => {})
-    );
+    // Só persiste no banco se NÃO for um filtro temporário de período
+    if (!isFiltered) {
+      import('@/lib/pg').then(({ sql }) =>
+        sql`INSERT INTO project_state (key, data) VALUES ('meta_cache', ${{ data: metaData, updatedAt: new Date().toISOString() } as never})
+            ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data`.catch(() => {})
+      );
+    }
   }
 
   const leadsResultRaw: LeadResult = (pgLeads ?? (liveCRMLeads.status === 'fulfilled' ? liveCRMLeads.value : null)) ?? { leads: [], total: 0, crmTotal: 0 };

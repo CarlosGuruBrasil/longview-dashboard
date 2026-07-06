@@ -78,12 +78,7 @@ const DEFAULT_DATE: DateRange = { start: '', end: '' };
  * (ex.: dia 2 mostrava 1 lead de 3.795 na base).
  */
 function defaultRange(): DateRange {
-  const iso = (dt: Date) =>
-    `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
-  const now = new Date();
-  const start = new Date(now);
-  start.setDate(start.getDate() - 90);
-  return { start: iso(start), end: iso(now) };
+  return { start: '', end: '' };
 }
 
 export function DataProvider({ children, initialData }: DataProviderProps) {

@@ -1,5 +1,6 @@
 export interface LeadSituacao {
   nome: string;
+  id?: string | number;
   cor?: string;
 }
 
@@ -26,11 +27,13 @@ export interface LeadTag {
 export interface LeadInteracao {
   data_cad?: string;
   tipo?: string;
+  descricao?: string;
 }
 
 export interface Lead {
   idlead?: string | number;
   id?: string | number;
+  raw?: any;
   nome?: string;
   email?: string;
   telefone?: string;
@@ -323,6 +326,7 @@ export type ActiveView =
   | 'oportunidades'
   | 'empreendimentos'
   | 'vendas'
+  | 'funil'
   | 'marketing'
   | 'publicar'
   | 'audiences'
@@ -331,7 +335,14 @@ export type ActiveView =
   | 'trafego'
   | 'metrics'
   | 'insights'
-  | 'intelligence';
+  | 'intelligence'
+  // ── Novas views do Marketing Vision refatorado ──
+  | 'comando'
+  | 'jornada'
+  | 'ads'
+  | 'assistente'
+  | 'social'
+  | 'integracoes';
 
 // ── BI / Star Schema ──────────────────────────────────────────────────────────
 
@@ -414,4 +425,146 @@ export interface BiPageInsights {
 export interface DateRange {
   start: string;
   end: string;
+}
+
+// ── Funil Inteligente (cruzamento Leads + Reservas/Vendas) ────────────────────
+
+export interface FunilConversionStep {
+  label: string;
+  value: number;
+  percentage: number;
+  color: string;
+}
+
+export interface FunilVgvByOrigin {
+  origem: string;
+  leads: number;
+  reservas: number;
+  vgv: number;
+  cpl: number;
+  roas: number;
+  ticket_medio: number;
+}
+
+export interface FunilCycleByEmp {
+  empreendimento: string;
+  leads: number;
+  reservas: number;
+  avg_days_to_reserva: number | null;
+  avg_days_to_venda: number | null;
+  vgv: number;
+}
+
+export interface FunilMonthlySeries {
+  month: string;
+  leads: number;
+  reservas: number;
+  vgv: number;
+}
+
+export interface FunilTopCorretor {
+  corretor: string;
+  reservas: number;
+  vgv: number;
+  ticket_medio: number;
+  cancelamentos: number;
+}
+
+export interface FunilIntelligenceData {
+  steps: FunilConversionStep[];
+  vgvByOrigin: FunilVgvByOrigin[];
+  cycleByEmp: FunilCycleByEmp[];
+  monthly: FunilMonthlySeries[];
+  topCorretores: FunilTopCorretor[];
+  summary: {
+    totalLeads: number;
+    totalReservas: number;
+    totalVendas: number;
+    totalVgv: number;
+    avgTicket: number;
+    avgDaysLeadToReserva: number | null;
+    conversionRate: number;
+    cancelamentos: number;
+  };
+}
+
+// ── Integração de Plataformas (Hub de APIs) ───────────────────────────────────
+
+export type IntegrationStatus = 'connected' | 'error' | 'disconnected' | 'pending';
+export type IntegrationPlatform = 'meta' | 'google_ads' | 'google_business' | 'rd_station' | 'cv_crm' | 'other';
+
+export interface Integration {
+  id: string;
+  platform: IntegrationPlatform;
+  name: string;
+  status: IntegrationStatus;
+  accountId?: string;
+  accountName?: string;
+  lastSync?: string;
+  errorMessage?: string;
+  scopes?: string[];
+}
+
+export interface IntegrationInstructions {
+  platform: IntegrationPlatform;
+  steps: Array<{ step: number; title: string; description: string }>;
+  fields: Array<{ key: string; label: string; type: 'text' | 'password'; placeholder?: string; helpText?: string }>;
+  docsUrl?: string;
+}
+
+// ── Criativos de Campanhas ─────────────────────────────────────────────────────
+
+export interface CampaignCreative {
+  adId: string;
+  adName: string;
+  campaignId: string;
+  campaignName: string;
+  adsetName?: string;
+  format: 'video' | 'image' | 'carousel' | 'story';
+  thumbnailUrl?: string;
+  videoId?: string;
+  videoUrl?: string;
+  title?: string;
+  body?: string;
+  callToAction?: string;
+  targeting?: string;
+}
+
+// ── Score de Performance de Campanha ──────────────────────────────────────────
+
+export type CampaignScore = 'good' | 'attention' | 'bad' | 'unknown';
+export type CampaignStatus = 'ACTIVE' | 'PAUSED' | 'ARCHIVED' | 'DELETED';
+
+export interface CampaignPerformance {
+  campaignId: string;
+  campaignName: string;
+  status: CampaignStatus;
+  score: CampaignScore;
+  spend: number;
+  leads: number;
+  cpl: number;
+  ctr: number;
+  roas: number;
+  impressions: number;
+  clicks: number;
+  budget?: number;
+  startDate?: string;
+}
+
+// ── Insights de IA ────────────────────────────────────────────────────────────
+
+export type AIInsightType = 'warning' | 'success' | 'opportunity' | 'info' | 'critical';
+export type AIInsightAction = 'pause_campaign' | 'increase_budget' | 'review_creative' | 'sync_leads' | 'custom';
+
+export interface AIInsight {
+  id: string;
+  type: AIInsightType;
+  title: string;
+  description: string;
+  action?: AIInsightAction;
+  actionLabel?: string;
+  actionPayload?: Record<string, unknown>;
+  generatedAt: string;
+  source: 'rule' | 'gemini';
+  dismissed?: boolean;
 }

@@ -58,7 +58,7 @@ async function logWebhookError(source: string, error: string, payload: unknown):
     const { sql } = await import('@/lib/pg');
     await sql`
       INSERT INTO webhook_errors (source, error, payload, created_at)
-      VALUES (${source}, ${error}, ${JSON.stringify(payload)}::jsonb, NOW())
+      VALUES (${source}, ${error}, ${(payload ?? {}) as never}, NOW())
     `;
   } catch (e) {
     console.error('[meta/webhook] Falha ao logar erro no banco:', e);

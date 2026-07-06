@@ -170,6 +170,15 @@ export async function ensureSchema(): Promise<void> {
       )
     `;
 
+    // De-para modelo → disciplina (0-TERRENO … 9-IMPERMEABILIZAÇÕES) — classificação manual,
+    // não vem da API do Construpoint. Seed inicial por pattern-matching (ver docs/QUALITY-VISION-BI.md).
+    await sql`
+      CREATE TABLE IF NOT EXISTS construpoint_disciplinas (
+        modelo     TEXT PRIMARY KEY,
+        disciplina TEXT
+      )
+    `;
+
     await sql`
       CREATE TABLE IF NOT EXISTS cv_empreendimentos (
         id               BIGINT PRIMARY KEY,

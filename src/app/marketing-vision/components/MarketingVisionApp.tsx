@@ -5,12 +5,19 @@ import AppShell from './AppShell';
 import { useData } from '../context/DataContext';
 import type { DashboardApiResponse } from '../types';
 
-const DashboardView      = lazy(() => import('./views/DashboardView'));
-const LeadsView          = lazy(() => import('./views/LeadsView'));
-const VendasView         = lazy(() => import('./views/VendasView'));
-const MetricsView        = lazy(() => import('./views/MetricsView'));
-const MarketingAdsView   = lazy(() => import('./views/MarketingAdsView'));
-const IntelligenceView   = lazy(() => import('./views/IntelligenceView'));
+const DashboardView         = lazy(() => import('./views/DashboardView'));
+const LeadsView             = lazy(() => import('./views/LeadsView'));
+const VendasView            = lazy(() => import('./views/VendasView'));
+const MetricsView           = lazy(() => import('./views/MetricsView'));
+const MarketingAdsView      = lazy(() => import('./views/MarketingAdsView'));
+const GestaoAdsView         = lazy(() => import('./views/GestaoAdsView'));
+const IntelligenceView      = lazy(() => import('./views/IntelligenceView'));
+const FunilInteligenteView  = lazy(() => import('./views/FunilInteligenteView'));
+const CentralComandoView    = lazy(() => import('./views/CentralComandoView'));
+const JornadaLeadView       = lazy(() => import('./views/JornadaLeadView'));
+const AssistenteIAView      = lazy(() => import('./views/AssistenteIAView'));
+const CentralSocialView     = lazy(() => import('./views/CentralSocialView'));
+const HubIntegracoesView    = lazy(() => import('./views/HubIntegracoesView'));
 
 function ViewRouter() {
   const { activeView } = useData();
@@ -18,10 +25,17 @@ function ViewRouter() {
   const viewMap: Record<string, React.ReactNode> = {
     dashboard:    <DashboardView />,
     leads:        <LeadsView />,
+    funil:        <FunilInteligenteView />,
     vendas:       <VendasView />,
     metrics:      <MetricsView />,
     marketing:    <MarketingAdsView />,
+    ads:          <GestaoAdsView />,
     intelligence: <IntelligenceView />,
+    comando:      <CentralComandoView />,
+    jornada:      <JornadaLeadView />,
+    assistente:   <AssistenteIAView />,
+    social:       <CentralSocialView />,
+    integracoes:  <HubIntegracoesView />,
   };
 
   return (

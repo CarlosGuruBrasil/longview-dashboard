@@ -21,38 +21,90 @@ interface StageData {
 }
 
 const STAGES = [
-  { key: 'new',        label: 'Novos Leads',        color: '#3b82f6' },
-  { key: 'attended',   label: 'Em Atendimento',     color: '#f59e0b' },
-  { key: 'scheduled',  label: 'Visita Agendada',    color: '#8b5cf6' },
-  { key: 'visited',    label: 'Visita Realizada',   color: '#06b6d4' },
-  { key: 'proposal',   label: 'Com Proposta',       color: '#ec4899' },
-  { key: 'sale',       label: 'Venda Realizada',    color: '#10b981' },
+  { key: 'aguardando atendimento',          label: 'Aguardando Atendimento',          color: '#FF0F47' },
+  { key: 'em atendimento sdr',              label: 'Em Atendimento SDR',              color: '#00E676' },
+  { key: 'aguardando atendimento corretor', label: 'Aguardando Atendimento Corretor', color: '#FFEA00' },
+  { key: 'em atendimento',                  label: 'Em Atendimento',                  color: '#FF8A00' },
+  { key: 'lançamento sul da ilha',          label: 'Lançamento Sul da Ilha',          color: '#8B5CF6' },
+  { key: 'lançamento trindade',             label: 'Lançamento Trindade',             color: '#8B5CF6' },
+  { key: 'visita agendada',                 label: 'Visita Agendada',                 color: '#00B0FF' },
+  { key: 'visita realizada',                label: 'Visita Realizada',                color: '#00897B' },
+  { key: 'simulação',                       label: 'Simulação',                       color: '#FF5252' },
+  { key: 'com reserva',                     label: 'Com Reserva',                     color: '#2979FF' },
+  { key: 'venda realizada',                 label: 'Venda Realizada',                 color: '#FFFFFF' },
+  { key: 'sem conexão',                     label: 'Sem Conexão',                     color: '#EF4444' },
+  { key: 'perdido',                         label: 'Perdido',                         color: '#6B7280' },
 ] as const
 
 export default function FunnelVisualization({ leads }: Props) {
   const stages = useMemo(() => {
-    const active = leads.filter(l => !isLoss(l))
-
     const stageCounts: Record<string, number> = {
-      new: 0, attended: 0, scheduled: 0, visited: 0, proposal: 0, sale: 0,
+      'aguardando atendimento': 0,
+      'em atendimento sdr': 0,
+      'aguardando atendimento corretor': 0,
+      'em atendimento': 0,
+      'lançamento sul da ilha': 0,
+      'lançamento trindade': 0,
+      'visita agendada': 0,
+      'visita realizada': 0,
+      'simulação': 0,
+      'com reserva': 0,
+      'venda realizada': 0,
+      'sem conexão': 0,
+      'perdido': 0,
     }
 
-    for (const lead of active) {
-      if (isSale(lead)) { stageCounts.sale++; continue }
-      if (isComProposta(lead)) { stageCounts.proposal++; continue }
-      const stage = getLeadStage(lead)
-      if (stage === 'none') { stageCounts.new++; continue }
-      stageCounts[stage]++
+    for (const lead of leads) {
+      const sit = lead.situacao?.nome || (lead as any).status || '';
+      const s = sit.toLowerCase().trim();
+
+      if (s === 'aguardando atendimento' || s === 'inicio' || s === 'início') {
+        stageCounts['aguardando atendimento']++
+      } else if (s === 'em atendimento sdr') {
+        stageCounts['em atendimento sdr']++
+      } else if (s === 'aguardando atendimento corretor') {
+        stageCounts['aguardando atendimento corretor']++
+      } else if (s === 'em atendimento') {
+        stageCounts['em atendimento']++
+      } else if (s.includes('sul da ilha')) {
+        stageCounts['lançamento sul da ilha']++
+      } else if (s.includes('trindade')) {
+        stageCounts['lançamento trindade']++
+      } else if (s === 'visita agendada') {
+        stageCounts['visita agendada']++
+      } else if (s === 'visita realizada') {
+        stageCounts['visita realizada']++
+      } else if (s === 'simulação' || s === 'simulacao') {
+        stageCounts['simulação']++
+      } else if (s === 'com reserva' || s === 'reserva') {
+        stageCounts['com reserva']++
+      } else if (s === 'venda realizada' || s.includes('ganho') || s.includes('vendid')) {
+        stageCounts['venda realizada']++
+      } else if (s === 'sem conexão' || s === 'sem conexao') {
+        stageCounts['sem conexão']++
+      } else if (s === 'perdido' || s.includes('descart') || s.includes('cancel')) {
+        stageCounts['perdido']++
+      }
     }
 
-    const total = active.length
+    const total = leads.length
 
     return STAGES.map((s, i) => {
       const count = stageCounts[s.key]
-      // Previous stage total for conversion calculation
-      const prev = i > 0 ? stageCounts[STAGES[i - 1].key] : total
-      const convFromPrev = prev > 0 ? ((count / prev) * 100).toFixed(1) : null
       const pctOfTotal = total > 0 ? ((count / total) * 100).toFixed(1) : '0.0'
+
+      // Conversão a partir da etapa anterior apenas para a trilha principal (sequencial física)
+      const mainPathKeys = ['aguardando atendimento', 'em atendimento sdr', 'aguardando atendimento corretor', 'em atendimento', 'visita agendada', 'visita realizada', 'simulação', 'com reserva', 'venda realizada']
+      let convFromPrev: string | null = null
+
+      if (mainPathKeys.includes(s.key)) {
+        const pathIdx = mainPathKeys.indexOf(s.key)
+        if (pathIdx > 0) {
+          const prevKey = mainPathKeys[pathIdx - 1]
+          const prevCount = stageCounts[prevKey]
+          convFromPrev = prevCount > 0 ? ((count / prevCount) * 100).toFixed(1) : '0.0'
+        }
+      }
 
       return { ...s, count, pctOfTotal, convFromPrev }
     })
@@ -66,19 +118,19 @@ export default function FunnelVisualization({ leads }: Props) {
       <div className="flex items-center gap-2 px-0.5 mb-2">
         <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Funil CV CRM</h3>
         <span className="text-xs text-zinc-600">
-          {leads.filter(l => !isLoss(l)).length} leads ativos
+          {leads.length} leads totais no período
         </span>
       </div>
 
       {/* Stages */}
       <div className="flex flex-col gap-1.5">
-        {stages.map((stage, i) => {
+        {stages.map((stage) => {
           const barW = maxCount > 0 ? (stage.count / maxCount) * 100 : 0
 
           return (
             <div key={stage.key} className="flex items-center gap-3 min-w-0">
               {/* Stage label */}
-              <span className="text-xs text-zinc-300 min-w-[120px] truncate shrink-0">
+              <span className="text-xs text-zinc-300 min-w-[190px] truncate shrink-0">
                 {stage.label}
               </span>
 
@@ -108,6 +160,7 @@ export default function FunnelVisualization({ leads }: Props) {
                            : Number(stage.convFromPrev) >= 25 ? '#f59e0b'
                            : '#ef4444',
                     }}
+                    title="Conversão da etapa anterior imediata da trilha"
                   >
                     {stage.convFromPrev}%
                   </span>

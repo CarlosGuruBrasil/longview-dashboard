@@ -528,7 +528,7 @@ export async function GET() {
         }
       }
     }
-    const zeroSalesCampaigns = campaignAttribution.filter(c => c.spend > 500 && c.salesInCrm === 0)
+    const zeroSalesCampaigns = campaignAttribution.filter(c => c.status === 'ACTIVE' && c.spend > 500 && c.salesInCrm === 0)
     if (zeroSalesCampaigns.length > 0) {
       oportunidadesIdentificadas.push(`${zeroSalesCampaigns.length} campanha(s) com gasto > R$500 e zero vendas — revisar segmentação e formulário`)
     }

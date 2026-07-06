@@ -11,6 +11,7 @@ export interface UserPermissions {
   deleteTasks: boolean;
   viewPeopleVision?: boolean;
   viewQualityVision?: boolean;
+  viewSalesVision: boolean;
   isAdmin: boolean;
 }
 
@@ -27,6 +28,7 @@ export const DEFAULT_USER_PERMISSIONS: UserPermissions = {
   deleteTasks: false,
   viewPeopleVision: false,
   viewQualityVision: false,
+  viewSalesVision: false,
   isAdmin: false,
 };
 

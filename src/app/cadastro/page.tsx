@@ -234,7 +234,7 @@ function CadastroContent() {
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
           <div className="relative w-36 h-10 mb-4">
-            <Image src="/logolongview.png" alt="LongView" fill style={{ objectFit: 'contain' }} />
+            <Image src="/logolongview.png" alt="LongView" fill style={{ objectFit: 'contain' }} sizes="144px" />
           </div>
           <span className="text-[9px] uppercase font-bold tracking-[0.25em] text-emerald-400/70">People Vision</span>
         </div>

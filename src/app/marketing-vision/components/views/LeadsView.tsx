@@ -31,6 +31,22 @@ export default function LeadsView() {
   } = useData()
   const [activeTab, setActiveTab] = useState<SubTab>('crm')
   const [growthMode, setGrowthMode] = useState<'month' | 'year'>('month')
+  const [syncing, setSyncing] = useState(false)
+
+  const handleSyncOrphans = async () => {
+    setSyncing(true)
+    try {
+      const res = await fetch('/api/meta/sync-orphans', { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Erro na sincronização')
+      alert(`Sucesso! ${data.leads_sincronizados} leads órfãos foram integrados no CV CRM e localmente.`)
+      refresh(true, undefined, { validateMeta: true })
+    } catch (err: any) {
+      alert(`Falha ao sincronizar: ${err.message}`)
+    } finally {
+      setSyncing(false)
+    }
+  }
 
   useEffect(() => {
     if (activeTab === 'meta-validation' && !metaValidation && !loading) {
@@ -154,6 +170,48 @@ export default function LeadsView() {
               Esta ferramenta compara em tempo real os contatos captados nos formulários ativos de campanhas de Meta Ads (Facebook e Instagram) com os leads cadastrados no CV CRM. Se o e-mail ou o telefone do lead captado no Meta não estiver cadastrado no CRM, ele será listado abaixo como uma inconsistência.
             </p>
           </GlassCard>
+
+          {/* Card de Aviso da Integração RD Station */}
+          <div className="bg-amber-500/10 border border-amber-500/20 text-amber-300 p-4 rounded-xl text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex flex-col gap-0.5">
+              <span className="font-semibold text-sm text-amber-400">Integração RD Station (OAuth2)</span>
+              <span>A conexão de conversão de leads com o RD Station necessita de re-autorização dos tokens de acesso.</span>
+            </div>
+            <a
+              href="/api/rd/token"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 h-9 px-4 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-955 font-bold flex items-center justify-center transition-colors text-xs"
+            >
+              Re-autenticar RD Station
+            </a>
+          </div>
+
+          {/* Ações de Sincronização de Leads Órfãos */}
+          {metaValidation && metaValidation.orphanedLeads?.length > 0 && (
+            <div className="p-5 rounded-xl bg-orange-500/10 border border-orange-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex flex-col gap-1">
+                <span className="text-sm font-semibold text-orange-400">Leads Perdidos Detectados ({metaValidation.orphanedLeads.length})</span>
+                <span className="text-xs text-zinc-400 max-w-xl">
+                  Encontramos leads órfãos no Meta Ads que não constam no CRM. Você pode forçar a importação retroativa deles no CV CRM e banco local.
+                </span>
+              </div>
+              <button
+                onClick={handleSyncOrphans}
+                disabled={syncing}
+                className="shrink-0 h-10 px-5 rounded-full bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+              >
+                {syncing ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Sincronizando...
+                  </>
+                ) : (
+                  'Sincronizar Leads Órfãos no CRM'
+                )}
+              </button>
+            </div>
+          )}
 
           {loading && !metaValidation ? (
             <div className="bg-sky-500/10 border border-sky-500/20 text-sky-300 p-4 rounded-xl text-sm">

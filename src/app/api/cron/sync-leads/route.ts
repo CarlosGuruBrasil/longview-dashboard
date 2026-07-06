@@ -119,7 +119,9 @@ export async function GET(request: NextRequest) {
         const email_lead   = lead.email || null;
         const telefone     = lead.telefone || lead.celular || lead.phone || null;
         const origem       = scalar(lead.origem || lead.source);
-        const status       = lead.status || null;
+        const status       = (typeof lead.situacao === 'object' && lead.situacao !== null
+          ? (lead.situacao as { nome?: string }).nome
+          : lead.status) || null;
         const empreend     = typeof lead.empreendimento === 'object'
           ? lead.empreendimento?.nome || null
           : lead.empreendimento || null;
@@ -135,7 +137,7 @@ export async function GET(request: NextRequest) {
           VALUES
             (${id}, ${nome}, ${email_lead}, ${telefone}, ${origem}, ${status},
              ${empreend}, ${score}, ${temperatura}, ${dataCad}, ${dataAtual},
-             ${JSON.stringify(lead)}::jsonb, NOW())
+             ${lead as never}, NOW())
           ON CONFLICT (id) DO UPDATE SET
             nome             = EXCLUDED.nome,
             email            = EXCLUDED.email,

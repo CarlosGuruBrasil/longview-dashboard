@@ -543,7 +543,10 @@ export async function readKv<T>(key: string, fallback: T): Promise<T> {
     try {
       const db   = await getPg();
       const rows = await db<{ data: T }[]>`SELECT data FROM project_state WHERE key = ${key}`;
-      if (rows.length > 0) return rows[0].data as T;
+      if (rows.length > 0) {
+        const raw = rows[0].data;
+        return (typeof raw === 'string' ? JSON.parse(raw) : raw) as T;
+      }
       return fallback;
     } catch (e) { console.error(`[db-kv] readKv(${key}) error:`, e); }
   }

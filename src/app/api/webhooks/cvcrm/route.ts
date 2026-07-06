@@ -194,7 +194,7 @@ export async function POST(request: NextRequest) {
         ${sqlScalar(full.temperatura)},
         ${parseCrmDate(full.data_cad ?? full.data_cadastro)},
         ${parseCrmDate(full.data_atualizacao)},
-        ${JSON.stringify(full)}::jsonb,
+        ${full as never},
         NOW()
       )
       ON CONFLICT (id) DO UPDATE SET
@@ -243,7 +243,7 @@ export async function POST(request: NextRequest) {
       const { sql } = await import('@/lib/pg');
       await sql`
         INSERT INTO webhook_errors (source, payload, error, created_at)
-        VALUES ('cvcrm', ${JSON.stringify({})}::jsonb, ${msg}, NOW())
+        VALUES ('cvcrm', ${{} as never}, ${msg}, NOW())
         ON CONFLICT DO NOTHING
       `.catch(() => {}); // ignora se tabela não existe ainda
     } catch { /* não bloqueia resposta */ }

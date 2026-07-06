@@ -36,8 +36,21 @@ function sumActions(actions: Array<{ action_type: string; value: string }> | und
 }
 
 export default function MarketingAdsView() {
-  const { metaData, filteredLeads } = useData()
+  const { metaData, filteredLeads, leadForms } = useData()
   const [dailyMetric, setDailyMetric] = useState<DailyMetric>('spend')
+
+  const ageData = useMemo(() => {
+    if (!metaData?.demographics?.length) return []
+    const map = new Map<string, number>()
+    for (const d of metaData.demographics) {
+      if (d.age) {
+        map.set(d.age, (map.get(d.age) ?? 0) + Number(d.impressions ?? 0))
+      }
+    }
+    return Array.from(map.entries())
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [metaData])
   const [campaignSearch, setCampaignSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'ACTIVE'>('all')
   const [sortField, setSortField] = useState<keyof MetaCampaignInsight>('spend')
@@ -195,9 +208,12 @@ export default function MarketingAdsView() {
       )}
 
       {/* Demographics charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {genderData.length > 0 && (
           <PieDonutChart title="Por Gênero" data={genderData} />
+        )}
+        {ageData.length > 0 && (
+          <PieDonutChart title="Por Faixa Etária" data={ageData} />
         )}
         {platformData.length > 0 && (
           <PieDonutChart title="Por Plataforma" data={platformData} />
@@ -206,6 +222,40 @@ export default function MarketingAdsView() {
           <PieDonutChart title="Por Dispositivo" data={deviceData} />
         )}
       </div>
+
+      {/* Lead Forms table */}
+      {leadForms && leadForms.length > 0 && (
+        <GlassCard title="Formulários de Lead da Meta (Leadgen Forms)">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr style={{ color: 'var(--text-secondary)' }}>
+                  <th className="text-left py-2 px-3 font-medium">Nome do Formulário</th>
+                  <th className="text-left py-2 px-3 font-medium">ID da Meta</th>
+                  <th className="text-left py-2 px-3 font-medium">Status</th>
+                  <th className="text-left py-2 px-3 font-medium">Leads Cadastrados</th>
+                </tr>
+              </thead>
+              <tbody>
+                {leadForms.map(f => (
+                  <tr key={f.id} className="border-t border-white/5 hover:bg-white/5 transition-colors" style={{ color: 'var(--text-primary)' }}>
+                    <td className="py-2.5 px-3 font-medium">{f.name}</td>
+                    <td className="py-2.5 px-3 text-zinc-500 font-mono">{f.id}</td>
+                    <td className="py-2.5 px-3">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                        f.status === 'ACTIVE' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-500/20 text-zinc-400'
+                      }`}>
+                        {f.status}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 text-pink-400 font-bold">{f.leads_count ?? 0}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </GlassCard>
+      )}
 
       {/* Campaigns table */}
       <GlassCard

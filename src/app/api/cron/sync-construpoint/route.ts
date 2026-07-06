@@ -26,6 +26,12 @@ export async function GET(request: NextRequest) {
   const startYear = 2025;
   const endYear = new Date().getFullYear();
 
+  // mode=incremental: só inspeções do mês corrente (roda a cada 15min via Coolify).
+  // Verificações ficam de fora porque a tabela não tem chave natural (sync full diário faz TRUNCATE+reload).
+  const incremental = url.searchParams.get('mode') === 'incremental';
+  const now0 = new Date();
+  const currentMonthStart = `${now0.getFullYear()}-${String(now0.getMonth() + 1).padStart(2, '0')}-01`;
+
   let upsertedInspections = 0;
   let upsertedVerifications = 0;
 
@@ -34,10 +40,10 @@ export async function GET(request: NextRequest) {
   try {
     // 1. Sync Inspecoes
     for (const key of modelKeys) {
-      for (let y = startYear; y <= endYear; y++) {
-        const beginDate = `${y}-01-01`;
+      for (let y = incremental ? endYear : startYear; y <= endYear; y++) {
+        const beginDate = incremental ? currentMonthStart : `${y}-01-01`;
         const endDate = `${y}-12-31`;
-        
+
         const res = await getInspections({
           BeginDate: beginDate,
           EndDate: endDate,
@@ -92,7 +98,8 @@ export async function GET(request: NextRequest) {
     }
   }
 
-    // 2. Sync Verificacoes
+    // 2. Sync Verificacoes (só no sync full — ver comentário do incremental acima)
+    if (!incremental) {
     await sql`TRUNCATE TABLE construpoint_verificacoes`;
 
     const today = new Date();
@@ -142,6 +149,7 @@ export async function GET(request: NextRequest) {
         upsertedVerifications++;
       }
     }
+  }
   }
 
     return NextResponse.json({

@@ -385,8 +385,13 @@ export default function LeadsTable({
                   <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>
                     {formatDate(toISODate(rawDate))}
                   </td>
-                  <td className="px-3 py-2 whitespace-nowrap max-w-[120px] truncate" style={{ color: 'var(--text-secondary)' }}>
-                    {getOrigin(lead)}
+                  <td className="px-3 py-2 whitespace-nowrap max-w-[150px]" style={{ color: 'var(--text-secondary)' }}>
+                    <div className="font-medium text-zinc-300 truncate" title={getOrigin(lead)}>{getOrigin(lead)}</div>
+                    {lead.midia_principal && lead.midia_principal !== getOrigin(lead) && !/\{\{.*\}\}/.test(String(lead.midia_principal)) && (
+                      <div className="text-[10px] text-zinc-500 truncate max-w-[140px]" title={String(lead.midia_principal)}>
+                        Campanha: {String(lead.midia_principal)}
+                      </div>
+                    )}
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap">
                     {lead.situacao?.nome ? (
