@@ -300,24 +300,29 @@ export default function DashboardView() {
       )}
 
       {/* ── KPIs Principais com Comparação ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <SmartKpi
           icon={Users} label="Total de Leads Gerados" value={formatNumber(filteredLeads.length)}
           sub="Todos os canais no período" color="#0ea5e9"
           onClick={() => filterAndNavigate({})}
         />
         <SmartKpi
+          icon={DollarSign} label="Investimento Meta Ads" value={formatCurrency(totalSpend)}
+          sub="Valor gasto em mídia paga" color="#10b981"
+          onClick={() => setActiveView('marketing')}
+        />
+        <SmartKpi
           icon={Megaphone} label="Leads Meta Ads" value={formatNumber(metaLeads.length)}
-          sub={`${totalSpend > 0 ? `Investido: ${formatCurrency(totalSpend)}` : 'Sem gasto'}`} color="#3b82f6"
+          sub="Leads vindos do Meta" color="#3b82f6"
           onClick={() => filterAndNavigate({ origem: 'facebook' })}
         />
         <SmartKpi
           icon={Compass} label="Outros Canais (Orgânicos)" value={formatNumber(outrosLeads.length)}
-          sub="Canais não-pagos no período" color="#10b981"
+          sub="Canais não-pagos no período" color="#a855f7"
           onClick={() => filterAndNavigate({ origem: 'Painel' })}
         />
         <SmartKpi
-          icon={DollarSign} label="Custo por Lead (CPL)" value={avgCpl > 0 ? formatCurrency(avgCpl) : '—'}
+          icon={Target} label="Custo por Lead (CPL)" value={avgCpl > 0 ? formatCurrency(avgCpl) : '—'}
           sub="Valor gasto ÷ leads Meta" color="#f43f5e"
         />
       </div>

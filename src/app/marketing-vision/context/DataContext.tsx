@@ -83,7 +83,10 @@ const DEFAULT_DATE: DateRange = { start: '', end: '' };
  * (ex.: dia 2 mostrava 1 lead de 3.795 na base).
  */
 function defaultRange(): DateRange {
-  return { start: '', end: '' };
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  return { start: `${year}-${month}-01`, end: '' };
 }
 
 export function DataProvider({ children, initialData }: DataProviderProps) {
