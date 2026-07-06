@@ -97,9 +97,11 @@ const PRIMARY_NAV = [
 
 // Nav completo do drawer lateral
 const DRAWER_NAV = [
+  { icon: LayoutDashboard, label: 'Dashboard',           view: 'dashboard'    as ActiveView },
   { icon: Radio,         label: 'Central de Comando',    view: 'comando'      as ActiveView },
   { icon: MapPin,        label: 'Jornada do Lead',       view: 'jornada'      as ActiveView },
   { icon: Megaphone,     label: 'Gestão de Ads',         view: 'ads'          as ActiveView },
+  { icon: BarChart3,     label: 'Marketing Ads (Gastos)', view: 'marketing'   as ActiveView },
   { icon: Cpu,           label: 'Assistente de IA',      view: 'assistente'   as ActiveView },
   { icon: Globe,         label: 'Central Social',        view: 'social'       as ActiveView },
   { icon: GitMerge,      label: 'Funil Inteligente',     view: 'funil'        as ActiveView },
