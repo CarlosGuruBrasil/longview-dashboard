@@ -197,7 +197,7 @@ export async function POST(request: NextRequest) {
   // Evita enviar duplicado para o mesmo contato (dedup por 90 dias)
   const alreadySent = await kv.get(dedupKey);
   if (alreadySent) {
-    logger.info(`[cv/webhook] Contato $ já processado — dedup`);
+    logger.info(`[cv/webhook] Contato ${leadId} já processado — dedup`);
     await logEvent({ ...body, lead, etapa, evento: 'sem_conexao_dedup' }, false);
     return NextResponse.json({ ok: true, action: 'dedup', leadId });
   }
@@ -218,7 +218,7 @@ export async function POST(request: NextRequest) {
 
   await logEvent({ ...body, lead, etapa, evento: 'sem_conexao' }, true, rdResult);
 
-  logger.info(`[cv/webhook] Lead $ → RD: $`);
+  logger.info(`[cv/webhook] Lead ${leadId} → RD: ${rdResult.ok ? 'OK' : rdResult.error}`);
 
   return NextResponse.json({
     ok:      rdResult.ok,

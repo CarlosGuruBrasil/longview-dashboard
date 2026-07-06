@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
   const event_type = text(body.event_type || event.type);
   const email = text(primaryData.email || leadData.email || payload.email);
 
-  logger.info(`[rd/webhook] $ | $`);
+  logger.info(`[rd/webhook] ${event_type} | ${email || '(sem email)'}`);
 
   if (email) {
     try {
