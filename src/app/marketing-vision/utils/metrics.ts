@@ -196,41 +196,49 @@ export function calculateMetricsByPeriod(
     periodMap.get(period)!.push(lead);
   });
 
-  return Array.from(periodMap.entries())
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([period, periodLeads]) => {
-      const newLeads = calculateNewLeadsRate(periodLeads);
-      const attendance = calculateAttendanceRate(periodLeads);
-      const scheduling = calculateSchedulingRate(periodLeads);
-      const visit = calculateVisitRate(periodLeads);
-      const total = periodLeads.length;
+  const sortedPeriods = Array.from(periodMap.entries()).sort((a, b) => a[0].localeCompare(b[0]));
 
-      const attendedCount = attendance.numerator;
-      const scheduledCount = scheduling.numerator;
-      const visitedCount = visit.numerator;
+  return sortedPeriods.map(([period, periodLeads], idx) => {
+    let rate = 1;
+    let prevCount = periodLeads.length;
 
-      // proposalCount: apenas leads em estágio "Com Proposta" (situacao.nome)
-      // Simulações (qtde_simulacoes_associadas) são cálculos financeiros, não propostas comerciais
-      const proposalCount = periodLeads.filter(l => isComProposta(l)).length;
+    if (idx > 0) {
+      const prevPeriodLeads = sortedPeriods[idx - 1][1];
+      prevCount = prevPeriodLeads.length;
+      rate = prevCount > 0 ? periodLeads.length / prevCount : 1;
+    }
 
-      // salesCount: usa isSale() de leads.ts (cobre 'venda realizada', 'negócio
-      // ganho', 'vendid', 'venda real') para manter consistência com o restante do app
-      const salesCount = periodLeads.filter(l => isSale(l)).length;
+    const attendance = calculateAttendanceRate(periodLeads);
+    const scheduling = calculateSchedulingRate(periodLeads);
+    const visit = calculateVisitRate(periodLeads);
+    const total = periodLeads.length;
 
-      return {
-        period,
-        newLeadsRate: newLeads.rate,
-        attendanceRate: attendance.rate,
-        schedulingRate: scheduling.rate,
-        visitRate: visit.rate,
-        totalLeads: total,
-        attendedCount,
-        scheduledCount,
-        visitedCount,
-        proposalCount,
-        salesCount,
-      };
-    });
+    const attendedCount = attendance.numerator;
+    const scheduledCount = scheduling.numerator;
+    const visitedCount = visit.numerator;
+
+    // proposalCount: apenas leads em estágio "Com Proposta" (situacao.nome)
+    // Simulações (qtde_simulacoes_associadas) são cálculos financeiros, não propostas comerciais
+    const proposalCount = periodLeads.filter(l => isComProposta(l)).length;
+
+    // salesCount: usa isSale() de leads.ts (cobre 'venda realizada', 'negócio
+    // ganho', 'vendid', 'venda real') para manter consistência com o restante do app
+    const salesCount = periodLeads.filter(l => isSale(l)).length;
+
+    return {
+      period,
+      newLeadsRate: rate,
+      attendanceRate: attendance.rate,
+      schedulingRate: scheduling.rate,
+      visitRate: visit.rate,
+      totalLeads: total,
+      attendedCount,
+      scheduledCount,
+      visitedCount,
+      proposalCount,
+      salesCount,
+    };
+  });
 }
 
 /**
