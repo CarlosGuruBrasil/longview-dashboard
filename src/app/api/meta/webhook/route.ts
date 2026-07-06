@@ -114,7 +114,7 @@ async function fetchMetaLead(leadgenId: string): Promise<MetaLeadFull | null> {
     return res.data as MetaLeadFull;
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Erro desconhecido';
-    logger.warn({ msg }, '[meta/webhook] fetchMetaLead $ falhou:');
+    logger.warn({ msg, leadgenId }, '[meta/webhook] fetchMetaLead falhou:');
     await logWebhookError('meta_webhook', `fetchMetaLead falhou para leadgenId ${leadgenId}: ${msg}`, { leadgenId });
     return null;
   }
@@ -241,9 +241,31 @@ export async function GET(request: NextRequest) {
 // ─── POST — recebe evento de novo lead ───────────────────────────────────────
 
 export async function POST(request: NextRequest) {
+  // Lê corpo como texto primeiro para poder validar assinatura
+  let rawBody: string;
+  try {
+    rawBody = await request.text();
+  } catch {
+    return NextResponse.json({ ok: false, error: 'Erro ao ler corpo' }, { status: 400 });
+  }
+
+  // Valida X-Hub-Signature-256 se META_APP_SECRET estiver configurado
+  const appSecret = process.env.META_APP_SECRET;
+  if (appSecret) {
+    const sig = request.headers.get('x-hub-signature-256') ?? '';
+    const { createHmac } = await import('crypto');
+    const expected = 'sha256=' + createHmac('sha256', appSecret).update(rawBody).digest('hex');
+    if (sig !== expected) {
+      logger.warn({ sig }, '[meta/webhook] Assinatura inválida — payload rejeitado');
+      return NextResponse.json({ ok: false, error: 'signature mismatch' }, { status: 403 });
+    }
+  } else {
+    logger.warn('[meta/webhook] META_APP_SECRET não configurado — validação de assinatura desativada');
+  }
+
   let body: Record<string, unknown>;
   try {
-    body = await request.json();
+    body = JSON.parse(rawBody) as Record<string, unknown>;
   } catch {
     return NextResponse.json({ ok: false, error: 'JSON inválido' }, { status: 400 });
   }
@@ -269,12 +291,12 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        logger.info(`[meta/webhook] Processando lead $ (campanha: $)`);
+        logger.info(`[meta/webhook] Processando lead ${leadgen_id} (campanha: ${campaign_name ?? '?'})`);
 
         // 1. Busca dados completos na Meta API
         const metaLead = await fetchMetaLead(leadgen_id);
         if (!metaLead) {
-          logger.warn(`[meta/webhook] Não foi possível buscar lead $`);
+          logger.warn(`[meta/webhook] Não foi possível buscar lead ${leadgen_id}`);
           continue;
         }
 
@@ -295,7 +317,7 @@ export async function POST(request: NextRequest) {
         const origem        = 'Meta Lead Ads';
 
         if (!nomeCompleto && !email && !telefone) {
-          logger.warn(`[meta/webhook] Lead $ sem dados de contato — ignorado`);
+          logger.warn(`[meta/webhook] Lead ${leadgen_id} sem dados de contato — ignorado`);
           await logWebhookError('meta_webhook', 'Lead descartado por falta de dados de contato básicos (nome, email ou telefone)', { leadgen_id, fields });
           continue;
         }
@@ -324,7 +346,7 @@ export async function POST(request: NextRequest) {
         });
 
         if (!crmResult.ok) {
-          logger.warn(`[meta/webhook] CV CRM falhou para $: $`);
+          logger.warn(`[meta/webhook] CV CRM falhou para ${leadgen_id}: ${crmResult.error}`);
           await logWebhookError('meta_webhook', `CV CRM falhou: ${crmResult.error}`, { leadgen_id, parsed });
         }
 

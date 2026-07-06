@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
           id_empreendimento = EXCLUDED.id_empreendimento, id_unidade = EXCLUDED.id_unidade, valor = EXCLUDED.valor,
           data_venda = EXCLUDED.data_venda, status = EXCLUDED.status, raw = EXCLUDED.raw, synced_at = EXCLUDED.synced_at
       `;
-      logger.info(`[webhook/cvcrm] Venda $ upserted`);
+      logger.info(`[webhook/cvcrm] Venda ${vendaId} upserted`);
       return NextResponse.json({ ok: true });
     }
 
@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
         ON CONFLICT (id) DO UPDATE SET
           status = EXCLUDED.status, status_venda = EXCLUDED.status_venda, valor = EXCLUDED.valor, raw = EXCLUDED.raw, synced_at = EXCLUDED.synced_at
       `;
-      logger.info(`[webhook/cvcrm] Unidade $ upserted`);
+      logger.info(`[webhook/cvcrm] Unidade ${unidadeId} upserted`);
       return NextResponse.json({ ok: true });
     }
 
@@ -213,7 +213,7 @@ export async function POST(request: NextRequest) {
         synced_at        = NOW()
     `;
 
-    logger.info(`[webhook/cvcrm] lead $ upserted ($)`);
+    logger.info(`[webhook/cvcrm] lead ${id} upserted (${statusNomeV ?? '?'})`);
 
     // ── Notificação FCM: nova venda realizada ────────────────────────────
     const statusNome = (statusNomeV ?? '').toLowerCase();
