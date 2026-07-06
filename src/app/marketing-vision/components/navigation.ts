@@ -1,7 +1,7 @@
 import type { ActiveView } from '../types';
 import {
   LayoutDashboard, Radio, MapPin, Megaphone, GitMerge, Cpu, Globe, Zap,
-  Users, BarChart3, DollarSign, Lightbulb, Building2,
+  Users, BarChart3, DollarSign, Lightbulb, Building2, Antenna,
 } from 'lucide-react';
 
 export interface NavItem {
@@ -31,6 +31,7 @@ export const MARKETING_NAV_ITEMS: NavItem[] = [
   { icon: GitMerge,        label: 'Funil Inteligente',   view: 'funil' },
   { icon: DollarSign,      label: 'Vendas e Projetos',   view: 'vendas' },
   { icon: Users,           label: 'Leads',               view: 'leads' },
+  { icon: Antenna,         label: 'Fontes de Leads',     view: 'fontes' },
   { icon: BarChart3,       label: 'Métricas',            view: 'metrics' },
   { icon: Lightbulb,       label: 'Inteligência',        view: 'intelligence' },
   { icon: Zap,             label: 'Hub de Integrações',  view: 'integracoes' },
@@ -59,4 +60,5 @@ export const MARKETING_VIEW_TITLES: Record<ActiveView, string> = {
   assistente:   'Assistente de IA',
   social:       'Central Social',
   integracoes:  'Hub de Integrações',
+  fontes:       'Fontes de Leads',
 };

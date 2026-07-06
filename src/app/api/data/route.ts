@@ -369,7 +369,7 @@ async function readLeadsSummaryFromPg(
     const totalLeadsFiltered = parseInt(filteredCountRow?.count ?? '0', 10);
 
     // Agregações paralelas
-    const [situacoes, origens, empreendimentos, corretores, monthly, temperatura, scoreRow, bolsaoRow] =
+    const [situacoes, origens, empreendimentos, corretores, monthly, weekly, sourceStatus, temperatura, scoreRow, bolsaoRow] =
       await Promise.all([
         sql<{ nome: string; total: number }[]>`
           SELECT status AS nome, COUNT(*)::int AS total
@@ -404,6 +404,36 @@ async function readLeadsSummaryFromPg(
           GROUP BY DATE_TRUNC('month', data_cadastro)
           ORDER BY mes DESC LIMIT 24
         `,
+        sql<{ semana: string; total: number; meta: number; portais: number; manual: number; outros: number }[]>`
+          SELECT
+            TO_CHAR(DATE_TRUNC('week', data_cadastro), 'YYYY-MM-DD') AS semana,
+            COUNT(*)::int AS total,
+            COUNT(*) FILTER (WHERE origem IN ('Meta Lead Ads','Facebook','Remarketing','Social','Instagram','Mídia Paga'))::int AS meta,
+            COUNT(*) FILTER (WHERE origem IN ('Busca Compartilhada','Busca Orgânica','Tráfego Direto','Referência','Contako'))::int AS portais,
+            COUNT(*) FILTER (WHERE origem IN ('Painel Gestor','Painel Corretor','Painel PDV','Painel Cliente'))::int AS manual,
+            COUNT(*) FILTER (WHERE origem NOT IN ('Meta Lead Ads','Facebook','Remarketing','Social','Instagram','Mídia Paga','Busca Compartilhada','Busca Orgânica','Tráfego Direto','Referência','Contako','Painel Gestor','Painel Corretor','Painel PDV','Painel Cliente') OR origem IS NULL)::int AS outros
+          FROM leads
+          WHERE data_cadastro >= NOW() - INTERVAL '16 weeks'
+          GROUP BY DATE_TRUNC('week', data_cadastro)
+          ORDER BY semana ASC
+        `,
+        sql<{ canal: string; total: number; ultimo_lead: string | null }[]>`
+          SELECT
+            CASE
+              WHEN origem IN ('Meta Lead Ads','Facebook','Remarketing','Social','Instagram','Mídia Paga') THEN 'Meta / Paid'
+              WHEN origem IN ('Busca Compartilhada') THEN 'Portais (Zap/OLX)'
+              WHEN origem IN ('Busca Orgânica') THEN 'Google Orgânico'
+              WHEN origem IN ('Tráfego Direto','Referência','Contako','Whatsapp') THEN 'Outros Digitais'
+              WHEN origem IN ('Painel Gestor','Painel Corretor','Painel PDV','Painel Cliente') THEN 'Manual (CRM)'
+              ELSE 'Não Definido'
+            END AS canal,
+            COUNT(*)::int AS total,
+            MAX(data_cadastro)::text AS ultimo_lead
+          FROM leads
+          WHERE data_cadastro IS NOT NULL
+          GROUP BY 1
+          ORDER BY total DESC
+        `,
         sql<{ temperatura: string; total: number }[]>`
           SELECT COALESCE(temperatura, 'Desconhecida') AS temperatura, COUNT(*)::int AS total
           FROM leads ${dateWhere}
@@ -428,7 +458,13 @@ async function readLeadsSummaryFromPg(
       byOrigem:           origens,
       byEmpreendimento:   empreendimentos,
       byCorretor:         corretores,
-      monthly:            monthly.reverse(), // mais antigo → mais novo
+      monthly:            monthly.reverse(),
+      weekly:             weekly,
+      sourceStatus:       sourceStatus.map(r => {
+        const ultimo = r.ultimo_lead ? new Date(r.ultimo_lead) : null;
+        const diasSemLead = ultimo ? Math.floor((Date.now() - ultimo.getTime()) / 86400000) : null;
+        return { canal: r.canal, total: r.total, ultimoLead: r.ultimo_lead, diasSemLead, ativo: diasSemLead !== null && diasSemLead <= 14 };
+      }),
       topTemperatura:     temperatura,
     };
   } catch (e: unknown) {

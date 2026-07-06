@@ -85,6 +85,7 @@ const VIEW_TITLES: Record<ActiveView, string> = {
   audiences:       'Audiências CRM',
   links:           'Links & QR',
   score:           'Score',
+  fontes:          'Fontes de Leads',
 };
 
 // Nav móvel (5 botões principais da barra inferior)

@@ -340,6 +340,23 @@ export interface LeadSummaryMonthly {
   total: number;
 }
 
+export interface LeadSummaryWeekly {
+  semana: string; // YYYY-MM-DD (segunda-feira)
+  total: number;
+  meta: number;
+  portais: number;
+  manual: number;
+  outros: number;
+}
+
+export interface LeadSourceStatus {
+  canal: string;
+  total: number;
+  ultimoLead: string | null; // ISO date
+  diasSemLead: number | null;
+  ativo: boolean;
+}
+
 /** Dados analíticos pré-calculados no servidor — substitui o array bruto de leads
  *  no carregamento inicial. Payload alvo: < 5 KB (vs ~8 MB do array bruto).
  */
@@ -353,6 +370,8 @@ export interface LeadSummary {
   byEmpreendimento: LeadSummaryByEmpreendimento[];
   byCorretor: LeadSummaryByCorretor[];
   monthly: LeadSummaryMonthly[];
+  weekly: LeadSummaryWeekly[];
+  sourceStatus: LeadSourceStatus[];
   topTemperatura: { temperatura: string; total: number }[];
 }
 
@@ -385,7 +404,8 @@ export type ActiveView =
   | 'ads'
   | 'assistente'
   | 'social'
-  | 'integracoes';
+  | 'integracoes'
+  | 'fontes';
 
 // ── BI / Star Schema ──────────────────────────────────────────────────────────
 

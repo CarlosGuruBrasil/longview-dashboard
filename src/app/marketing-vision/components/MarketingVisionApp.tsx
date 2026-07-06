@@ -18,6 +18,7 @@ const JornadaLeadView       = lazy(() => import('./views/JornadaLeadView'));
 const AssistenteIAView      = lazy(() => import('./views/AssistenteIAView'));
 const CentralSocialView     = lazy(() => import('./views/CentralSocialView'));
 const HubIntegracoesView    = lazy(() => import('./views/HubIntegracoesView'));
+const FontesView            = lazy(() => import('./views/FontesView'));
 
 function ViewRouter() {
   const { activeView } = useData();
@@ -36,6 +37,7 @@ function ViewRouter() {
     assistente:   <AssistenteIAView />,
     social:       <CentralSocialView />,
     integracoes:  <HubIntegracoesView />,
+    fontes:       <FontesView />,
   };
 
   return (
