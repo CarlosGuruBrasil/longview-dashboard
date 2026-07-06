@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminAuth } from '@/lib/auth';
 import { readProjectData, writeKv, writeProjectData } from '@/lib/db-kv';
 import { buildProjectDataFromCsv, buildProjectDataFromXlsx, readProjectDataFromDefaultSheet } from '@/lib/project-sheet-import';
+import logger from '@/lib/logger'
 
 export const runtime = 'nodejs';
 
@@ -74,7 +75,7 @@ export async function GET() {
     const { report } = readProjectDataFromDefaultSheet();
     return NextResponse.json({ dryRun: true, report });
   } catch (error) {
-    console.error('[project-vision/import-sheet] dry-run error:', error);
+    logger.error({ error }, '[project-vision/import-sheet] dry-run error:');
     return NextResponse.json({ error: 'Erro ao ler planilha.' }, { status: 500 });
   }
 }
@@ -111,7 +112,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, report });
   } catch (error) {
-    console.error('[project-vision/import-sheet] import error:', error);
+    logger.error({ error }, '[project-vision/import-sheet] import error:');
     return NextResponse.json({ error: 'Erro ao importar planilha.' }, { status: 500 });
   }
 }

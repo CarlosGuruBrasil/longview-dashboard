@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminAuth } from '@/lib/auth';
 import { rateLimit } from '@/lib/rateLimit';
 import axios from 'axios';
+import logger from '@/lib/logger'
 
 const META_BASE = 'https://graph.facebook.com/v21.0';
 
@@ -104,7 +105,7 @@ export async function PATCH(request: NextRequest) {
       timeout: 15000,
     });
 
-    console.log(`[meta/campaigns] ${type} ${id} atualizado por ${admin.name}: ${JSON.stringify(updatePayload)}`);
+    logger.info(`[meta/campaigns] $ $ atualizado por $: $`);
 
     return NextResponse.json({
       success: true,
@@ -115,7 +116,7 @@ export async function PATCH(request: NextRequest) {
     });
   } catch (err: unknown) {
     const details = axiosData(err);
-    console.error(`[meta/campaigns] Erro ao atualizar ${type} ${id}:`, details);
+    logger.error({ details }, '[meta/campaigns] Erro ao atualizar $ $:');
     return NextResponse.json(
       { error: 'Erro ao atualizar no Meta', details },
       { status: 500 }

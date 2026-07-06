@@ -16,6 +16,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { kv } from '@/lib/kv';
 import axios from 'axios';
 import { sendCAPIEvents, type CAPIEvent } from '@/app/api/meta/capi/route';
+import logger from '@/lib/logger'
 
 const META_BASE = 'https://graph.facebook.com/v21.0';
 const PAGE_ID   = '259079394232614';
@@ -168,7 +169,7 @@ async function sendToRD(lead: MetaLead, score: number): Promise<boolean> {
     );
     return true;
   } catch (err) {
-    console.warn('[process-leads] RD error:', axios.isAxiosError(err) ? err.response?.data?.error ?? err.message : err);
+    logger.warn({ err: axios.isAxiosError(err) ? err.response?.data?.error ?? err.message : err }, '[process-leads] RD error');
     return false;
   }
 }
@@ -279,7 +280,7 @@ export async function GET(request: NextRequest) {
     await kv.set('meta:leads:lastStats', stats);
 
     log.push(`[✓] Concluído: ${stats.newLeads} leads, ${stats.sentToRD} → RD, ${stats.capiSent} → CAPI`);
-    console.log('[cron/process-leads]', stats);
+    logger.info({ stats }, '[cron/process-leads]');
 
     return NextResponse.json({ ...stats, log });
   } catch (err) {
@@ -288,7 +289,7 @@ export async function GET(request: NextRequest) {
     stats.finishedAt = new Date().toISOString();
     log.push(`[ERRO FATAL] ${msg}`);
     await kv.set('meta:leads:lastStats', stats);
-    console.error('[cron/process-leads] Erro:', msg);
+    logger.error({ msg }, '[cron/process-leads] Erro:');
     return NextResponse.json({ ...stats, log }, { status: 500 });
   }
 }

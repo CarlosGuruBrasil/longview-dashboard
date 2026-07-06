@@ -361,7 +361,7 @@ export default function KpiGaugeHistoryCard({
     if (metric !== 'novos_leads') return null
 
     let startStr = dateRange.start
-    let endStr = dateRange.end
+    const endStr = dateRange.end
 
     if (!startStr) {
       const now = new Date()

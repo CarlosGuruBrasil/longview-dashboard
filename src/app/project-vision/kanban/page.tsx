@@ -11,6 +11,7 @@ import { Task, Project } from '@/lib/db';
 import { useUser } from '@/context/UserContext';
 import TaskDrawer from '../components/TaskDrawer';
 import ResponsibleModal from '../components/ResponsibleModal';
+import logger from '@/lib/logger'
 
 export default function KanbanPage() {
   const { currentUser } = useUser();
@@ -40,7 +41,7 @@ export default function KanbanPage() {
       setTasks(dataTasks.tasks || []);
       setProjects(dataProj.projects || []);
     } catch (e) {
-      console.error('Erro ao carregar dados do Kanban:', e);
+      logger.error({ e }, 'Erro ao carregar dados do Kanban:');
     } finally {
       setLoading(false);
     }
@@ -131,7 +132,7 @@ export default function KanbanPage() {
         fetchData();
       }
     } catch (e) {
-      console.error('Erro ao atualizar status do Kanban:', e);
+      logger.error({ e }, 'Erro ao atualizar status do Kanban:');
       fetchData();
     }
   };

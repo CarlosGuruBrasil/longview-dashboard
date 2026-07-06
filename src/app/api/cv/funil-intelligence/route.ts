@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import jwt from 'jsonwebtoken';
 import { sql, ensureSchema } from '@/lib/pg';
 import type { FunilIntelligenceData } from '@/app/marketing-vision/types';
+import logger from '@/lib/logger'
 
 const JWT_SECRET = process.env.JWT_SECRET ?? (() => { throw new Error('[LongView] JWT_SECRET nao configurado. Defina no .env.local') })();
 export const runtime = 'nodejs';
@@ -228,7 +229,7 @@ export async function GET() {
     return NextResponse.json(result);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('[/api/cv/funil-intelligence]', msg);
+    logger.error({ msg }, '[/api/cv/funil-intelligence]');
     return NextResponse.json({ error: msg, steps: [], vgvByOrigin: [], cycleByEmp: [], monthly: [], topCorretores: [], summary: { totalLeads: 0, totalReservas: 0, totalVendas: 0, totalVgv: 0, avgTicket: 0, avgDaysLeadToReserva: null, conversionRate: 0, cancelamentos: 0 } }, { status: 200 });
   }
 }

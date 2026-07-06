@@ -11,6 +11,7 @@ import {
 import Image from 'next/image';
 import { Task, Project } from '@/lib/db';
 import { useUser } from '@/context/UserContext';
+import logger from '@/lib/logger'
 
 export default function ReportsPage() {
   const { currentUser } = useUser();
@@ -32,7 +33,7 @@ export default function ReportsPage() {
       setTasks(dataTasks.tasks || []);
       setProjects(dataProj.projects || []);
     } catch (e) {
-      console.error('Erro ao buscar dados de relatórios:', e);
+      logger.error({ e }, 'Erro ao buscar dados de relatórios:');
     } finally {
       setLoading(false);
     }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import jwt from 'jsonwebtoken';
 import { sql } from '@/lib/pg';
+import logger from '@/lib/logger'
 
 const JWT_SECRET = process.env.JWT_SECRET ?? (() => { throw new Error('[LongView] JWT_SECRET nao configurado. Defina no .env.local') })();
 
@@ -149,7 +150,7 @@ export async function GET(_request: NextRequest) {
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.error('[/api/bi/insights]', msg);
+    logger.error({ msg }, '[/api/bi/insights]');
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

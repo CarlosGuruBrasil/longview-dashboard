@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import logger from '@/lib/logger'
 
 export default function Error({
   error,
@@ -12,11 +13,7 @@ export default function Error({
   const [showDetails, setShowDetails] = useState(false);
 
   useEffect(() => {
-    console.error('[marketing-vision] Error caught:', {
-      message: error.message,
-      digest: error.digest,
-      stack: error.stack,
-    });
+    logger.error({ error }, '[marketing-vision] Error caught:');
   }, [error]);
 
   return (

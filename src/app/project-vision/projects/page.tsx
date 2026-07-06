@@ -14,6 +14,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Task, Project } from '@/lib/db';
 import { useUser } from '@/context/UserContext';
+import logger from '@/lib/logger'
 
 export default function ProjectsPage() {
   const { currentUser } = useUser();
@@ -42,7 +43,7 @@ export default function ProjectsPage() {
       setProjects(dataProj.projects || []);
       setTasks(dataTasks.tasks || []);
     } catch (e) {
-      console.error('Erro ao buscar empreendimentos:', e);
+      logger.error({ e }, 'Erro ao buscar empreendimentos:');
     } finally {
       setLoading(false);
     }
@@ -134,7 +135,7 @@ export default function ProjectsPage() {
         alert(err.error || 'Erro ao cadastrar empreendimento');
       }
     } catch (err) {
-      console.error('Erro de requisição:', err);
+      logger.error({ err }, 'Erro de requisição:');
     }
   };
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
 import { rateLimit, getClientIp } from '@/lib/rateLimit';
 import axios from 'axios';
+import logger from '@/lib/logger'
 
 const SCORE_TIERS = [
   { min: 75, label: 'quente', conversion_id: 'lead_quente_longview' },
@@ -77,14 +78,14 @@ export async function POST(request: NextRequest) {
       { event_type: 'CONVERSION', event_family: 'CDP', payload },
       { params: { api_key: apiKey }, timeout: 15000 }
     );
-    console.log(`[rd/score] ${score} (${tier.label}) → ${email}`);
+    logger.info(`[rd/score] $ ($) → $`);
     return NextResponse.json({
       success: true, email, score: Number(score),
       temperatura: tier.label, conversion_sent: tier.conversion_id, rd_response: res.data,
     });
   } catch (err: unknown) {
     const details = axiosDetails(err);
-    console.error('[rd/score]', details);
+    logger.error({ details }, '[rd/score]');
     return NextResponse.json(
       { error: 'Erro ao enviar score', details },
       { status: 500 }

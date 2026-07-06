@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect } from 'react';
+import logger from '@/lib/logger'
 
 export default function Error({
   error,
@@ -10,7 +11,7 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error('[quality-vision] Error caught:', error);
+    logger.error({ error }, '[quality-vision] Error caught:');
   }, [error]);
 
   return (

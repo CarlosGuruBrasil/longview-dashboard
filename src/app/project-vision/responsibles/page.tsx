@@ -15,6 +15,7 @@ import { Task, Responsible } from '@/lib/db';
 import { useUser } from '@/context/UserContext';
 import ResponsibleModal from '../components/ResponsibleModal';
 import TaskDrawer from '../components/TaskDrawer';
+import logger from '@/lib/logger'
 
 interface CombinedStats extends Responsible {
   total: number;
@@ -58,7 +59,7 @@ export default function ResponsiblesPage() {
       const dataResp = await resResp.json();
       setResponsibles(dataResp.responsibles || []);
     } catch (e) {
-      console.error('Erro ao buscar dados na página de responsáveis:', e);
+      logger.error({ e }, 'Erro ao buscar dados na página de responsáveis:');
     } finally {
       setLoading(false);
     }
@@ -120,7 +121,7 @@ export default function ResponsiblesPage() {
         alert(err.error || 'Erro ao cadastrar responsável');
       }
     } catch (err) {
-      console.error('Erro de requisição:', err);
+      logger.error({ err }, 'Erro de requisição:');
     }
   };
 

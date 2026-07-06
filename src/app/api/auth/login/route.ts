@@ -3,6 +3,7 @@ import { readUsers, seedDatabaseIfEmpty } from '@/lib/db-kv';
 import { rateLimit, getClientIp } from '@/lib/rateLimit';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import logger from '@/lib/logger'
 
 const JWT_SECRET = process.env.JWT_SECRET ?? (() => { throw new Error('[LongView] JWT_SECRET nao configurado. Defina no .env.local') })();
 
@@ -77,7 +78,7 @@ export async function POST(request: NextRequest) {
 
     return response;
   } catch (error) {
-    console.error('[/api/auth/login] Erro:', error);
+    logger.error({ error }, '[/api/auth/login] Erro:');
     return NextResponse.json({ error: 'Erro interno no servidor de autenticação.' }, { status: 500 });
   }
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { sql, ensureSchema } from '@/lib/pg';
+import logger from '@/lib/logger'
 
 export const runtime = 'nodejs';
 // Cache of 1 hour for the dash, but we can make it shorter or 0 if we want instant webhook updates.
@@ -161,7 +162,7 @@ export async function GET(req: Request) {
       meta: { startYear, endYear },
     });
   } catch (error: unknown) {
-    console.error('[API/construpoint]', error);
+    logger.error({ error }, '[API/construpoint]');
     return NextResponse.json({ error: `Erro ao buscar dados no SQL: ${errorMessage(error)}` }, { status: 500 });
   }
 }

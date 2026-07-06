@@ -1,4 +1,5 @@
 import postgres from 'postgres';
+import logger from '@/lib/logger'
 
 declare global {
   var _pg: postgres.Sql | undefined;
@@ -28,7 +29,7 @@ async function optionalSchemaStep(label: string, step: () => Promise<unknown>): 
   } catch (error) {
     const pgError = error as { code?: string; message?: string };
     if (pgError.code === '42501') {
-      console.warn(`[pg] optional schema step skipped (${label}): ${pgError.message}`);
+      logger.warn(`[pg] optional schema step skipped ($): $`);
       return;
     }
     throw error;

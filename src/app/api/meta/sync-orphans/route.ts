@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import axios from 'axios';
 import { sql, ensureSchema } from '@/lib/pg';
 import { createCrmLead } from '@/lib/cvcrm';
+import logger from '@/lib/logger'
 
 const JWT_SECRET = process.env.JWT_SECRET ?? (() => { throw new Error('[LongView] JWT_SECRET nao configurado. Defina no .env.local') })();
 const META_BASE = 'https://graph.facebook.com/v21.0';
@@ -94,19 +95,19 @@ export async function POST(request: NextRequest) {
 
   try {
     await ensureSchema();
-    console.log('[sync-orphans] Obtendo Page Access Token...');
+    logger.info('[sync-orphans] Obtendo Page Access Token...');
     const pageToken = await getPageAccessToken(metaToken);
     const PAGE_ID = '259079394232614';
 
     // 1. Buscar formulários ativos da página
-    console.log('[sync-orphans] Buscando formulários do Facebook...');
+    logger.info('[sync-orphans] Buscando formulários do Facebook...');
     const formsRes = await axios.get(`${META_BASE}/${PAGE_ID}/leadgen_forms`, {
       params: { fields: 'id,name,status,leads_count', limit: 50, access_token: pageToken },
       timeout: 15000,
     });
 
     const activeForms = (formsRes.data?.data || []).filter(
-      (f: any) => f.status === 'ACTIVE' && (f.leads_count ?? 0) > 0
+      (f: { status?: string; leads_count?: number }) => f.status === 'ACTIVE' && (f.leads_count ?? 0) > 0
     );
 
     if (activeForms.length === 0) {
@@ -114,11 +115,11 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. Buscar os leads de cada formulário
-    console.log(`[sync-orphans] Buscando leads de ${activeForms.length} formulários ativos...`);
+    logger.info(`[sync-orphans] Buscando leads de $ formulários ativos...`);
     const metaLeads: (MetaLead & { formName: string })[] = [];
 
     const formsData = await Promise.allSettled(
-      activeForms.map((f: any) =>
+      activeForms.map((f: { id: string; name: string }) =>
         axios.get(`${META_BASE}/${f.id}/leads`, {
           params: { fields: 'id,created_time,field_data,campaign_name,adset_name,ad_name,form_id', limit: 200, access_token: pageToken },
           timeout: 15000,
@@ -167,10 +168,10 @@ export async function POST(request: NextRequest) {
       return true;
     });
 
-    console.log(`[sync-orphans] Cruzamento concluído. Encontrados ${orphans.length} leads órfãos no Meta Ads.`);
+    logger.info(`[sync-orphans] Cruzamento concluído. Encontrados $ leads órfãos no Meta Ads.`);
 
     let syncedCount = 0;
-    const syncedLeadsList: any[] = [];
+    const syncedLeadsList: Array<{ id: string; nome: string | null; email: string | null; formName: string; crmId: string | null }> = [];
 
     // 5. Inserir retroativamente cada lead órfão no CRM e no Postgres local
     for (const o of orphans) {
@@ -248,9 +249,10 @@ export async function POST(request: NextRequest) {
             synced_at        = NOW()
         `;
         syncedCount++;
-        syncedLeadsList.push({ id: o.id, nome: parsed.nome, email: parsed.email, formName: o.formName, crmId: crmResult.id ?? null });
-      } catch (dbErr: any) {
-        console.error(`[sync-orphans] Erro ao salvar no banco local lead ${o.id}:`, dbErr.message);
+        syncedLeadsList.push({ id: o.id, nome: parsed.nome, email: parsed.email, formName: o.formName, crmId: (crmResult.id as string | undefined) ?? null });
+      } catch (dbErr: unknown) {
+        const msg = dbErr instanceof Error ? dbErr.message : String(dbErr);
+        logger.error({ err: msg }, '[sync-orphans] Erro ao salvar no banco local');
       }
     }
 
@@ -262,8 +264,9 @@ export async function POST(request: NextRequest) {
       sincronizados: syncedLeadsList
     });
 
-  } catch (err: any) {
-    console.error('[sync-orphans] Erro geral na sincronização retroativa:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.error({ err: msg }, '[sync-orphans] Erro geral na sincronização retroativa:');
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { kv } from '@/lib/kv';
 import axios from 'axios';
 import { sendCAPIEvents, type CAPIEvent } from '@/app/api/meta/capi/route';
+import logger from '@/lib/logger'
 
 // CV CRM retorna etapa/situacao ora como string, ora como { nome }.
 type NamedRef = { nome?: string } | string | null | undefined;
@@ -221,7 +222,7 @@ async function triggerSemConexaoRD(lead: CrmLead): Promise<boolean> {
     );
     return true;
   } catch (err) {
-    console.warn('[recalc] sem_conexao RD error:', axios.isAxiosError(err) ? err.response?.data ?? err.message : err);
+    logger.warn({ err: axios.isAxiosError(err) ? err.response?.data ?? err.message : err }, '[recalc] sem_conexao RD error');
     return false;
   }
 }
@@ -341,7 +342,7 @@ export async function GET(request: NextRequest) {
     ]);
 
     stats.total = crmLeads.length;
-    console.log(`[recalc-scores] ${crmLeads.length} leads CRM, ${metaLeads.length} leads Meta`);
+    logger.info(`[recalc-scores] $ leads CRM, $ leads Meta`);
 
     const rdQueue: { lead: CrmLead; score: number }[] = [];
     const capiQueue: CAPIEvent[] = [];
@@ -403,7 +404,7 @@ export async function GET(request: NextRequest) {
     );
 
     stats.semConexao = semConexaoLeads.length;
-    console.log(`[recalc-scores] ${semConexaoLeads.length} leads Sem Conexão encontrados`);
+    logger.info(`[recalc-scores] $ leads Sem Conexão encontrados`);
 
     // Modo seed: marca os leads atuais como ja processados SEM disparar o RD.
     // Uso unico apos deploy: /api/cron/recalc-scores?seed=1
@@ -457,14 +458,14 @@ export async function GET(request: NextRequest) {
     await kv.set('meta:scores:lastRun',   stats.finishedAt);
     await kv.set('meta:scores:lastStats', stats);
 
-    console.log('[recalc-scores] Concluído:', stats);
+    logger.info({ stats }, '[recalc-scores] Concluído:');
     return NextResponse.json(stats);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     stats.error      = msg;
     stats.finishedAt = new Date().toISOString();
     await kv.set('meta:scores:lastStats', stats);
-    console.error('[recalc-scores] Erro:', msg);
+    logger.error({ msg }, '[recalc-scores] Erro:');
     return NextResponse.json(stats, { status: 500 });
   }
 }

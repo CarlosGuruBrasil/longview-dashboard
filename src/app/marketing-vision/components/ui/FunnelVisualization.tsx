@@ -43,7 +43,7 @@ export default function FunnelVisualization({ leads }: Props) {
     }
 
     for (const lead of leads) {
-      const sit = lead.situacao?.nome || (lead as any).status || '';
+      const sit = lead.situacao?.nome || String((lead as Record<string, unknown>).status ?? '') || '';
       const s = sit.toLowerCase().trim();
 
       if (s === 'aguardando atendimento' || s === 'inicio' || s === 'início') {

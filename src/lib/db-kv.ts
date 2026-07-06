@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import bcrypt from 'bcryptjs';
 import { createDefaultPermissions, normalizePermissions, type UserPermissions } from './permissions';
+import logger from '@/lib/logger'
 
 export type { UserPermissions } from './permissions';
 
@@ -186,7 +187,7 @@ async function getPg() {
 }
 
 function throwPgWriteError(operation: string, error: unknown): never {
-  console.error(`[db-kv] ${operation} PG error:`, error);
+  logger.error({ error }, '[db-kv] $ PG error:');
   const message = error instanceof Error ? error.message : String(error);
   throw new Error(`${operation} falhou no Postgres; escrita local bloqueada para evitar divergência de dados. ${message}`);
 }
@@ -271,7 +272,7 @@ export async function readProjectData(): Promise<ProjectDatabaseState> {
         `;
         return seededState;
       }
-    } catch (e) { console.error('[db-kv] readProjectData PG error:', e); }
+    } catch (e) { logger.error({ err: e }, '[db-kv] readProjectData PG error'); }
   }
 
   return readLocalProjectData();
@@ -344,7 +345,7 @@ export async function seedDatabaseIfEmpty(): Promise<void> {
     } catch {
       // Banco indisponível (ex: container ainda subindo) — abortar sem semear
       // Isso evita o bug onde conexão falha → readUsers() retorna [] → seed apaga todos
-      console.warn('[db-kv] seedDatabaseIfEmpty: banco indisponível, seed abortado para preservar dados');
+      logger.warn('[db-kv] seedDatabaseIfEmpty: banco indisponível, seed abortado para preservar dados');
       return;
     }
   } else {
@@ -352,7 +353,7 @@ export async function seedDatabaseIfEmpty(): Promise<void> {
     if (users.length > 0) return;
   }
 
-  console.log('[db-kv] Banco vazio confirmado — semeando usuários padrão...');
+  logger.info('[db-kv] Banco vazio confirmado — semeando usuários padrão...');
   const [developerHash, diretoriaHash] = await Promise.all([
     bcrypt.hash('Guru$2026', 10),
     bcrypt.hash('Longview$2026', 10),
@@ -395,7 +396,7 @@ export async function readUserDocuments(userId: string): Promise<UserDocument[]>
         FROM user_documents WHERE user_id = ${userId} ORDER BY uploaded_at DESC
       `;
       return rows;
-    } catch (e) { console.error('[db-kv] readUserDocuments PG error:', e); }
+    } catch (e) { logger.error({ err: e }, '[db-kv] readUserDocuments PG error'); }
   }
   const store = readJson<Record<string, UserDocument[]>>(LOCAL_DOCS_FILE, {});
   return store[userId] ?? [];
@@ -449,7 +450,7 @@ export async function readLinks(): Promise<ShortLink[]> {
         FROM short_links ORDER BY created_at DESC
       `;
       return rows;
-    } catch (e) { console.error('[db-kv] readLinks PG error:', e); }
+    } catch (e) { logger.error({ err: e }, '[db-kv] readLinks PG error'); }
   }
   const d = readJson<{ links: ShortLink[] }>(LOCAL_LINKS_FILE, { links: [] });
   return d.links;
@@ -514,7 +515,7 @@ export async function getClicks(slugs: string[]): Promise<Record<string, number>
       rows.forEach(r => { out[r.slug] = Number(r.count); });
       slugs.forEach(s => { if (!(s in out)) out[s] = 0; });
       return out;
-    } catch (e) { console.error('[db-kv] getClicks PG error:', e); }
+    } catch (e) { logger.error({ err: e }, '[db-kv] getClicks PG error'); }
   }
   const { clicks } = readJson<{ clicks: Record<string, number> }>(LOCAL_LINKS_FILE, { clicks: {} });
   slugs.forEach(s => { out[s] = clicks[s] || 0; });
@@ -548,7 +549,7 @@ export async function readKv<T>(key: string, fallback: T): Promise<T> {
         return (typeof raw === 'string' ? JSON.parse(raw) : raw) as T;
       }
       return fallback;
-    } catch (e) { console.error(`[db-kv] readKv(${key}) error:`, e); }
+    } catch (e) { logger.error({ err: e, key }, '[db-kv] readKv error'); }
   }
   const store = readJson<Record<string, unknown>>(LOCAL_KV_FILE, {});
   return (key in store ? store[key] : fallback) as T;
@@ -602,7 +603,7 @@ async function migrateTasksIfNeeded(db: Awaited<ReturnType<typeof getPg>>): Prom
   const tasks = await readTasksFromJsonb(db);
   if (tasks.length === 0) return [];
 
-  console.log(`[db-kv] Iniciando migração de ${tasks.length} tarefas JSONB → tabela tasks`);
+  logger.info(`[db-kv] Iniciando migração de $ tarefas JSONB → tabela tasks`);
   let migrated = 0;
   for (const t of tasks) {
     try {
@@ -614,10 +615,10 @@ async function migrateTasksIfNeeded(db: Awaited<ReturnType<typeof getPg>>): Prom
       `;
       migrated++;
     } catch (e) {
-      console.warn(`[db-kv] migrate task ${t.id} falhou:`, e);
+      logger.warn({ e }, '[db-kv] migrate task $ falhou:');
     }
   }
-  console.log(`[db-kv] Migração concluída: ${migrated}/${tasks.length} tarefas`);
+  logger.info(`[db-kv] Migração concluída: $/$ tarefas`);
   return tasks; // retorna as tarefas mesmo que a migração falhe parcialmente
 }
 
@@ -642,11 +643,11 @@ export async function readTasks(filters: {
 
       // Fallback: migração acabou de rodar mas INSERT pode ter falhado → usa dados originais
       if (tasks.length === 0 && migrated.length > 0) {
-        console.warn('[db-kv] Tabela tasks vazia após migração — usando fallback JSONB');
+        logger.warn('[db-kv] Tabela tasks vazia após migração — usando fallback JSONB');
         tasks = migrated;
       }
     } catch (e) {
-      console.error('[db-kv] readTasks erro:', e);
+      logger.error({ e }, '[db-kv] readTasks erro:');
       // Último recurso: ler direto do JSONB
       tasks = await readTasksFromJsonb(db);
     }
@@ -760,7 +761,7 @@ async function _syncProjectProgress(db: Awaited<ReturnType<typeof getPg>>, proje
     await db`
       UPDATE project_state SET data = ${JSON.stringify(state)} WHERE key = 'state'
     `;
-  } catch (e) { console.warn('[db-kv] _syncProjectProgress error:', e); }
+  } catch (e) { logger.warn({ err: e }, '[db-kv] _syncProjectProgress error'); }
 }
 
 // ─── 8. TASK DOCUMENTS — binário no Postgres ─────────────────────────────────

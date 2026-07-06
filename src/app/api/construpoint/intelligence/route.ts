@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { sql, ensureSchema } from '@/lib/pg';
+import logger from '@/lib/logger'
 
 export const runtime = 'nodejs';
 export const revalidate = 0;
@@ -280,7 +281,7 @@ export async function GET() {
       meta: { taxaGeral90, inspecoesPendentes, geradoEm: new Date().toISOString() },
     });
   } catch (error: unknown) {
-    console.error('[API/construpoint/intelligence]', error);
+    logger.error({ error }, '[API/construpoint/intelligence]');
     return NextResponse.json({ error: errorMessage(error) }, { status: 500 });
   }
 }

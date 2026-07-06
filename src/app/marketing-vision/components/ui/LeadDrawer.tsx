@@ -1,9 +1,10 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import type { Lead } from '../../types';
+import type { Lead, LeadInteracao } from '../../types';
 import { getOrigin, getStatusColor, getLeadTags, getLeadSource } from '../../utils/leads';
 import { formatDate } from '../../utils/formatters';
 import { useData } from '../../context/DataContext';
+import logger from '@/lib/logger'
 import { 
   Lightbulb, 
   Edit2, 
@@ -40,7 +41,7 @@ interface Props {
   onClose: () => void;
 }
 
-function GridField({ icon: Icon, label, value }: { icon: any; label: string; value?: string | number | null }) {
+function GridField({ icon: Icon, label, value }: { icon: React.ComponentType<{ size?: number; className?: string }>; label: string; value?: string | number | null }) {
   if (value == null || value === '') {
     return (
       <div className="flex items-start gap-2.5 p-3 rounded-xl bg-white/[0.01] border border-white/5 opacity-55">
@@ -107,7 +108,7 @@ export default function LeadDrawer({ lead, onClose }: Props) {
           setFullLead(d.lead);
         }
       })
-      .catch(console.error)
+      .catch((err: unknown) => logger.error({ err }))
       .finally(() => {
         if (active) setLoadingLead(false);
       });
@@ -203,7 +204,8 @@ export default function LeadDrawer({ lead, onClose }: Props) {
   if (!activeLead) return null;
 
   const id = activeLead.idlead ?? activeLead.id;
-  const isMetaOrphan = String(id).startsWith('meta_') && (!activeLead.raw?._crm?.id && !activeLead.idlead);
+  const rawCrm = activeLead.raw as { _crm?: { id?: string } } | undefined;
+  const isMetaOrphan = String(id).startsWith('meta_') && (!rawCrm?._crm?.id && !activeLead.idlead);
   
   // Link exato para o CV CRM comercial do cliente
   const crmUrl = id && !String(id).startsWith('meta_')
@@ -256,8 +258,8 @@ export default function LeadDrawer({ lead, onClose }: Props) {
 
       setIsEditing(false);
       refresh(true);
-    } catch (err: any) {
-      setErrorMsg(err.message);
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : String(err));
     } finally {
       setSaving(false);
     }
@@ -572,7 +574,7 @@ export default function LeadDrawer({ lead, onClose }: Props) {
                   </div>
                 ) : (
                   <div className="flex flex-col gap-3 overflow-y-auto max-h-[48vh] pr-1 scrollbar-thin">
-                    {interacoes.map((it: any, i) => (
+                    {interacoes.map((it: LeadInteracao, i) => (
                       <div key={i} className="flex flex-col gap-2 p-3.5 rounded-xl bg-zinc-900 border border-white/5 hover:border-white/10 transition-colors">
                         <div className="flex justify-between items-center gap-2">
                           <span className="text-[10px] font-bold uppercase tracking-wider text-orange-400 bg-orange-400/10 px-2 py-0.5 rounded">

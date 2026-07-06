@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
 import { sql, ensureSchema } from '@/lib/pg';
 import { isCronAuthorized, unauthorizedJson } from '@/lib/internal-auth';
+import logger from '@/lib/logger'
 
 export const maxDuration = 300;
 export const runtime = 'nodejs';
@@ -159,14 +160,14 @@ export async function POST(request: NextRequest) {
           upsertedUnidades++;
         }
       } catch (detErr: unknown) {
-        console.error(`[cron/sync-cv-estoque] Erro ao buscar detalhes do emp ${idEmp}:`, errorMessage(detErr));
+        logger.error({ err: errorMessage(detErr) }, '[cron/sync-cv-estoque] Erro ao buscar detalhes do emp $:');
       }
     }
 
     return NextResponse.json({ ok: true, empreendimentos: upsertedEmp, unidades: upsertedUnidades });
   } catch (error: unknown) {
     const message = errorMessage(error);
-    console.error('[/cron/sync-cv-estoque] Erro:', message);
+    logger.error({ message }, '[/cron/sync-cv-estoque] Erro:');
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

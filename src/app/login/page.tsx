@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Lock, Mail, Loader2, AlertCircle } from 'lucide-react';
 import PasswordInput from '@/components/app/PasswordInput';
+import logger from '@/lib/logger'
 
 export default function LoginPage() {
   const router = useRouter();
@@ -35,7 +36,7 @@ export default function LoginPage() {
       router.push('/select-app');
       router.refresh();
     } catch (err) {
-      console.error('Erro de login:', err);
+      logger.error({ err }, 'Erro de login:');
       setError(err instanceof Error ? err.message : 'Erro ao conectar ao servidor.');
     } finally {
       setLoading(false);

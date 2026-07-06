@@ -11,6 +11,7 @@ import {
 import { useData } from '../../context/DataContext'
 import { useUser } from '@/context/UserContext'
 import type { Empreendimento } from '../../types'
+import logger from '@/lib/logger'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -234,7 +235,7 @@ function DetailPanel({ empId, dateRange, onClose, isAdmin }: {
         const r = await fetch(`/api/empreendimentos/${empId}`)
         setData(await r.json())
       } catch (e) {
-        console.error(e)
+        logger.error({ err: e })
       } finally {
         setLoading(false)
       }
@@ -245,7 +246,7 @@ function DetailPanel({ empId, dateRange, onClose, isAdmin }: {
   const refreshMateriais = () =>
     fetch(`/api/empreendimentos/${empId}/materiais`).then(r => r.json())
       .then(d => setData(p => p ? { ...p, materiais: d.materiais.map((m: Material) => ({ ...m, fonte: 'manual' as const })) } : p))
-      .catch(console.error)
+      .catch((err: unknown) => logger.error({ err }))
 
   const uploadMaterial = async (file: File) => {
     setUploading(true)

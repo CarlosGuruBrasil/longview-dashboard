@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
 import { sql, ensureSchema } from '@/lib/pg';
 import { mutateProjectData } from '@/lib/db-kv';
+import logger from '@/lib/logger'
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -57,7 +58,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     return NextResponse.json({ url: bannerUrl });
   } catch (e: unknown) {
-    console.error('[projects/banner] POST error:', e);
+    logger.error({ e }, '[projects/banner] POST error:');
     return NextResponse.json({ error: 'Erro ao salvar imagem' }, { status: 500 });
   }
 }

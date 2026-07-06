@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
 import { sql, ensureSchema } from '@/lib/pg';
 import { isCronAuthorized, unauthorizedJson } from '@/lib/internal-auth';
+import logger from '@/lib/logger'
 
 export const maxDuration = 300;
 export const runtime = 'nodejs';
@@ -46,7 +47,7 @@ async function fetchAllCvdwVendas(): Promise<CvVenda[]> {
     }
     return allVendas;
   } catch (err: unknown) {
-    console.error('[/cron/sync-cv-vendas] Erro ao buscar CVDW vendas:', errorMessage(err));
+    logger.error({ err: errorMessage(err) }, '[/cron/sync-cv-vendas] Erro ao buscar CVDW vendas:');
     return [];
   }
 }

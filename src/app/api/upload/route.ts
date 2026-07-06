@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import jwt from 'jsonwebtoken';
 import { rateLimit, getClientIp } from '@/lib/rateLimit';
+import logger from '@/lib/logger'
 
 const JWT_SECRET    = process.env.JWT_SECRET ?? (() => { throw new Error('[LongView] JWT_SECRET nao configurado. Defina no .env.local') })();
 const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -87,7 +88,7 @@ export async function POST(request: NextRequest) {
       via:  'base64',
     });
   } catch (error) {
-    console.error('[/api/upload] Erro:', error);
+    logger.error({ error }, '[/api/upload] Erro:');
     return NextResponse.json({ error: 'Erro interno no servidor.' }, { status: 500 });
   }
 }

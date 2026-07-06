@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
 import { sql, ensureSchema } from '@/lib/pg';
+import logger from '@/lib/logger'
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -116,7 +117,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
       })),
     });
   } catch (e: unknown) {
-    console.error('[GET /api/empreendimentos/[id]]', e);
+    logger.error({ e }, '[GET /api/empreendimentos/[id]]');
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
   }
 }

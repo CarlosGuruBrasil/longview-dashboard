@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
 import type { Lead, MetaData, EstoqueData, MetaLeadForm, MetaPageInfo, DateRange, ActiveView, LeadSituacao, LeadSummary } from '../types';
 import { toISODate, getOrigin } from '../utils/leads';
+import logger from '@/lib/logger'
 
 
 export interface LeadFilters {
@@ -178,7 +179,7 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
       setDetailedPage(page);
       setDetailedLimit(limit);
     } catch (e) {
-      console.error('[DataContext] fetchDetailedLeads error:', e);
+      logger.error({ e }, '[DataContext] fetchDetailedLeads error:');
     } finally {
       setDetailedLoading(false);
     }
@@ -231,7 +232,7 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
       await fetchDetailedLeads(1, detailedLimit, r);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Erro ao carregar dados';
-      console.error('[DataContext] refresh error:', msg);
+      logger.error({ msg }, '[DataContext] refresh error:');
       setDataError(msg);
     } finally {
       setLoading(false);
@@ -260,7 +261,7 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
       const data = await res.json();
       if (data.leadSummary) setLeadSummary(data.leadSummary);
     } catch (e) {
-      console.warn('[DataContext] fetchAggregate error:', e);
+      logger.warn({ e }, '[DataContext] fetchAggregate error:');
     }
   }, [dateRange]);
 

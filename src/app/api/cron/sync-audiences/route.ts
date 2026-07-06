@@ -17,6 +17,7 @@ import { kv } from '@/lib/kv';
 import axios from 'axios';
 import crypto from 'crypto';
 import { sendCAPIEvents, type CAPIEvent } from '@/app/api/meta/capi/route';
+import logger from '@/lib/logger'
 
 const META_BASE = 'https://graph.facebook.com/v21.0';
 const ACT_ID    = process.env.META_ACT_ID;
@@ -163,7 +164,7 @@ async function uploadContactsToAudience(audienceId: string, contacts: Normalized
       received += res.data?.num_received   || batch.length;
       invalid  += res.data?.num_invalid_entries || 0;
     } catch (err) {
-      console.error('[sync] upload batch erro:', axios.isAxiosError(err) ? err.response?.data?.error?.message : err);
+      logger.error({ err: axios.isAxiosError(err) ? err.response?.data?.error?.message : err }, '[sync] upload batch erro');
       invalid += batch.length;
     }
   }
@@ -269,7 +270,7 @@ export async function GET(request: NextRequest) {
     await kv.set('meta:sync:lastRun', result.finishedAt);
 
     log.push(`[✓] Sync concluído em ${result.finishedAt}`);
-    console.log('[cron/sync-audiences] Concluído:', result.totalContacts);
+    logger.info({ totalContacts: result.totalContacts }, '[cron/sync-audiences] Concluído');
 
     return NextResponse.json(result);
   } catch (err) {
@@ -278,7 +279,7 @@ export async function GET(request: NextRequest) {
     result.finishedAt = new Date().toISOString();
     log.push(`[ERRO] ${msg}`);
     await kv.set('meta:sync:last', result);
-    console.error('[cron/sync-audiences] Erro:', msg);
+    logger.error({ msg }, '[cron/sync-audiences] Erro:');
     return NextResponse.json(result, { status: 500 });
   }
 }

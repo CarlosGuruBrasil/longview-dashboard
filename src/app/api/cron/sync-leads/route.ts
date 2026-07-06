@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
 import { sql, ensureSchema } from '@/lib/pg';
 import { parseCrmDate } from '@/lib/dateUtils';
+import logger from '@/lib/logger'
 
 type CrmLead = Record<string, unknown> & {
   idlead?: string | number;
@@ -157,12 +158,12 @@ export async function GET(request: NextRequest) {
     }
 
     const result = { ok: true, startedAt, finishedAt: new Date().toISOString(), totalInCRM: total, upserted };
-    console.log('[cron/sync-leads]', result);
+    logger.info({ result }, '[cron/sync-leads]');
     return NextResponse.json(result);
 
   } catch (err: unknown) {
     const message = errorMessage(err);
-    console.error('[cron/sync-leads] Erro:', message);
+    logger.error({ message }, '[cron/sync-leads] Erro:');
     return NextResponse.json({ ok: false, startedAt, error: message }, { status: 500 });
   }
 }

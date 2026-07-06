@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { kv } from '@/lib/kv';
 import axios from 'axios';
 import { getBearerToken } from '@/lib/internal-auth';
+import logger from '@/lib/logger'
 
 // CV CRM retorna etapa/situacao ora como string, ora como { nome }.
 type NamedRef = { nome?: string } | string | null | undefined;
@@ -137,7 +138,7 @@ async function logEvent(event: WebhookBody & { etapa?: string }, triggered: bool
       await kv.set('cv:webhook:sem_conexao_count', count);
     }
   } catch (e) {
-    console.warn('[cv/webhook] KV log error:', e);
+    logger.warn({ e }, '[cv/webhook] KV log error:');
   }
 }
 
@@ -156,11 +157,11 @@ export async function POST(request: NextRequest) {
     request.headers.get('x-cv-secret') ||
     getBearerToken(request);
   if (!cvSecret || incomingSecret !== cvSecret) {
-    console.warn('[cv/webhook] Secret ausente ou inválido');
+    logger.warn('[cv/webhook] Secret ausente ou inválido');
     return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
   }
 
-  console.log('[cv/webhook] Evento recebido:', JSON.stringify(body).slice(0, 300));
+  logger.info({ bodyPreview: JSON.stringify(body).slice(0, 300) }, '[cv/webhook] Evento recebido');
 
   // Suporta múltiplos formatos de payload que o CV CRM pode enviar
   const lead     = body.lead    || body.data?.lead || body;
@@ -196,7 +197,7 @@ export async function POST(request: NextRequest) {
   // Evita enviar duplicado para o mesmo contato (dedup por 90 dias)
   const alreadySent = await kv.get(dedupKey);
   if (alreadySent) {
-    console.log(`[cv/webhook] Contato ${dedupKey} já processado — dedup`);
+    logger.info(`[cv/webhook] Contato $ já processado — dedup`);
     await logEvent({ ...body, lead, etapa, evento: 'sem_conexao_dedup' }, false);
     return NextResponse.json({ ok: true, action: 'dedup', leadId });
   }
@@ -217,7 +218,7 @@ export async function POST(request: NextRequest) {
 
   await logEvent({ ...body, lead, etapa, evento: 'sem_conexao' }, true, rdResult);
 
-  console.log(`[cv/webhook] Lead ${leadId} → RD: ${rdResult.ok ? 'OK' : rdResult.error}`);
+  logger.info(`[cv/webhook] Lead $ → RD: $`);
 
   return NextResponse.json({
     ok:      rdResult.ok,

@@ -183,7 +183,7 @@ export default function DashboardView() {
           // 2. Match semântico por Empreendimento de Interesse do lead no CRM
           const lEmps = Array.isArray(l.empreendimento)
             ? l.empreendimento.map(e => (e.nome || '').toLowerCase())
-            : [String((l.empreendimento as any)?.nome || '').toLowerCase()];
+            : [String((l.empreendimento as { nome?: string } | undefined)?.nome || '').toLowerCase()];
 
           const hasEmpMatch = empMatch 
             ? lEmps.some(le => le.includes(empMatch.nome.toLowerCase()) || empMatch.keywords.some(kw => le.includes(kw)))
@@ -249,7 +249,7 @@ export default function DashboardView() {
 
   // 3. Classificação de leads por Etapas Reais do CRM
   const etapasCrmData = useMemo(() => {
-    const map = new Map<string, { count: number; colorObj: any }>();
+    const map = new Map<string, { count: number; colorObj: ReturnType<typeof getStatusColor> }>();
     filteredLeads.forEach(l => {
       const stageName = l.situacao?.nome || 'Sem etapa';
       const existing = map.get(stageName) ?? { count: 0, colorObj: getStatusColor(l) };

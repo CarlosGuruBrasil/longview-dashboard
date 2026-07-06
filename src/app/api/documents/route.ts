@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
 import { sql, ensureSchema } from '@/lib/pg';
+import logger from '@/lib/logger'
 
 export interface DocumentWithContext {
   id: string;
@@ -81,7 +82,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ documents: docs, total: docs.length });
   } catch (e) {
-    console.error('[GET /api/documents]', e);
+    logger.error({ e }, '[GET /api/documents]');
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
   }
 }

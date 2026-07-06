@@ -458,11 +458,11 @@ export default function FunilInteligenteView() {
                 defaultSortField="vgv"
                 columns={[
                   { label: 'Origem de Mídia', field: 'origem' },
-                  { label: 'Leads', field: 'leads', align: 'right', render: (row: any) => formatNumber(row.leads) },
-                  { label: 'Reservas', field: 'reservas', align: 'right', render: (row: any) => formatNumber(row.reservas) },
-                  { label: 'VGV Comercial', field: 'vgv', align: 'right', render: (row: any) => formatCurrency(row.vgv), csvValue: (row: any) => String(row.vgv) },
-                  { label: 'Cancelamentos', field: 'cancelamentos', align: 'right', render: (row: any) => formatNumber(row.cancelamentos) },
-                  { label: 'Ticket Médio', field: 'ticket_medio', align: 'right', render: (row: any) => formatCurrency(row.ticket_medio), csvValue: (row: any) => String(row.ticket_medio) }
+                  { label: 'Leads', field: 'leads', align: 'right', render: (row) => formatNumber(row.leads as number) },
+                  { label: 'Reservas', field: 'reservas', align: 'right', render: (row) => formatNumber(row.reservas) },
+                  { label: 'VGV Comercial', field: 'vgv', align: 'right', render: (row) => formatCurrency(row.vgv), csvValue: (row) => String(row.vgv) },
+                  { label: 'Cancelamentos', field: 'cancelamentos', align: 'right', render: (row) => formatNumber(row.cancelamentos) },
+                  { label: 'Ticket Médio', field: 'ticket_medio', align: 'right', render: (row) => formatCurrency(row.ticket_medio), csvValue: (row) => String(row.ticket_medio) }
                 ]}
               />
             )}
@@ -477,12 +477,12 @@ export default function FunilInteligenteView() {
                 defaultSortField="vgv"
                 columns={[
                   { label: 'Empreendimento', field: 'empreendimento' },
-                  { label: 'Ciclo Médio', field: 'avg_days_to_venda', align: 'center', render: (row: any) => row.avg_days_to_venda != null ? `${row.avg_days_to_venda} dias` : '—' },
-                  { label: 'Leads', field: 'leads', align: 'right', render: (row: any) => formatNumber(row.leads) },
-                  { label: 'Reservas', field: 'reservas', align: 'right', render: (row: any) => formatNumber(row.reservas) },
-                  { label: 'VGV Comercial', field: 'vgv', align: 'right', render: (row: any) => formatCurrency(row.vgv), csvValue: (row: any) => String(row.vgv) },
-                  { label: 'Cancelamentos', field: 'cancelamentos', align: 'right', render: (row: any) => formatNumber(row.cancelamentos) },
-                  { label: 'Ticket Médio', field: 'ticket_medio', align: 'right', render: (row: any) => formatCurrency(row.ticket_medio), csvValue: (row: any) => String(row.ticket_medio) }
+                  { label: 'Ciclo Médio', field: 'avg_days_to_venda', align: 'center', render: (row) => row.avg_days_to_venda != null ? `${row.avg_days_to_venda} dias` : '—' },
+                  { label: 'Leads', field: 'leads', align: 'right', render: (row) => formatNumber(row.leads as number) },
+                  { label: 'Reservas', field: 'reservas', align: 'right', render: (row) => formatNumber(row.reservas) },
+                  { label: 'VGV Comercial', field: 'vgv', align: 'right', render: (row) => formatCurrency(row.vgv), csvValue: (row) => String(row.vgv) },
+                  { label: 'Cancelamentos', field: 'cancelamentos', align: 'right', render: (row) => formatNumber(row.cancelamentos) },
+                  { label: 'Ticket Médio', field: 'ticket_medio', align: 'right', render: (row) => formatCurrency(row.ticket_medio), csvValue: (row) => String(row.ticket_medio) }
                 ]}
               />
             )}
@@ -496,10 +496,10 @@ export default function FunilInteligenteView() {
                 searchPlaceholder="Buscar corretor..."
                 defaultSortField="vgv"
                 columns={[
-                  { label: 'Posição', width: '50px', render: (_: any, idx: number) => <span>{idx + 1}º</span> },
+                  { label: 'Posição', width: '50px', render: (_, idx: number) => <span>{idx + 1}º</span> },
                   { label: 'Corretor', field: 'corretor' },
-                  { label: 'Vendas Realizadas', field: 'reservas', align: 'right', render: (row: any) => formatNumber(row.reservas) },
-                  { label: 'VGV Total', field: 'vgv', align: 'right', render: (row: any) => formatCurrency(row.vgv), csvValue: (row: any) => String(row.vgv) }
+                  { label: 'Vendas Realizadas', field: 'reservas', align: 'right', render: (row) => formatNumber(row.reservas) },
+                  { label: 'VGV Total', field: 'vgv', align: 'right', render: (row) => formatCurrency(row.vgv), csvValue: (row) => String(row.vgv) }
                 ]}
               />
             )}
@@ -514,9 +514,9 @@ export default function FunilInteligenteView() {
                 defaultSortField="month"
                 columns={[
                   { label: 'Mês', field: 'month' },
-                  { label: 'Leads', field: 'leads', align: 'right', render: (row: any) => formatNumber(row.leads) },
-                  { label: 'Reservas', field: 'reservas', align: 'right', render: (row: any) => formatNumber(row.reservas) },
-                  { label: 'VGV', field: 'vgv', align: 'right', render: (row: any) => formatCurrency(row.vgv), csvValue: (row: any) => String(row.vgv) }
+                  { label: 'Leads', field: 'leads', align: 'right', render: (row) => formatNumber(row.leads as number) },
+                  { label: 'Reservas', field: 'reservas', align: 'right', render: (row) => formatNumber(row.reservas) },
+                  { label: 'VGV', field: 'vgv', align: 'right', render: (row) => formatCurrency(row.vgv), csvValue: (row) => String(row.vgv) }
                 ]}
               />
             )}

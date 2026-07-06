@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, DollarSign, Users, Clock, RefreshCw } from 'lucide-react';
+import logger from '@/lib/logger'
 
 interface SalesOverview {
   vgvTotal: number;
@@ -44,7 +45,7 @@ export default function VisaoGeralView() {
         vgvMes,
       });
     } catch (e) {
-      console.error('Erro ao carregar Sales Vision:', e);
+      logger.error({ e }, 'Erro ao carregar Sales Vision:');
     } finally {
       setLoading(false);
     }

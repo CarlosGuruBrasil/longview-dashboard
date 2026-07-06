@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
 import { listTaskDocuments, addTaskDocument } from '@/lib/db-kv';
 import { randomUUID } from 'crypto';
+import logger from '@/lib/logger'
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -46,7 +47,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       document: { id: docId, taskId, name: file.name, category, contentType: file.type, sizeBytes: file.size, uploadedBy: user.name, uploadedAt: new Date().toISOString(), version: 1 },
     }, { status: 201 });
   } catch (e: unknown) {
-    console.error('[POST /api/tasks/[id]/documents]', e);
+    logger.error({ e }, '[POST /api/tasks/[id]/documents]');
     return NextResponse.json({ error: 'Erro ao salvar arquivo' }, { status: 500 });
   }
 }

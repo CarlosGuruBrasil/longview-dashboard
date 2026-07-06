@@ -16,6 +16,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sql, ensureSchema } from '@/lib/pg';
 import { evaluateAlerts } from '@/app/marketing-vision/utils/alerts';
 import type { Lead } from '@/app/marketing-vision/types';
+import logger from '@/lib/logger'
 
 // Intervalo mínimo entre notificações do mesmo alerta (ms)
 const DEDUP_MS = 4 * 60 * 60 * 1000; // 4 horas
@@ -57,7 +58,7 @@ export async function GET(req: NextRequest) {
       return raw as Lead;
     }).filter(Boolean) as Lead[];
   } catch (e) {
-    console.error('[check-alerts] erro ao ler leads:', e);
+    logger.error({ e }, '[check-alerts] erro ao ler leads:');
   }
 
   // ── 2. Carrega metaData ─────────────────────────────────────────────────────
@@ -69,7 +70,7 @@ export async function GET(req: NextRequest) {
       metaData = (d.data ?? d) as NonNullable<typeof metaData>;
     }
   } catch (e) {
-    console.error('[check-alerts] erro ao ler meta_cache:', e);
+    logger.error({ e }, '[check-alerts] erro ao ler meta_cache:');
   }
 
   // ── 3. Avalia alertas ───────────────────────────────────────────────────────
@@ -126,7 +127,7 @@ export async function GET(req: NextRequest) {
         pushSent++;
       }
     } catch (e) {
-      console.error(`[check-alerts] falha ao enviar push para ${alert.id}:`, e);
+      logger.error({ e }, '[check-alerts] falha ao enviar push para $:');
     }
   }
 
@@ -145,7 +146,7 @@ export async function GET(req: NextRequest) {
     warning: alerts.filter(a => a.severity === 'warning').length,
   };
 
-  console.log(`[check-alerts] ${counts.critical} críticos, ${counts.warning} avisos → ${pushSent} push enviados`);
+  logger.info(`[check-alerts] $ críticos, $ avisos → $ push enviados`);
 
   return NextResponse.json({
     ok: true,

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import logger from '@/lib/logger'
 
 export interface UserPermissions {
   viewMarketingDashboard: boolean;
@@ -72,7 +73,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           }
         }
       } catch (e) {
-        console.error('Erro ao carregar usuário autenticado:', e);
+        logger.error({ e }, 'Erro ao carregar usuário autenticado:');
       } finally {
         setIsLoading(false);
       }

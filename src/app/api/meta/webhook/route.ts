@@ -25,6 +25,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
 import { createCrmLead } from '@/lib/cvcrm';
+import logger from '@/lib/logger'
 
 const META_BASE    = 'https://graph.facebook.com/v21.0';
 const VERIFY_TOKEN = process.env.META_WEBHOOK_VERIFY_TOKEN ?? '';
@@ -61,7 +62,7 @@ async function logWebhookError(source: string, error: string, payload: unknown):
       VALUES (${source}, ${error}, ${(payload ?? {}) as never}, NOW())
     `;
   } catch (e) {
-    console.error('[meta/webhook] Falha ao logar erro no banco:', e);
+    logger.error({ e }, '[meta/webhook] Falha ao logar erro no banco:');
   }
 }
 
@@ -76,8 +77,9 @@ async function getPageAccessToken(): Promise<string> {
       timeout: 8000,
     });
     return res.data?.access_token || token;
-  } catch (err: any) {
-    console.warn('[meta/webhook] Erro ao obter page access token:', err.message);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.warn({ err: msg }, '[meta/webhook] Erro ao obter page access token');
     return token;
   }
 }
@@ -112,7 +114,7 @@ async function fetchMetaLead(leadgenId: string): Promise<MetaLeadFull | null> {
     return res.data as MetaLeadFull;
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Erro desconhecido';
-    console.warn(`[meta/webhook] fetchMetaLead ${leadgenId} falhou:`, msg);
+    logger.warn({ msg }, '[meta/webhook] fetchMetaLead $ falhou:');
     await logWebhookError('meta_webhook', `fetchMetaLead falhou para leadgenId ${leadgenId}: ${msg}`, { leadgenId });
     return null;
   }
@@ -162,7 +164,7 @@ async function saveToPostgres(lead: MetaLeadFull, parsed: {
     `;
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Erro desconhecido';
-    console.warn('[meta/webhook] saveToPostgres falhou:', msg);
+    logger.warn({ msg }, '[meta/webhook] saveToPostgres falhou:');
   }
 }
 
@@ -196,7 +198,7 @@ function forwardToRDStation(parsed: {
     },
     { params: { api_key: apiKey }, timeout: 12_000 }
   ).catch(err => {
-    console.warn('[meta/webhook] RD Station forward falhou:', err.response?.data?.error_description ?? err.message);
+    logger.warn({ err: err?.response?.data?.error_description || err?.message || err }, '[meta/webhook] RD Station forward falhou');
   });
 }
 
@@ -229,7 +231,7 @@ export async function GET(request: NextRequest) {
   const challenge = searchParams.get('hub.challenge');
 
   if (mode === 'subscribe' && token === VERIFY_TOKEN && challenge) {
-    console.log('[meta/webhook] Verificação OK');
+    logger.info('[meta/webhook] Verificação OK');
     return new Response(challenge, { status: 200, headers: { 'Content-Type': 'text/plain' } });
   }
 
@@ -263,16 +265,16 @@ export async function POST(request: NextRequest) {
         const { leadgen_id, form_id, ad_id, ad_name, campaign_name } = change.value ?? {};
 
         if (!leadgen_id) {
-          console.warn('[meta/webhook] change sem leadgen_id');
+          logger.warn('[meta/webhook] change sem leadgen_id');
           continue;
         }
 
-        console.log(`[meta/webhook] Processando lead ${leadgen_id} (campanha: ${campaign_name ?? '?'})`);
+        logger.info(`[meta/webhook] Processando lead $ (campanha: $)`);
 
         // 1. Busca dados completos na Meta API
         const metaLead = await fetchMetaLead(leadgen_id);
         if (!metaLead) {
-          console.warn(`[meta/webhook] Não foi possível buscar lead ${leadgen_id}`);
+          logger.warn(`[meta/webhook] Não foi possível buscar lead $`);
           continue;
         }
 
@@ -293,7 +295,7 @@ export async function POST(request: NextRequest) {
         const origem        = 'Meta Lead Ads';
 
         if (!nomeCompleto && !email && !telefone) {
-          console.warn(`[meta/webhook] Lead ${leadgen_id} sem dados de contato — ignorado`);
+          logger.warn(`[meta/webhook] Lead $ sem dados de contato — ignorado`);
           await logWebhookError('meta_webhook', 'Lead descartado por falta de dados de contato básicos (nome, email ou telefone)', { leadgen_id, fields });
           continue;
         }
@@ -322,7 +324,7 @@ export async function POST(request: NextRequest) {
         });
 
         if (!crmResult.ok) {
-          console.warn(`[meta/webhook] CV CRM falhou para ${leadgen_id}: ${crmResult.error}`);
+          logger.warn(`[meta/webhook] CV CRM falhou para $: $`);
           await logWebhookError('meta_webhook', `CV CRM falhou: ${crmResult.error}`, { leadgen_id, parsed });
         }
 
@@ -332,7 +334,7 @@ export async function POST(request: NextRequest) {
         // 6. Push FCM para equipe comercial
         sendFCMPush(parsed.nome, empreendimento, campanha);
 
-        console.log(
+        logger.info(
           `[meta/webhook] Lead ${leadgen_id} processado — ` +
           `CRM: ${crmResult.ok ? `OK (id=${crmResult.id})` : 'FALHOU'}`
         );
@@ -341,7 +343,7 @@ export async function POST(request: NextRequest) {
   };
 
   // Inicia processamento assíncrono e responde imediatamente
-  processAsync().catch(e => console.error('[meta/webhook] processAsync error:', e));
+  processAsync().catch(e => logger.error('[meta/webhook] processAsync error:', e));
 
   return NextResponse.json({ ok: true, received: true });
 }

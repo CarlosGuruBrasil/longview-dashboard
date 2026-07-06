@@ -4,6 +4,7 @@
  * Usa a tabela kv_store no Postgres.
  */
 import { sql, ensureSchema } from './pg';
+import logger from '@/lib/logger'
 
 let tableReady = false;
 
@@ -13,7 +14,7 @@ async function optionalKvSchemaStep(label: string, step: () => Promise<unknown>)
   } catch (error) {
     const pgError = error as { code?: string; message?: string };
     if (pgError.code === '42501') {
-      console.warn(`[kv] optional schema step skipped (${label}): ${pgError.message}`);
+      logger.warn(`[kv] optional schema step skipped ($): $`);
       return;
     }
     throw error;
@@ -57,7 +58,7 @@ export const kv = {
       }
       return value as T;
     } catch (e) {
-      console.error('[kv] get error:', e);
+      logger.error({ e }, '[kv] get error:');
       return null;
     }
   },
@@ -88,7 +89,7 @@ export const kv = {
         `;
       }
     } catch (e) {
-      console.error('[kv] set error:', e);
+      logger.error({ e }, '[kv] set error:');
     }
   },
 
@@ -97,7 +98,7 @@ export const kv = {
       await ensureTable();
       await sql`DELETE FROM kv_store WHERE key = ${key}`;
     } catch (e) {
-      console.error('[kv] del error:', e);
+      logger.error({ e }, '[kv] del error:');
     }
   },
 
@@ -115,7 +116,7 @@ export const kv = {
       `;
       return rows.map(r => r.key);
     } catch (e) {
-      console.error('[kv] keys error:', e);
+      logger.error({ e }, '[kv] keys error:');
       return [];
     }
   },
@@ -169,7 +170,7 @@ export const kv = {
         return 1;
       }
     } catch (e) {
-      console.error('[kv] incr error:', e);
+      logger.error({ e }, '[kv] incr error:');
       throw e;
     }
   },
@@ -185,7 +186,7 @@ export const kv = {
       `;
       return (result as unknown as { count: number }).count > 0 ? 1 : 0;
     } catch (e) {
-      console.error('[kv] expire error:', e);
+      logger.error({ e }, '[kv] expire error:');
       return 0;
     }
   },
@@ -207,7 +208,7 @@ export const kv = {
       }
       return Math.ceil(diffMs / 1000);
     } catch (e) {
-      console.error('[kv] ttl error:', e);
+      logger.error({ e }, '[kv] ttl error:');
       return -2;
     }
   },

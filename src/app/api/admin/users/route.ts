@@ -4,6 +4,7 @@ import { normalizePermissions } from '@/lib/permissions';
 import { rateLimit, getClientIp } from '@/lib/rateLimit';
 import { verifyAdminAuth } from '@/lib/auth';
 import bcrypt from 'bcryptjs';
+import logger from '@/lib/logger'
 
 // GET: Listar usuários cadastrados
 export async function GET(request: NextRequest) {
@@ -28,7 +29,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ users: safeUsers });
   } catch (error) {
-    console.error('Erro ao listar usuários:', error);
+    logger.error({ error }, 'Erro ao listar usuários:');
     return NextResponse.json({ error: 'Erro ao carregar usuários.' }, { status: 500 });
   }
 }
@@ -76,7 +77,7 @@ export async function POST(request: NextRequest) {
     const { passwordHash: _, ...safeUser } = newUser;
     return NextResponse.json({ success: true, user: safeUser }, { status: 201 });
   } catch (error) {
-    console.error('Erro ao criar usuário:', error);
+    logger.error({ error }, 'Erro ao criar usuário:');
     return NextResponse.json({ error: 'Erro interno ao cadastrar usuário.' }, { status: 500 });
   }
 }
@@ -127,7 +128,7 @@ export async function PUT(request: NextRequest) {
     const { passwordHash: _, ...safeUser } = targetUser;
     return NextResponse.json({ success: true, user: safeUser });
   } catch (error) {
-    console.error('Erro ao atualizar usuário:', error);
+    logger.error({ error }, 'Erro ao atualizar usuário:');
     return NextResponse.json({ error: 'Erro interno ao atualizar usuário.' }, { status: 500 });
   }
 }
@@ -170,7 +171,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true, message: 'Usuário excluído com sucesso.' });
   } catch (error) {
-    console.error('Erro ao excluir usuário:', error);
+    logger.error({ error }, 'Erro ao excluir usuário:');
     return NextResponse.json({ error: 'Erro interno ao excluir usuário.' }, { status: 500 });
   }
 }

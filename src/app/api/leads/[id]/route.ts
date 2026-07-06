@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import jwt from 'jsonwebtoken';
+import logger from '@/lib/logger'
 
 const JWT_SECRET = process.env.JWT_SECRET ?? (() => { throw new Error('[LongView] JWT_SECRET nao configurado. Defina no .env.local') })();
 
@@ -19,8 +20,16 @@ type LeadContact = {
 };
 
 type LeadRaw = {
+  nome?: string;
+  email?: string;
+  telefone?: string;
+  situacao?: { id?: number; nome?: string };
   corretor?: LeadContact;
   gestor?: LeadContact;
+  imobiliaria?: LeadContact;
+  _crm?: { id?: string | number };
+  idlead?: string | number;
+  id?: string | number;
 };
 
 function errorMessage(error: unknown): string {
@@ -123,12 +132,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Lead não encontrado.' }, { status: 404 });
     }
 
-    const oldRaw: any = rows[0].raw || {};
+    const oldRaw = (rows[0].raw ?? {}) as LeadRaw;
 
     // 2. Resolver o idlead do CRM
-    let idleadCrm = id;
+    let idleadCrm: string | number = id;
     if (id.startsWith('meta_')) {
-      idleadCrm = oldRaw._crm?.id ?? oldRaw.idlead ?? oldRaw.id;
+      const crm = oldRaw._crm;
+      idleadCrm = String(crm?.id ?? oldRaw.idlead ?? oldRaw.id ?? id);
     }
 
     if (!idleadCrm || String(idleadCrm).startsWith('meta_')) {
@@ -143,9 +153,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Credenciais do CRM não configuradas.' }, { status: 500 });
     }
 
-    console.log(`[edit-lead] Atualizando lead ${idleadCrm} no CV CRM...`);
+    logger.info(`[edit-lead] Atualizando lead $ no CV CRM...`);
     
-    const payload: any = {
+    const payload: Record<string, unknown> = {
       idlead: Number(idleadCrm),
       permitir_alteracao: true,
       nome: body.nome || oldRaw.nome,
@@ -191,9 +201,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     await sql`
       UPDATE leads 
       SET 
-        nome = ${payload.nome},
-        email = ${payload.email || null},
-        telefone = ${payload.telefone || null},
+        nome = ${payload.nome as string | null},
+        email = ${(payload.email as string) || null},
+        telefone = ${(payload.telefone as string) || null},
         status = ${newRaw.situacao?.nome || null},
         raw = ${newRaw as never},
         data_atualizacao = NOW(),
@@ -201,13 +211,16 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       WHERE id = ${id}
     `;
 
-    console.log(`[edit-lead] Lead ${id} atualizado com sucesso local e no CRM.`);
+    logger.info(`[edit-lead] Lead $ atualizado com sucesso local e no CRM.`);
 
     return NextResponse.json({ ok: true, lead: newRaw });
 
-  } catch (err: any) {
-    const errorMsg = err.response?.data?.message || err.message;
-    console.error('[edit-lead] Erro ao editar lead:', errorMsg);
-    return NextResponse.json({ ok: false, error: `Erro no CRM: ${errorMsg}` }, { status: 500 });
+  } catch (err: unknown) {
+    const axiosErr = err && typeof err === 'object' && 'response' in err
+      ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+      : null;
+    const msg = axiosErr || (err instanceof Error ? err.message : String(err));
+    logger.error({ errorMsg: msg }, '[edit-lead] Erro ao editar lead:');
+    return NextResponse.json({ ok: false, error: `Erro no CRM: ${msg}` }, { status: 500 });
   }
 }

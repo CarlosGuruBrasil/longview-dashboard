@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { RefreshCw, Search } from 'lucide-react';
+import logger from '@/lib/logger'
 
 interface Venda {
   ID?: string;
@@ -27,7 +28,7 @@ export default function ReservasContratosView() {
       const json = await res.json();
       setVendas(json.vendas ?? []);
     } catch (e) {
-      console.error('Erro ao carregar vendas:', e);
+      logger.error({ e }, 'Erro ao carregar vendas:');
     } finally {
       setLoading(false);
     }

@@ -1,4 +1,5 @@
 import { kv } from '@/lib/kv';
+import logger from '@/lib/logger'
 
 export interface RateLimitResult {
   success: boolean;
@@ -45,7 +46,7 @@ export async function rateLimit(
     };
   } catch (err) {
     // Se Redis falhar, libera a request (fail open) — não bloqueia usuários por erro de infra
-    console.warn('[rateLimit] Erro ao consultar KV, liberando request:', err);
+    logger.warn({ err }, '[rateLimit] Erro ao consultar KV, liberando request:');
     return { success: true, remaining: limit, reset: Date.now() + windowSecs * 1000 };
   }
 }

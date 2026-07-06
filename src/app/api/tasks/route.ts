@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
 import { readTasks, nextTaskId, upsertTask, Task } from '@/lib/db-kv';
+import logger from '@/lib/logger'
 
 export async function GET(request: NextRequest) {
   try {
@@ -23,7 +24,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ tasks });
   } catch (error) {
-    console.error('[GET /api/tasks]', error);
+    logger.error({ error }, '[GET /api/tasks]');
     return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
   }
 }
@@ -71,7 +72,7 @@ export async function POST(request: NextRequest) {
     await upsertTask(task);
     return NextResponse.json({ task }, { status: 201 });
   } catch (error) {
-    console.error('[POST /api/tasks]', error);
+    logger.error({ error }, '[POST /api/tasks]');
     return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
   }
 }

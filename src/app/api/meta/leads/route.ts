@@ -11,6 +11,7 @@ import { verifyAuth } from '@/lib/auth';
 import { rateLimit, getClientIp } from '@/lib/rateLimit';
 import { kv } from '@/lib/kv';
 import axios from 'axios';
+import logger from '@/lib/logger'
 
 const META_BASE = 'https://graph.facebook.com/v21.0';
 const PAGE_ID   = '259079394232614';
@@ -124,7 +125,7 @@ async function fetchLeadForms(pageToken: string | null): Promise<MetaLeadForm[]>
     const forms = res.data.data ?? [];
     if (forms.length >= 0) return forms; // retorna mesmo se vazio
   } catch (err: unknown) {
-    console.warn('[meta/leads] leadgen_forms via página falhou:', errorMessage(err));
+    logger.warn({ err: errorMessage(err) }, '[meta/leads] leadgen_forms via página falhou:');
   }
 
   // Tentativa 2: via ad account
@@ -135,7 +136,7 @@ async function fetchLeadForms(pageToken: string | null): Promise<MetaLeadForm[]>
     });
     return res.data.data ?? [];
   } catch (err: unknown) {
-    console.warn('[meta/leads] leadgen_forms via ad account falhou:', errorMessage(err));
+    logger.warn({ err: errorMessage(err) }, '[meta/leads] leadgen_forms via ad account falhou:');
   }
 
   return [];
@@ -210,7 +211,7 @@ export async function GET(request: NextRequest) {
     });
     crmLeads = crmRes.data?.leads || [];
   } catch (err: unknown) {
-    console.warn('[meta/leads] CRM leads falhou:', errorMessage(err));
+    logger.warn({ err: errorMessage(err) }, '[meta/leads] CRM leads falhou:');
   }
 
   // 4. Buscar leads dos formulários
@@ -243,7 +244,7 @@ export async function GET(request: NextRequest) {
           timeout: 20000,
         }).then((r): LeadsByForm => ({ form_id: form.id, form_name: form.name, leads: r.data?.data ?? [] }))
           .catch((err: unknown): LeadsByForm => {
-            console.warn(`[meta/leads] Form ${form.id} falhou:`, errorMessage(err));
+            logger.warn({ err: errorMessage(err) }, '[meta/leads] Form $ falhou:');
             return { form_id: form.id, form_name: form.name, leads: [], _error: true };
           })
       );
@@ -251,7 +252,7 @@ export async function GET(request: NextRequest) {
       allMetaLeads   = leadsPerForm.flatMap((f) => f.leads.map((l) => ({ ...l, _form_name: f.form_name })));
     }
   } catch (err: unknown) {
-    console.error('[meta/leads] Erro ao buscar leads:', errorData(err));
+    logger.error({ err: errorData(err) }, '[meta/leads] Erro ao buscar leads:');
   }
 
   // 5. Cruzar leads Meta com CRM

@@ -6,6 +6,7 @@
  * sem passar pelo RD Station (que adiciona latência de minutos a horas).
  */
 import axios from 'axios';
+import logger from '@/lib/logger'
 
 const CRM_BASE    = 'https://longviewempreendimentos.cvcrm.com.br/api/v1';
 const CRM_TIMEOUT = 15_000; // 15s
@@ -71,7 +72,7 @@ export async function createCrmLead(lead: CrmLeadInput): Promise<CrmLeadResult> 
     const data = res.data as { idlead?: string | number; id?: string | number; lead?: { id?: string | number; idlead?: string | number } };
     const id   = data.idlead ?? data.id ?? data.lead?.id ?? data.lead?.idlead;
 
-    console.log(`[cvcrm] lead criado: id=${id} nome="${lead.nome}"`);
+    logger.info(`[cvcrm] lead criado: id=$ nome="$"`);
     return { ok: true, id, raw: data };
 
   } catch (err: unknown) {
@@ -80,7 +81,7 @@ export async function createCrmLead(lead: CrmLeadInput): Promise<CrmLeadResult> 
       data?.message ??
       data?.error   ??
       (err instanceof Error ? err.message : String(err));
-    console.warn(`[cvcrm] createLead falhou: ${detail}`);
+    logger.warn(`[cvcrm] createLead falhou: $`);
     return { ok: false, error: detail };
   }
 }

@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { RefreshCw, TrendingUp } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import logger from '@/lib/logger'
 
 interface Venda {
   EMPREENDIMENTO?: string;
@@ -33,7 +34,7 @@ export default function PerformanceEmpreendimentoView() {
 
       setData(sorted);
     } catch (e) {
-      console.error('Erro:', e);
+      logger.error({ e }, 'Erro:');
     } finally {
       setLoading(false);
     }

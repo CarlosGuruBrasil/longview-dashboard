@@ -1,6 +1,7 @@
 // Firebase Client SDK — push notifications (FCM) no navegador
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
 import { getMessaging, getToken, onMessage, isSupported, type Messaging, type MessagePayload } from 'firebase/messaging';
+import logger from '@/lib/logger'
 
 const firebaseConfig = {
   apiKey:            process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -21,7 +22,7 @@ function getMessagingInstance(): Promise<Messaging | null> {
     if (typeof window === 'undefined') return null;
     if (!(await isSupported())) return null;
     if (!firebaseConfig.apiKey) {
-      console.warn('[Firebase] config ausente — NEXT_PUBLIC_FIREBASE_* não setadas');
+      logger.warn('[Firebase] config ausente — NEXT_PUBLIC_FIREBASE_* não setadas');
       return null;
     }
     const app: FirebaseApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
@@ -35,7 +36,7 @@ export async function requestNotificationToken(): Promise<string | null> {
   const messaging = await getMessagingInstance();
   if (!messaging) return null;
   if (!VAPID_KEY) {
-    console.warn('[Firebase] NEXT_PUBLIC_FIREBASE_VAPID_KEY ausente — não é possível gerar token');
+    logger.warn('[Firebase] NEXT_PUBLIC_FIREBASE_VAPID_KEY ausente — não é possível gerar token');
     return null;
   }
 

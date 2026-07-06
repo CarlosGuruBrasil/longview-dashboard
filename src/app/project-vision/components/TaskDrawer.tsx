@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { Task, Comment, Subtask, TaskDocumentMeta } from '@/lib/db-kv';
 import { useUser } from '@/context/UserContext';
+import logger from '@/lib/logger'
 
 interface Props {
   taskId: string | null;
@@ -101,7 +102,7 @@ export default function TaskDrawer({ taskId, onClose, onUpdate }: Props) {
         setSituacao(t.situacao ?? '');
         setObservacoes(t.observacoesRotinas ?? '');
       })
-      .catch(console.error)
+      .catch((err: unknown) => logger.error({ err }))
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; window.clearTimeout(timer); };
   }, [taskId]);
@@ -112,7 +113,7 @@ export default function TaskDrawer({ taskId, onClose, onUpdate }: Props) {
     fetch(`/api/tasks/${taskId}/documents`)
       .then(r => r.json())
       .then(d => setDocs(d.documents ?? []))
-      .catch(console.error)
+      .catch((err: unknown) => logger.error({ err }))
       .finally(() => setDocsLoading(false));
     return () => window.clearTimeout(timer);
   }, [taskId, tab]);

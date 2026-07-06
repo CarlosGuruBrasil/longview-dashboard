@@ -21,6 +21,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { kv } from '@/lib/kv';
 import crypto from 'crypto';
 import axios from 'axios';
+import logger from '@/lib/logger'
 
 const META_BASE = 'https://graph.facebook.com/v21.0';
 const PIXEL_ID  = process.env.META_PIXEL_ID;
@@ -131,13 +132,13 @@ export async function sendCAPIEvents(events: CAPIEvent[]): Promise<{
       const current = ((await kv.get<number>(dayKey)) || 0) + sent;
       await kv.set(dayKey, current, { ex: 86400 * 3 }); // 3 dias TTL
     } catch (kvErr) {
-      console.warn('[capi] Erro ao salvar log KV:', kvErr);
+      logger.warn({ kvErr }, '[capi] Erro ao salvar log KV:');
     }
 
     return { sent, errors: 0, details: [result] };
   } catch (err: unknown) {
     const detail = axios.isAxiosError(err) ? err.response?.data || err.message : err instanceof Error ? err.message : String(err);
-    console.error('[capi] Erro ao enviar eventos:', detail);
+    logger.error({ detail }, '[capi] Erro ao enviar eventos:');
     return { sent: 0, errors: events.length, details: [detail] };
   }
 }

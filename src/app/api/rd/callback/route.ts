@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { kv } from '@/lib/kv';
 import axios from 'axios';
+import logger from '@/lib/logger'
 
 const RD_TOKEN_URL = 'https://api.rd.services/auth/token';
 
@@ -66,7 +67,7 @@ export async function GET(request: NextRequest) {
       }), { ex: expires_in || 86400 }),
     ]);
 
-    console.log('[rd/callback] Tokens OAuth2 salvos com sucesso no KV');
+    logger.info('[rd/callback] Tokens OAuth2 salvos com sucesso no KV');
 
     // Redirecionar de volta ao dashboard com sucesso
     return NextResponse.redirect(
@@ -74,7 +75,7 @@ export async function GET(request: NextRequest) {
     );
   } catch (err: unknown) {
     const detailRaw = axios.isAxiosError(err) ? err.response?.data || err.message : err instanceof Error ? err.message : String(err);
-    console.error('[rd/callback] Erro ao trocar code:', detailRaw);
+    logger.error({ detailRaw }, '[rd/callback] Erro ao trocar code:');
     const detail = encodeURIComponent(
       JSON.stringify(detailRaw)
     );

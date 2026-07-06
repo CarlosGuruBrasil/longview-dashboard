@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parseCrmDate } from '@/lib/dateUtils';
+import logger from '@/lib/logger'
 
 type NamedValue = {
   nome?: string;
@@ -118,7 +119,7 @@ export async function POST(request: NextRequest) {
           id_empreendimento = EXCLUDED.id_empreendimento, id_unidade = EXCLUDED.id_unidade, valor = EXCLUDED.valor,
           data_venda = EXCLUDED.data_venda, status = EXCLUDED.status, raw = EXCLUDED.raw, synced_at = EXCLUDED.synced_at
       `;
-      console.log(`[webhook/cvcrm] Venda ${v.idvenda} upserted`);
+      logger.info(`[webhook/cvcrm] Venda $ upserted`);
       return NextResponse.json({ ok: true });
     }
 
@@ -142,7 +143,7 @@ export async function POST(request: NextRequest) {
         ON CONFLICT (id) DO UPDATE SET
           status = EXCLUDED.status, status_venda = EXCLUDED.status_venda, valor = EXCLUDED.valor, raw = EXCLUDED.raw, synced_at = EXCLUDED.synced_at
       `;
-      console.log(`[webhook/cvcrm] Unidade ${u.idunidade} upserted`);
+      logger.info(`[webhook/cvcrm] Unidade $ upserted`);
       return NextResponse.json({ ok: true });
     }
 
@@ -212,7 +213,7 @@ export async function POST(request: NextRequest) {
         synced_at        = NOW()
     `;
 
-    console.log(`[webhook/cvcrm] lead ${id} upserted (${statusNomeV ?? '?'})`);
+    logger.info(`[webhook/cvcrm] lead $ upserted ($)`);
 
     // ── Notificação FCM: nova venda realizada ────────────────────────────
     const statusNome = (statusNomeV ?? '').toLowerCase();
@@ -237,7 +238,7 @@ export async function POST(request: NextRequest) {
 
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.error('[webhook/cvcrm]', msg);
+    logger.error({ msg }, '[webhook/cvcrm]');
     // Grava falha para retry manual — não retorna 500 para o CV não parar de reenviar
     try {
       const { sql } = await import('@/lib/pg');

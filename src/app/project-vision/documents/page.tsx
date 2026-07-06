@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import type { DocumentWithContext } from '@/app/api/documents/route';
 import { useUser } from '@/context/UserContext';
+import logger from '@/lib/logger'
 
 const CATEGORIES = ['Todos', 'contrato', 'proposta', 'planta', 'foto', 'aprovacao', 'ata', 'outro'];
 const CAT_LABEL: Record<string, string> = {
@@ -70,7 +71,7 @@ export default function DocumentsPage() {
       const data = await res.json();
       setDocs(data.documents ?? []);
     } catch (e) {
-      console.error(e);
+      logger.error({ err: e });
     } finally {
       setLoading(false);
     }

@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import jwt from 'jsonwebtoken';
 import axios from 'axios';
 import { sql, ensureSchema } from '@/lib/pg';
+import logger from '@/lib/logger'
 
 const JWT_SECRET = process.env.JWT_SECRET ?? (() => { throw new Error('[LongView] JWT_SECRET nao configurado. Defina no .env.local') })();
 export const runtime = 'nodejs';
@@ -55,7 +56,7 @@ async function fetchAllReservas(email: string, token: string): Promise<Record<st
     );
     return res.data && typeof res.data === 'object' ? res.data : {};
   } catch (err: unknown) {
-    console.error('[/api/cv/vendas] Erro ao buscar reservas do CV:', errorMessage(err));
+    logger.error({ err: errorMessage(err) }, '[/api/cv/vendas] Erro ao buscar reservas do CV:');
     return {};
   }
 }
@@ -145,7 +146,7 @@ async function syncReservas(email: string, token: string): Promise<number> {
     `;
     upserted++;
   }
-  console.log(`[api/cv/vendas] ${upserted} reservas sincronizadas do funil de reservas`);
+  logger.info(`[api/cv/vendas] $ reservas sincronizadas do funil de reservas`);
   return upserted;
 }
 
@@ -198,7 +199,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ vendas, total: vendas.length, _cached: false });
   } catch (err: unknown) {
-    console.error('[/api/cv/vendas] Erro ao buscar vendas do postgres:', errorMessage(err));
+    logger.error({ err: errorMessage(err) }, '[/api/cv/vendas] Erro ao buscar vendas do postgres:');
     return NextResponse.json({ error: 'Erro ao buscar vendas', vendas: [], total: 0 }, { status: 500 });
   }
 }

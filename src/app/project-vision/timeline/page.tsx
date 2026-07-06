@@ -13,6 +13,7 @@ import { Task, Project } from '@/lib/db';
 import { useUser } from '@/context/UserContext';
 import TaskDrawer from '../components/TaskDrawer';
 import ResponsibleModal from '../components/ResponsibleModal';
+import logger from '@/lib/logger'
 
 export default function TimelinePage() {
   const { currentUser } = useUser();
@@ -51,7 +52,7 @@ export default function TimelinePage() {
       setTasks(dataTasks.tasks || []);
       setProjects(dataProj.projects || []);
     } catch (e) {
-      console.error('Erro ao carregar dados da Timeline:', e);
+      logger.error({ e }, 'Erro ao carregar dados da Timeline:');
     } finally {
       setLoading(false);
     }

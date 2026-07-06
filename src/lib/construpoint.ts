@@ -1,3 +1,4 @@
+import logger from '@/lib/logger'
 /**
  * Construpoint API Client — Quality Vision
  *
@@ -115,7 +116,7 @@ async function getToken(): Promise<string> {
     throw new Error('Construpoint credentials are not configured.');
   }
 
-  console.log('Fetching token for user:', username);
+  logger.info({ username }, 'Fetching token for user:');
   const body = new URLSearchParams({
     grant_type: 'password',
     username,
@@ -137,7 +138,7 @@ async function getToken(): Promise<string> {
   }
 
   const data: ConstrupointToken = await res.json();
-  console.log('Token successfully fetched, expires in:', data.expires_in);
+  logger.info({ expiresIn: data.expires_in }, 'Token successfully fetched');
   _cachedToken = data.access_token;
   _tokenExpiry = Date.now() + (data.expires_in - 60) * 1000;
   return _cachedToken;

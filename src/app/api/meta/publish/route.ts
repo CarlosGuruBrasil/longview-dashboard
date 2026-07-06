@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminAuth } from '@/lib/auth';
 import { rateLimit } from '@/lib/rateLimit';
 import axios from 'axios';
+import logger from '@/lib/logger'
 
 const META_BASE = 'https://graph.facebook.com/v21.0';
 const PAGE_ID   = '259079394232614';
@@ -89,7 +90,7 @@ export async function GET(request: NextRequest) {
 
   } catch (err: unknown) {
     const details = errorPayload(err);
-    console.error('[meta/publish GET]', details);
+    logger.error({ details }, '[meta/publish GET]');
     return NextResponse.json(
       { error: 'Erro ao buscar posts', details, posts: [] },
       { status: 500 }
@@ -122,7 +123,7 @@ export async function POST(request: NextRequest) {
       const fbRes = await axios.post<MetaPublishResponse>(endpoint, payload, { timeout: 20000 });
       const postId = fbRes.data.id || fbRes.data.post_id;
       results.facebook = { success: true, post_id: postId };
-      console.log(`[meta/publish] FB post por ${admin.name}: ${postId}`);
+      logger.info(`[meta/publish] FB post por $: $`);
     } catch (err: unknown) {
       results.facebook = { success: false, error: errorPayload(err) };
     }
@@ -150,7 +151,7 @@ export async function POST(request: NextRequest) {
 
         const mediaId = publishRes.data.id;
         results.instagram = { success: true, media_id: mediaId };
-        console.log(`[meta/publish] IG post por ${admin.name}: ${mediaId}`);
+        logger.info(`[meta/publish] IG post por $: $`);
       } catch (err: unknown) {
         results.instagram = { success: false, error: errorPayload(err) };
       }

@@ -13,6 +13,7 @@ import { sql, ensureSchema } from '@/lib/pg';
 import type { MetaData, Lead, CvdwVenda } from '@/app/marketing-vision/types';
 import { getOrigin, isSale, isLoss, getLeadValueNumber } from '@/app/marketing-vision/utils/leads';
 import { getLeadStage } from '@/app/marketing-vision/utils/metrics';
+import logger from '@/lib/logger'
 
 const JWT_SECRET = process.env.JWT_SECRET ?? (() => { throw new Error('[LongView] JWT_SECRET nao configurado. Defina no .env.local') })();
 export const runtime = 'nodejs';
@@ -475,7 +476,7 @@ export async function GET() {
         }
       }
     } catch (e) {
-      console.warn('[bi/intelligence] Erro ao buscar posts:', errorMessage(e))
+      logger.warn({ err: errorMessage(e) }, '[bi/intelligence] Erro ao buscar posts:')
     }
 
     // Sort posts by engagement
@@ -605,7 +606,7 @@ export async function GET() {
     return NextResponse.json(response)
 
   } catch (err: unknown) {
-    console.error('[bi/intelligence] Erro:', errorMessage(err))
+    logger.error({ err: errorMessage(err) }, '[bi/intelligence] Erro:')
     return NextResponse.json({ error: 'Erro ao gerar inteligência de marketing' }, { status: 500 })
   }
 }

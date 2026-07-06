@@ -33,7 +33,7 @@ export interface LeadInteracao {
 export interface Lead {
   idlead?: string | number;
   id?: string | number;
-  raw?: any;
+  raw?: Record<string, unknown>;
   nome?: string;
   email?: string;
   telefone?: string;

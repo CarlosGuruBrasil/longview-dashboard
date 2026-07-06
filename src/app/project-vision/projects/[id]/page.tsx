@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { Task, Project } from '@/lib/db';
 import TaskDrawer from '../../components/TaskDrawer';
 import { useUser } from '@/context/UserContext';
+import logger from '@/lib/logger'
 
 export default function ProjectDetailPage() {
   const params = useParams();
@@ -78,7 +79,7 @@ export default function ProjectDetailPage() {
         setTasks((await resT.json()).tasks || []);
       }
     } catch (e) {
-      console.error(e);
+      logger.error({ err: e });
     } finally {
       setLoading(false);
     }

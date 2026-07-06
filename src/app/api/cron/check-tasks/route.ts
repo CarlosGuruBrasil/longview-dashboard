@@ -20,6 +20,7 @@ import { sql, ensureSchema } from '@/lib/pg';
 import { sendFCMMulticast } from '@/lib/firebase-admin';
 import { readProjectData } from '@/lib/db-kv';
 import type { Task } from '@/lib/db-kv';
+import logger from '@/lib/logger'
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 const DEDUP_TASK_MS  = 4  * 60 * 60 * 1000;  // 4h — regras 1, 2, 3
@@ -111,7 +112,7 @@ export async function GET(req: NextRequest) {
   try {
     db = await readProjectData();
   } catch (e) {
-    console.error('[check-tasks] erro ao ler DB:', e);
+    logger.error({ e }, '[check-tasks] erro ao ler DB:');
     return NextResponse.json({ error: 'Falha ao ler dados' }, { status: 500 });
   }
 
@@ -329,7 +330,7 @@ export async function GET(req: NextRequest) {
         invalidTokens.push(...result.invalidTokens);
       }
     } catch (e) {
-      console.error(`[check-tasks] push error for ${job.alertId}:`, e);
+      logger.error({ e }, '[check-tasks] push error for $:');
     }
   }
 
@@ -353,7 +354,7 @@ export async function GET(req: NextRequest) {
     ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data
   `;
 
-  console.log(`[check-tasks] fila=${queue.length} sent=${sent} invalid=${invalidTokens.length}`);
+  logger.info(`[check-tasks] fila=$ sent=$ invalid=$`);
 
   return NextResponse.json({
     ok: true,

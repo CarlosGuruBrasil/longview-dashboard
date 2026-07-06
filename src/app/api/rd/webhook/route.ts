@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { kv } from '@/lib/kv';
+import logger from '@/lib/logger'
 
 type JsonObject = Record<string, unknown>;
 
@@ -26,7 +27,7 @@ export async function POST(request: NextRequest) {
   const event_type = text(body.event_type || event.type);
   const email = text(primaryData.email || leadData.email || payload.email);
 
-  console.log(`[rd/webhook] ${event_type} | ${email || 'sem email'}`);
+  logger.info(`[rd/webhook] $ | $`);
 
   if (email) {
     try {

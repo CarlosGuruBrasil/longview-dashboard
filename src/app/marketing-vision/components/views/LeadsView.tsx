@@ -41,8 +41,9 @@ export default function LeadsView() {
       if (!res.ok) throw new Error(data.error || 'Erro na sincronização')
       alert(`Sucesso! ${data.leads_sincronizados} leads órfãos foram integrados no CV CRM e localmente.`)
       refresh(true, undefined, { validateMeta: true })
-    } catch (err: any) {
-      alert(`Falha ao sincronizar: ${err.message}`)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      alert(`Falha ao sincronizar: ${msg}`)
     } finally {
       setSyncing(false)
     }

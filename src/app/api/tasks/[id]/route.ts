@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
 import { readTaskById, upsertTask, deleteTask, Task, ChangeLog } from '@/lib/db-kv';
+import logger from '@/lib/logger'
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -14,7 +15,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     if (!task) return NextResponse.json({ error: 'Tarefa não encontrada' }, { status: 404 });
     return NextResponse.json({ task });
   } catch (e) {
-    console.error('[GET /api/tasks/[id]]', e);
+    logger.error({ e }, '[GET /api/tasks/[id]]');
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
   }
 }
@@ -56,7 +57,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     await upsertTask(updated);
     return NextResponse.json({ task: updated });
   } catch (e) {
-    console.error('[PATCH /api/tasks/[id]]', e);
+    logger.error({ e }, '[PATCH /api/tasks/[id]]');
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
   }
 }
@@ -71,7 +72,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     if (!found) return NextResponse.json({ error: 'Tarefa não encontrada' }, { status: 404 });
     return NextResponse.json({ success: true });
   } catch (e) {
-    console.error('[DELETE /api/tasks/[id]]', e);
+    logger.error({ e }, '[DELETE /api/tasks/[id]]');
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
   }
 }

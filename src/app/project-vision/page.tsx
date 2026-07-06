@@ -17,6 +17,8 @@ import Link from 'next/link';
 import TaskDrawer from './components/TaskDrawer';
 import ResponsibleModal from './components/ResponsibleModal';
 
+import logger from '@/lib/logger'
+
 // Componentes do Recharts importados dinamicamente para evitar erro de hidratação no Next.js
 import {
   BarChart,
@@ -93,7 +95,7 @@ export default function Home() {
       // Simula a geração de notificações e alertas em tempo real do sistema
       generateNotifications(dataTasks.tasks || []);
     } catch (e) {
-      console.error('Erro ao carregar dados do dashboard:', e);
+      logger.error({ e }, 'Erro ao carregar dados do dashboard:');
     } finally {
       setLoading(false);
     }

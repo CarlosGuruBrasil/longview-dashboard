@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import logger from '@/lib/logger'
 
 export interface Subtask {
   id: string;
@@ -168,7 +169,7 @@ function initializeFromCSV(): DatabaseState {
   ];
 
   if (!fs.existsSync(CSV_FILE)) {
-    console.error('Planilha CSV não encontrada. Inicializando estado vazio.');
+    logger.error('Planilha CSV não encontrada. Inicializando estado vazio.');
     return { tasks: [], projects: defaultProjects, users: defaultUsers, responsibles: [] };
   }
 
@@ -335,7 +336,7 @@ function initializeFromCSV(): DatabaseState {
 
     return { tasks, projects: updatedProjects, users: defaultUsers, responsibles: [] };
   } catch (error) {
-    console.error('Erro ao ler CSV e inicializar banco de dados:', error);
+    logger.error({ error }, 'Erro ao ler CSV e inicializar banco de dados:');
     return { tasks: [], projects: defaultProjects, users: defaultUsers, responsibles: [] };
   }
 }
@@ -393,7 +394,7 @@ export function readDatabase(): DatabaseState {
       cachedDbState = state;
       return state;
     } catch (e) {
-      console.error('Erro ao ler JSON de banco de dados, reinicializando a partir do CSV...', e);
+      logger.error({ e }, 'Erro ao ler JSON de banco de dados, reinicializando a partir do CSV...');
     }
   }
 

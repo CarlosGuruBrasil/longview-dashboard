@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
 import { readProjectData, mutateProjectData, Project } from '@/lib/db-kv';
+import logger from '@/lib/logger'
 
 export async function GET(_request: NextRequest) {
   try {
@@ -10,7 +11,7 @@ export async function GET(_request: NextRequest) {
     const db = await readProjectData();
     return NextResponse.json({ projects: db.projects || [] });
   } catch (error) {
-    console.error('Erro na API de empreendimentos:', error);
+    logger.error({ error }, 'Erro na API de empreendimentos:');
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
   }
 }
@@ -35,7 +36,7 @@ export async function PATCH(request: NextRequest) {
     if (!updated) return NextResponse.json({ error: 'Empreendimento não encontrado' }, { status: 404 });
     return NextResponse.json({ project: updated });
   } catch (error) {
-    console.error('Erro ao atualizar empreendimento:', error);
+    logger.error({ error }, 'Erro ao atualizar empreendimento:');
     return NextResponse.json({ error: 'Erro ao atualizar' }, { status: 500 });
   }
 }
@@ -62,7 +63,7 @@ export async function POST(request: NextRequest) {
     if (conflict) return NextResponse.json({ error: 'Já existe um empreendimento com este nome' }, { status: 400 });
     return NextResponse.json({ project: newProject }, { status: 201 });
   } catch (error) {
-    console.error('Erro ao cadastrar empreendimento:', error);
+    logger.error({ error }, 'Erro ao cadastrar empreendimento:');
     return NextResponse.json({ error: 'Erro ao cadastrar empreendimento' }, { status: 500 });
   }
 }

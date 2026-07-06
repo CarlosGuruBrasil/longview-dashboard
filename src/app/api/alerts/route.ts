@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
 import { sql, ensureSchema } from '@/lib/pg';
+import logger from '@/lib/logger'
 
 export async function GET(_req: NextRequest) {
   const user = await verifyAuth();
@@ -36,7 +37,7 @@ export async function GET(_req: NextRequest) {
       source: 'cache',
     });
   } catch (e) {
-    console.error('[api/alerts] erro:', e);
+    logger.error({ e }, '[api/alerts] erro:');
     return NextResponse.json({ alerts: [], updatedAt: null, source: 'error' });
   }
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import jwt from 'jsonwebtoken';
+import logger from '@/lib/logger'
 
 const JWT_SECRET = process.env.JWT_SECRET ?? (() => { throw new Error('[LongView] JWT_SECRET nao configurado. Defina no .env.local') })();
 const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN || '';
@@ -99,7 +100,7 @@ export async function GET() {
     return NextResponse.json({ creatives });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('[meta/creatives]', msg);
+    logger.error({ msg }, '[meta/creatives]');
     return NextResponse.json({ creatives: [], error: msg });
   }
 }

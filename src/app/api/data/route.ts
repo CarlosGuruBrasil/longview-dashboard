@@ -7,6 +7,7 @@ import type { AxiosResponse } from 'axios';
 import jwt from 'jsonwebtoken';
 import { rateLimit, getClientIp } from '@/lib/rateLimit';
 import type { MetaData, MetaLeadForm, MetaPageInfo } from '@/app/marketing-vision/types';
+import logger from '@/lib/logger'
 
 const JWT_SECRET   = process.env.JWT_SECRET ?? (() => { throw new Error('[LongView] JWT_SECRET nao configurado. Defina no .env.local') })();
 const META_PAGE_ID = '259079394232614';
@@ -333,7 +334,7 @@ async function readLeadsFromPg(
 
     return { leads, total: leads.length, crmTotal: totalCount };
   } catch (e: unknown) {
-    console.warn('[/api/data] Postgres leads falhou:', e instanceof Error ? e.message : e);
+    logger.warn({ err: e instanceof Error ? e.message : e }, '[/api/data] Postgres leads falhou:');
     return null;
   }
 }
@@ -431,7 +432,7 @@ async function readLeadsSummaryFromPg(
       topTemperatura:     temperatura,
     };
   } catch (e: unknown) {
-    console.warn('[/api/data] readLeadsSummaryFromPg falhou:', e instanceof Error ? e.message : e);
+    logger.warn({ err: e instanceof Error ? e.message : e }, '[/api/data] readLeadsSummaryFromPg falhou:');
     return null;
   }
 }
@@ -492,7 +493,7 @@ async function readEstoqueFromPg() {
     if (empreendimentos.length === 0) return null;
     return { empreendimentos, resumo, unidades };
   } catch(e: unknown) {
-    console.warn('[/api/data] Postgres estoque falhou:', e instanceof Error ? e.message : e);
+    logger.warn({ err: e instanceof Error ? e.message : e }, '[/api/data] Postgres estoque falhou:');
     return null;
   }
 }
@@ -514,7 +515,7 @@ async function fetchAllCRMLeads(email: string, token: string): Promise<{ leads: 
     const allLeads = results.flatMap(r => r.status === 'fulfilled' ? r.value.data.leads ?? [] : []);
     return { leads: allLeads, total: allLeads.length, crmTotal: initial.data.total || allLeads.length };
   } catch (err: unknown) {
-    console.warn('[/api/data] CRM leads falhou:', err instanceof Error ? err.message : err);
+    logger.warn({ err: err instanceof Error ? err.message : err }, '[/api/data] CRM leads falhou:');
     return { leads: [], total: 0, crmTotal: 0 };
   }
 }
@@ -530,10 +531,10 @@ async function fetchCRMEmpreendimentos(): Promise<{ empreendimentos: unknown[]; 
     const { sql, ensureSchema } = await import('@/lib/pg');
     await ensureSchema();
 
-    console.log('[fetchCRMEmpreendimentos] Iniciando fallback...');
+    logger.info('[fetchCRMEmpreendimentos] Iniciando fallback...');
     const projRes = await axios.get('https://longviewempreendimentos.cvcrm.com.br/api/v1/cadastros/empreendimentos', { headers, timeout: 20000 });
     const projects = Array.isArray(projRes.data) ? projRes.data : [];
-    console.log(`[fetchCRMEmpreendimentos] ${projects.length} projetos recebidos do CRM`);
+    logger.info(`[fetchCRMEmpreendimentos] $ projetos recebidos do CRM`);
     const validProjects = projects.filter((p: Record<string, unknown>) => {
       const te = (p.tipo_empreendimento as { nome?: string }[] | undefined);
       const sc = (p.situacao_comercial as { nome?: string }[] | undefined);
@@ -623,7 +624,7 @@ async function fetchCRMEmpreendimentos(): Promise<{ empreendimentos: unknown[]; 
           `;
         }
       } catch (detErr: unknown) {
-        console.warn(`[/api/data] Detalhes emp ${idEmp} falhou:`, detErr instanceof Error ? detErr.message : detErr);
+        logger.warn({ err: detErr instanceof Error ? detErr.message : detErr }, '[/api/data] Detalhes emp $ falhou:');
       }
     }
 
@@ -639,10 +640,10 @@ async function fetchCRMEmpreendimentos(): Promise<{ empreendimentos: unknown[]; 
     }
     const resumo = Array.from(resumoMap.entries()).map(([id_empreendimento, v]) => ({ id_empreendimento, ...v }));
 
-    console.log(`[fetchCRMEmpreendimentos] Retornando ${empreendimentos.length} emp, ${unidades.length} unid (${validProjects.length} projetos válidos de ${projects.length})`);
+    logger.info(`[fetchCRMEmpreendimentos] Retornando $ emp, $ unid ($ projetos válidos de $)`);
     return { empreendimentos, resumo, unidades };
   } catch (e: unknown) {
-    console.warn('[/api/data] CRM empreendimentos falhou:', e instanceof Error ? e.message : e);
+    logger.warn({ err: e instanceof Error ? e.message : e }, '[/api/data] CRM empreendimentos falhou:');
     return null;
   }
 }
@@ -710,7 +711,7 @@ async function fetchMetaOrphanedLeads(
 
   const work = async () => {
     try {
-      console.log(`[meta-validation] ${activeForms.length} formulários ativos`);
+      logger.info(`[meta-validation] $ formulários ativos`);
       const results = await Promise.allSettled(
         activeForms.map(f =>
           axios.get(`https://graph.facebook.com/${META_API_VERSION}/${f.id}/leads`, {
@@ -759,7 +760,7 @@ async function fetchMetaOrphanedLeads(
       return { orphanedLeads, totalMetaLeads: metaLeads.length, error: null };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error('[meta-validation] erro:', msg);
+      logger.error({ msg }, '[meta-validation] erro:');
       return { orphanedLeads: [], totalMetaLeads: 0, error: `Erro na API do Meta: ${msg}` };
     }
   };
@@ -839,7 +840,7 @@ export async function GET(request: NextRequest) {
       const email = process.env.CV_CRM_EMAIL;
       const token = process.env.CV_CRM_TOKEN;
       if (email && token) {
-        console.log('[api/data] Sincronização forçada iniciada...');
+        logger.info('[api/data] Sincronização forçada iniciada...');
         const { leads } = await fetchAllCRMLeads(email, token);
         if (leads.length > 0) {
           const { ensureSchema, sql } = await import('@/lib/pg');
@@ -858,7 +859,7 @@ export async function GET(request: NextRequest) {
               const email_lead = lead.email || null;
               const telefone = lead.telefone || lead.celular || lead.phone || null;
               const origem = stringOrNull(lead.origem || lead.source);
-              const status = (lead.situacao as any)?.nome || lead.status || null;
+              const status = (lead.situacao as { nome?: string } | undefined)?.nome || lead.status || null;
               const empreend = typeof lead.empreendimento === 'object'
                 ? lead.empreendimento.nome ?? null
                 : lead.empreendimento ?? null;
@@ -892,11 +893,11 @@ export async function GET(request: NextRequest) {
               upserted++;
             }
           }
-          console.log(`[api/data] Sincronização forçada concluída. ${upserted} leads atualizados.`);
+          logger.info(`[api/data] Sincronização forçada concluída. $ leads atualizados.`);
         }
       }
     } catch (e: unknown) {
-      console.error('[api/data] Erro na sincronização forçada:', e instanceof Error ? e.message : e);
+      logger.error({ err: e instanceof Error ? e.message : e }, '[api/data] Erro na sincronização forçada:');
     }
   }
 
@@ -907,9 +908,9 @@ export async function GET(request: NextRequest) {
   ]);
 
   // Se estoque vazio, busca ao vivo do CRM e persiste
-  if (!pgEstoque) console.log('[/api/data] pgEstoque vazio — tentando fallback CRM');
+  if (!pgEstoque) logger.info('[/api/data] pgEstoque vazio — tentando fallback CRM');
   const estoque = pgEstoque ?? (await fetchCRMEmpreendimentos()) ?? { empreendimentos: [], resumo: [], unidades: [] };
-  console.log(`[/api/data] estoque: ${estoque.empreendimentos.length} emp, ${estoque.unidades.length} unid`);
+  logger.info(`[/api/data] estoque: $ emp, $ unid`);
 
   // ---------- META (SEMPRE do Postgres; API externa só nos crons/webhook) ----------
   type MetaDataShape = { leadForms?: unknown[]; page?: unknown; [k: string]: unknown };
@@ -927,7 +928,7 @@ export async function GET(request: NextRequest) {
   // os dados do Meta ao vivo para esse período específico para os números baterem exato!
   const isFiltered = !!startDate || !!endDate;
   const needMetaLive = forceRefresh || !metaData || cacheStale || isFiltered;
-  if (cacheStale && metaData) console.warn(`[/api/data] meta_cache stale (${Math.round(cacheAgeMin)}min) — buscando ao vivo`);
+  logger.warn({ err: metaData, ageMin: Math.round(cacheAgeMin) }, 'meta_cache stale — buscando ao vivo');
 
   const CV_EMAIL = process.env.CV_CRM_EMAIL || '';
   const CV_TOKEN = process.env.CV_CRM_TOKEN || '';

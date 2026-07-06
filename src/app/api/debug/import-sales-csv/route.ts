@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import jwt from 'jsonwebtoken';
 import { sql, ensureSchema } from '@/lib/pg';
+import logger from '@/lib/logger'
 
 const JWT_SECRET = process.env.JWT_SECRET ?? (() => { throw new Error('[LongView] JWT_SECRET nao configurado. Defina no .env.local') })();
 
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
     }
 
     await ensureSchema();
-    console.log(`[import-sales] Iniciando importação manual de ${records.length} vendas...`);
+    logger.info(`[import-sales] Iniciando importação manual de $ vendas...`);
 
     let imported = 0;
     
@@ -119,16 +120,17 @@ export async function POST(request: NextRequest) {
         method: 'POST',
         headers: { Authorization: `Bearer ${process.env.CRON_SECRET}` }
       });
-      console.log('[import-sales] BI recalculado com sucesso.');
+      logger.info('[import-sales] BI recalculado com sucesso.');
     } catch (biErr) {
-      console.warn('[import-sales] Falha ao disparar sync-bi:', biErr);
+      logger.warn({ biErr }, '[import-sales] Falha ao disparar sync-bi:');
     }
 
-    console.log(`[import-sales] Importação concluída. ${imported} vendas inseridas/atualizadas.`);
+    logger.info(`[import-sales] Importação concluída. $ vendas inseridas/atualizadas.`);
     return NextResponse.json({ ok: true, message: 'Vendas importadas com sucesso', importadas: imported });
 
-  } catch (err: any) {
-    console.error('[import-sales] Erro na importação:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.error({ err: msg }, '[import-sales] Erro na importação:');
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

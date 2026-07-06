@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { RefreshCw, TrendingUp, DollarSign, Users } from 'lucide-react';
+import logger from '@/lib/logger'
 
 interface Venda {
   CORRETOR?: string;
@@ -34,7 +35,7 @@ export default function CorretoresView() {
 
       setData(sorted);
     } catch (e) {
-      console.error('Erro:', e);
+      logger.error({ e }, 'Erro:');
     } finally {
       setLoading(false);
     }

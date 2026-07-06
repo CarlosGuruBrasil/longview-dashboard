@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sql, ensureSchema } from '@/lib/pg';
 import { getInspections, getVerifications, parseConstrupointDate, cpField, cpName, MODEL_TYPES, type ModelTypeKey } from '@/lib/construpoint';
 import { getBearerToken, isSecretAuthorized, unauthorizedJson } from '@/lib/internal-auth';
+import logger from '@/lib/logger'
 
 export const maxDuration = 300; // 5 minutes
 export const runtime = 'nodejs';
@@ -161,7 +162,7 @@ export async function GET(request: NextRequest) {
 
   } catch (error: unknown) {
     const message = errorMessage(error);
-    console.error('[cron/sync-construpoint] Erro:', message);
+    logger.error({ message }, '[cron/sync-construpoint] Erro:');
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

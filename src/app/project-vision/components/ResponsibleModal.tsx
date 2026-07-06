@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, ExternalLink, AlertTriangle, CheckCircle2, Clock, AlertOctagon } from 'lucide-react';
 import { Task } from '@/lib/db';
+import logger from '@/lib/logger'
 
 const isDelayed = (task: Task): boolean => {
   if (task.statusAndamento === 'Finalizado' || !task.previsaoEntrega) return false;
@@ -35,7 +36,7 @@ export default function ResponsibleModal({ responsibleName, onClose, onSelectTas
       .then(data => {
         if (active) setTasks(data.tasks || []);
       })
-      .catch(console.error)
+      .catch((err: unknown) => logger.error({ err }))
       .finally(() => {
         if (active) setLoading(false);
       });

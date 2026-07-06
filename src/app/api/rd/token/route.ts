@@ -10,6 +10,7 @@ import { NextResponse } from 'next/server';
 import { verifyAdminAuth } from '@/lib/auth';
 import { kv } from '@/lib/kv';
 import axios from 'axios';
+import logger from '@/lib/logger'
 
 const RD_TOKEN_URL = 'https://api.rd.services/auth/token';
 
@@ -46,11 +47,11 @@ export async function getValidRDToken(): Promise<string | null> {
       kv.set('rd:refresh_token', newRefresh,     { ex: 60 * 86400 }),
     ]);
 
-    console.log('[rd/token] Token renovado via refresh_token');
+    logger.info('[rd/token] Token renovado via refresh_token');
     return access_token;
   } catch (err: unknown) {
     const details = axios.isAxiosError(err) ? err.response?.data || err.message : err;
-    console.error('[rd/token] Erro no refresh:', details);
+    logger.error({ details }, '[rd/token] Erro no refresh:');
     return null;
   }
 }

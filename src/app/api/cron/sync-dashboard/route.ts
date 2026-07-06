@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
 import { isCronAuthorized, unauthorizedJson } from '@/lib/internal-auth';
+import logger from '@/lib/logger'
 
 const META_API_VERSION = 'v21.0';
 const META_PAGE_ID     = '259079394232614';
@@ -89,7 +90,7 @@ export async function GET(request: NextRequest) {
       INSERT INTO project_state (key, data) VALUES ('meta_cache', ${{ data: metaData, updatedAt: new Date().toISOString() } as never})
       ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data
     `;
-    console.log('[sync-dashboard] Meta cache atualizado');
+    logger.info('[sync-dashboard] Meta cache atualizado');
   } catch (e: unknown) {
     errors.push('meta: ' + errorMessage(e));
   }
@@ -124,7 +125,7 @@ export async function GET(request: NextRequest) {
       INSERT INTO project_state (key, data) VALUES ('estoque_cache', ${{ projects, estoque: estoqueMap, updatedAt: new Date().toISOString() } as never})
       ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data
     `;
-    console.log('[sync-dashboard] Estoque cache atualizado');
+    logger.info('[sync-dashboard] Estoque cache atualizado');
   } catch (e: unknown) {
     errors.push('estoque: ' + errorMessage(e));
   }

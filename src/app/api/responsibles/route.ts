@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
 import { readProjectData, mutateProjectData, Responsible } from '@/lib/db-kv';
 import axios from 'axios';
+import logger from '@/lib/logger'
 
 const CACHE_KEY = 'cv_responsibles_cache';
 const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutos
@@ -43,7 +44,7 @@ async function readCache(): Promise<Responsible[] | null> {
     }
     return d.responsibles || null;
   } catch (e) {
-    console.warn('[responsibles/route] Falha ao ler cache do Postgres:', e);
+    logger.warn({ e }, '[responsibles/route] Falha ao ler cache do Postgres:');
     return null;
   }
 }
@@ -63,7 +64,7 @@ async function saveCache(responsibles: Responsible[]): Promise<void> {
       ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data
     `;
   } catch (e) {
-    console.warn('[responsibles/route] Falha ao salvar cache no Postgres:', e);
+    logger.warn({ e }, '[responsibles/route] Falha ao salvar cache no Postgres:');
   }
 }
 
@@ -78,7 +79,7 @@ async function fetchCvcrmCorretores(): Promise<Responsible[]> {
   }
 
   try {
-    console.log('[responsibles/route] Buscando corretores do CV CRM (V1)...');
+    logger.info('[responsibles/route] Buscando corretores do CV CRM (V1)...');
     const headers = { email, token, Accept: 'application/json' };
     const response = await axios.get<CvCorretor[]>('https://longviewempreendimentos.cvcrm.com.br/api/v1/cadastros/corretores', {
       headers,
@@ -111,7 +112,7 @@ async function fetchCvcrmCorretores(): Promise<Responsible[]> {
     return mapped;
   } catch (e: unknown) {
     const message = axios.isAxiosError(e) ? e.message : e;
-    console.error('[responsibles/route] Erro ao buscar corretores no CV CRM:', message);
+    logger.error({ message }, '[responsibles/route] Erro ao buscar corretores no CV CRM:');
     return [];
   }
 }
@@ -152,7 +153,7 @@ export async function GET() {
 
     return NextResponse.json({ responsibles: merged });
   } catch (error) {
-    console.error('Erro na API de responsáveis:', error);
+    logger.error({ error }, 'Erro na API de responsáveis:');
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
   }
 }
@@ -184,7 +185,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ responsible: newResponsible }, { status: 201 });
   } catch (error) {
-    console.error('Erro ao cadastrar responsável:', error);
+    logger.error({ error }, 'Erro ao cadastrar responsável:');
     return NextResponse.json({ error: 'Erro ao processar requisição' }, { status: 500 });
   }
 }

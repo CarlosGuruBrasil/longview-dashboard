@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sql, ensureSchema } from '@/lib/pg';
 import { getBearerToken } from '@/lib/internal-auth';
 import { parseConstrupointDate } from '@/lib/construpoint';
+import logger from '@/lib/logger'
 
 type ConstrupointPayload = Record<string, unknown> & {
   Id?: string | number;
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
     }
 
-    console.log('[webhook/construpoint] Recebido:', JSON.stringify(body).slice(0, 500));
+    logger.info({ bodyPreview: JSON.stringify(body).slice(0, 500) }, '[webhook/construpoint] Recebido');
     await ensureSchema();
 
     // Como não temos a doc exata do webhook da Construpoint, vamos fazer um parser defensivo
@@ -104,12 +105,12 @@ export async function POST(request: NextRequest) {
       `;
     } else {
       // Se não reconhecermos o formato, podemos logar em uma tabela de webhooks genérica ou ignorar por enquanto
-      console.log('[webhook/construpoint] Payload não reconhecido como inspeção (sem ID). Ignorando inserção.');
+      logger.info('[webhook/construpoint] Payload não reconhecido como inspeção (sem ID). Ignorando inserção.');
     }
 
     return NextResponse.json({ ok: true });
   } catch (error: unknown) {
-    console.error('[webhook/construpoint] Erro:', errorMessage(error));
+    logger.error({ err: errorMessage(error) }, '[webhook/construpoint] Erro:');
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }

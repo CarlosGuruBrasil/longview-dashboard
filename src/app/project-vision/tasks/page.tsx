@@ -12,6 +12,7 @@ import { Task, Project } from '@/lib/db';
 import { useUser } from '@/context/UserContext';
 import TaskDrawer from '../components/TaskDrawer';
 import ResponsibleModal from '../components/ResponsibleModal';
+import logger from '@/lib/logger'
 
 export default function TasksPage() {
   const { currentUser } = useUser();
@@ -56,7 +57,7 @@ export default function TasksPage() {
       setTasks(dataTasks.tasks || []);
       setProjects(dataProj.projects || []);
     } catch (e) {
-      console.error('Erro ao carregar dados:', e);
+      logger.error({ e }, 'Erro ao carregar dados:');
     } finally {
       setLoading(false);
     }
@@ -152,7 +153,7 @@ export default function TasksPage() {
         alert('Tarefa criada com sucesso!');
       }
     } catch (e) {
-      console.error('Erro ao criar tarefa:', e);
+      logger.error({ e }, 'Erro ao criar tarefa:');
     }
   };
 

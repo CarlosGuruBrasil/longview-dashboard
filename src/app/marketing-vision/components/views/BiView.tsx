@@ -12,6 +12,7 @@ import {
 import GlassCard from '../ui/GlassCard'
 import type { BiInsights } from '../../types'
 import { formatCurrency, formatNumber } from '../../utils/formatters'
+import logger from '@/lib/logger'
 
 const TICK = '#71717a'
 const GRID = 'rgba(255,255,255,0.05)'
@@ -256,7 +257,7 @@ export default function BiView() {
       const json = await res.json()
       setData(json)
     } catch (e) {
-      console.error('[BiView] fetch error:', e)
+      logger.error({ e }, '[BiView] fetch error:')
     } finally {
       setLoading(false)
     }
