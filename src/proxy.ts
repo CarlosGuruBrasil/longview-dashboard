@@ -35,7 +35,6 @@ export function proxy(request: NextRequest) {
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api/auth') || // rotas de api de auth (/api/auth/login)
-    pathname === '/api/cv/webhook'         || // webhooks do CV CRM (legado) — acesso externo
     pathname === '/api/webhooks/cvcrm'     || // webhooks do CV CRM (grava leads) — acesso externo
     pathname === '/api/meta/webhook'       || // webhooks do Meta Lead Ads — acesso externo
     pathname === '/api/webhooks/construpoint' || // webhooks do Construpoint — acesso externo

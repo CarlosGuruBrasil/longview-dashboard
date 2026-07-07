@@ -140,7 +140,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       semConexao: {
-        webhookUrl:    `${request.nextUrl.origin || 'https://app.guru.dev.br'}/api/cv/webhook`,
+        webhookUrl:    `${request.nextUrl.origin || 'https://app.guru.dev.br'}/api/webhooks/cvcrm`,
         lastReceived:  get(cvWebhookLast),
         totalDisparos: get(cvSemConexaoCount) || 0,
         todayCount:    cvToday,
