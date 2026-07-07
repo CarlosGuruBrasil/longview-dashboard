@@ -5,8 +5,8 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recha
 import logger from '@/lib/logger'
 
 interface Venda {
-  EMPREENDIMENTO?: string;
-  VGV?: string | number;
+  empreendimento?: string;
+  valor_contrato?: string | number;
 }
 
 export default function PerformanceEmpreendimentoView() {
@@ -22,9 +22,9 @@ export default function PerformanceEmpreendimentoView() {
 
       const agg: Record<string, { vgv: number; vendas: number }> = {};
       vendas.forEach((v) => {
-        const name = v.EMPREENDIMENTO ?? 'Sem empreendimento';
+        const name = v.empreendimento ?? 'Sem empreendimento';
         if (!agg[name]) agg[name] = { vgv: 0, vendas: 0 };
-        agg[name].vgv += parseFloat(String(v.VGV ?? 0));
+        agg[name].vgv += parseFloat(String(v.valor_contrato ?? 0));
         agg[name].vendas += 1;
       });
 

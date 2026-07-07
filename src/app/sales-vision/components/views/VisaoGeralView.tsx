@@ -23,18 +23,18 @@ export default function VisaoGeralView() {
       const json = await res.json();
       const vendas = json.vendas ?? [];
       const totalVendas = vendas.length;
-      const vgvTotal = vendas.reduce((s: number, v: { VGV?: string | number }) => s + (parseFloat(String(v.VGV ?? 0)) || 0), 0);
+      const vgvTotal = vendas.reduce((s: number, v: { valor_contrato?: string | number }) => s + (parseFloat(String(v.valor_contrato ?? 0)) || 0), 0);
       const ticketMedio = totalVendas > 0 ? vgvTotal / totalVendas : 0;
 
       const now = new Date();
       const mesAtual = now.getMonth();
       const anoAtual = now.getFullYear();
-      const vendasMes = vendas.filter((v: { DATA?: string }) => {
-        if (!v.DATA) return false;
-        const d = new Date(v.DATA);
+      const vendasMes = vendas.filter((v: { data_venda?: string }) => {
+        if (!v.data_venda) return false;
+        const d = new Date(v.data_venda);
         return d.getMonth() === mesAtual && d.getFullYear() === anoAtual;
       });
-      const vgvMes = vendasMes.reduce((s: number, v: { VGV?: string | number }) => s + (parseFloat(String(v.VGV ?? 0)) || 0), 0);
+      const vgvMes = vendasMes.reduce((s: number, v: { valor_contrato?: string | number }) => s + (parseFloat(String(v.valor_contrato ?? 0)) || 0), 0);
 
       setData({
         vgvTotal,

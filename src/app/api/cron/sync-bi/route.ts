@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sql, ensureSchema } from '@/lib/pg';
 import { isCronAuthorized, unauthorizedJson } from '@/lib/internal-auth';
 import axios from 'axios';
+import logger from '@/lib/logger';
 
 export const maxDuration = 300;
 export const runtime = 'nodejs';
@@ -68,14 +69,15 @@ async function upsertDimCampanhasMeta(): Promise<number> {
     const rows = await sql`
       INSERT INTO dim_campanhas_meta (id_campanha, nome)
       SELECT DISTINCT
-        COALESCE(NULLIF(midia_principal, ''), 'unknown'),
-        COALESCE(NULLIF(midia_principal, ''), 'Desconhecida')
+        COALESCE(NULLIF(raw->>'midia_principal', ''), 'unknown'),
+        COALESCE(NULLIF(raw->>'midia_principal', ''), 'Desconhecida')
       FROM leads
-      WHERE midia_principal IS NOT NULL AND midia_principal != ''
+      WHERE raw->>'midia_principal' IS NOT NULL AND raw->>'midia_principal' != ''
       ON CONFLICT (id_campanha) DO NOTHING
     `;
     return rows.count ?? 0;
-  } catch {
+  } catch (err: unknown) {
+    logger.error({ err }, '[sync-bi] erro no upsertDimCampanhasMeta:');
     return 0;
   }
 }
@@ -240,8 +242,13 @@ async function upsertFatoAtribuicao(): Promise<number> {
       cpl, cac, roas
     )
     SELECT
-      COALESCE(NULLIF(l.midia, ''), 'Sem origem')   AS id_campanha,
-      COALESCE(dc.nome, NULLIF(l.midia, ''), 'Sem origem') AS nome_campanha,
+      COALESCE(l.raw->'_meta'->>'campaign_id', l.raw->>'campaign_id', 'Sem origem') AS id_campanha,
+      COALESCE(
+        dc.nome,
+        NULLIF(l.raw->'_meta'->>'campaign_name', ''),
+        NULLIF(l.raw->>'campaign_name', ''),
+        'Sem origem'
+      ) AS nome_campanha,
       l.data_cadastro                               AS data,
       COALESCE(SUM(mp.spend), 0)                    AS spend,
       COALESCE(SUM(mp.impressions), 0)              AS impressions,
@@ -266,15 +273,23 @@ async function upsertFatoAtribuicao(): Promise<number> {
         ELSE 0 END                                  AS roas
     FROM fato_leads l
     LEFT JOIN fato_midia_paga mp
-           ON mp.id_campanha = COALESCE(NULLIF(l.midia, ''), 'Sem origem')
+           ON mp.id_campanha = COALESCE(l.raw->'_meta'->>'campaign_id', l.raw->>'campaign_id', 'Sem origem')
           AND mp.data = l.data_cadastro
     LEFT JOIN dim_campanhas_meta dc
-           ON dc.id_campanha = COALESCE(NULLIF(l.midia, ''), 'Sem origem')
+           ON dc.id_campanha = COALESCE(l.raw->'_meta'->>'campaign_id', l.raw->>'campaign_id', 'Sem origem')
     LEFT JOIN fato_vendas fv
            ON fv.data_venda = l.data_venda
           AND l.data_venda IS NOT NULL
     WHERE l.data_cadastro IS NOT NULL
-    GROUP BY l.midia, dc.nome, l.data_cadastro
+    GROUP BY
+      COALESCE(l.raw->'_meta'->>'campaign_id', l.raw->>'campaign_id', 'Sem origem'),
+      COALESCE(
+        dc.nome,
+        NULLIF(l.raw->'_meta'->>'campaign_name', ''),
+        NULLIF(l.raw->>'campaign_name', ''),
+        'Sem origem'
+      ),
+      l.data_cadastro
     ON CONFLICT DO NOTHING
   `;
   return result.count ?? 0;

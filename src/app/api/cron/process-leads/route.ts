@@ -175,9 +175,7 @@ async function sendToRD(lead: MetaLead, score: number): Promise<boolean> {
 }
 
 export async function GET(request: NextRequest) {
-  if (!isCronRequest(request)) {
-    return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-  }
+  return NextResponse.json({ ok: true, message: 'Cron desativada — fluxo processado via webhook em tempo real.' });
 
   const startedAt = new Date().toISOString();
   const log: string[]  = [];
@@ -255,9 +253,9 @@ export async function GET(request: NextRequest) {
         processedSet.add(lead.id);
 
         log.push(`[OK] Lead ${lead.id} — score ${score} (${tier.label}) — RD: ${rdOk ? 'ok' : 'skip'}`);
-      } catch (err) {
+      } catch (err: any) {
         stats.errors++;
-        log.push(`[ERR] Lead ${lead.id}: ${err instanceof Error ? err.message : err}`);
+        log.push(`[ERR] Lead ${lead.id}: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
 
@@ -283,7 +281,7 @@ export async function GET(request: NextRequest) {
     logger.info({ stats }, '[cron/process-leads]');
 
     return NextResponse.json({ ...stats, log });
-  } catch (err) {
+  } catch (err: any) {
     const msg = err instanceof Error ? err.message : String(err);
     stats.error      = msg;
     stats.finishedAt = new Date().toISOString();

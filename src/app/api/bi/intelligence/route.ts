@@ -2,7 +2,7 @@
  * GET /api/bi/intelligence
  *
  * Marketing Intelligence Engine
- * Cruza dados reais de: Meta Ads (cache) × CRM (leads) × CVDW (vendas)
+ * Cruza dados reais de: Meta Ads (cache) × CRM (leads) × cv_vendas (reservas)
  * Produz atribuição de campanhas, ROAS real, inteligência por empreendimento,
  * análise de redes sociais, e recomendações de investimento.
  */

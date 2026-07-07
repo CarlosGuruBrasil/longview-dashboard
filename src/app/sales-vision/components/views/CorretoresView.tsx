@@ -4,9 +4,9 @@ import { RefreshCw, TrendingUp, DollarSign, Users } from 'lucide-react';
 import logger from '@/lib/logger'
 
 interface Venda {
-  CORRETOR?: string;
-  VGV?: string | number;
-  EMPREENDIMENTO?: string;
+  corretor?: string;
+  valor_contrato?: string | number;
+  empreendimento?: string;
 }
 
 export default function CorretoresView() {
@@ -22,9 +22,9 @@ export default function CorretoresView() {
 
       const agg: Record<string, { vgv: number; vendas: number }> = {};
       vendas.forEach((v) => {
-        const name = v.CORRETOR ?? 'Sem corretor';
+        const name = v.corretor ?? 'Sem corretor';
         if (!agg[name]) agg[name] = { vgv: 0, vendas: 0 };
-        agg[name].vgv += parseFloat(String(v.VGV ?? 0));
+        agg[name].vgv += parseFloat(String(v.valor_contrato ?? 0));
         agg[name].vendas += 1;
       });
 

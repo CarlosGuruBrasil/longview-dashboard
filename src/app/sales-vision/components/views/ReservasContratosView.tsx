@@ -4,16 +4,16 @@ import { RefreshCw, Search } from 'lucide-react';
 import logger from '@/lib/logger'
 
 interface Venda {
-  ID?: string;
-  DATA?: string;
-  CLIENTE?: string;
-  EMAIL?: string;
-  TELEFONE?: string;
-  EMPREENDIMENTO?: string;
-  UNIDADE?: string;
-  VGV?: string | number;
-  STATUS?: string;
-  CORRETOR?: string;
+  idreserva?: string | number;
+  data_venda?: string;
+  cliente?: string;
+  email?: string;
+  telefone?: string;
+  empreendimento?: string;
+  unidade?: string;
+  valor_contrato?: string | number;
+  status?: string;
+  corretor?: string;
 }
 
 export default function ReservasContratosView() {
@@ -39,10 +39,10 @@ export default function ReservasContratosView() {
   const filtered = vendas.filter((v) => {
     if (!search) return true;
     const q = search.toLowerCase();
-    return (v.CLIENTE?.toLowerCase() ?? '').includes(q)
-      || (v.EMPREENDIMENTO?.toLowerCase() ?? '').includes(q)
-      || (v.CORRETOR?.toLowerCase() ?? '').includes(q)
-      || (v.UNIDADE?.toLowerCase() ?? '').includes(q);
+    return (v.cliente?.toLowerCase() ?? '').includes(q)
+      || (v.empreendimento?.toLowerCase() ?? '').includes(q)
+      || (v.corretor?.toLowerCase() ?? '').includes(q)
+      || (v.unidade?.toLowerCase() ?? '').includes(q);
   });
 
   const formatCurrency = (v: number) =>
@@ -95,13 +95,13 @@ export default function ReservasContratosView() {
               <tr><td colSpan={6} className="p-8 text-center text-zinc-500">Nenhuma venda encontrada.</td></tr>
             ) : (
               filtered.map((v, i) => (
-                <tr key={v.ID ?? i} className="hover:bg-white/[0.02] transition-colors">
-                  <td className="p-3 text-zinc-300">{v.DATA ? new Date(v.DATA).toLocaleDateString('pt-BR') : '-'}</td>
-                  <td className="p-3 text-white font-semibold">{v.CLIENTE ?? '-'}</td>
-                  <td className="p-3 text-zinc-300">{v.EMPREENDIMENTO ?? '-'}</td>
-                  <td className="p-3 text-zinc-300">{v.UNIDADE ?? '-'}</td>
-                  <td className="p-3 text-right text-emerald-400 font-semibold">{v.VGV ? formatCurrency(parseFloat(String(v.VGV))) : '-'}</td>
-                  <td className="p-3 text-zinc-300">{v.CORRETOR ?? '-'}</td>
+                <tr key={v.idreserva ?? i} className="hover:bg-white/[0.02] transition-colors">
+                  <td className="p-3 text-zinc-300">{v.data_venda ? new Date(v.data_venda).toLocaleDateString('pt-BR') : '-'}</td>
+                  <td className="p-3 text-white font-semibold">{v.cliente ?? '-'}</td>
+                  <td className="p-3 text-zinc-300">{v.empreendimento ?? '-'}</td>
+                  <td className="p-3 text-zinc-300">{v.unidade ?? '-'}</td>
+                  <td className="p-3 text-right text-emerald-400 font-semibold">{v.valor_contrato ? formatCurrency(parseFloat(String(v.valor_contrato))) : '-'}</td>
+                  <td className="p-3 text-zinc-300">{v.corretor ?? '-'}</td>
                 </tr>
               ))
             )}

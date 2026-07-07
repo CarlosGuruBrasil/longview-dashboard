@@ -95,40 +95,5 @@ export async function GET(request: NextRequest) {
     errors.push('meta: ' + errorMessage(e));
   }
 
-  // ---------- ESTOQUE ----------
-  try {
-    const headers = { email: CV_EMAIL, token: CV_TOKEN, Accept: 'application/json' };
-    const projRes = await axios.get(
-      'https://longviewempreendimentos.cvcrm.com.br/api/v1/cadastros/empreendimentos',
-      { headers, timeout: 15000 }
-    );
-    const projects = Array.isArray(projRes.data) ? projRes.data as ProjectResponse[] : [];
-    const ids = projects.map((p) => p.idempreendimento).filter(isId);
-
-    const estoqueResults = await Promise.allSettled(
-      ids.map((id) => {
-        const idText = String(id);
-        return (
-        axios.get(`https://longviewempreendimentos.cvcrm.com.br/api/v1/cadastros/empreendimentos/${id}`,
-          { params: { limite_dados_unidade: 1000 }, headers, timeout: 15000 }
-        ).then(r => ({ id: idText, data: r.data }))
-        );
-      })
-    );
-
-    const estoqueMap: Record<string, unknown> = {};
-    estoqueResults.forEach((r) => {
-      if (r.status === 'fulfilled') estoqueMap[r.value.id] = r.value.data;
-    });
-
-    await sql`
-      INSERT INTO project_state (key, data) VALUES ('estoque_cache', ${{ projects, estoque: estoqueMap, updatedAt: new Date().toISOString() } as never})
-      ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data
-    `;
-    logger.info('[sync-dashboard] Estoque cache atualizado');
-  } catch (e: unknown) {
-    errors.push('estoque: ' + errorMessage(e));
-  }
-
   return NextResponse.json({ ok: true, errors, updatedAt: new Date().toISOString() });
 }
