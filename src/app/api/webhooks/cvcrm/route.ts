@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parseCrmDate } from '@/lib/dateUtils';
 import logger from '@/lib/logger'
+import type { CAPIEvent } from '@/app/api/meta/capi/route';
 
 type NamedValue = {
   nome?: string;
@@ -214,6 +215,47 @@ export async function POST(request: NextRequest) {
     `;
 
     logger.info(`[webhook/cvcrm] lead ${id} upserted (${statusNomeV ?? '?'})`);
+
+    // ── CAPI: envia evento de etapa ao pixel da Meta ─────────────────────
+    if (statusNomeV) {
+      try {
+        const s = statusNomeV.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+        let eventName: string | null = null;
+        let eventValue: number | undefined;
+
+        if (s.includes('atendimento') || s.includes('contato') || s.includes('primeiro contato'))
+          eventName = 'Contact';
+        else if (s.includes('visita') || s.includes('visitou'))
+          eventName = 'ViewContent';
+        else if (s.includes('proposta') || s.includes('negociacao') || s.includes('negociando'))
+          eventName = 'InitiateCheckout';
+        else if (s.includes('reserva') || s.includes('reservado')) {
+          eventName = 'InitiateCheckout';
+          const v = parseFloat(String(full.valor_venda ?? 0));
+          if (v > 0) eventValue = v;
+        } else if (s.includes('venda') || s.includes('negocio ganho') || s.includes('negócio ganho')) {
+          eventName = 'Purchase';
+          const v = parseFloat(String(full.valor_venda ?? 0));
+          if (v > 0) eventValue = v;
+        }
+
+        if (eventName) {
+          const capiEvent: CAPIEvent = {
+            event_name:  eventName,
+            event_id:    `cvcrm_${id}_${eventName}`,
+            email:       full.email ?? undefined,
+            phone:       full.telefone ?? full.celular ?? undefined,
+            first_name:  full.nome ?? undefined,
+            value:       eventValue,
+          };
+          import('@/app/api/meta/capi/route').then(({ sendCAPIEvents }) => {
+            sendCAPIEvents([capiEvent]).catch(() =>
+              logger.warn(`[webhook/cvcrm] CAPI ${eventName} falhou para lead ${id}`)
+            );
+          });
+        }
+      } catch { /* nunca bloqueia o webhook */ }
+    }
 
     // ── Notificação FCM: nova venda realizada ────────────────────────────
     const statusNome = (statusNomeV ?? '').toLowerCase();
