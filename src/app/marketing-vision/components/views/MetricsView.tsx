@@ -50,7 +50,7 @@ export default function MetricsView() {
     const map = new Map<string, MediaStatRow>()
     for (const l of filteredLeads) {
       const c = l.corretor
-      const cName = typeof c === 'object' && c ? c.nome : (typeof c === 'string' ? c : 'Sem Corretor')
+      const cName = String((typeof c === 'object' && c ? c.nome : c) || 'Sem Corretor')
       const key = cName.toLowerCase().trim()
       const stats = map.get(key) ?? { name: cName, leads: 0, atend: 0, visita: 0, proposta: 0, vendas: 0 }
       stats.leads++
@@ -71,7 +71,7 @@ export default function MetricsView() {
     const map = new Map<string, MediaStatRow>()
     for (const l of filteredLeads) {
       const imob = l.imobiliaria
-      const iName = typeof imob === 'object' && imob ? imob.nome : (typeof imob === 'string' ? imob : 'Sem Imobiliária')
+      const iName = String((typeof imob === 'object' && imob ? imob.nome : imob) || 'Sem Imobiliária')
       const key = iName.toLowerCase().trim()
       const stats = map.get(key) ?? { name: iName, leads: 0, atend: 0, visita: 0, proposta: 0, vendas: 0 }
       stats.leads++

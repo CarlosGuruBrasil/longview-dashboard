@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { TrendingUp, DollarSign, Target, AlertTriangle, Lightbulb, Users, BarChart3, ThumbsUp, MessageCircle, Globe } from 'lucide-react'
+import { TrendingUp, DollarSign, Target, AlertTriangle, Lightbulb, Users, BarChart3, ThumbsUp, MessageCircle, Globe, Search } from 'lucide-react'
+import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts'
 import GlassCard from '../ui/GlassCard'
 import logger from '@/lib/logger'
 
@@ -50,6 +51,7 @@ interface IntelData {
   socialMedia: { totalPosts: number; totalEngagement: number; avgEngagementRate: number; bestPost: SocialPost | null; posts?: SocialPost[]; postsByPlatform: { facebook: number; instagram: number } }
   audience: AudienceItem[]
   investmentRecommendations: { campanhasParaEscalar: string[]; campanhasParaPausar: string[]; canaisMaisEficientes: string[]; oportunidadesIdentificadas: string[] }
+  monthlyPerformance?: Array<{ period: string; spend: number; leads: number }>
 }
 
 function fmt(v: number) { return v.toLocaleString('pt-BR', { maximumFractionDigits: 0 }) }
@@ -78,7 +80,7 @@ function CampaignRow({ c }: { c: CampaignAttr }) {
   const roasColor = c.roas >= 2 ? '#10b981' : c.roas >= 1 ? '#f59e0b' : '#ef4444'
   return (
     <tr className="border-t border-white/5 hover:bg-white/5 transition-colors text-xs">
-      <td className="py-2 px-2 max-w-[180px] truncate text-zinc-100">{c.campaignName}</td>
+      <td className="py-2 px-2 max-w-[180px] truncate text-zinc-100" title={c.campaignName}>{c.campaignName}</td>
       <td className="py-2 px-2">
         <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${c.status === 'ACTIVE' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-500/20 text-zinc-400'}`}>
           {c.status}
@@ -102,6 +104,11 @@ export default function IntelligenceView() {
   const [campaignSort, setCampaignSort] = useState<'roas' | 'spend' | 'leadsInCrm'>('roas')
   const [postSort, setPostSort] = useState<'recent' | 'engagement'>('engagement')
   const [activeTab, setActiveTab] = useState<'attribution' | 'social' | 'audience' | 'devs'>('attribution')
+
+  // Filtros locais da listagem de campanhas
+  const [campaignSearch, setCampaignSearch] = useState('')
+  const [campaignStatus, setCampaignStatus] = useState('all')
+  const [showOnlySales, setShowOnlySales] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -131,14 +138,27 @@ export default function IntelligenceView() {
     )
   }
 
-  const { summary, campaignAttribution, developmentIntelligence, channelPerformance, socialMedia, audience, investmentRecommendations } = data
+  const { summary, campaignAttribution, developmentIntelligence, channelPerformance, socialMedia, audience, investmentRecommendations, monthlyPerformance } = data
 
-  // Sort campaigns
-  const sortedCampaigns = [...campaignAttribution].sort((a, b) => {
-    if (campaignSort === 'roas') return b.roas - a.roas
-    if (campaignSort === 'spend') return b.spend - a.spend
-    return b.leadsInCrm - a.leadsInCrm
-  })
+  // Sort and filter campaigns
+  const sortedCampaigns = [...campaignAttribution]
+    .filter(c => {
+      const matchesSearch = c.campaignName.toLowerCase().includes(campaignSearch.toLowerCase())
+      const matchesStatus = campaignStatus === 'all' || c.status === campaignStatus
+      const matchesSales = !showOnlySales || c.salesInCrm > 0
+      return matchesSearch && matchesStatus && matchesSales
+    })
+    .sort((a, b) => {
+      // ACTIVE primeiro
+      const aActive = a.status === 'ACTIVE' ? 1 : 0
+      const bActive = b.status === 'ACTIVE' ? 1 : 0
+      if (aActive !== bActive) return bActive - aActive
+
+      // Critério secundário do usuário
+      if (campaignSort === 'roas') return b.roas - a.roas
+      if (campaignSort === 'spend') return b.spend - a.spend
+      return b.leadsInCrm - a.leadsInCrm
+    })
 
   // Best/worst devs
   const topDev = developmentIntelligence[0]
@@ -154,6 +174,62 @@ export default function IntelligenceView() {
         <StatBox label="Vendas" value={fmt(summary.totalSales)} sub={`Receita: ${fmtK(summary.totalRevenue)}`} color="#10b981" />
         <StatBox label="ROAS Geral" value={summary.overallRoas > 0 ? `${summary.overallRoas.toFixed(1)}x` : '—'} sub={summary.overallRoas >= 2 ? '✅ Acima da meta (2x)' : summary.overallRoas > 0 ? '⚠ Abaixo da meta' : 'Sem dados'} color={summary.overallRoas >= 2 ? '#10b981' : '#f59e0b'} />
       </div>
+
+      {/* Gráfico Histórico de Investimento x Geração de Leads */}
+      {monthlyPerformance && monthlyPerformance.length > 0 && (
+        <GlassCard title="Histórico de Investimento vs Geração de Leads (Mês a Mês)">
+          <div className="h-[280px] w-full mt-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={monthlyPerformance} margin={{ top: 10, right: 10, left: 10, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                <XAxis
+                  dataKey="period"
+                  stroke="#71717a"
+                  fontSize={10}
+                  tickLine={false}
+                  tickFormatter={(val) => {
+                    const parts = val.split('-');
+                    if (parts.length === 2) {
+                      const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+                      const mIdx = parseInt(parts[1]) - 1;
+                      return `${months[mIdx] ?? parts[1]}/${parts[0].slice(2)}`;
+                    }
+                    return val;
+                  }}
+                />
+                <YAxis
+                  yAxisId="left"
+                  stroke="#f59e0b"
+                  fontSize={10}
+                  tickLine={false}
+                  tickFormatter={(val) => `R$${Math.round(val / 1000)}k`}
+                />
+                <YAxis
+                  yAxisId="right"
+                  orientation="right"
+                  stroke="#0ea5e9"
+                  fontSize={10}
+                  tickLine={false}
+                />
+                <Tooltip
+                  contentStyle={{ background: '#18181b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px' }}
+                  labelStyle={{ color: '#f4f4f5', fontSize: '11px', fontWeight: 'bold' }}
+                  itemStyle={{ fontSize: '11px' }}
+                  formatter={(value: any, name: any) => {
+                    if (name === 'Investimento') {
+                      return [value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), 'Investimento'];
+                    }
+                    return [value, 'Leads CRM'];
+                  }}
+                />
+                <Legend verticalAlign="top" height={36} iconSize={10} wrapperStyle={{ fontSize: '11px' }} />
+                <Bar yAxisId="left" dataKey="spend" name="Investimento" fill="#f59e0b" fillOpacity={0.15} stroke="#f59e0b" radius={[4, 4, 0, 0]} />
+                <Line yAxisId="right" type="monotone" dataKey="leads" name="Leads Gerados" stroke="#0ea5e9" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </GlassCard>
+      )}
 
       {/* Investment Recommendations */}
       {investmentRecommendations.oportunidadesIdentificadas.length > 0 && (
@@ -213,26 +289,67 @@ export default function IntelligenceView() {
       {/* Tab: Campaign Attribution */}
       {activeTab === 'attribution' && (
         <div className="flex flex-col gap-4">
-          {/* Sort toggles */}
-          <div className="flex items-center gap-2 text-xs">
-            <span className="text-zinc-500">Ordenar por:</span>
-            {([
-              { key: 'roas' as const, label: 'ROAS' },
-              { key: 'spend' as const, label: 'Gasto' },
-              { key: 'leadsInCrm' as const, label: 'Leads' },
-            ]).map(({ key, label }) => (
-              <button
-                key={key}
-                onClick={() => setCampaignSort(key)}
-                className={`px-2 py-1 rounded-md transition-colors ${
-                  campaignSort === key
-                    ? 'bg-orange-500/20 text-orange-400 font-semibold'
-                    : 'bg-white/5 text-zinc-400 hover:text-zinc-200'
-                }`}
+          
+          {/* Barra de Filtros Locais das Campanhas */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white/[0.02] border border-white/5 p-3 rounded-xl">
+            <div className="flex items-center gap-3 flex-1 flex-wrap">
+              {/* Busca por texto */}
+              <div className="relative flex-1 min-w-[200px]">
+                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
+                <input
+                  type="text"
+                  placeholder="Buscar campanha..."
+                  value={campaignSearch}
+                  onChange={e => setCampaignSearch(e.target.value)}
+                  className="w-full h-8 pl-8 pr-3 text-xs bg-white/[0.04] border border-white/[0.09] rounded-lg text-zinc-200 focus:outline-none focus:border-orange-500/40"
+                />
+              </div>
+
+              {/* Filtro de Status */}
+              <select
+                value={campaignStatus}
+                onChange={e => setCampaignStatus(e.target.value)}
+                className="h-8 px-2 text-xs bg-[#121214] border border-white/[0.09] rounded-lg text-zinc-300 focus:outline-none cursor-pointer"
               >
-                {label}
-              </button>
-            ))}
+                <option value="all">Todos os Status</option>
+                <option value="ACTIVE">Ativas (ACTIVE)</option>
+                <option value="PAUSED">Pausadas (PAUSED)</option>
+                <option value="ARCHIVED">Arquivadas</option>
+              </select>
+
+              {/* Checkbox Apenas com Vendas */}
+              <label className="flex items-center gap-1.5 text-xs text-zinc-400 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={showOnlySales}
+                  onChange={e => setShowOnlySales(e.target.checked)}
+                  className="rounded border-zinc-700 bg-zinc-800 text-orange-500 focus:ring-0 focus:ring-offset-0 w-3.5 h-3.5"
+                />
+                <span>Apenas com vendas</span>
+              </label>
+            </div>
+
+            {/* Ordenação */}
+            <div className="flex items-center gap-2 text-xs shrink-0">
+              <span className="text-zinc-500">Ordenar por:</span>
+              {([
+                { key: 'roas' as const, label: 'ROAS' },
+                { key: 'spend' as const, label: 'Gasto' },
+                { key: 'leadsInCrm' as const, label: 'Leads' },
+              ]).map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setCampaignSort(key)}
+                  className={`px-2 py-1 rounded-md transition-colors ${
+                    campaignSort === key
+                      ? 'bg-orange-500/20 text-orange-400 font-semibold'
+                      : 'bg-white/5 text-zinc-400 hover:text-zinc-200'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Campaign table */}

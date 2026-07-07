@@ -31,10 +31,16 @@ function unique(values: (string | undefined | null)[]): string[] {
   return Array.from(new Set(values.filter((v): v is string => Boolean(v)))).sort();
 }
 
-// ── Chip base classes ────────────────────────────────────────────────────────
 const chip     = 'shrink-0 h-9 px-3 rounded-full text-[13px] font-medium transition-all [color-scheme:dark]';
 const chipIdle = `${chip} border border-white/12 bg-white/[0.03] text-zinc-400 focus:outline-none focus:border-white/30`;
 const chipActive = `${chip} bg-white/90 text-zinc-900 border-transparent`;
+
+function renderIdleBadge(days: number) {
+  if (days <= 0) return <span className="text-[10px] text-zinc-500">ativo</span>
+  if (days <= 10) return <span className="text-[10px] text-zinc-400 font-medium">{days}d ativo</span>
+  if (days <= 30) return <span className="text-[10px] text-amber-400 font-semibold bg-amber-500/10 px-1.5 py-0.5 rounded-md border border-amber-500/20">⏱ {days}d parado</span>
+  return <span className="text-[10px] text-red-400 font-bold bg-red-500/10 px-1.5 py-0.5 rounded-md border border-red-500/20 animate-pulse">⚠️ {days}d parado!</span>
+}
 
 export default function LeadsTable({
   leads,
@@ -378,6 +384,11 @@ export default function LeadsTable({
           const id     = lead.idlead ?? lead.id;
           const sc     = getStatusColor(lead);
           const rawDate = lead.data_cad || lead.data_cadastro || lead.data_cadastramento;
+
+          const hasComments = Array.isArray(lead.interacao) && lead.interacao.length > 0;
+          const lastUpdate = lead.data_atualizacao || lead.data_cadastro || lead.data_cad || '';
+          const daysIdle = lastUpdate ? Math.floor((Date.now() - new Date(lastUpdate).getTime()) / (1000 * 60 * 60 * 24)) : 0;
+
           return (
             <div
               key={id ?? idx}
@@ -385,8 +396,13 @@ export default function LeadsTable({
               className="rounded-xl border border-white/10 bg-white/5 p-3 flex flex-col gap-1.5 cursor-pointer active:bg-white/10"
             >
               <div className="flex items-start justify-between gap-2">
-                <span className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                <span className="text-sm font-semibold truncate flex items-center gap-1.5" style={{ color: 'var(--text-primary)' }}>
                   {lead.nome || '-'}
+                  {!hasComments && (
+                    <span className="text-[9px] font-bold text-red-400 bg-red-500/10 border border-red-500/20 rounded px-1.5 py-0.5 shrink-0" title="Sem interações ou comentários do corretor">
+                      💬 Sem coment.
+                    </span>
+                  )}
                 </span>
                 {lead.situacao?.nome && (
                   <span
@@ -397,11 +413,12 @@ export default function LeadsTable({
                   </span>
                 )}
               </div>
-              <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs" style={{ color: 'var(--text-secondary)' }}>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs" style={{ color: 'var(--text-secondary)' }}>
                 <span>{formatDate(toISODate(rawDate))}</span>
                 <span>{getOrigin(lead)}</span>
                 {lead.corretor?.nome && <span>{lead.corretor.nome}</span>}
                 {lead.empreendimento?.[0]?.nome && <span>{lead.empreendimento[0].nome}</span>}
+                {renderIdleBadge(daysIdle)}
               </div>
             </div>
           );
@@ -413,7 +430,7 @@ export default function LeadsTable({
         <table className="w-full text-xs border-collapse">
           <thead>
             <tr className="border-b border-white/10 bg-white/5">
-              {['Nome', 'Cadastro', 'Origem', 'Etapa', 'Corretor', 'Gestor', 'Imobiliária', 'Empreendimento', 'Tags'].map((col) => (
+              {['Nome', 'Tempo Parado', 'Cadastro', 'Origem', 'Etapa', 'Corretor', 'Gestor', 'Imobiliária', 'Empreendimento', 'Tags'].map((col) => (
                 <th
                   key={col}
                   className="text-left px-3 py-2.5 font-semibold whitespace-nowrap"
@@ -431,10 +448,24 @@ export default function LeadsTable({
               const sc     = getStatusColor(lead);
               const rawDate = lead.data_cad || lead.data_cadastro || lead.data_cadastramento;
 
-              const RowContent = (
+               const hasComments = Array.isArray(lead.interacao) && lead.interacao.length > 0;
+               const lastUpdate = lead.data_atualizacao || lead.data_cadastro || lead.data_cad || '';
+               const daysIdle = lastUpdate ? Math.floor((Date.now() - new Date(lastUpdate).getTime()) / (1000 * 60 * 60 * 24)) : 0;
+
+               const RowContent = (
                 <>
                   <td className="px-3 py-2 whitespace-nowrap font-medium max-w-[160px] truncate" style={{ color: 'var(--text-primary)' }}>
-                    {lead.nome || '-'}
+                    <div className="flex items-center gap-1.5">
+                      <span className="truncate">{lead.nome || '-'}</span>
+                      {!hasComments && (
+                        <span className="text-[9px] font-bold text-red-400 bg-red-500/10 border border-red-500/20 rounded px-1.5 py-0.5 shrink-0" title="Sem interações ou comentários do corretor">
+                          💬 Sem coment.
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-3 py-2 whitespace-nowrap">
+                    {renderIdleBadge(daysIdle)}
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>
                     {formatDate(toISODate(rawDate))}
@@ -490,7 +521,7 @@ export default function LeadsTable({
             })}
             {displayed.length === 0 && (
               <tr>
-                <td colSpan={9} className="text-center py-8 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                <td colSpan={10} className="text-center py-8 text-sm" style={{ color: 'var(--text-secondary)' }}>
                   Nenhum lead encontrado com os filtros aplicados.
                 </td>
               </tr>

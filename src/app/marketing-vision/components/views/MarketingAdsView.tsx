@@ -186,19 +186,56 @@ export default function MarketingAdsView() {
 
       {activeTab === 'dashboard' ? (
         <div className="flex flex-col gap-6">
-          {/* KPI Row */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <KpiCard icon={DollarSign} label="Investimento" value={formatCurrency(spend)} color="#f59e0b" />
-            <KpiCard icon={Users} label="Alcance" value={reach.toLocaleString('pt-BR')} color="#0ea5e9" />
-            <KpiCard icon={Eye} label="Impressões" value={impressions.toLocaleString('pt-BR')} color="#a855f7" />
-            <KpiCard icon={MousePointerClick} label="Cliques" value={clicks.toLocaleString('pt-BR')} color="#10b981" />
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <KpiCard icon={DollarSign} label="CPM" value={formatCurrency(cpm)} color="#f59e0b" />
-            <KpiCard icon={DollarSign} label="CPC" value={formatCurrency(cpc)} color="#f43f5e" />
-            <KpiCard icon={TrendingUp} label="CTR" value={`${ctr.toFixed(2)}%`} color="#06b6d4" />
-            <KpiCard icon={Users} label="Leads Meta" value={metaLeadsFromAds.toLocaleString('pt-BR')} color="#ec4899" />
-          </div>
+          {/* KPI Row com Badges Qualitativas baseadas em Semáforo */}
+          {(() => {
+            const badge = (cls: string, text: string) => (
+              <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wide uppercase ${cls}`}>
+                {text}
+              </span>
+            )
+            const getCtrBadge = (val: number) => {
+              if (val >= 1.5) return badge('bg-green-500/15 text-green-400 border border-green-500/20', 'Excelente CTR')
+              if (val >= 1.0) return badge('bg-sky-500/15 text-sky-400 border border-sky-500/20', 'Bom CTR')
+              if (val >= 0.6) return badge('bg-amber-500/15 text-amber-400 border border-amber-500/20', 'Regular')
+              return badge('bg-red-500/15 text-red-400 border border-red-500/20', 'Crítico / Baixo')
+            }
+            const getCpcBadge = (val: number) => {
+              if (val <= 1.50) return badge('bg-green-500/15 text-green-400 border border-green-500/20', 'Excelente CPC')
+              if (val <= 3.00) return badge('bg-sky-500/15 text-sky-400 border border-sky-500/20', 'Bom CPC')
+              if (val <= 5.00) return badge('bg-amber-500/15 text-amber-400 border border-amber-500/20', 'Regular')
+              return badge('bg-red-500/15 text-red-400 border border-red-500/20', 'Caro CPC')
+            }
+            const getCpmBadge = (val: number) => {
+              if (val <= 20.00) return badge('bg-green-500/15 text-green-400 border border-green-500/20', 'Excelente CPM')
+              if (val <= 40.00) return badge('bg-sky-500/15 text-sky-400 border border-sky-500/20', 'Bom CPM')
+              return badge('bg-amber-500/15 text-amber-400 border border-amber-500/20', 'Caro CPM')
+            }
+            const getCplBadge = (val: number) => {
+              if (val === 0) return badge('bg-zinc-500/15 text-zinc-400 border border-zinc-500/20', 'Sem dados')
+              if (val <= 45.00) return badge('bg-green-500/15 text-green-400 border border-green-500/20', 'Excelente CPL')
+              if (val <= 85.00) return badge('bg-sky-500/15 text-sky-400 border border-sky-500/20', 'Bom CPL')
+              if (val <= 140.00) return badge('bg-amber-500/15 text-amber-400 border border-amber-500/20', 'Regular')
+              return badge('bg-red-500/15 text-red-400 border border-red-500/20', 'Caro CPL')
+            }
+            const metaCpl = metaLeadsFromAds > 0 ? spend / metaLeadsFromAds : 0
+
+            return (
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <KpiCard icon={DollarSign} label="Investimento Meta" value={formatCurrency(spend)} color="#f59e0b" subtitleNode={badge('bg-orange-500/15 text-orange-400 border border-orange-500/20', 'Mídia Paga')} />
+                  <KpiCard icon={Users} label="CPL Médio Meta" value={formatCurrency(metaCpl)} color="#ec4899" subtitleNode={getCplBadge(metaCpl)} />
+                  <KpiCard icon={TrendingUp} label="CTR" value={`${ctr.toFixed(2)}%`} color="#06b6d4" subtitleNode={getCtrBadge(ctr)} />
+                  <KpiCard icon={MousePointerClick} label="CPC" value={formatCurrency(cpc)} color="#f43f5e" subtitleNode={getCpcBadge(cpc)} />
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <KpiCard icon={DollarSign} label="CPM" value={formatCurrency(cpm)} color="#a855f7" subtitleNode={getCpmBadge(cpm)} />
+                  <KpiCard icon={Users} label="Alcance" value={reach.toLocaleString('pt-BR')} color="#0ea5e9" subtitleNode={badge('bg-sky-500/15 text-sky-400 border border-sky-500/20', 'Pessoas')} />
+                  <KpiCard icon={Eye} label="Impressões" value={impressions.toLocaleString('pt-BR')} color="#10b981" subtitleNode={badge('bg-green-500/15 text-green-400 border border-green-500/20', 'Exibições')} />
+                  <KpiCard icon={Users} label="Leads Meta Ads" value={metaLeadsFromAds.toLocaleString('pt-BR')} color="#ec4899" subtitleNode={badge('bg-pink-500/15 text-pink-400 border border-pink-500/20', 'Meta Ads')} />
+                </div>
+              </>
+            )
+          })()}
 
           {/* CRM vs Meta comparison */}
           <GlassCard title="Comparativo CRM × Meta Ads">
@@ -252,145 +289,6 @@ export default function MarketingAdsView() {
               <PieDonutChart title="Por Dispositivo" data={deviceData} />
             )}
           </div>
-
-          {/* Lead Forms table */}
-          {leadForms && leadForms.length > 0 && (
-            <GlassCard title="Formulários de Lead da Meta (Leadgen Forms)">
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr style={{ color: 'var(--text-secondary)' }}>
-                      <th className="text-left py-2 px-3 font-medium">Nome do Formulário</th>
-                      <th className="text-left py-2 px-3 font-medium">ID da Meta</th>
-                      <th className="text-left py-2 px-3 font-medium">Status</th>
-                      <th className="text-left py-2 px-3 font-medium">Leads Cadastrados</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {leadForms.map(f => (
-                      <tr key={f.id} className="border-t border-white/5 hover:bg-white/5 transition-colors" style={{ color: 'var(--text-primary)' }}>
-                        <td className="py-2.5 px-3 font-medium">{f.name}</td>
-                        <td className="py-2.5 px-3 text-zinc-500 font-mono">{f.id}</td>
-                        <td className="py-2.5 px-3">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                            f.status === 'ACTIVE' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-500/20 text-zinc-400'
-                          }`}>
-                            {f.status}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3 text-pink-400 font-bold">{f.leads_count ?? 0}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </GlassCard>
-          )}
-
-          {/* Campaigns table */}
-          <GlassCard
-            title="Campanhas"
-            action={
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setStatusFilter(s => s === 'all' ? 'ACTIVE' : 'all')}
-                  className={`px-2.5 py-1.5 text-xs rounded-lg font-medium transition-colors ${
-                    statusFilter === 'ACTIVE'
-                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                      : 'bg-white/5 text-zinc-400 border border-white/10 hover:bg-white/10'
-                  }`}
-                >
-                  {statusFilter === 'ACTIVE' ? 'Só ativas' : 'Todas'}
-                </button>
-                <div className="relative">
-                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 opacity-40" style={{ color: 'var(--text-primary)' }} />
-                  <input
-                    type="text"
-                    placeholder="Filtrar campanha..."
-                    value={campaignSearch}
-                    onChange={e => setCampaignSearch(e.target.value)}
-                    className="pl-8 pr-3 py-1.5 text-xs rounded-lg bg-white/5 border border-white/10 focus:outline-none focus:border-sky-500/40 w-48"
-                    style={{ color: 'var(--text-primary)' }}
-                  />
-                </div>
-              </div>
-            }
-          >
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr style={{ color: 'var(--text-secondary)' }}>
-                    {[
-                      { label: 'Campanha', field: 'campaign_name' as keyof MetaCampaignInsight },
-                      { label: 'Status', field: null },
-                      { label: 'Gasto', field: 'spend' as keyof MetaCampaignInsight },
-                      { label: 'Impressões', field: 'impressions' as keyof MetaCampaignInsight },
-                      { label: 'Cliques', field: 'clicks' as keyof MetaCampaignInsight },
-                      { label: 'CTR', field: 'ctr' as keyof MetaCampaignInsight },
-                      { label: 'CPM', field: 'cpm' as keyof MetaCampaignInsight },
-                      { label: 'CPC', field: 'cpc' as keyof MetaCampaignInsight },
-                      { label: 'Leads', field: null },
-                    ].map(({ label, field }) => (
-                      <th
-                        key={label}
-                        className={`text-left py-2 px-3 font-medium whitespace-nowrap ${field ? 'cursor-pointer hover:text-white' : ''}`}
-                        onClick={() => field && toggleSort(field)}
-                      >
-                        {label}
-                        {field && sortField === field && (
-                          <span className="ml-1">{sortDir === 'desc' ? '↓' : '↑'}</span>
-                        )}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredCampaigns.length === 0 && (
-                    <tr>
-                      <td colSpan={9} className="py-8 text-center opacity-50" style={{ color: 'var(--text-secondary)' }}>
-                        Nenhuma campanha encontrada
-                      </td>
-                    </tr>
-                  )}
-                  {filteredCampaigns.map(c => {
-                    const leads = Math.round(sumActions(c.actions, 'lead'))
-                    const status = statusById.get(c.campaign_id)
-                    return (
-                      <tr
-                        key={c.campaign_id}
-                        className="border-t border-white/5 hover:bg-white/5 transition-colors"
-                        style={{ color: 'var(--text-primary)' }}
-                      >
-                        <td className="py-2.5 px-3 max-w-[200px] truncate">{c.campaign_name}</td>
-                        <td className="py-2.5 px-3">
-                          {status ? (
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                                status === 'ACTIVE'
-                                  ? 'bg-emerald-500/20 text-emerald-400'
-                                  : 'bg-zinc-500/20 text-zinc-400'
-                              }`}
-                            >
-                              {status}
-                            </span>
-                          ) : (
-                            <span className="opacity-30">—</span>
-                          )}
-                        </td>
-                        <td className="py-2.5 px-3 text-amber-400">{formatCurrency(Number(c.spend ?? 0))}</td>
-                        <td className="py-2.5 px-3">{Number(c.impressions ?? 0).toLocaleString('pt-BR')}</td>
-                        <td className="py-2.5 px-3">{Number(c.clicks ?? 0).toLocaleString('pt-BR')}</td>
-                        <td className="py-2.5 px-3">{Number(c.ctr ?? 0).toFixed(2)}%</td>
-                        <td className="py-2.5 px-3">{formatCurrency(Number(c.cpm ?? 0))}</td>
-                        <td className="py-2.5 px-3">{formatCurrency(Number(c.cpc ?? 0))}</td>
-                        <td className="py-2.5 px-3 text-pink-400 font-semibold">{leads}</td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </GlassCard>
         </div>
       ) : (
         <div className="flex flex-col gap-6">

@@ -33,6 +33,72 @@ export default function LeadsView() {
   const [growthMode, setGrowthMode] = useState<'month' | 'year'>('month')
   const [syncing, setSyncing] = useState(false)
 
+  // Filtros locais independentes para o Gráfico de Crescimento
+  const [growthStart, setGrowthStart] = useState('')
+  const [growthEnd, setGrowthEnd]     = useState('')
+
+  const growthFilteredLeads = useMemo(() => {
+    let result = allLeads
+    if (growthStart || growthEnd) {
+      result = result.filter(l => {
+        const raw = l.data_cad || l.data_cadastro || l.data_cadastramento
+        if (!raw) return false
+        const d = String(raw).trim().split(' ')[0].split('T')[0]
+        if (growthStart && d < growthStart) return false
+        if (growthEnd && d > growthEnd) return false
+        return true
+      })
+    }
+    return result
+  }, [allLeads, growthStart, growthEnd])
+
+  const growthFilteredDaily = useMemo(() => {
+    let result = metaData?.daily ?? []
+    if (growthStart || growthEnd) {
+      result = result.filter(d => {
+        if (!d.date_start) return false
+        if (growthStart && d.date_start < growthStart) return false
+        if (growthEnd && d.date_start > growthEnd) return false
+        return true
+      })
+    }
+    return result
+  }, [metaData?.daily, growthStart, growthEnd])
+
+  const sourcesPerformance = useMemo(() => {
+    const map = new Map<string, { count: number; spend: number }>()
+    const totalMetaSpend = growthFilteredDaily.reduce((sum, d) => sum + (parseFloat(d.spend || '0') || 0), 0)
+
+    growthFilteredLeads.forEach(lead => {
+      const orig = getOrigin(lead)
+      const existing = map.get(orig) ?? { count: 0, spend: 0 }
+      existing.count += 1
+      map.set(orig, existing)
+    })
+
+    const META_KEYWORDS = ['facebook', 'instagram', 'meta', 'ads', 'anúncio', 'midia paga']
+    const isMetaSource = (name: string) => META_KEYWORDS.some(kw => name.toLowerCase().includes(kw))
+
+    const metaSources = Array.from(map.keys()).filter(isMetaSource)
+    const metaLeadsCount = metaSources.reduce((sum, k) => sum + (map.get(k)?.count ?? 0), 0)
+
+    if (metaLeadsCount > 0) {
+      metaSources.forEach(k => {
+        const entry = map.get(k)!
+        entry.spend = (entry.count / metaLeadsCount) * totalMetaSpend
+      })
+    }
+
+    return Array.from(map.entries())
+      .map(([name, data]) => ({
+        name,
+        leads: data.count,
+        spend: data.spend,
+        cpl: data.count > 0 ? data.spend / data.count : 0,
+      }))
+      .sort((a, b) => b.leads - a.leads)
+  }, [growthFilteredLeads, growthFilteredDaily])
+
   const handleSyncOrphans = async () => {
     setSyncing(true)
     try {
@@ -123,32 +189,97 @@ export default function LeadsView() {
             <FunnelVisualization leads={filteredLeads} />
           </GlassCard>
 
-          {/* Growth line chart */}
-          <GrowthLineChart
-            leads={filteredLeads}
-            daily={metaData?.daily ?? []}
-            mode={growthMode}
-            onModeChange={setGrowthMode}
-          />
+          {/* ── CARD DE CRESCIMENTO COM FILTROS INDEPENDENTES ── */}
+          <div className="bg-[#121214] border border-white/10 rounded-2xl p-4 sm:p-6 flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold text-white">Crescimento de Leads</h3>
+                <p className="text-xs text-zinc-500 mt-0.5">Comparativo do fluxo de entrada ao longo do tempo</p>
+              </div>
 
-          {/* Charts de perfil — origens, cidades, temperatura */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Filtros de data locais e independentes */}
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 bg-white/[0.02] border border-white/10 rounded-xl px-2.5 py-1 text-xs">
+                  <span className="text-[10px] text-zinc-500">De</span>
+                  <input
+                    type="date"
+                    value={growthStart}
+                    onChange={e => setGrowthStart(e.target.value)}
+                    className="bg-transparent text-zinc-300 focus:outline-none focus:border-transparent text-[11px] h-6 cursor-pointer"
+                  />
+                  <span className="text-[10px] text-zinc-500 ml-1">Até</span>
+                  <input
+                    type="date"
+                    value={growthEnd}
+                    onChange={e => setGrowthEnd(e.target.value)}
+                    className="bg-transparent text-zinc-300 focus:outline-none focus:border-transparent text-[11px] h-6 cursor-pointer"
+                  />
+                </div>
+                {/* Botão limpar filtro local */}
+                {(growthStart || growthEnd) && (
+                  <button
+                    onClick={() => { setGrowthStart(''); setGrowthEnd('') }}
+                    className="text-[10px] text-zinc-400 hover:text-orange-400 font-semibold px-2 py-1 bg-white/5 rounded-lg border border-white/10 transition-all"
+                  >
+                    Limpar
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Gráfico de crescimento real */}
+            <GrowthLineChart
+              leads={growthFilteredLeads}
+              daily={growthFilteredDaily}
+              mode={growthMode}
+              onModeChange={setGrowthMode}
+            />
+          </div>
+
+          {/* ── SEÇÃO DE FONTES & INVESTIMENTO DETALHADO (SUBSTITUI CIDADES/TEMPERATURA) ── */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Pie Chart de Origens */}
             <PieDonutChart
               title="Origem dos Leads"
               data={origensData.length > 0 ? origensData : [{ name: 'Sem dados', value: 1 }]}
-              height={260}
+              height={280}
             />
-            <PieDonutChart
-              title="Top 5 Cidades"
-              data={cidadesData.length > 0 ? cidadesData : [{ name: 'Sem dados', value: 1 }]}
-              height={260}
-            />
-            <PieDonutChart
-              title="Temperatura dos Leads"
-              data={temperaturaData.length > 0 ? temperaturaData : [{ name: 'Sem dados', value: 1 }]}
-              colors={['#f43f5e', '#f97316', '#f59e0b', '#3b82f6', '#6b7280']}
-              height={260}
-            />
+
+            {/* Tabela de Investimento por Fonte */}
+            <GlassCard title="Investimento & leads por Fonte (Período Crescimento)">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-white/10 text-zinc-400 font-semibold">
+                      <th className="text-left py-2 px-3">Fonte / Mídia</th>
+                      <th className="text-right py-2 px-3">Leads Gerados</th>
+                      <th className="text-right py-2 px-3">Investimento</th>
+                      <th className="text-right py-2 px-3">CPL Médio</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sourcesPerformance.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="py-8 text-center text-zinc-500">Sem dados para exibir no período selecionado.</td>
+                      </tr>
+                    ) : (
+                      sourcesPerformance.map((source, i) => (
+                        <tr key={source.name} className="border-b border-white/[0.03] hover:bg-white/[0.01]">
+                          <td className="py-2.5 px-3 font-semibold text-zinc-200">{source.name}</td>
+                          <td className="py-2.5 px-3 text-right text-zinc-300 font-mono">{source.leads}</td>
+                          <td className="py-2.5 px-3 text-right text-amber-400 font-mono font-semibold">
+                            {source.spend > 0 ? source.spend.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'}
+                          </td>
+                          <td className="py-2.5 px-3 text-right text-emerald-400 font-mono font-semibold">
+                            {source.spend > 0 ? source.cpl.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </GlassCard>
           </div>
 
           {/* Leads table */}

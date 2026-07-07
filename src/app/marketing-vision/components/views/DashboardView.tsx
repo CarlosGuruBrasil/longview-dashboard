@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import {
   TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Info,
   Lightbulb, Users, DollarSign, Target, Clock, ShoppingCart,
-  BarChart3, Activity, Globe, ArrowRight, Layers, HelpCircle,
+  BarChart3, Activity, Globe, ArrowRight, ArrowDown, Layers, HelpCircle,
   Megaphone, Compass, Eye, MousePointerClick, ChevronDown
 } from 'lucide-react'
 import { useData } from '../../context/DataContext'
@@ -105,7 +105,14 @@ export default function DashboardView() {
   const { allLeads, filteredLeads, crmTotal, loading, metaData, metaValidation, setActiveView, setLeadFilters } = useData()
   const [biData, setBiData] = useState<BiInsights | null>(null)
   const [, setBiLoading] = useState(true)
-  const [empFilterStage, setEmpFilterStage] = useState<string>('')
+  
+  // Filtros locais e independentes do Funil de Leads
+  const [funnelStart, setFunnelStart] = useState('')
+  const [funnelEnd, setFunnelEnd] = useState('')
+  const [funnelCorretor, setFunnelCorretor] = useState('')
+  const [funnelImobiliaria, setFunnelImobiliaria] = useState('')
+  const [funnelGestor, setFunnelGestor] = useState('')
+  const [funnelEmpreendimento, setFunnelEmpreendimento] = useState('')
 
   useEffect(() => {
     let active = true
@@ -249,44 +256,140 @@ export default function DashboardView() {
       .join(' · ');
   }, [outrosCanaisData]);
 
-  // 3. Classificação de leads por Etapas Reais do CRM
-  const empOptions = useMemo(() => {
-    const set = new Set<string>()
-    filteredLeads.forEach(l => {
-      const emp = l.empreendimento?.[0]?.nome
-      if (emp) set.add(emp)
+  // 3. Classificação e Filtros do Funil de Leads (Independentes de Data Global)
+  const funnelOptions = useMemo(() => {
+    const corretores = new Set<string>()
+    const imobiliarias = new Set<string>()
+    const gestores = new Set<string>()
+    const empreendimentos = new Set<string>()
+
+    allLeads.forEach(l => {
+      const c = l.corretor
+      const cName = typeof c === 'object' && c ? c.nome : (typeof c === 'string' ? c : '')
+      if (cName) corretores.add(cName)
+
+      const imob = l.imobiliaria
+      const iName = typeof imob === 'object' && imob ? imob.nome : (typeof imob === 'string' ? imob : '')
+      if (iName) imobiliarias.add(iName)
+
+      const g = l.gestor
+      const gName = typeof g === 'object' && g ? g.nome : (typeof g === 'string' ? g : '')
+      if (gName) gestores.add(gName)
+
+      const emp = l.empreendimento
+      const empList = Array.isArray(emp) ? emp.map(e => e.nome) : []
+      empList.forEach(e => { if (typeof e === 'string' && e) empreendimentos.add(e) })
     })
-    return Array.from(set).sort()
-  }, [filteredLeads])
 
-  const stageLeads = useMemo(() =>
-    empFilterStage
-      ? filteredLeads.filter(l => l.empreendimento?.[0]?.nome === empFilterStage)
-      : filteredLeads,
-    [filteredLeads, empFilterStage]
-  )
+    return {
+      corretores: Array.from(corretores).sort(),
+      imobiliarias: Array.from(imobiliarias).sort(),
+      gestores: Array.from(gestores).sort(),
+      empreendimentos: Array.from(empreendimentos).sort(),
+    }
+  }, [allLeads])
 
-  const etapasCrmData = useMemo(() => {
-    const map = new Map<string, { count: number; colorObj: ReturnType<typeof getStatusColor> }>();
+  const stageLeads = useMemo(() => {
+    let result = allLeads
+
+    // Filtro de data local
+    if (funnelStart || funnelEnd) {
+      result = result.filter(l => {
+        const raw = l.data_cad || l.data_cadastro || l.data_cadastramento
+        if (!raw) return false
+        const d = String(raw).trim().split(' ')[0].split('T')[0]
+        if (funnelStart && d < funnelStart) return false
+        if (funnelEnd && d > funnelEnd) return false
+        return true
+      })
+    }
+
+    // Filtros locais adicionais
+    if (funnelCorretor) {
+      result = result.filter(l => {
+        const c = l.corretor
+        const name = typeof c === 'object' && c ? c.nome : (typeof c === 'string' ? c : '')
+        return name === funnelCorretor
+      })
+    }
+    if (funnelImobiliaria) {
+      result = result.filter(l => {
+        const imob = l.imobiliaria
+        const name = typeof imob === 'object' && imob ? imob.nome : (typeof imob === 'string' ? imob : '')
+        return name === funnelImobiliaria
+      })
+    }
+    if (funnelGestor) {
+      result = result.filter(l => {
+        const g = l.gestor
+        const name = typeof g === 'object' && g ? g.nome : (typeof g === 'string' ? g : '')
+        return name === funnelGestor
+      })
+    }
+    if (funnelEmpreendimento) {
+      result = result.filter(l => {
+        const emp = l.empreendimento
+        const empList = Array.isArray(emp) ? emp.map(e => e.nome) : []
+        return empList.includes(funnelEmpreendimento)
+      })
+    }
+
+    return result
+  }, [allLeads, funnelStart, funnelEnd, funnelCorretor, funnelImobiliaria, funnelGestor, funnelEmpreendimento])
+
+  const funnelConsolidated = useMemo(() => {
+    let novos = 0
+    let atendimento = 0
+    let visita = 0
+    let proposta = 0
+    let venda = 0
+
     stageLeads.forEach(l => {
-      const stageName = l.situacao?.nome || 'Sem etapa';
-      const existing = map.get(stageName) ?? { count: 0, colorObj: getStatusColor(l) };
-      existing.count += 1;
-      map.set(stageName, existing);
-    });
+      const s = (l.situacao?.nome ?? '').toLowerCase()
+      
+      if (s === 'venda realizada' || s.includes('negócio ganho') || s.includes('negocio ganho') || s.includes('vendid') || s.includes('venda real')) {
+        venda++
+      } else if (s.includes('com proposta') || s === 'proposta' || s.includes('com reserva') || s.includes('reserva') || s.includes('simula')) {
+        proposta++
+      } else if (s.includes('visita') || s.includes('apresenta')) {
+        visita++
+      } else if (s.includes('atend') || s.includes('sdr') || s.includes('conex')) {
+        atendimento++
+      } else {
+        novos++
+      }
+    })
 
-    const total = stageLeads.length;
-    return Array.from(map.entries())
-      .map(([name, data]) => ({
-        name,
-        count: data.count,
-        percentage: total > 0 ? Math.round((data.count / total) * 100) : 0,
-        colorObj: data.colorObj
-      }))
-      .sort((a, b) => b.count - a.count);
-  }, [stageLeads]);
+    const totalLeads = stageLeads.length
 
-  // Crescimento de leads (mês atual vs mês anterior, baseado em allLeads)
+    const cVenda = venda
+    const cProposta = proposta + cVenda
+    const cVisita = visita + cProposta
+    const cAtend = atendimento + cVisita
+    const cNovos = novos + cAtend
+
+    const tAtend = cNovos > 0 ? (cAtend / cNovos) * 100 : 0
+    const tVisita = cAtend > 0 ? (cVisita / cAtend) * 100 : 0
+    const tProposta = cVisita > 0 ? (cProposta / cVisita) * 100 : 0
+    const tVenda = cProposta > 0 ? (cVenda / cProposta) * 100 : 0
+
+    const getStatus = (val: number, meta: number) => {
+      if (val >= meta) return { label: 'Excelente (Meta batida)', color: 'text-green-400', bg: 'bg-green-500/10 border-green-500/20' }
+      if (val >= meta * 0.7) return { label: 'Bom', color: 'text-sky-400', bg: 'bg-sky-500/10 border-sky-500/20' }
+      if (val >= meta * 0.45) return { label: 'Regular', color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/20' }
+      return { label: 'Abaixo da meta', color: 'text-red-400', bg: 'bg-red-500/10 border-red-500/20' }
+    }
+
+    return [
+      { name: '1. Captação (Novos)', count: cNovos, pctOfTotal: 100, convRate: 100, diag: { label: 'Início', color: 'text-zinc-400', bg: 'bg-zinc-800/40 border-zinc-700' } },
+      { name: '2. Em Atendimento', count: cAtend, pctOfTotal: cNovos > 0 ? Math.round((cAtend / cNovos) * 100) : 0, convRate: Math.round(tAtend), diag: getStatus(tAtend, 85) },
+      { name: '3. Visita Realizada/Agendada', count: cVisita, pctOfTotal: cNovos > 0 ? Math.round((cVisita / cNovos) * 100) : 0, convRate: Math.round(tVisita), diag: getStatus(tVisita, 45) },
+      { name: '4. Com Proposta/Reserva', count: cProposta, pctOfTotal: cNovos > 0 ? Math.round((cProposta / cNovos) * 100) : 0, convRate: Math.round(tProposta), diag: getStatus(tProposta, 20) },
+      { name: '5. Venda Fechada', count: cVenda, pctOfTotal: cNovos > 0 ? Math.round((cVenda / cNovos) * 100) : 0, convRate: Math.round(tVenda), diag: getStatus(tVenda, 35) },
+    ]
+  }, [stageLeads])
+
+  // Crescimento de leads (mês atual vs mês anterior, baseado nos leads filtrados do funil)
   const crescimento = useMemo(() => {
     const now = new Date()
     const ym = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
@@ -295,16 +398,16 @@ export default function DashboardView() {
     const prevMonth = ym(prevDate)
 
     let curr = 0, prev = 0
-    for (const l of allLeads) {
+    for (const l of stageLeads) {
       const d = l.data_cad ?? l.data_cadastro ?? l.data_cadastramento ?? ''
       if (!d) continue
-      const m = d.slice(0, 7)
+      const m = String(d).slice(0, 7)
       if (m === currMonth) curr++
       else if (m === prevMonth) prev++
     }
     const pct = prev > 0 ? Math.round(((curr - prev) / prev) * 100) : null
     return { curr, prev, pct }
-  }, [allLeads])
+  }, [stageLeads])
 
   // Mix de leads (mídia paga Meta vs orgânicos)
   const mixData = useMemo(() => [
@@ -450,75 +553,184 @@ export default function DashboardView() {
         
         {/* ── Seção B: Funil de Vendas e Etapas do CRM ── */}
         <GlassCard title="Etapas do Funil de Leads">
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-4">
 
-            {/* Crescimento + filtro por empreendimento */}
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              {/* Crescimento */}
-              <div className="flex items-center gap-2">
-                <div className="flex flex-col">
-                  <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">Crescimento mês atual</span>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="text-xl font-bold text-white">{stageLeads.length}</span>
-                    {crescimento.pct !== null && (
-                      <span className={`flex items-center gap-0.5 text-xs font-bold px-1.5 py-0.5 rounded-full ${
-                        crescimento.pct >= 0
-                          ? 'bg-emerald-500/15 text-emerald-400'
-                          : 'bg-red-500/15 text-red-400'
-                      }`}>
-                        {crescimento.pct >= 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-                        {crescimento.pct >= 0 ? '+' : ''}{crescimento.pct}%
-                      </span>
-                    )}
-                    <span className="text-[10px] text-zinc-600">vs {crescimento.prev} no mês anterior</span>
-                  </div>
-                </div>
+            {/* ── FILTROS INDEPENDENTES DO FUNIL ── */}
+            <div className="bg-white/[0.02] border border-white/5 rounded-xl p-3 flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Filtros Locais do Funil</span>
+                <button
+                  onClick={() => {
+                    setFunnelStart('')
+                    setFunnelEnd('')
+                    setFunnelCorretor('')
+                    setFunnelImobiliaria('')
+                    setFunnelGestor('')
+                    setFunnelEmpreendimento('')
+                  }}
+                  className="text-[10px] text-zinc-500 hover:text-orange-400 font-medium transition-colors"
+                >
+                  Limpar Filtros
+                </button>
               </div>
 
-              {/* Filtro empreendimento */}
-              <div className="relative">
-                <select
-                  value={empFilterStage}
-                  onChange={e => setEmpFilterStage(e.target.value)}
-                  className="appearance-none h-8 pl-3 pr-7 text-xs bg-white/[0.04] border border-white/[0.09] rounded-xl text-zinc-300 focus:outline-none focus:border-orange-500/40 transition-all cursor-pointer"
-                >
-                  <option value="">Todos os empreendimentos</option>
-                  {empOptions.map(emp => (
-                    <option key={emp} value={emp}>{emp}</option>
-                  ))}
-                </select>
-                <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
+              {/* Grid de seletores */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {/* Data Início */}
+                <div className="flex flex-col gap-1">
+                  <span className="text-[9px] text-zinc-500">De</span>
+                  <input
+                    type="date"
+                    value={funnelStart}
+                    onChange={e => setFunnelStart(e.target.value)}
+                    className="h-7 px-2 text-[11px] bg-white/[0.04] border border-white/[0.09] rounded-lg text-zinc-300 focus:outline-none focus:border-orange-500/40 w-full"
+                  />
+                </div>
+
+                {/* Data Fim */}
+                <div className="flex flex-col gap-1">
+                  <span className="text-[9px] text-zinc-500">Até</span>
+                  <input
+                    type="date"
+                    value={funnelEnd}
+                    onChange={e => setFunnelEnd(e.target.value)}
+                    className="h-7 px-2 text-[11px] bg-white/[0.04] border border-white/[0.09] rounded-lg text-zinc-300 focus:outline-none focus:border-orange-500/40 w-full"
+                  />
+                </div>
+
+                {/* Empreendimento */}
+                <div className="flex flex-col gap-1">
+                  <span className="text-[9px] text-zinc-500">Empreendimento</span>
+                  <select
+                    value={funnelEmpreendimento}
+                    onChange={e => setFunnelEmpreendimento(e.target.value)}
+                    className="h-7 px-2 text-[11px] bg-[#121214] border border-white/[0.09] rounded-lg text-zinc-300 focus:outline-none focus:border-orange-500/40 w-full cursor-pointer"
+                  >
+                    <option value="">Todos</option>
+                    {funnelOptions.empreendimentos.map(e => <option key={e} value={e}>{e}</option>)}
+                  </select>
+                </div>
+
+                {/* Corretor */}
+                <div className="flex flex-col gap-1">
+                  <span className="text-[9px] text-zinc-500">Corretor</span>
+                  <select
+                    value={funnelCorretor}
+                    onChange={e => setFunnelCorretor(e.target.value)}
+                    className="h-7 px-2 text-[11px] bg-[#121214] border border-white/[0.09] rounded-lg text-zinc-300 focus:outline-none focus:border-orange-500/40 w-full cursor-pointer"
+                  >
+                    <option value="">Todos</option>
+                    {funnelOptions.corretores.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+
+                {/* Imobiliária */}
+                <div className="flex flex-col gap-1">
+                  <span className="text-[9px] text-zinc-500">Imobiliária</span>
+                  <select
+                    value={funnelImobiliaria}
+                    onChange={e => setFunnelImobiliaria(e.target.value)}
+                    className="h-7 px-2 text-[11px] bg-[#121214] border border-white/[0.09] rounded-lg text-zinc-300 focus:outline-none focus:border-orange-500/40 w-full cursor-pointer"
+                  >
+                    <option value="">Todos</option>
+                    {funnelOptions.imobiliarias.map(i => <option key={i} value={i}>{i}</option>)}
+                  </select>
+                </div>
+
+                {/* Gestor */}
+                <div className="flex flex-col gap-1">
+                  <span className="text-[9px] text-zinc-500">Gestor</span>
+                  <select
+                    value={funnelGestor}
+                    onChange={e => setFunnelGestor(e.target.value)}
+                    className="h-7 px-2 text-[11px] bg-[#121214] border border-white/[0.09] rounded-lg text-zinc-300 focus:outline-none focus:border-orange-500/40 w-full cursor-pointer"
+                  >
+                    <option value="">Todos</option>
+                    {funnelOptions.gestores.map(g => <option key={g} value={g}>{g}</option>)}
+                  </select>
+                </div>
               </div>
             </div>
 
-            {/* Barras de etapas */}
-            <div className="flex flex-col gap-2 max-h-[320px] overflow-y-auto pr-1">
-              {etapasCrmData.length === 0 ? (
-                <p className="text-zinc-500 text-center text-xs py-8">Sem leads para distribuir nas etapas.</p>
+            {/* ── INDICADORES GERAIS DO FUNIL FILTRADO ── */}
+            <div className="flex items-center justify-between gap-3 flex-wrap border-b border-white/5 pb-3">
+              <div className="flex flex-col">
+                <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">Crescimento mês atual (funil filtrado)</span>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="text-xl font-bold text-white">{stageLeads.length}</span>
+                  {crescimento.pct !== null && (
+                    <span className={`flex items-center gap-0.5 text-xs font-bold px-1.5 py-0.5 rounded-full ${
+                      crescimento.pct >= 0 ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400'
+                    }`}>
+                      {crescimento.pct >= 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                      {crescimento.pct >= 0 ? '+' : ''}{crescimento.pct}%
+                    </span>
+                  )}
+                  <span className="text-[10px] text-zinc-600">vs {crescimento.prev} no mês anterior</span>
+                </div>
+              </div>
+            </div>
+
+            {/* ── FUNIL VISUAL PREMIUM (PIRÂMIDE INVERTIDA) ── */}
+            <div className="flex flex-col gap-3 pr-1">
+              {funnelConsolidated.length === 0 || stageLeads.length === 0 ? (
+                <p className="text-zinc-500 text-center text-xs py-12">Nenhum lead encontrado para os filtros selecionados.</p>
               ) : (
-                etapasCrmData.map(e => (
-                  <div
-                    key={e.name}
-                    onClick={() => filterAndNavigate({ situacao: e.name, ...(empFilterStage ? { empreendimento: empFilterStage } : {}) })}
-                    className="flex flex-col gap-1.5 p-3 rounded-xl bg-white/[0.01] border border-white/5 hover:bg-white/5 cursor-pointer transition-all"
-                  >
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="font-semibold text-zinc-200 flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: e.colorObj.bg }} />
-                        {e.name}
-                      </span>
-                      <span className="text-zinc-400">
-                        <strong className="text-white font-bold">{e.count}</strong> lead{e.count !== 1 ? 's' : ''} <span className="text-zinc-600">({e.percentage}%)</span>
-                      </span>
-                    </div>
-                    <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                funnelConsolidated.map((step, idx) => {
+                  // Determina largura do bloco de funil baseando-se no percentual do total
+                  const blockWidth = `${Math.max(30, step.pctOfTotal)}%`
+
+                  return (
+                    <div key={step.name} className="flex flex-col items-center w-full">
+                      {/* Bloco de Funil Invertido */}
                       <div
-                        className="h-full rounded-full transition-all duration-500"
-                        style={{ width: `${e.percentage}%`, backgroundColor: e.colorObj.bg }}
-                      />
+                        onClick={() => {
+                          const baseFilters: Record<string, string> = {}
+                          if (funnelEmpreendimento) baseFilters.empreendimento = funnelEmpreendimento
+                          if (step.name.includes('Atendimento')) baseFilters.situacao = 'Em Atendimento'
+                          else if (step.name.includes('Visita')) baseFilters.situacao = 'Visita Realizada'
+                          else if (step.name.includes('Proposta')) baseFilters.situacao = 'Com Proposta'
+                          else if (step.name.includes('Venda')) baseFilters.situacao = 'Venda Realizada'
+                          filterAndNavigate(baseFilters)
+                        }}
+                        style={{ width: blockWidth }}
+                        className="group relative overflow-hidden rounded-xl border border-white/10 bg-gradient-to-r from-white/[0.03] to-white/[0.01] hover:from-white/[0.08] hover:to-white/[0.04] p-3 flex items-center justify-between cursor-pointer transition-all hover:scale-[1.01] duration-300"
+                      >
+                        {/* Indicador de Meta do Estágio */}
+                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-sky-500/50 group-hover:bg-orange-500/60 transition-colors" />
+                        
+                        <div className="flex flex-col gap-0.5 pl-1.5">
+                          <span className="text-[11px] font-bold text-zinc-300 group-hover:text-white transition-colors">{step.name}</span>
+                          <span className="text-[10px] text-zinc-500">
+                            Volume: <strong className="text-zinc-300 font-semibold">{formatNumber(step.count)}</strong> ({step.pctOfTotal}% do total)
+                          </span>
+                        </div>
+
+                        {/* Conversão e Status */}
+                        <div className="text-right flex items-center gap-3">
+                          <div className="flex flex-col">
+                            <span className="text-xs font-bold text-zinc-100">
+                              {idx === 0 ? 'Conversão' : `Conv: ${step.convRate}%`}
+                            </span>
+                            {idx > 0 && (
+                              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full mt-0.5 ${step.diag.color} ${step.diag.bg}`}>
+                                {step.diag.label}
+                              </span>
+                            )}
+                          </div>
+                          <ArrowRight size={12} className="text-zinc-500 group-hover:text-white transition-colors translate-x-0 group-hover:translate-x-1 duration-300" />
+                        </div>
+                      </div>
+
+                      {/* Divisor de Fluxo (Seta de conversão) */}
+                      {idx < funnelConsolidated.length - 1 && (
+                        <div className="flex flex-col items-center justify-center my-1">
+                          <ArrowDown size={14} className="text-zinc-700 animate-pulse" />
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))
+                  )
+                })
               )}
             </div>
           </div>

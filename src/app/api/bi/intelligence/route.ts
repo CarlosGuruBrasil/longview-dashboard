@@ -557,6 +557,36 @@ export async function GET() {
 
     // Summary com totais reais (deduplicados) — não somar por campanha,
     // que só enxerga leads atribuídos por nome.
+    // 8. Performance Mensal (Investimento x Leads Gerados) Histórico
+    let monthlyPerformance: Array<{ period: string; spend: number; leads: number }> = []
+    try {
+      const [monthlySpendRows, monthlyLeadsRows] = await Promise.all([
+        sql`SELECT TO_CHAR(data, 'YYYY-MM') as month, SUM(spend)::float as spend FROM fato_midia_paga GROUP BY TO_CHAR(data, 'YYYY-MM') ORDER BY month`,
+        sql`SELECT TO_CHAR(data_cadastro, 'YYYY-MM') as month, COUNT(*)::int as leads FROM leads GROUP BY TO_CHAR(data_cadastro, 'YYYY-MM') ORDER BY month`
+      ])
+
+      const monthlyMap = new Map<string, { period: string; spend: number; leads: number }>()
+
+      for (const r of (monthlySpendRows as unknown as { month: string; spend: number }[])) {
+        if (r.month) {
+          monthlyMap.set(r.month, { period: r.month, spend: r.spend || 0, leads: 0 })
+        }
+      }
+
+      for (const r of (monthlyLeadsRows as unknown as { month: string; leads: number }[])) {
+        if (r.month) {
+          const entry = monthlyMap.get(r.month) ?? { period: r.month, spend: 0, leads: 0 }
+          entry.leads = r.leads || 0
+          monthlyMap.set(r.month, entry)
+        }
+      }
+
+      monthlyPerformance = Array.from(monthlyMap.values())
+        .sort((a, b) => a.period.localeCompare(b.period))
+    } catch (e) {
+      logger.warn({ err: errorMessage(e) }, '[bi/intelligence] Falhou ao calcular monthlyPerformance')
+    }
+
     const totalSpend = metaData?.global?.spend
       ? Number(metaData.global.spend)
       : campaignAttribution.reduce((s, c) => s + c.spend, 0)
@@ -568,7 +598,7 @@ export async function GET() {
     // inclui anos de histórico e canais fora do Meta, o que distorceria o número.
     const attributedRevenue = campaignAttribution.reduce((s, c) => s + c.revenue, 0)
 
-    const response: MarketingIntelligence = {
+    const response: MarketingIntelligence & { monthlyPerformance?: typeof monthlyPerformance } = {
       summary: {
         totalSpend,
         totalLeads,
@@ -580,6 +610,7 @@ export async function GET() {
         totalCampaigns: campaignAttribution.length,
       },
       campaignAttribution,
+      monthlyPerformance,
       developmentIntelligence,
       channelPerformance,
       socialMedia: {
