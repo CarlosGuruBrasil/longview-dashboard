@@ -229,7 +229,6 @@ async function upsertFatoMidiaPaga(): Promise<number> {
 async function upsertFatoAtribuicao(): Promise<number> {
   await sql`DELETE FROM fato_atribuicao_marketing`;
 
-  // Usa cv_vendas para identificar vendas reais (valor_venda quase sempre 0 nos leads)
   const result = await sql`
     INSERT INTO fato_atribuicao_marketing (
       id_campanha, nome_campanha, data,
@@ -238,37 +237,39 @@ async function upsertFatoAtribuicao(): Promise<number> {
       cpl, cac, roas
     )
     SELECT
-      COALESCE(NULLIF(l.midia, ''), 'Sem origem')      AS id_campanha,
-      COALESCE(
-        dc.nome,
-        NULLIF(l.midia, ''),
-        'Sem origem'
-      )                                                 AS nome_campanha,
-      l.data_cadastro                                   AS data,
-      COALESCE(SUM(mp.spend), 0)                        AS spend,
-      COALESCE(SUM(mp.impressions), 0)                  AS impressions,
-      COALESCE(SUM(mp.clicks), 0)                       AS clicks,
-      COUNT(DISTINCT l.id_lead)::bigint                 AS leads_gerados,
-      COUNT(DISTINCT v.id_venda)::bigint                AS leads_com_venda,
-      COALESCE(SUM(v.valor), 0)                         AS valor_vendas,
+      COALESCE(NULLIF(l.midia, ''), 'Sem origem')   AS id_campanha,
+      COALESCE(dc.nome, NULLIF(l.midia, ''), 'Sem origem') AS nome_campanha,
+      l.data_cadastro                               AS data,
+      COALESCE(SUM(mp.spend), 0)                    AS spend,
+      COALESCE(SUM(mp.impressions), 0)              AS impressions,
+      COALESCE(SUM(mp.clicks), 0)                   AS clicks,
+      COUNT(DISTINCT l.id_lead)::bigint             AS leads_gerados,
+      COUNT(DISTINCT l.id_lead) FILTER (
+        WHERE lower(l.status) LIKE '%venda%'
+           OR lower(l.status) LIKE '%negócio ganho%'
+      )::bigint                                     AS leads_com_venda,
+      COALESCE(SUM(fv.valor) FILTER (
+        WHERE fv.id_venda IS NOT NULL
+      ), 0)                                         AS valor_vendas,
       CASE WHEN COUNT(DISTINCT l.id_lead) > 0 AND COALESCE(SUM(mp.spend), 0) > 0
         THEN ROUND(SUM(mp.spend) / COUNT(DISTINCT l.id_lead), 2)
-        ELSE 0 END                                      AS cpl,
-      CASE WHEN COUNT(DISTINCT v.id_venda) > 0 AND COALESCE(SUM(mp.spend), 0) > 0
-        THEN ROUND(SUM(mp.spend) / COUNT(DISTINCT v.id_venda), 2)
-        ELSE 0 END                                      AS cac,
-      CASE WHEN COALESCE(SUM(mp.spend), 0) > 0 AND COALESCE(SUM(v.valor), 0) > 0
-        THEN ROUND(SUM(v.valor) / SUM(mp.spend), 2)
-        ELSE 0 END                                      AS roas
+        ELSE 0 END                                  AS cpl,
+      CASE WHEN COUNT(DISTINCT l.id_lead) FILTER (WHERE lower(l.status) LIKE '%venda%') > 0
+             AND COALESCE(SUM(mp.spend), 0) > 0
+        THEN ROUND(SUM(mp.spend) / COUNT(DISTINCT l.id_lead) FILTER (WHERE lower(l.status) LIKE '%venda%'), 2)
+        ELSE 0 END                                  AS cac,
+      CASE WHEN COALESCE(SUM(mp.spend), 0) > 0 AND COALESCE(SUM(fv.valor), 0) > 0
+        THEN ROUND(SUM(fv.valor) / SUM(mp.spend), 2)
+        ELSE 0 END                                  AS roas
     FROM fato_leads l
-    LEFT JOIN fato_vendas v      ON v.id_venda IN (
-      SELECT cv.id FROM cv_vendas cv WHERE cv.id IN (
-        SELECT raw->>'idvenda' FROM leads WHERE id = l.id_lead
-      )
-    )
-    LEFT JOIN fato_midia_paga mp ON mp.id_campanha = COALESCE(NULLIF(l.midia, ''), 'Sem origem')
-                                AND mp.data = l.data_cadastro
-    LEFT JOIN dim_campanhas_meta dc ON dc.id_campanha = COALESCE(NULLIF(l.midia, ''), 'Sem origem')
+    LEFT JOIN fato_midia_paga mp
+           ON mp.id_campanha = COALESCE(NULLIF(l.midia, ''), 'Sem origem')
+          AND mp.data = l.data_cadastro
+    LEFT JOIN dim_campanhas_meta dc
+           ON dc.id_campanha = COALESCE(NULLIF(l.midia, ''), 'Sem origem')
+    LEFT JOIN fato_vendas fv
+           ON fv.id_empreendimento::text = l.id_empreendimento::text
+          AND fv.data_venda = l.data_venda
     WHERE l.data_cadastro IS NOT NULL
     GROUP BY l.midia, dc.nome, l.data_cadastro
     ON CONFLICT DO NOTHING
