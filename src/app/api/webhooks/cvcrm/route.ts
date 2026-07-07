@@ -210,7 +210,11 @@ export async function POST(request: NextRequest) {
         temperatura      = EXCLUDED.temperatura,
         data_cadastro    = EXCLUDED.data_cadastro,
         data_atualizacao = EXCLUDED.data_atualizacao,
-        raw              = EXCLUDED.raw,
+        raw              = CASE
+          WHEN leads.raw ? '_meta'
+          THEN EXCLUDED.raw || jsonb_build_object('_meta', leads.raw->'_meta')
+          ELSE EXCLUDED.raw
+        END,
         synced_at        = NOW()
     `;
 

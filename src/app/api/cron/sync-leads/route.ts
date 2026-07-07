@@ -119,13 +119,17 @@ export async function GET(request: NextRequest) {
         const nome         = lead.nome || lead.name || null;
         const email_lead   = lead.email || null;
         const telefone     = lead.telefone || lead.celular || lead.phone || null;
-        const origem       = scalar(lead.origem || lead.source);
+        const origem       = typeof lead.origem === 'object' && lead.origem !== null
+          ? (lead.origem as { nome?: string }).nome || null
+          : scalar(lead.origem || lead.source);
         const status       = (typeof lead.situacao === 'object' && lead.situacao !== null
           ? (lead.situacao as { nome?: string }).nome
           : lead.status) || null;
-        const empreend     = typeof lead.empreendimento === 'object'
-          ? lead.empreendimento?.nome || null
-          : lead.empreendimento || null;
+        const empreend     = Array.isArray(lead.empreendimento)
+          ? (lead.empreendimento as { nome?: string }[]).map(e => e?.nome).filter(Boolean).join(', ') || null
+          : typeof lead.empreendimento === 'object' && lead.empreendimento
+            ? (lead.empreendimento as { nome?: string }).nome || null
+            : (lead.empreendimento as string) || null;
         const score        = lead.score != null ? Number(lead.score) : null;
         const temperatura  = lead.temperatura || lead.temperatura_lead || null;
         const dataCad      = parseDate(lead.data_cad || lead.data_cadastro || lead.created_at || lead.createdAt);
@@ -150,7 +154,11 @@ export async function GET(request: NextRequest) {
             temperatura      = EXCLUDED.temperatura,
             data_cadastro    = EXCLUDED.data_cadastro,
             data_atualizacao = EXCLUDED.data_atualizacao,
-            raw              = EXCLUDED.raw,
+            raw              = CASE
+              WHEN leads.raw ? '_meta'
+              THEN EXCLUDED.raw || jsonb_build_object('_meta', leads.raw->'_meta')
+              ELSE EXCLUDED.raw
+            END,
             synced_at        = EXCLUDED.synced_at
         `;
         upserted++;

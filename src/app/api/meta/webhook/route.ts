@@ -136,19 +136,34 @@ async function fetchMetaLead(leadgenId: string): Promise<MetaLeadFull | null> {
   }
 }
 
-/** Salva lead no Postgres (dedup por meta_lead_id via campo raw.id) */
-async function saveToPostgres(lead: MetaLeadFull, parsed: {
-  nome: string; email: string; telefone: string;
-  empreendimento: string; midia: string; origem: string;
-  conhece_empreendimento?: string; procura_imovel_para?: string; cidade?: string;
-}): Promise<void> {
+/**
+ * Salva lead no Postgres.
+ * Se o CV CRM retornou um ID (cvId), usa ele como chave — sem duplicata.
+ * Se CV CRM falhou, cai para meta_xxx como fallback temporário.
+ * O raw do Meta fica em _meta para preservar atribuição de campanha/UTM.
+ */
+async function saveToPostgres(
+  lead: MetaLeadFull,
+  parsed: {
+    nome: string; email: string; telefone: string;
+    empreendimento: string; midia: string; origem: string;
+    conhece_empreendimento?: string; procura_imovel_para?: string; cidade?: string;
+  },
+  cvId?: string | number,
+): Promise<void> {
   if (!process.env.DATABASE_URL) return;
   try {
     const { sql, ensureSchema } = await import('@/lib/pg');
     await ensureSchema();
 
-    // ID sintético prefixado para não colidir com IDs do CRM
-    const id = `meta_${lead.id}`;
+    const id      = cvId ? String(cvId) : `meta_${lead.id}`;
+    const metaRaw = { ...lead, _source: 'meta_webhook', _parsed: parsed };
+
+    // Se temos o ID do CV, o raw virá via webhook do CV CRM depois — guardamos só _meta agora.
+    // Se é fallback meta_xxx, o raw é o objeto Meta completo.
+    const rawVal = cvId
+      ? { _meta: metaRaw, _meta_lead_id: lead.id, origem: parsed.origem, midia_principal: parsed.midia }
+      : metaRaw;
 
     await sql`
       INSERT INTO leads (
@@ -166,17 +181,17 @@ async function saveToPostgres(lead: MetaLeadFull, parsed: {
         ${null}, ${null},
         ${lead.created_time ? new Date(lead.created_time).toISOString() : null},
         ${new Date().toISOString()},
-        ${JSON.stringify({ ...lead, _source: 'meta_webhook', _parsed: parsed })},
+        ${rawVal as never},
         NOW()
       )
       ON CONFLICT (id) DO UPDATE SET
         nome             = EXCLUDED.nome,
         email            = EXCLUDED.email,
         telefone         = EXCLUDED.telefone,
-        origem           = EXCLUDED.origem,
-        empreendimento   = EXCLUDED.empreendimento,
+        origem           = COALESCE(leads.origem, EXCLUDED.origem),
+        empreendimento   = COALESCE(leads.empreendimento, EXCLUDED.empreendimento),
         data_atualizacao = EXCLUDED.data_atualizacao,
-        raw              = EXCLUDED.raw,
+        raw              = leads.raw || jsonb_build_object('_meta', ${metaRaw as never}),
         synced_at        = NOW()
     `;
   } catch (e: unknown) {
@@ -354,10 +369,7 @@ export async function POST(request: NextRequest) {
           cidade:                 cidadeForm || undefined,
         };
 
-        // 3. Salva no Postgres (background-safe)
-        await saveToPostgres(metaLead, parsed);
-
-        // 4. Cria direto no CV CRM (principal mudança — sem passar pelo RD Station)
+        // 3. Cria direto no CV CRM — o ID retornado vira a chave do Postgres
         const crmResult = await createCrmLead({
           nome:            parsed.nome,
           email:           email     || undefined,
@@ -376,6 +388,9 @@ export async function POST(request: NextRequest) {
           logger.warn(`[meta/webhook] CV CRM falhou para ${leadgen_id}: ${crmResult.error}`);
           await logWebhookError('meta_webhook', `CV CRM falhou: ${crmResult.error}`, { leadgen_id, parsed });
         }
+
+        // 4. Salva no Postgres com ID do CV CRM (sem duplicata); fallback meta_xxx se CV falhou
+        await saveToPostgres(metaLead, parsed, crmResult.ok ? crmResult.id : undefined);
 
         // 5. RD Station em background (para e-mail e nutrição)
         forwardToRDStation(parsed);
