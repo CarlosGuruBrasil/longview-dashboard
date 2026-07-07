@@ -35,9 +35,6 @@ export function proxy(request: NextRequest) {
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api/auth') || // rotas de api de auth (/api/auth/login)
-    pathname === '/api/rd/callback'        || // OAuth2 callback — deve ser público
-    pathname === '/api/rd/token'           || // status do token — acesso interno
-    pathname === '/api/rd/webhook'         || // webhooks do RD — acesso externo
     pathname === '/api/cv/webhook'         || // webhooks do CV CRM (legado) — acesso externo
     pathname === '/api/webhooks/cvcrm'     || // webhooks do CV CRM (grava leads) — acesso externo
     pathname === '/api/meta/webhook'       || // webhooks do Meta Lead Ads — acesso externo

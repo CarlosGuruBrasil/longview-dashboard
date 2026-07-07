@@ -82,6 +82,27 @@ async function upsertDimCampanhasMeta(): Promise<number> {
   }
 }
 
+async function upsertDimCorretores(): Promise<number> {
+  const rows = await sql`
+    INSERT INTO dim_corretores (id_corretor, nome, email, imobiliaria, ativo)
+    SELECT DISTINCT
+      (raw->'_reserva'->'corretor'->>'idcorretor_cv')::int AS id_corretor,
+      raw->>'corretor' AS nome,
+      raw->>'corretor_email' AS email,
+      raw->>'imobiliaria' AS imobiliaria,
+      true AS ativo
+    FROM cv_vendas
+    WHERE raw->>'corretor' IS NOT NULL AND raw->>'corretor' != ''
+      AND raw->'_reserva'->'corretor'->>'idcorretor_cv' IS NOT NULL
+    ON CONFLICT (id_corretor) DO UPDATE SET
+      nome = EXCLUDED.nome,
+      email = EXCLUDED.email,
+      imobiliaria = EXCLUDED.imobiliaria,
+      ativo = true
+  `;
+  return rows.count ?? 0;
+}
+
 async function upsertFatoLeads(): Promise<number> {
   await sql`DELETE FROM fato_leads`;
 
@@ -362,6 +383,7 @@ export async function POST(request: NextRequest) {
   await safe('dim_tempo',           upsertDimTempo,           results);
   await safe('dim_empreendimentos', upsertDimEmpreendimentos, results);
   await safe('dim_campanhas_meta',  upsertDimCampanhasMeta,   results);
+  await safe('dim_corretores',      upsertDimCorretores,      results);
   await safe('fato_leads',          upsertFatoLeads,          results);
   await safe('fato_vendas',         upsertFatoVendas,         results);
   await safe('fato_interacoes',     upsertFatoInteracoes,     results);

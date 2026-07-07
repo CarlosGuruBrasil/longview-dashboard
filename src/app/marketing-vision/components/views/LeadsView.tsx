@@ -316,22 +316,6 @@ export default function LeadsView() {
             </p>
           </GlassCard>
 
-          {/* Card de Aviso da Integração RD Station */}
-          <div className="bg-amber-500/10 border border-amber-500/20 text-amber-300 p-4 rounded-xl text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex flex-col gap-0.5">
-              <span className="font-semibold text-sm text-amber-400">Integração RD Station (OAuth2)</span>
-              <span>A conexão de conversão de leads com o RD Station necessita de re-autorização dos tokens de acesso.</span>
-            </div>
-            <a
-              href="/api/rd/token"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="shrink-0 h-9 px-4 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-955 font-bold flex items-center justify-center transition-colors text-xs"
-            >
-              Re-autenticar RD Station
-            </a>
-          </div>
-
           {/* Ações de Sincronização de Leads Órfãos */}
           {metaValidation && metaValidation.orphanedLeads?.length > 0 && (
             <div className="p-5 rounded-xl bg-orange-500/10 border border-orange-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
