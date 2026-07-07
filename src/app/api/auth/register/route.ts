@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
   store.registrations = [...store.registrations, reg];
   await writeKv('pending_registrations', store);
 
-  // TODO: enviar push FCM para o aprovador (quando houver tokens FCM configurados)
+
 
   return NextResponse.json({ success: true, id: reg.id }, { status: 201 });
 }

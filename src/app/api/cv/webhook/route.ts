@@ -2,7 +2,7 @@
  * /api/cv/webhook
  *
  * Recebe webhooks do CV CRM em tempo real.
- * Configurar no CV CRM: Configurações → Webhooks → URL: https://longview-dashboard.vercel.app/api/cv/webhook
+ * Configurar no CV CRM: Configurações → Webhooks → URL: https://app.guru.dev.br/api/cv/webhook
  *
  * Gatilho principal:
  *   Quando um lead muda de etapa para "Sem Conexão"
