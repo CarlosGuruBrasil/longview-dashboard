@@ -108,7 +108,7 @@ async function upsertFatoLeads(): Promise<number> {
       END AS tempo_conversao_dias,
       l.raw
     FROM leads l
-    LEFT JOIN cv_vendas v ON v.id::text = (l.raw->>'idvenda')
+    LEFT JOIN cv_vendas v ON v.raw->>'idlead' = l.id
     LEFT JOIN dim_empreendimentos de ON lower(de.nome) = lower(l.empreendimento)
     WHERE l.data_cadastro IS NOT NULL
     ON CONFLICT DO NOTHING
@@ -120,9 +120,10 @@ async function upsertFatoVendas(): Promise<number> {
   await sql`DELETE FROM fato_vendas`;
 
   const result = await sql`
-    INSERT INTO fato_vendas (id_venda, id_empreendimento, id_unidade, data_venda, valor, status)
+    INSERT INTO fato_vendas (id_venda, id_lead, id_empreendimento, id_unidade, data_venda, valor, status)
     SELECT
       v.id AS id_venda,
+      v.raw->>'idlead' AS id_lead,
       v.id_empreendimento,
       v.id_unidade,
       v.data_venda::date AS data_venda,

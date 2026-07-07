@@ -1,95 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
-import axios from 'axios';
-import { sql, ensureSchema } from '@/lib/pg';
+import { ensureSchema } from '@/lib/pg';
 import { isCronAuthorized, unauthorizedJson } from '@/lib/internal-auth';
-import logger from '@/lib/logger'
+import { syncReservas } from '@/lib/cv-sync';
+import logger from '@/lib/logger';
 
 export const maxDuration = 300;
 export const runtime = 'nodejs';
 
-type CvVenda = {
-  idvenda?: string | number;
-  idempreendimento?: string | number;
-  idunidade?: string | number;
-  valor_venda?: string | number;
-  data_venda?: string | number | Date;
-  situacao?: string;
-};
-
-type CvdwVendasResponse = {
-  total_de_paginas?: number;
-  dados?: CvVenda[];
-};
-
-function errorMessage(error: unknown): string {
-  return axios.isAxiosError(error) ? error.message : error instanceof Error ? error.message : String(error);
-}
-
-async function fetchAllCvdwVendas(): Promise<CvVenda[]> {
-  const email = process.env.CV_CRM_EMAIL!;
-  const token = process.env.CV_CRM_TOKEN!;
-  const headers = { email, token, Accept: 'application/json' };
-  const base = 'https://longviewempreendimentos.cvcrm.com.br/api/v1/cvdw/vendas';
-
-  try {
-    const first = await axios.get<CvdwVendasResponse>(base, { params: { pagina: 1, registros_por_pagina: 500 }, headers, timeout: 15000 });
-    const totalPaginas = first.data?.total_de_paginas ?? 1;
-    const allVendas = [...(first.data?.dados ?? [])];
-
-    if (totalPaginas > 1) {
-      const pages = Array.from({ length: totalPaginas - 1 }, (_, i) => i + 2);
-      const results = await Promise.allSettled(
-        pages.map(p => axios.get<CvdwVendasResponse>(base, { params: { pagina: p, registros_por_pagina: 500 }, headers, timeout: 15000 }))
-      );
-      results.forEach((r) => {
-        if (r.status === 'fulfilled') allVendas.push(...(r.value.data?.dados ?? []));
-      });
-    }
-    return allVendas;
-  } catch (err: unknown) {
-    logger.error({ err: errorMessage(err) }, '[/cron/sync-cv-vendas] Erro ao buscar CVDW vendas:');
-    return [];
-  }
-}
-
 export async function POST(request: NextRequest) {
   if (!isCronAuthorized(request)) return unauthorizedJson();
 
-  await ensureSchema();
-  
-  const vendas = await fetchAllCvdwVendas();
-  let upserted = 0;
-
-  if (vendas.length > 0) {
-    for (const v of vendas) {
-      if (!v.idvenda) continue;
-      const dVenda = v.data_venda ? new Date(v.data_venda) : null;
-      const valor = v.valor_venda ? parseFloat(String(v.valor_venda)) : null;
-
-      await sql`
-        INSERT INTO cv_vendas (
-          id, id_empreendimento, id_unidade, valor, data_venda, status, raw, synced_at
-        ) VALUES (
-          ${v.idvenda},
-          ${v.idempreendimento ?? null},
-          ${v.idunidade ?? null},
-          ${valor},
-          ${dVenda},
-          ${v.situacao ?? null},
-          ${JSON.stringify(v)},
-          NOW()
-        ) ON CONFLICT (id) DO UPDATE SET
-          id_empreendimento = EXCLUDED.id_empreendimento,
-          id_unidade = EXCLUDED.id_unidade,
-          valor = EXCLUDED.valor,
-          data_venda = EXCLUDED.data_venda,
-          status = EXCLUDED.status,
-          raw = EXCLUDED.raw,
-          synced_at = EXCLUDED.synced_at
-      `;
-      upserted++;
-    }
+  const email = process.env.CV_CRM_EMAIL;
+  const token = process.env.CV_CRM_TOKEN;
+  if (!email || !token) {
+    return NextResponse.json({ error: 'CV_CRM_EMAIL ou CV_CRM_TOKEN não configurados' }, { status: 503 });
   }
 
-  return NextResponse.json({ ok: true, message: 'Vendas sincronizadas', count: upserted });
+  try {
+    await ensureSchema();
+    const count = await syncReservas(email, token);
+    logger.info(`[cron/sync-cv-vendas] ${count} reservas sincronizadas`);
+    return NextResponse.json({ ok: true, message: 'Vendas sincronizadas', count });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    logger.error({ msg }, '[cron/sync-cv-vendas]');
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+  }
 }
