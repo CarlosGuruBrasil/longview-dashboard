@@ -84,16 +84,8 @@ interface DataProviderProps {
 
 const DEFAULT_DATE: DateRange = { start: '', end: '' };
 
-/**
- * Janela móvel de 90 dias, em ISO local (YYYY-MM-DD) para não dar erro de fuso.
- * "Mês até hoje" deixava o painel quase vazio no início do mês
- * (ex.: dia 2 mostrava 1 lead de 3.795 na base).
- */
 function defaultRange(): DateRange {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  return { start: `${year}-${month}-01`, end: '' };
+  return DEFAULT_DATE;
 }
 
 export function DataProvider({ children, initialData }: DataProviderProps) {

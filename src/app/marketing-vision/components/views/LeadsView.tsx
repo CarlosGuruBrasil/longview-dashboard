@@ -30,7 +30,6 @@ export default function LeadsView() {
     fetchDetailedLeads
   } = useData()
   const [activeTab, setActiveTab] = useState<SubTab>('crm')
-  const [growthMode, setGrowthMode] = useState<'day' | 'month'>('day')
   const [syncing, setSyncing] = useState(false)
 
   // Paginação local do frontend para responder reativamente aos filtros globais/locais
@@ -244,8 +243,6 @@ export default function LeadsView() {
             <GrowthLineChart
               leads={growthFilteredLeads}
               daily={growthFilteredDaily}
-              mode={growthMode}
-              onModeChange={setGrowthMode}
             />
           </div>
 

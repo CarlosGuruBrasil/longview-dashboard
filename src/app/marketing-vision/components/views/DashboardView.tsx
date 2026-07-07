@@ -102,7 +102,13 @@ function SmartKpi({
 }
 
 export default function DashboardView() {
-  const { allLeads, filteredLeads, crmTotal, loading, metaData, metaValidation, setActiveView, setLeadFilters } = useData()
+  const { allLeads, crmTotal, loading, metaData, metaValidation, setActiveView, setLeadFilters } = useData()
+
+  // Smart Dashboard usa sempre mês atual (não depende do filtro global)
+  const currentMonthLeads = useMemo(() => {
+    const ym = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
+    return allLeads.filter(l => String(l.data_cad ?? l.data_cadastro ?? l.data_cadastramento ?? '').slice(0, 7) === ym)
+  }, [allLeads])
   const [biData, setBiData] = useState<BiInsights | null>(null)
   const [, setBiLoading] = useState(true)
   
@@ -132,7 +138,7 @@ export default function DashboardView() {
 
   // Identifica leads pagos do Meta de forma extremamente segura e abrangente
   const metaLeads = useMemo(() => {
-    return filteredLeads.filter(l => {
+    return currentMonthLeads.filter(l => {
       const orig = getOrigin(l).toLowerCase();
       const midia = String(l.midia_principal || l.midia_visita || '').toLowerCase();
       const rawOrigem = String(l.raw?.origem || '').toLowerCase();
@@ -144,12 +150,12 @@ export default function DashboardView() {
              rawMidia.includes('facebook') || rawMidia.includes('meta') || rawMidia.includes('ads') ||
              l.origem === 'Meta Lead Ads';
     });
-  }, [filteredLeads]);
+  }, [currentMonthLeads]);
 
   // Identifica leads de outros canais
   const outrosLeads = useMemo(() => {
-    return filteredLeads.filter(l => !metaLeads.some(ml => ml.id === l.id));
-  }, [filteredLeads, metaLeads]);
+    return currentMonthLeads.filter(l => !metaLeads.some(ml => ml.id === l.id));
+  }, [currentMonthLeads, metaLeads]);
 
   // Gasto total (Meta) no período
   const totalSpend = useMemo(() => {
@@ -224,8 +230,8 @@ export default function DashboardView() {
           ctr: impressionsVal > 0 ? (clicksVal / impressionsVal) * 100 : 0
         };
       })
-      // Lista as campanhas que tiveram investimento (spend) ou impressões no período
-      .filter(c => c.spend > 0 || c.impressions > 0 || c.leadsCount > 0)
+      // Apenas campanhas ATIVAS no Meta (não exibe históricas pausadas)
+      .filter(c => c.status === 'ACTIVE')
       .sort((a, b) => b.spend - a.spend);
   }, [metaData, metaLeads]);
 
@@ -460,8 +466,8 @@ export default function DashboardView() {
       {/* ── KPIs Principais com Comparação ── */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <SmartKpi
-          icon={Users} label="Total de Leads Gerados" value={formatNumber(filteredLeads.length)}
-          sub="Todos os canais no período" color="#0ea5e9"
+          icon={Users} label="Leads no Mês Atual" value={formatNumber(currentMonthLeads.length)}
+          sub="Todos os canais — mês corrente" color="#0ea5e9"
           onClick={() => filterAndNavigate({})}
         />
         <SmartKpi
@@ -766,7 +772,7 @@ export default function DashboardView() {
                 </ResponsiveContainer>
                 {/* Texto Centralizado */}
                 <div className="absolute flex flex-col items-center justify-center">
-                  <span className="text-lg font-bold text-white leading-none">{formatNumber(filteredLeads.length)}</span>
+                  <span className="text-lg font-bold text-white leading-none">{formatNumber(currentMonthLeads.length)}</span>
                   <span className="text-[8px] text-zinc-500 font-semibold uppercase mt-0.5">Leads</span>
                 </div>
               </div>
@@ -774,7 +780,7 @@ export default function DashboardView() {
               {/* Legenda Detalhada */}
               <div className="flex flex-col gap-2 text-xs">
                 {mixData.map(d => {
-                  const pct = filteredLeads.length > 0 ? ((d.value / filteredLeads.length) * 100).toFixed(1) : '0.0';
+                  const pct = currentMonthLeads.length > 0 ? ((d.value / currentMonthLeads.length) * 100).toFixed(1) : '0.0';
                   return (
                     <div key={d.name} className="flex items-center gap-2">
                       <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
@@ -791,7 +797,7 @@ export default function DashboardView() {
 
           {/* ── Seção C: Outros Canais de Captação (Orgânicos / Manuais) ── */}
           <GlassCard title={`Captação Orgânica & Outros Canais (${outrosLeads.length} leads)`}>
-            <div className="flex flex-col gap-3 max-h-[220px] overflow-y-auto pr-1">
+            <div className="flex flex-col gap-3 max-h-[420px] overflow-y-auto pr-1">
               {outrosCanaisData.length === 0 ? (
                 <p className="text-zinc-500 text-center text-xs py-8">Nenhum lead captado fora do tráfego pago no período.</p>
               ) : (

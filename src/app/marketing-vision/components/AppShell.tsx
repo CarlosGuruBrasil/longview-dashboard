@@ -9,7 +9,6 @@ import {
 import { useData } from '../context/DataContext';
 import type { ActiveView } from '../types';
 import Sidebar from './Sidebar';
-import DateFilter from './DateFilter';
 import NotificationBanner from '@/components/NotificationBanner';
 import AppHeader from '@/components/app/AppHeader';
 import logger from '@/lib/logger'
@@ -246,7 +245,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           fallbackTitle={title}
           accent="orange"
           centerContent={<MarketingHeaderMetrics />}
-          actions={<DateFilter />}
         />
 
         <main
@@ -267,9 +265,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             />
           </div>
 
-          <div className="lg:hidden sticky top-0 z-20 px-4 pt-2.5 pb-2 bg-[#09090b]/96 backdrop-blur-md border-b border-white/[0.05]">
-            <DateFilter />
-          </div>
           <div
             className="px-4 pt-3 pb-3 lg:px-6 lg:py-4 min-w-0"
             style={{ paddingBottom: 'calc(max(env(safe-area-inset-bottom), 16px) + 76px)' }}
