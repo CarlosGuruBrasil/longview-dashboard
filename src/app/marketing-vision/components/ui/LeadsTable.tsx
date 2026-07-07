@@ -11,6 +11,7 @@ import {
   getLeadTags,
   isLeadBolsao,
   toISODate,
+  hasLeadComments,
 } from '../../utils/leads';
 import { formatDate } from '../../utils/formatters';
 import LeadDrawer from './LeadDrawer';
@@ -361,7 +362,7 @@ export default function LeadsTable({
           const sc     = getStatusColor(lead);
           const rawDate = lead.data_cad || lead.data_cadastro || lead.data_cadastramento;
 
-          const hasComments = Array.isArray(lead.interacao) && lead.interacao.some(it => it.descricao && it.descricao.trim().length > 0);
+          const hasComments = hasLeadComments(lead);
           const lastUpdate = lead.data_atualizacao || lead.data_cadastro || lead.data_cad || '';
           const daysIdle = lastUpdate ? Math.floor((Date.now() - new Date(lastUpdate).getTime()) / (1000 * 60 * 60 * 24)) : 0;
 
@@ -424,7 +425,7 @@ export default function LeadsTable({
               const sc     = getStatusColor(lead);
               const rawDate = lead.data_cad || lead.data_cadastro || lead.data_cadastramento;
 
-               const hasComments = Array.isArray(lead.interacao) && lead.interacao.some(it => it.descricao && it.descricao.trim().length > 0);
+               const hasComments = hasLeadComments(lead);
                const lastUpdate = lead.data_atualizacao || lead.data_cadastro || lead.data_cad || '';
                const daysIdle = lastUpdate ? Math.floor((Date.now() - new Date(lastUpdate).getTime()) / (1000 * 60 * 60 * 24)) : 0;
 

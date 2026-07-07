@@ -66,7 +66,7 @@ function GridField({ icon: Icon, label, value }: { icon: React.ComponentType<{ s
 }
 
 export default function LeadDrawer({ lead, onClose }: Props) {
-  const { allLeads, refresh } = useData();
+  const { allLeads, refresh, updateLeadInMemory } = useData();
   const [history, setHistory] = useState<StageChange[] | null>(null);
   const [fullLead, setFullLead] = useState<Lead | null>(null);
   const [loadingLead, setLoadingLead] = useState(false);
@@ -106,6 +106,7 @@ export default function LeadDrawer({ lead, onClose }: Props) {
       .then((d) => {
         if (active && d.ok && d.lead) {
           setFullLead(d.lead);
+          updateLeadInMemory(leadId, d.lead);
         }
       })
       .catch((err: unknown) => logger.error({ err }))

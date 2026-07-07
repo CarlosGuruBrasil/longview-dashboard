@@ -57,6 +57,7 @@ interface DataContextValue {
 
   // refresh
   refresh: (force?: boolean, rangeOverride?: DateRange, options?: { validateMeta?: boolean }) => Promise<void>;
+  updateLeadInMemory: (leadId: string | number, fields: Partial<Lead>) => void;
 }
 
 const DataContext = createContext<DataContextValue | null>(null);
@@ -294,6 +295,23 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
     }
   }, [dateRange]);
 
+  const updateLeadInMemory = useCallback((leadId: string | number, fields: Partial<Lead>) => {
+    setAllLeads(prev => prev.map(l => {
+      const currentId = l.idlead ?? l.id;
+      if (String(currentId) === String(leadId)) {
+        return { ...l, ...fields };
+      }
+      return l;
+    }));
+    setDetailedLeads(prev => prev.map(l => {
+      const currentId = l.idlead ?? l.id;
+      if (String(currentId) === String(leadId)) {
+        return { ...l, ...fields };
+      }
+      return l;
+    }));
+  }, []);
+
   // Initial load — comportamento original mantido (refresh ao vivo garante Meta atualizado).
   // leadSummary é populado em paralelo dentro do refresh().
   useEffect(() => {
@@ -322,6 +340,7 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
       dateRange, setDateRange, leadFilters, setLeadFilters, clearFilters,
       activeView, setActiveView,
       refresh,
+      updateLeadInMemory,
     }}>
       {children}
     </DataContext.Provider>

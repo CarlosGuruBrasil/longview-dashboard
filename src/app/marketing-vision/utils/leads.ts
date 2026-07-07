@@ -224,3 +224,40 @@ export function groupLeadsByYearMonth(leads: Lead[]): Record<number, number[]> {
   });
   return byYearMonth;
 }
+
+export function hasLeadComments(lead: Lead): boolean {
+  if (!lead) return false;
+
+  // 1. Tenta ler do array de interacao padrão
+  const interacoes = lead.interacao ?? (lead.raw as any)?.interacao;
+  if (Array.isArray(interacoes)) {
+    const hasReal = interacoes.some(it => {
+      if (!it) return false;
+      const desc = typeof it === 'object' ? it.descricao || (it as any).mensagem || (it as any).comentario : String(it);
+      return desc && String(desc).trim().length > 0;
+    });
+    if (hasReal) return true;
+  }
+
+  // 2. Fallbacks de chaves parecidas no objeto lead ou no raw
+  const raw = lead.raw || {};
+  const alternativeKeys = ['interacoes', 'comentarios', 'comentario', 'descricao', 'obs', 'observacao', 'historico'];
+  
+  for (const key of alternativeKeys) {
+    const val = (lead as any)[key] ?? (raw as any)[key];
+    if (val) {
+      if (Array.isArray(val)) {
+        const hasReal = val.some(it => {
+          if (!it) return false;
+          const desc = typeof it === 'object' ? it.descricao || (it as any).mensagem || (it as any).comentario || (it as any).texto : String(it);
+          return desc && String(desc).trim().length > 0;
+        });
+        if (hasReal) return true;
+      } else if (typeof val === 'string' && val.trim().length > 0) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}

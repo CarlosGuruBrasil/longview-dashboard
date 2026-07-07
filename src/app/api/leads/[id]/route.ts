@@ -101,7 +101,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       }
     }
 
-    return NextResponse.json({ ok: true, lead });
+    return NextResponse.json({ ok: true, lead }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      }
+    });
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 500 });
   }

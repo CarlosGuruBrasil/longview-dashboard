@@ -294,6 +294,10 @@ async function readLeadsFromPg(
       const base: DashboardLead = {
         id: r.id,
         idlead: leadObj.idlead ?? r.id,
+        nome: r.nome || leadObj.nome || undefined,
+        email: r.email || leadObj.email || undefined,
+        telefone: r.telefone || leadObj.telefone || undefined,
+        celular: leadObj.celular ?? null,
         midia_principal: leadObj.midia_principal ?? null,
         midia_visita: leadObj.midia_visita ?? null,
         origem: leadObj.origem ?? r.origem ?? 'Desconhecido',
@@ -302,6 +306,7 @@ async function readLeadsFromPg(
         empreendimento: empVal,
         corretor: leadObj.corretor || null,
         imobiliaria: leadObj.imobiliaria || null,
+        gestor: leadObj.gestor || null,
         temperatura: r.temperatura || leadObj.temperatura || null,
         score: r.score != null ? r.score : (leadObj.score != null ? Number(leadObj.score) : null),
         valor_negocio: leadObj.valor_negocio ?? null,
@@ -310,23 +315,14 @@ async function readLeadsFromPg(
         cidade: leadObj.cidade ?? null,
         bolsao: leadObj.bolsao ?? null,
         data_cadastro: r.data_cadastro || leadObj.data_cad || leadObj.data_cadastro,
+        data_atualizacao: r.data_atualizacao || leadObj.data_atualizacao,
+        interacao: leadObj.interacao || [],
+        tags: leadObj.tags || [],
+        autor_ultima_alteracao: leadObj.autor_ultima_alteracao ?? null,
+        qtde_reservas_associadas: leadObj.qtde_reservas_associadas ?? 0,
+        qtde_simulacoes_associadas: leadObj.qtde_simulacoes_associadas ?? 0,
+        motivo_cancelamento: leadObj.motivo_cancelamento || null,
       };
-
-      if (detailed) {
-        base.nome = r.nome || leadObj.nome || undefined;
-        base.email = r.email || leadObj.email || undefined;
-        base.telefone = r.telefone || leadObj.telefone || undefined;
-        base.celular = leadObj.celular ?? null;
-        base.midia_visita = leadObj.midia_visita ?? null;
-        base.gestor = leadObj.gestor || null;
-        base.autor_ultima_alteracao = leadObj.autor_ultima_alteracao ?? null;
-        base.qtde_reservas_associadas = leadObj.qtde_reservas_associadas ?? 0;
-        base.qtde_simulacoes_associadas = leadObj.qtde_simulacoes_associadas ?? 0;
-        base.motivo_cancelamento = leadObj.motivo_cancelamento || null;
-        base.tags = leadObj.tags || [];
-        base.data_atualizacao = r.data_atualizacao || leadObj.data_atualizacao;
-        base.interacao = leadObj.interacao || [];
-      }
 
       return base;
     });
@@ -875,6 +871,12 @@ export async function GET(request: NextRequest) {
       page:         metaFinal.page,
       updatedAt:    new Date().toISOString(),
       _cached:      !!metaCache,
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      }
     });
   }
 
@@ -1043,5 +1045,11 @@ export async function GET(request: NextRequest) {
     metaValidation,
     updatedAt: new Date().toISOString(),
     _cached:   !needMetaLive && !!pgLeads,
+  }, {
+    headers: {
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+    }
   });
 }
