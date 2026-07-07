@@ -91,7 +91,7 @@ async function upsertFatoLeads(): Promise<number> {
     )
     SELECT
       l.id AS id_lead,
-      NULLIF(l.empreendimento, '')::int AS id_empreendimento,
+      de.id_empreendimento,
       l.data_cadastro::date AS data_cadastro,
       v.data_venda::date AS data_venda,
       l.origem,
@@ -109,6 +109,7 @@ async function upsertFatoLeads(): Promise<number> {
       l.raw
     FROM leads l
     LEFT JOIN cv_vendas v ON v.id::text = (l.raw->>'idvenda')
+    LEFT JOIN dim_empreendimentos de ON lower(de.nome) = lower(l.empreendimento)
     WHERE l.data_cadastro IS NOT NULL
     ON CONFLICT DO NOTHING
   `;
