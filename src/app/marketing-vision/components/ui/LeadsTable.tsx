@@ -53,7 +53,7 @@ export default function LeadsTable({
   // ── Debounced name search → triggers server-side fetch ───────────────────
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestRange = useRef(localRange);
-  latestRange.current = localRange;
+  useEffect(() => { latestRange.current = localRange; }, [localRange]);
 
   // ── Filter states ────────────────────────────────────────────────────────
   const [filterNome, setFilterNome]                   = useState('');
