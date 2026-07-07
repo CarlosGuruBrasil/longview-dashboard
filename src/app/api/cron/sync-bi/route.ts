@@ -93,21 +93,22 @@ async function upsertFatoLeads(): Promise<number> {
       l.id AS id_lead,
       NULLIF(l.empreendimento, '')::int AS id_empreendimento,
       l.data_cadastro::date AS data_cadastro,
-      l.data_venda::date AS data_venda,
+      v.data_venda::date AS data_venda,
       l.origem,
       l.raw->>'midia_principal' AS midia,
       l.raw->>'midia_principal' AS campanha,
       l.status,
       l.temperatura,
       l.score,
-      NULLIF(l.raw->>'valor_venda', '')::numeric AS valor_venda,
+      v.valor AS valor_venda,
       CASE
-        WHEN l.data_venda IS NOT NULL AND l.data_cadastro IS NOT NULL
-        THEN (l.data_venda::date - l.data_cadastro::date)
+        WHEN v.data_venda IS NOT NULL AND l.data_cadastro IS NOT NULL
+        THEN (v.data_venda::date - l.data_cadastro::date)
         ELSE NULL
       END AS tempo_conversao_dias,
       l.raw
     FROM leads l
+    LEFT JOIN cv_vendas v ON v.id::text = (l.raw->>'idvenda')
     WHERE l.data_cadastro IS NOT NULL
     ON CONFLICT DO NOTHING
   `;
@@ -268,8 +269,8 @@ async function upsertFatoAtribuicao(): Promise<number> {
     LEFT JOIN dim_campanhas_meta dc
            ON dc.id_campanha = COALESCE(NULLIF(l.midia, ''), 'Sem origem')
     LEFT JOIN fato_vendas fv
-           ON fv.id_empreendimento::text = l.id_empreendimento::text
-          AND fv.data_venda = l.data_venda
+           ON fv.data_venda = l.data_venda
+          AND l.data_venda IS NOT NULL
     WHERE l.data_cadastro IS NOT NULL
     GROUP BY l.midia, dc.nome, l.data_cadastro
     ON CONFLICT DO NOTHING
