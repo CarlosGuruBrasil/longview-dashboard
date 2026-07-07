@@ -70,23 +70,30 @@ export default function FilterBar() {
                      !!leadFilters.corretor || !!leadFilters.imobiliaria || !!leadFilters.gestor ||
                      !!leadFilters.startDate || !!leadFilters.endDate
 
+  const selectStyle = "h-9 px-3 text-[12px] rounded-xl bg-zinc-900 border border-white/10 text-zinc-300 focus:outline-none focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/20 max-w-[170px] truncate cursor-pointer transition-all hover:bg-zinc-800/80 font-semibold"
+
   return (
-    <div className="flex items-center flex-wrap gap-2.5 bg-white/[0.01] border border-white/5 p-3 rounded-2xl">
-      {/* Período de Data */}
-      <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-lg px-2.5 py-1 text-xs shrink-0">
-        <span className="text-[10px] text-zinc-500 font-bold uppercase">De</span>
+    <div className="flex items-center flex-wrap gap-2.5 bg-white/[0.01] border border-white/5 p-3 rounded-2xl w-full">
+      
+      {/* Filtro de Data Inicial */}
+      <div className="flex items-center gap-2 bg-zinc-900 border border-white/10 rounded-xl px-3 h-9 text-xs">
+        <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">De</span>
         <input
           type="date"
           value={leadFilters.startDate ?? ''}
           onChange={e => setLeadFilters({ ...leadFilters, startDate: e.target.value || undefined })}
-          className="bg-transparent text-zinc-300 focus:outline-none focus:border-transparent text-[11px] h-5 cursor-pointer [color-scheme:dark]"
+          className="bg-transparent text-zinc-200 focus:outline-none text-[11px] cursor-pointer [color-scheme:dark] w-[105px] font-bold"
         />
-        <span className="text-[10px] text-zinc-500 font-bold uppercase ml-1">Até</span>
+      </div>
+
+      {/* Filtro de Data Final */}
+      <div className="flex items-center gap-2 bg-zinc-900 border border-white/10 rounded-xl px-3 h-9 text-xs">
+        <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Até</span>
         <input
           type="date"
           value={leadFilters.endDate ?? ''}
           onChange={e => setLeadFilters({ ...leadFilters, endDate: e.target.value || undefined })}
-          className="bg-transparent text-zinc-300 focus:outline-none focus:border-transparent text-[11px] h-5 cursor-pointer [color-scheme:dark]"
+          className="bg-transparent text-zinc-200 focus:outline-none text-[11px] cursor-pointer [color-scheme:dark] w-[105px] font-bold"
         />
       </div>
 
@@ -94,7 +101,7 @@ export default function FilterBar() {
       <select
         value={leadFilters.origem ?? ''}
         onChange={e => setLeadFilters({ ...leadFilters, origem: e.target.value || undefined })}
-        className="px-2.5 py-1.5 text-xs rounded-lg bg-white/5 border border-white/10 text-zinc-300 focus:outline-none focus:border-sky-500/40 max-w-[140px] truncate cursor-pointer"
+        className={selectStyle}
       >
         <option value="">Origem: todas</option>
         {originOptions.map(o => (
@@ -106,7 +113,7 @@ export default function FilterBar() {
       <select
         value={leadFilters.situacao ?? ''}
         onChange={e => setLeadFilters({ ...leadFilters, situacao: e.target.value || undefined })}
-        className="px-2.5 py-1.5 text-xs rounded-lg bg-white/5 border border-white/10 text-zinc-300 focus:outline-none focus:border-sky-500/40 max-w-[160px] truncate cursor-pointer"
+        className={selectStyle}
       >
         <option value="">Situação: todas</option>
         {situacaoOptions.map(s => (
@@ -118,7 +125,7 @@ export default function FilterBar() {
       <select
         value={leadFilters.empreendimento ?? ''}
         onChange={e => setLeadFilters({ ...leadFilters, empreendimento: e.target.value || undefined })}
-        className="px-2.5 py-1.5 text-xs rounded-lg bg-white/5 border border-white/10 text-zinc-300 focus:outline-none focus:border-sky-500/40 max-w-[180px] truncate cursor-pointer"
+        className={selectStyle}
       >
         <option value="">Empreendimento: todos</option>
         {empreendimentoOptions.map(e => (
@@ -130,7 +137,7 @@ export default function FilterBar() {
       <select
         value={leadFilters.corretor ?? ''}
         onChange={e => setLeadFilters({ ...leadFilters, corretor: e.target.value || undefined })}
-        className="px-2.5 py-1.5 text-xs rounded-lg bg-white/5 border border-white/10 text-zinc-300 focus:outline-none focus:border-sky-500/40 max-w-[160px] truncate cursor-pointer"
+        className={selectStyle}
       >
         <option value="">Corretor: todos</option>
         {corretorOptions.map(c => (
@@ -142,7 +149,7 @@ export default function FilterBar() {
       <select
         value={leadFilters.imobiliaria ?? ''}
         onChange={e => setLeadFilters({ ...leadFilters, imobiliaria: e.target.value || undefined })}
-        className="px-2.5 py-1.5 text-xs rounded-lg bg-white/5 border border-white/10 text-zinc-300 focus:outline-none focus:border-sky-500/40 max-w-[180px] truncate cursor-pointer"
+        className={selectStyle}
       >
         <option value="">Imobiliária: todas</option>
         {imobiliariaOptions.map(i => (
@@ -154,7 +161,7 @@ export default function FilterBar() {
       <select
         value={leadFilters.gestor ?? ''}
         onChange={e => setLeadFilters({ ...leadFilters, gestor: e.target.value || undefined })}
-        className="px-2.5 py-1.5 text-xs rounded-lg bg-white/5 border border-white/10 text-zinc-300 focus:outline-none focus:border-sky-500/40 max-w-[150px] truncate cursor-pointer"
+        className={selectStyle}
       >
         <option value="">Gestor: todos</option>
         {gestorOptions.map(g => (
@@ -165,7 +172,7 @@ export default function FilterBar() {
       {hasFilters && (
         <button
           onClick={clearFilters}
-          className="flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors font-semibold"
+          className="flex items-center gap-1.5 px-3.5 h-9 rounded-xl text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors font-bold border border-red-500/10"
         >
           <X size={12} />
           Limpar Filtros

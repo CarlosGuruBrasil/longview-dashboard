@@ -30,7 +30,7 @@ export default function LeadsView() {
     fetchDetailedLeads
   } = useData()
   const [activeTab, setActiveTab] = useState<SubTab>('crm')
-  const [growthMode, setGrowthMode] = useState<'month' | 'year'>('month')
+  const [growthMode, setGrowthMode] = useState<'day' | 'month'>('day')
   const [syncing, setSyncing] = useState(false)
 
   // Paginação local do frontend para responder reativamente aos filtros globais/locais

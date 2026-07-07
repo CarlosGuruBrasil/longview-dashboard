@@ -1,5 +1,6 @@
 'use client'
 
+import { useMemo } from 'react'
 import {
   LineChart,
   Line,
@@ -11,209 +12,218 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import type { Lead, MetaDailyInsight } from '../../types'
-import { groupLeadsByYearMonth } from '../../utils/leads'
-import { MONTHS_PT, CHART_PALETTE, formatCurrency } from '../../utils/formatters'
+import { toISODate } from '../../utils/leads'
+import { formatCurrency } from '../../utils/formatters'
 import GlassCard from '../ui/GlassCard'
 
 interface GrowthLineChartProps {
   leads: Lead[]
   daily?: MetaDailyInsight[]
-  mode: 'month' | 'year'
-  onModeChange: (mode: 'month' | 'year') => void
+  mode: 'day' | 'month'
+  onModeChange: (mode: 'day' | 'month') => void
 }
 
-type ChartPoint = Record<string, unknown> & { label: string }
-type CustomTooltipProps = {
-  active?: boolean
-  payload?: unknown[]
-  label?: string
-  data: ChartPoint[]
-  years: number[]
-  hasSpend: boolean
-  mode: 'month' | 'year'
+type ChartPoint = {
+  label: string
+  leads: number
+  spend?: number
+  sortKey: string
 }
 
 const TICK_COLOR = '#71717a'
 const GRID_COLOR = 'rgba(255,255,255,0.05)'
+const COLOR_LEADS = '#3b82f6' // azul — leads
 const COLOR_SPEND = '#f59e0b' // amarelo — investimento
 
-// Agrega spend do Meta por mês (índice 0-11) e por ano
-function buildSpendByMonth(daily: MetaDailyInsight[]): { byMonth: number[]; byYear: Record<number, number> } {
-  const byMonth = Array(12).fill(0)
-  const byYear: Record<number, number> = {}
-  daily.forEach(d => {
-    if (!d.date_start || !d.spend) return
-    const spend = parseFloat(d.spend)
-    if (isNaN(spend)) return
-    const parts = d.date_start.split('-')
-    if (parts.length < 2) return
-    const y = parseInt(parts[0], 10)
-    const m = parseInt(parts[1], 10) - 1
-    if (m < 0 || m > 11) return
-    byMonth[m] += spend
-    byYear[y] = (byYear[y] ?? 0) + spend
-  })
-  return { byMonth, byYear }
-}
-
-function CustomTooltip({ active, payload, label, data, years, hasSpend, mode }: CustomTooltipProps) {
-  if (!active || !payload?.length) return null
-  const point = data.find(d => d.label === label)
-  if (!point) return null
-
-  return (
-    <div style={{
-      backgroundColor: '#18181b',
-      border: '1px solid rgba(255,255,255,0.1)',
-      borderRadius: 8,
-      padding: '10px 14px',
-      fontSize: 12,
-      minWidth: 190,
-    }}>
-      <p style={{ color: '#e4e4e7', marginBottom: 8, fontWeight: 600 }}>{label}</p>
-      {mode === 'month' ? (
-        <>
-          {years.map((y, i) => (
-            <div key={y} style={{ marginBottom: 6 }}>
-              <p style={{ color: CHART_PALETTE[i % CHART_PALETTE.length], fontWeight: 600, marginBottom: 2 }}>
-                {y}
-              </p>
-              <p style={{ color: '#a1a1aa', paddingLeft: 8 }}>
-                Leads: <strong style={{ color: '#e4e4e7' }}>{(point[`qty_${y}`] as number) ?? 0}</strong>
-              </p>
-            </div>
-          ))}
-          {hasSpend && (
-            <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-              <p style={{ color: COLOR_SPEND }}>
-                Investimento: <strong>{formatCurrency((point.spend as number) ?? 0)}</strong>
-              </p>
-            </div>
-          )}
-        </>
-      ) : (
-        <>
-          <p style={{ color: '#a1a1aa', marginBottom: 4 }}>
-            Leads: <strong style={{ color: '#e4e4e7' }}>{point.qty as number}</strong>
-          </p>
-          {hasSpend && (
-            <p style={{ color: COLOR_SPEND }}>
-              Investimento: <strong>{formatCurrency((point.spend as number) ?? 0)}</strong>
-            </p>
-          )}
-        </>
-      )}
-    </div>
-  )
-}
-
 export default function GrowthLineChart({ leads, daily = [], mode, onModeChange }: GrowthLineChartProps) {
-  const byYearMonth = groupLeadsByYearMonth(leads)
-  const years = Object.keys(byYearMonth).map(Number).sort()
-  const { byMonth: spendByMonth, byYear: spendByYear } = buildSpendByMonth(daily)
   const hasSpend = daily.length > 0
 
-  const monthData: ChartPoint[] = MONTHS_PT.map((label, i) => {
-    const entry: ChartPoint = { label }
-    years.forEach(y => { entry[`qty_${y}`] = byYearMonth[y]?.[i] ?? 0 })
-    if (hasSpend) entry.spend = spendByMonth[i]
-    return entry
-  })
+  const data = useMemo(() => {
+    // 1. Coleta todas as datas disponíveis nos leads e insights diários
+    const dates = leads
+      .map(l => toISODate(l.data_cad || l.data_cadastro || l.data_cadastramento))
+      .filter(Boolean) as string[]
 
-  const yearData = years.map(y => ({
-    label: String(y),
-    qty: byYearMonth[y].reduce((a, b) => a + b, 0),
-    ...(hasSpend ? { spend: spendByYear[y] ?? 0 } : {}),
-  }))
+    if (daily.length > 0) {
+      daily.forEach(d => {
+        if (d.date_start) dates.push(d.date_start)
+      })
+    }
 
-  const data = mode === 'month' ? monthData : yearData
+    if (dates.length === 0) {
+      return []
+    }
+
+    dates.sort()
+    const minDateStr = dates[0]
+    const maxDateStr = dates[dates.length - 1]
+
+    if (mode === 'day') {
+      // Agrupamento Diário
+      const start = new Date(minDateStr)
+      const end = new Date(maxDateStr)
+      const points: ChartPoint[] = []
+
+      const current = new Date(start)
+      let limit = 0
+      while (current <= end && limit < 366) {
+        const isoString = current.toISOString().split('T')[0]
+        const label = current.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
+
+        // Filtra leads do dia
+        const qtyLeads = leads.filter(l => {
+          const d = toISODate(l.data_cad || l.data_cadastro || l.data_cadastramento)
+          return d === isoString
+        }).length
+
+        // Soma spend do dia
+        const spend = daily
+          .filter(d => d.date_start === isoString)
+          .reduce((sum, d) => sum + (parseFloat(d.spend || '0') || 0), 0)
+
+        points.push({
+          label,
+          leads: qtyLeads,
+          spend,
+          sortKey: isoString
+        })
+
+        current.setDate(current.getDate() + 1)
+        limit++
+      }
+      return points
+    } else {
+      // Agrupamento Mensal
+      const map = new Map<string, ChartPoint>()
+      const start = new Date(minDateStr)
+      const end = new Date(maxDateStr)
+
+      const current = new Date(start.getFullYear(), start.getMonth(), 1)
+      const targetEnd = new Date(end.getFullYear(), end.getMonth(), 1)
+
+      let limit = 0
+      while (current <= targetEnd && limit < 48) {
+        const y = current.getFullYear()
+        const m = current.getMonth()
+        const sortKey = `${y}-${String(m + 1).padStart(2, '0')}`
+        const label = current.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })
+
+        map.set(sortKey, { label, leads: 0, spend: 0, sortKey })
+        current.setMonth(current.getMonth() + 1)
+        limit++
+      }
+
+      // Distribui os leads
+      leads.forEach(l => {
+        const iso = toISODate(l.data_cad || l.data_cadastro || l.data_cadastramento)
+        if (!iso) return
+        const parts = iso.split('-')
+        const sortKey = `${parts[0]}-${parts[1]}`
+        const entry = map.get(sortKey)
+        if (entry) {
+          entry.leads += 1
+        }
+      })
+
+      // Distribui o spend
+      daily.forEach(d => {
+        if (!d.date_start) return
+        const parts = d.date_start.split('-')
+        const sortKey = `${parts[0]}-${parts[1]}`
+        const entry = map.get(sortKey)
+        if (entry) {
+          entry.spend = (entry.spend || 0) + (parseFloat(d.spend || '0') || 0)
+        }
+      })
+
+      return Array.from(map.values()).sort((a, b) => a.sortKey.localeCompare(b.sortKey))
+    }
+  }, [leads, daily, mode])
 
   const spendFormatter = (v: number) =>
-    v >= 1_000_000 ? `R$${(v / 1_000_000).toFixed(1)}M` : `R$${(v / 1_000).toFixed(0)}K`
+    v >= 1_000_000 ? `R$${(v / 1_000_000).toFixed(1)}M` : v >= 1_000 ? `R$${(v / 1_000).toFixed(0)}K` : `R$${v.toFixed(0)}`
 
   const action = (
-    <div className="flex gap-1 bg-white/5 rounded-lg p-0.5">
-      {(['month', 'year'] as const).map(m => (
+    <div className="flex gap-1 bg-white/5 rounded-lg p-0.5 border border-white/5">
+      {(['day', 'month'] as const).map(m => (
         <button
           key={m}
           onClick={() => onModeChange(m)}
-          className={`no-tap px-3 py-1 rounded-md text-xs font-medium transition-all shrink-0 ${
+          className={`no-tap px-3 py-1 rounded-md text-xs font-semibold transition-all shrink-0 ${
             mode === m
-              ? 'bg-sky-500/20 text-sky-400'
+              ? 'bg-orange-500/20 text-orange-400 border border-orange-500/10'
               : 'text-zinc-500 hover:text-zinc-200'
           }`}
         >
-          {m === 'month' ? 'Mês a Mês' : 'Ano a Ano'}
+          {m === 'day' ? 'Evolução Diária' : 'Evolução Mensal'}
         </button>
       ))}
     </div>
   )
 
   return (
-    <GlassCard title="Crescimento de Leads" action={action}>
-      <ResponsiveContainer width="100%" height={300}>
-        <LineChart data={data} margin={{ top: 5, right: hasSpend ? 16 : 10, left: 0, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} />
-          <XAxis dataKey="label" tick={{ fill: TICK_COLOR, fontSize: 12 }} axisLine={false} tickLine={false} />
-          <YAxis yAxisId="left" tick={{ fill: TICK_COLOR, fontSize: 12 }} axisLine={false} tickLine={false} allowDecimals={false} />
-          {hasSpend && (
-            <YAxis
-              yAxisId="right"
-              orientation="right"
-              tick={{ fill: COLOR_SPEND, fontSize: 10 }}
-              axisLine={false}
-              tickLine={false}
-              tickFormatter={spendFormatter}
-              width={64}
-            />
-          )}
-          <Tooltip content={<CustomTooltip data={data} years={years} hasSpend={hasSpend} mode={mode} />} />
-          <Legend wrapperStyle={{ color: TICK_COLOR, fontSize: 12 }} />
-
-          {/* Linhas de leads — uma por ano */}
-          {mode === 'month' ? (
-            years.map((y, i) => (
-              <Line
-                key={y}
-                yAxisId="left"
-                type="monotone"
-                dataKey={`qty_${y}`}
-                name={String(y)}
-                stroke={CHART_PALETTE[i % CHART_PALETTE.length]}
-                strokeWidth={2}
-                dot={false}
-                activeDot={{ r: 4 }}
+    <GlassCard title="Crescimento & Investimento de Leads" action={action}>
+      {data.length === 0 ? (
+        <div className="flex items-center justify-center h-[280px] text-zinc-500 text-xs">
+          Nenhum dado de leads ou investimento no período selecionado.
+        </div>
+      ) : (
+        <ResponsiveContainer width="100%" height={300}>
+          <LineChart data={data} margin={{ top: 12, right: hasSpend ? 16 : 10, left: -10, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} vertical={false} />
+            <XAxis dataKey="label" tick={{ fill: TICK_COLOR, fontSize: 10 }} axisLine={false} tickLine={false} />
+            <YAxis yAxisId="left" tick={{ fill: TICK_COLOR, fontSize: 10 }} axisLine={false} tickLine={false} allowDecimals={false} />
+            {hasSpend && (
+              <YAxis
+                yAxisId="right"
+                orientation="right"
+                tick={{ fill: COLOR_SPEND, fontSize: 10 }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={spendFormatter}
+                width={64}
               />
-            ))
-          ) : (
+            )}
+            <Tooltip
+              contentStyle={{ backgroundColor: '#121214', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px' }}
+              labelClassName="text-zinc-200 font-bold text-xs"
+              formatter={(value: any, name: any) => {
+                const nameStr = String(name || '')
+                if (nameStr.includes('Investimento')) {
+                  return [formatCurrency(Number(value)), nameStr]
+                }
+                return [value, nameStr]
+              }}
+            />
+            <Legend wrapperStyle={{ color: TICK_COLOR, fontSize: 11 }} />
+
             <Line
               yAxisId="left"
               type="monotone"
-              dataKey="qty"
-              name="Leads"
-              stroke={CHART_PALETTE[0]}
-              strokeWidth={2}
-              dot={{ r: 4, fill: CHART_PALETTE[0] }}
-              activeDot={{ r: 6 }}
+              dataKey="leads"
+              name="Leads Gerados"
+              stroke={COLOR_LEADS}
+              strokeWidth={2.5}
+              dot={data.length <= 31 ? { r: 3, strokeWidth: 1 } : false}
+              activeDot={{ r: 5 }}
             />
-          )}
 
-          {/* Linha de investimento Meta */}
-          {hasSpend && (
-            <Line
-              yAxisId="right"
-              type="monotone"
-              dataKey="spend"
-              name="Investimento (R$)"
-              stroke={COLOR_SPEND}
-              strokeWidth={2}
-              strokeDasharray="5 3"
-              dot={false}
-              activeDot={{ r: 4 }}
-            />
-          )}
-        </LineChart>
-      </ResponsiveContainer>
+            {hasSpend && (
+              <Line
+                yAxisId="right"
+                type="monotone"
+                dataKey="spend"
+                name="Investimento Meta (R$)"
+                stroke={COLOR_SPEND}
+                strokeWidth={2}
+                strokeDasharray="4 4"
+                dot={data.length <= 31 ? { r: 2, strokeWidth: 1 } : false}
+                activeDot={{ r: 4 }}
+              />
+            )}
+          </LineChart>
+        </ResponsiveContainer>
+      )}
     </GlassCard>
   )
 }
