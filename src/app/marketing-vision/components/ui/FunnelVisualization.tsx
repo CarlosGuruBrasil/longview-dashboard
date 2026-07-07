@@ -32,38 +32,96 @@ function getDiag(val: number, meta: number) {
   return                          { label: 'Abaixo da meta', ...DIAG_COLORS.abaixo }
 }
 
+// Status values excludídos do pipeline ativo (não são etapas de funil)
+const EXCLUDED_STATUS = new Set([
+  'Perdido',
+  'Lançamento Sul da Ilha',
+  'Lançamento Trindade',
+])
+
+// Status que indicam "Atendimento iniciado ou além"
+const ATENDIMENTO_STATUS = new Set([
+  'Em Atendimento',
+  'Em Atendimento SDR',
+  'Sem conexão',
+  'Carteira Corretor',
+  'Visita Agendada',
+  'Visita Realizada',
+  'Com Reserva',
+  'Venda Realizada',
+])
+
+// Status de visita ou além
+const VISITA_STATUS = new Set([
+  'Visita Agendada',
+  'Visita Realizada',
+  'Com Reserva',
+  'Venda Realizada',
+])
+
+// Status de reserva ou venda
+const RESERVA_STATUS = new Set([
+  'Com Reserva',
+  'Venda Realizada',
+])
+
 export default function FunnelVisualization({ leads }: Props) {
   const { setLeadFilters } = useData()
 
   const stages = useMemo(() => {
-    let novos = 0, atendimento = 0, visita = 0, proposta = 0, venda = 0
+    // Exclui leads "perdidos" e de lançamento — não são parte do funil ativo
+    const active = leads.filter(l => !EXCLUDED_STATUS.has(l.status ?? ''))
 
-    leads.forEach(l => {
-      const s = (l.situacao?.nome ?? '').toLowerCase()
-      if (s === 'venda realizada' || s.includes('negócio ganho') || s.includes('negocio ganho') || s.includes('vendid') || s.includes('venda real')) venda++
-      else if (s.includes('com proposta') || s === 'proposta' || s.includes('com reserva') || s.includes('reserva') || s.includes('simula')) proposta++
-      else if (s.includes('visita') || s.includes('apresenta')) visita++
-      else if (s.includes('atend') || s.includes('sdr') || s.includes('conex')) atendimento++
-      else novos++
-    })
+    const cNovos    = active.length
+    const cAtend    = active.filter(l => ATENDIMENTO_STATUS.has(l.status ?? '')).length
+    const cVisita   = active.filter(l => VISITA_STATUS.has(l.status ?? '')).length
+    const cReserva  = active.filter(l => RESERVA_STATUS.has(l.status ?? '')).length
+    const cVenda    = active.filter(l => l.status === 'Venda Realizada').length
 
-    const cVenda    = venda
-    const cProposta = proposta + cVenda
-    const cVisita   = visita   + cProposta
-    const cAtend    = atendimento + cVisita
-    const cNovos    = novos   + cAtend
-
-    const tAtend   = cNovos    > 0 ? (cAtend   / cNovos)    * 100 : 0
-    const tVisita  = cAtend    > 0 ? (cVisita   / cAtend)   * 100 : 0
-    const tProposta = cVisita  > 0 ? (cProposta / cVisita)  * 100 : 0
-    const tVenda   = cProposta > 0 ? (cVenda    / cProposta) * 100 : 0
+    const pct = (n: number) => cNovos > 0 ? Math.round((n / cNovos) * 100) : 0
+    const conv = (n: number, d: number) => d > 0 ? Math.round((n / d) * 100) : 0
 
     return [
-      { name: 'Captação (Novos)', count: cNovos,    pct: 100,                                                              conv: 100,                 diag: null,                    situacao: '' },
-      { name: 'Em Atendimento',   count: cAtend,    pct: cNovos    > 0 ? Math.round((cAtend    / cNovos)    * 100) : 0,   conv: Math.round(tAtend),   diag: getDiag(tAtend,    85),  situacao: 'Em Atendimento' },
-      { name: 'Visita',           count: cVisita,   pct: cNovos    > 0 ? Math.round((cVisita   / cNovos)    * 100) : 0,   conv: Math.round(tVisita),  diag: getDiag(tVisita,   45),  situacao: 'Visita Realizada' },
-      { name: 'Proposta/Reserva', count: cProposta, pct: cNovos    > 0 ? Math.round((cProposta / cNovos)    * 100) : 0,   conv: Math.round(tProposta),diag: getDiag(tProposta, 20),  situacao: 'Com Proposta' },
-      { name: 'Venda Fechada',    count: cVenda,    pct: cNovos    > 0 ? Math.round((cVenda    / cNovos)    * 100) : 0,   conv: Math.round(tVenda),   diag: getDiag(tVenda,    35),  situacao: 'Venda Realizada' },
+      {
+        name: 'Captação (Ativos)',
+        count: cNovos,
+        pct: 100,
+        conv: 100,
+        diag: null,
+        statusFilter: null,
+      },
+      {
+        name: 'Em Atendimento',
+        count: cAtend,
+        pct: pct(cAtend),
+        conv: conv(cAtend, cNovos),
+        diag: getDiag(conv(cAtend, cNovos), 75),
+        statusFilter: 'Em Atendimento',
+      },
+      {
+        name: 'Visita',
+        count: cVisita,
+        pct: pct(cVisita),
+        conv: conv(cVisita, cAtend),
+        diag: getDiag(conv(cVisita, cAtend), 30),
+        statusFilter: 'Visita Realizada',
+      },
+      {
+        name: 'Reserva',
+        count: cReserva,
+        pct: pct(cReserva),
+        conv: conv(cReserva, cVisita),
+        diag: getDiag(conv(cReserva, cVisita), 25),
+        statusFilter: 'Com Reserva',
+      },
+      {
+        name: 'Venda Realizada',
+        count: cVenda,
+        pct: pct(cVenda),
+        conv: conv(cVenda, cReserva),
+        diag: getDiag(conv(cVenda, cReserva), 70),
+        statusFilter: 'Venda Realizada',
+      },
     ]
   }, [leads])
 
@@ -74,22 +132,20 @@ export default function FunnelVisualization({ leads }: Props) {
   return (
     <div className="flex flex-col items-center gap-0.5 py-2 w-full">
       {stages.map((step, idx) => {
-        const widthPct  = Math.max(28, step.pct)
-        const nextStep  = stages[idx + 1]
-        const dropped   = nextStep ? step.count - nextStep.count : 0
-        const dropPct   = step.count > 0 ? Math.round((dropped / step.count) * 100) : 0
+        const widthPct = Math.max(28, step.pct)
+        const nextStep = stages[idx + 1]
+        const dropped  = nextStep ? step.count - nextStep.count : 0
+        const dropPct  = step.count > 0 ? Math.round((dropped / step.count) * 100) : 0
         const { color, bg, border } = STAGES[idx]
 
         return (
           <div key={step.name} className="flex flex-col items-center w-full">
-            {/* Stage block */}
             <div
               style={{ width: `${widthPct}%`, background: bg, borderColor: border }}
-              onClick={() => step.situacao ? setLeadFilters({ situacao: step.situacao }) : setLeadFilters({})}
+              onClick={() => step.statusFilter ? setLeadFilters({ situacao: step.statusFilter }) : setLeadFilters({})}
               className="border rounded-xl px-4 py-3 cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:brightness-125 group"
             >
               <div className="flex items-center justify-between gap-3">
-                {/* Left: name + count */}
                 <div className="flex items-center gap-3 min-w-0">
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
                   <div className="min-w-0">
@@ -98,7 +154,6 @@ export default function FunnelVisualization({ leads }: Props) {
                   </div>
                 </div>
 
-                {/* Right: pct + diag */}
                 <div className="flex flex-col items-end shrink-0 gap-1">
                   <span className="text-lg font-black leading-tight" style={{ color }}>{step.pct}%</span>
                   {step.diag && (
@@ -112,7 +167,6 @@ export default function FunnelVisualization({ leads }: Props) {
                 </div>
               </div>
 
-              {/* Progress bar (shows stage's % of total) */}
               <div className="mt-2.5 h-1.5 rounded-full bg-white/5 overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-700"
@@ -121,7 +175,6 @@ export default function FunnelVisualization({ leads }: Props) {
               </div>
             </div>
 
-            {/* Drop-off indicator */}
             {nextStep && (
               <div className="flex items-center gap-1.5 py-1 text-[10px]">
                 <ArrowDown size={9} className="text-zinc-600" />

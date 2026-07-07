@@ -68,6 +68,9 @@ export interface Lead {
   tags?: Array<string | LeadTag>;
   interacao?: LeadInteracao[];
   bolsao?: boolean | string | number;
+  /** Status da etapa do funil — campo direto do banco (confiável) */
+  status?: string;
+  empreendimento_id?: number;
 }
 
 export interface LeadsApiResponse {

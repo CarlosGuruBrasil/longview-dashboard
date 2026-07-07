@@ -344,54 +344,35 @@ export default function DashboardView() {
   }, [allLeads, funnelStart, funnelEnd, funnelCorretor, funnelImobiliaria, funnelGestor, funnelEmpreendimento])
 
   const funnelConsolidated = useMemo(() => {
-    let novos = 0
-    let atendimento = 0
-    let visita = 0
-    let proposta = 0
-    let venda = 0
+    const EXCL = new Set(['Perdido', 'Lançamento Sul da Ilha', 'Lançamento Trindade'])
+    const active = stageLeads.filter(l => !EXCL.has(l.status ?? ''))
 
-    stageLeads.forEach(l => {
-      const s = (l.situacao?.nome ?? '').toLowerCase()
-      
-      if (s === 'venda realizada' || s.includes('negócio ganho') || s.includes('negocio ganho') || s.includes('vendid') || s.includes('venda real')) {
-        venda++
-      } else if (s.includes('com proposta') || s === 'proposta' || s.includes('com reserva') || s.includes('reserva') || s.includes('simula')) {
-        proposta++
-      } else if (s.includes('visita') || s.includes('apresenta')) {
-        visita++
-      } else if (s.includes('atend') || s.includes('sdr') || s.includes('conex')) {
-        atendimento++
-      } else {
-        novos++
-      }
-    })
+    const ATEND_S  = new Set(['Em Atendimento', 'Em Atendimento SDR', 'Sem conexão', 'Carteira Corretor', 'Visita Agendada', 'Visita Realizada', 'Com Reserva', 'Venda Realizada'])
+    const VISITA_S = new Set(['Visita Agendada', 'Visita Realizada', 'Com Reserva', 'Venda Realizada'])
+    const RESERVA_S = new Set(['Com Reserva', 'Venda Realizada'])
 
-    const totalLeads = stageLeads.length
+    const cNovos   = active.length
+    const cAtend   = active.filter(l => ATEND_S.has(l.status ?? '')).length
+    const cVisita  = active.filter(l => VISITA_S.has(l.status ?? '')).length
+    const cReserva = active.filter(l => RESERVA_S.has(l.status ?? '')).length
+    const cVenda   = active.filter(l => l.status === 'Venda Realizada').length
 
-    const cVenda = venda
-    const cProposta = proposta + cVenda
-    const cVisita = visita + cProposta
-    const cAtend = atendimento + cVisita
-    const cNovos = novos + cAtend
-
-    const tAtend = cNovos > 0 ? (cAtend / cNovos) * 100 : 0
-    const tVisita = cAtend > 0 ? (cVisita / cAtend) * 100 : 0
-    const tProposta = cVisita > 0 ? (cProposta / cVisita) * 100 : 0
-    const tVenda = cProposta > 0 ? (cVenda / cProposta) * 100 : 0
+    const pct  = (n: number) => cNovos > 0 ? Math.round((n / cNovos) * 100) : 0
+    const conv = (n: number, d: number) => d > 0 ? Math.round((n / d) * 100) : 0
 
     const getStatus = (val: number, meta: number) => {
-      if (val >= meta) return { label: 'Excelente (Meta batida)', color: 'text-green-400', bg: 'bg-green-500/10 border-green-500/20' }
-      if (val >= meta * 0.7) return { label: 'Bom', color: 'text-sky-400', bg: 'bg-sky-500/10 border-sky-500/20' }
+      if (val >= meta)         return { label: 'Excelente (Meta batida)', color: 'text-green-400', bg: 'bg-green-500/10 border-green-500/20' }
+      if (val >= meta * 0.7)  return { label: 'Bom', color: 'text-sky-400', bg: 'bg-sky-500/10 border-sky-500/20' }
       if (val >= meta * 0.45) return { label: 'Regular', color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/20' }
-      return { label: 'Abaixo da meta', color: 'text-red-400', bg: 'bg-red-500/10 border-red-500/20' }
+      return                         { label: 'Abaixo da meta', color: 'text-red-400', bg: 'bg-red-500/10 border-red-500/20' }
     }
 
     return [
-      { name: '1. Captação (Novos)', count: cNovos, pctOfTotal: 100, convRate: 100, diag: { label: 'Início', color: 'text-zinc-400', bg: 'bg-zinc-800/40 border-zinc-700' } },
-      { name: '2. Em Atendimento', count: cAtend, pctOfTotal: cNovos > 0 ? Math.round((cAtend / cNovos) * 100) : 0, convRate: Math.round(tAtend), diag: getStatus(tAtend, 85) },
-      { name: '3. Visita Realizada/Agendada', count: cVisita, pctOfTotal: cNovos > 0 ? Math.round((cVisita / cNovos) * 100) : 0, convRate: Math.round(tVisita), diag: getStatus(tVisita, 45) },
-      { name: '4. Com Proposta/Reserva', count: cProposta, pctOfTotal: cNovos > 0 ? Math.round((cProposta / cNovos) * 100) : 0, convRate: Math.round(tProposta), diag: getStatus(tProposta, 20) },
-      { name: '5. Venda Fechada', count: cVenda, pctOfTotal: cNovos > 0 ? Math.round((cVenda / cNovos) * 100) : 0, convRate: Math.round(tVenda), diag: getStatus(tVenda, 35) },
+      { name: '1. Captação (Ativos)',       count: cNovos,   pctOfTotal: 100,          convRate: 100,                   diag: { label: 'Início', color: 'text-zinc-400', bg: 'bg-zinc-800/40 border-zinc-700' } },
+      { name: '2. Em Atendimento',          count: cAtend,   pctOfTotal: pct(cAtend),  convRate: conv(cAtend, cNovos),  diag: getStatus(conv(cAtend, cNovos), 75) },
+      { name: '3. Visita Realizada',        count: cVisita,  pctOfTotal: pct(cVisita), convRate: conv(cVisita, cAtend), diag: getStatus(conv(cVisita, cAtend), 30) },
+      { name: '4. Com Reserva',             count: cReserva, pctOfTotal: pct(cReserva),convRate: conv(cReserva, cVisita),diag: getStatus(conv(cReserva, cVisita), 25) },
+      { name: '5. Venda Realizada',         count: cVenda,   pctOfTotal: pct(cVenda),  convRate: conv(cVenda, cReserva),diag: getStatus(conv(cVenda, cReserva), 70) },
     ]
   }, [stageLeads])
 
@@ -695,7 +676,7 @@ export default function DashboardView() {
                           if (funnelEmpreendimento) baseFilters.empreendimento = funnelEmpreendimento
                           if (step.name.includes('Atendimento')) baseFilters.situacao = 'Em Atendimento'
                           else if (step.name.includes('Visita')) baseFilters.situacao = 'Visita Realizada'
-                          else if (step.name.includes('Proposta')) baseFilters.situacao = 'Com Proposta'
+                          else if (step.name.includes('Reserva')) baseFilters.situacao = 'Com Reserva'
                           else if (step.name.includes('Venda')) baseFilters.situacao = 'Venda Realizada'
                           filterAndNavigate(baseFilters)
                         }}
