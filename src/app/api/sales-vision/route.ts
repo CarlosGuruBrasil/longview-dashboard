@@ -8,7 +8,7 @@ export async function GET() {
   const user = await verifyPermission('viewSalesVision');
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const [overviewRows, corretoresRows, funilRows, cicloRows] = await Promise.all([
+  const [overviewRows, corretoresRows, funilRows, cicloRows, funilReservasRows] = await Promise.all([
     // Overview: totais de vendas e ciclo médio
     sql`
       SELECT
@@ -49,6 +49,16 @@ export async function GET() {
       LEFT JOIN leads l ON l.status = fe.nome
       GROUP BY fe.nome, fe.ordem
       ORDER BY fe.ordem, fe.nome
+    `,
+    // Funil de reservas: etapas reais do cv_vendas
+    sql`
+      SELECT
+        situacao,
+        COUNT(*)::int AS qtd
+      FROM cv_vendas
+      WHERE situacao IS NOT NULL AND situacao <> ''
+      GROUP BY situacao
+      ORDER BY qtd DESC
     `,
     // Ciclo de conversão: distribuição por faixas
     sql`
@@ -92,6 +102,10 @@ export async function GET() {
     })),
     cicloDistribuicao: cicloRows.map((r) => ({
       faixa: r.faixa,
+      qtd: Number(r.qtd),
+    })),
+    funilReservas: funilReservasRows.map((r) => ({
+      situacao: r.situacao,
       qtd: Number(r.qtd),
     })),
   });

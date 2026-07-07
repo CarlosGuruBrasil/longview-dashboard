@@ -120,7 +120,7 @@ export default function FunnelVisualization({ leads }: Props) {
         pct: pct(cVenda),
         conv: conv(cVenda, cReserva),
         diag: getDiag(conv(cVenda, cReserva), 70),
-        statusFilter: 'Venda Realizada',
+        statusFilter: null, // dado analítico — pipeline de vendas está no Sales Vision
       },
     ]
   }, [leads])
@@ -142,8 +142,8 @@ export default function FunnelVisualization({ leads }: Props) {
           <div key={step.name} className="flex flex-col items-center w-full">
             <div
               style={{ width: `${widthPct}%`, background: bg, borderColor: border }}
-              onClick={() => step.statusFilter ? setLeadFilters({ situacao: step.statusFilter }) : setLeadFilters({})}
-              className="border rounded-xl px-4 py-3 cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:brightness-125 group"
+              onClick={() => step.statusFilter ? setLeadFilters({ situacao: step.statusFilter }) : undefined}
+              className={`border rounded-xl px-4 py-3 transition-all duration-300 ${step.statusFilter ? 'cursor-pointer hover:scale-[1.02] hover:brightness-125' : 'cursor-default'} group`}
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">

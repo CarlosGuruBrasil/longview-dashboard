@@ -672,16 +672,20 @@ export default function DashboardView() {
                       {/* Bloco de Funil Invertido */}
                       <div
                         onClick={() => {
+                          if (step.name.includes('Venda')) return // dado analítico — pipeline no Sales Vision
                           const baseFilters: Record<string, string> = {}
                           if (funnelEmpreendimento) baseFilters.empreendimento = funnelEmpreendimento
                           if (step.name.includes('Atendimento')) baseFilters.situacao = 'Em Atendimento'
                           else if (step.name.includes('Visita')) baseFilters.situacao = 'Visita Realizada'
                           else if (step.name.includes('Reserva')) baseFilters.situacao = 'Com Reserva'
-                          else if (step.name.includes('Venda')) baseFilters.situacao = 'Venda Realizada'
                           filterAndNavigate(baseFilters)
                         }}
                         style={{ width: blockWidth }}
-                        className="group relative overflow-hidden rounded-xl border border-white/10 bg-gradient-to-r from-white/[0.03] to-white/[0.01] hover:from-white/[0.08] hover:to-white/[0.04] p-3 flex items-center justify-between cursor-pointer transition-all hover:scale-[1.01] duration-300"
+                        className={`group relative overflow-hidden rounded-xl border border-white/10 bg-gradient-to-r from-white/[0.03] to-white/[0.01] p-3 flex items-center justify-between transition-all duration-300 ${
+                          step.name.includes('Venda')
+                            ? 'cursor-default opacity-80'
+                            : 'hover:from-white/[0.08] hover:to-white/[0.04] cursor-pointer hover:scale-[1.01]'
+                        }`}
                       >
                         {/* Indicador de Meta do Estágio */}
                         <div className="absolute left-0 top-0 bottom-0 w-1 bg-sky-500/50 group-hover:bg-orange-500/60 transition-colors" />
