@@ -33,6 +33,19 @@ export default function LeadsView() {
   const [growthMode, setGrowthMode] = useState<'month' | 'year'>('month')
   const [syncing, setSyncing] = useState(false)
 
+  // Paginação local do frontend para responder reativamente aos filtros globais/locais
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 50
+
+  const paginatedLeads = useMemo(() => {
+    const startIdx = (currentPage - 1) * itemsPerPage
+    return filteredLeads.slice(startIdx, startIdx + itemsPerPage)
+  }, [filteredLeads, currentPage])
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [filteredLeads])
+
   // Filtros locais independentes para o Gráfico de Crescimento
   const [growthStart, setGrowthStart] = useState('')
   const [growthEnd, setGrowthEnd]     = useState('')
@@ -284,12 +297,12 @@ export default function LeadsView() {
 
           {/* Leads table */}
           <LeadsTable 
-            leads={detailedLeads} 
-            page={detailedPage}
-            limit={detailedLimit}
-            total={detailedTotal}
-            loading={detailedLoading}
-            onPageChange={fetchDetailedLeads}
+            leads={paginatedLeads} 
+            page={currentPage}
+            limit={itemsPerPage}
+            total={filteredLeads.length}
+            loading={loading}
+            onPageChange={(page) => setCurrentPage(page)}
             allLeadsForDropdowns={allLeads}
           />
         </div>

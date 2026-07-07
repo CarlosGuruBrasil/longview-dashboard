@@ -251,30 +251,6 @@ export default function LeadsTable({
 
       {/* ── DESKTOP FILTER BAR ────────────────────────────────────────── */}
       <div className="hidden sm:flex flex-col gap-2">
-        {/* Row 0 — local date range (independent from global filter) */}
-        <div className="flex gap-2 items-center flex-wrap text-xs text-zinc-500">
-          <span className="text-[11px] font-semibold uppercase tracking-wider shrink-0">Período da lista:</span>
-          <input
-            type="date"
-            value={localStart}
-            onChange={(e) => setLocalStart(e.target.value)}
-            className={`${localStart ? chipActive : chipIdle} w-36 placeholder:text-zinc-600`}
-            placeholder="De..."
-          />
-          <input
-            type="date"
-            value={localEnd}
-            onChange={(e) => setLocalEnd(e.target.value)}
-            className={`${localEnd ? chipActive : chipIdle} w-36 placeholder:text-zinc-600`}
-            placeholder="Até..."
-          />
-          {(localStart || localEnd) && (
-            <button onClick={() => { setLocalStart(''); setLocalEnd(''); }} className={`${chipIdle} !text-zinc-400 px-2.5`}>
-              ✕ Limpar data
-            </button>
-          )}
-          <span className="text-[10px] text-zinc-600 ml-1">Sem data selecionada = todos os leads, mais recentes primeiro</span>
-        </div>
         {/* Row 1 — primary filters */}
         <div className="flex gap-2 items-center flex-wrap">
           <input
@@ -385,7 +361,7 @@ export default function LeadsTable({
           const sc     = getStatusColor(lead);
           const rawDate = lead.data_cad || lead.data_cadastro || lead.data_cadastramento;
 
-          const hasComments = Array.isArray(lead.interacao) && lead.interacao.length > 0;
+          const hasComments = Array.isArray(lead.interacao) && lead.interacao.some(it => it.descricao && it.descricao.trim().length > 0);
           const lastUpdate = lead.data_atualizacao || lead.data_cadastro || lead.data_cad || '';
           const daysIdle = lastUpdate ? Math.floor((Date.now() - new Date(lastUpdate).getTime()) / (1000 * 60 * 60 * 24)) : 0;
 
@@ -448,7 +424,7 @@ export default function LeadsTable({
               const sc     = getStatusColor(lead);
               const rawDate = lead.data_cad || lead.data_cadastro || lead.data_cadastramento;
 
-               const hasComments = Array.isArray(lead.interacao) && lead.interacao.length > 0;
+               const hasComments = Array.isArray(lead.interacao) && lead.interacao.some(it => it.descricao && it.descricao.trim().length > 0);
                const lastUpdate = lead.data_atualizacao || lead.data_cadastro || lead.data_cad || '';
                const daysIdle = lastUpdate ? Math.floor((Date.now() - new Date(lastUpdate).getTime()) / (1000 * 60 * 60 * 24)) : 0;
 

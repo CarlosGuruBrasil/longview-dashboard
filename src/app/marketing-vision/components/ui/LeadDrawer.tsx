@@ -214,7 +214,7 @@ export default function LeadDrawer({ lead, onClose }: Props) {
   
   const sc = getStatusColor(activeLead);
   const tags = getLeadTags(activeLead);
-  const interacoes = activeLead.interacao ?? [];
+  const interacoes = (activeLead.interacao ?? []).filter(it => it.descricao && it.descricao.trim().length > 0);
   const source = getLeadSource(activeLead);
 
   // Submissão das alterações

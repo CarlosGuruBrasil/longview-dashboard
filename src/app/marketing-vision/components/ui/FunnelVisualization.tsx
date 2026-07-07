@@ -1,198 +1,145 @@
 'use client'
 
 import { useMemo } from 'react'
+import { ArrowRight, ArrowDown, Activity } from 'lucide-react'
 import type { Lead } from '../../types'
 import { formatNumber } from '../../utils/formatters'
+import { useData } from '../../context/DataContext'
 
 interface Props {
   leads: Lead[]
 }
 
-const STAGES = [
-  { key: 'aguardando atendimento',          label: 'Aguardando Atendimento',          color: '#3b82f6' },
-  { key: 'em atendimento sdr',              label: 'Em Atendimento SDR',              color: '#8b5cf6' },
-  { key: 'aguardando atendimento corretor', label: 'Aguardando Atendimento Corretor', color: '#6366f1' },
-  { key: 'em atendimento',                  label: 'Em Atendimento',                  color: '#a855f7' },
-  { key: 'lançamento sul da ilha',          label: 'Lançamento Sul da Ilha',          color: '#ec4899' },
-  { key: 'lançamento trindade',             label: 'Lançamento Trindade',             color: '#f43f5e' },
-  { key: 'visita agendada',                 label: 'Visita Agendada',                 color: '#f97316' },
-  { key: 'visita realizada',                label: 'Visita Realizada',                color: '#f59e0b' },
-  { key: 'simulação',                       label: 'Simulação',                       color: '#eab308' },
-  { key: 'com reserva',                     label: 'Com Reserva',                     color: '#06b6d4' },
-  { key: 'venda realizada',                 label: 'Venda Realizada',                 color: '#10b981' },
-  { key: 'sem conexão',                     label: 'Sem Conexão (Descartado)',        color: '#ef4444' },
-  { key: 'perdido',                         label: 'Perdido (Descartado)',            color: '#6b7280' },
-] as const
-
 export default function FunnelVisualization({ leads }: Props) {
-  const stages = useMemo(() => {
-    const stageCounts: Record<string, number> = {
-      'aguardando atendimento': 0,
-      'em atendimento sdr': 0,
-      'aguardando atendimento corretor': 0,
-      'em atendimento': 0,
-      'lançamento sul da ilha': 0,
-      'lançamento trindade': 0,
-      'visita agendada': 0,
-      'visita realizada': 0,
-      'simulação': 0,
-      'com reserva': 0,
-      'venda realizada': 0,
-      'sem conexão': 0,
-      'perdido': 0,
-    }
+  const { leadFilters, setLeadFilters } = useData()
 
-    for (const lead of leads) {
-      const sit = lead.situacao?.nome || String((lead as Record<string, unknown>).status ?? '') || '';
-      const s = sit.toLowerCase().trim();
+  const funnelConsolidated = useMemo(() => {
+    let novos = 0
+    let atendimento = 0
+    let visita = 0
+    let proposta = 0
+    let venda = 0
 
-      if (s === 'aguardando atendimento' || s === 'inicio' || s === 'início') {
-        stageCounts['aguardando atendimento']++
-      } else if (s === 'em atendimento sdr') {
-        stageCounts['em atendimento sdr']++
-      } else if (s === 'aguardando atendimento corretor') {
-        stageCounts['aguardando atendimento corretor']++
-      } else if (s === 'em atendimento') {
-        stageCounts['em atendimento']++
-      } else if (s.includes('sul da ilha')) {
-        stageCounts['lançamento sul da ilha']++
-      } else if (s.includes('trindade')) {
-        stageCounts['lançamento trindade']++
-      } else if (s === 'visita agendada') {
-        stageCounts['visita agendada']++
-      } else if (s === 'visita realizada') {
-        stageCounts['visita realizada']++
-      } else if (s === 'simulação' || s === 'simulacao') {
-        stageCounts['simulação']++
-      } else if (s === 'com reserva' || s === 'reserva') {
-        stageCounts['com reserva']++
-      } else if (s === 'venda realizada' || s.includes('ganho') || s.includes('vendid')) {
-        stageCounts['venda realizada']++
-      } else if (s === 'sem conexão' || s === 'sem conexao') {
-        stageCounts['sem conexão']++
-      } else if (s === 'perdido' || s.includes('descart') || s.includes('cancel')) {
-        stageCounts['perdido']++
+    leads.forEach(l => {
+      const s = (l.situacao?.nome ?? '').toLowerCase()
+      
+      if (s === 'venda realizada' || s.includes('negócio ganho') || s.includes('negocio ganho') || s.includes('vendid') || s.includes('venda real')) {
+        venda++
+      } else if (s.includes('com proposta') || s === 'proposta' || s.includes('com reserva') || s.includes('reserva') || s.includes('simula')) {
+        proposta++
+      } else if (s.includes('visita') || s.includes('apresenta')) {
+        visita++
+      } else if (s.includes('atend') || s.includes('sdr') || s.includes('conex')) {
+        atendimento++
+      } else {
+        novos++
       }
-    }
-
-    const total = leads.length
-
-    return STAGES.map((s, i) => {
-      const count = stageCounts[s.key]
-      const pctOfTotal = total > 0 ? ((count / total) * 100).toFixed(1) : '0.0'
-
-      // Conversão a partir da etapa anterior apenas para a trilha principal (sequencial física)
-      const mainPathKeys = [
-        'aguardando atendimento', 
-        'em atendimento sdr', 
-        'aguardando atendimento corretor', 
-        'em atendimento', 
-        'visita agendada', 
-        'visita realizada', 
-        'simulação', 
-        'com reserva', 
-        'venda realizada'
-      ]
-      let convFromPrev: string | null = null
-
-      if (mainPathKeys.includes(s.key)) {
-        const pathIdx = mainPathKeys.indexOf(s.key)
-        if (pathIdx > 0) {
-          const prevKey = mainPathKeys[pathIdx - 1]
-          const prevCount = stageCounts[prevKey]
-          convFromPrev = prevCount > 0 ? ((count / prevCount) * 100).toFixed(1) : '0.0'
-        }
-      }
-
-      return { ...s, count, pctOfTotal, convFromPrev }
     })
+
+    const cVenda = venda
+    const cProposta = proposta + cVenda
+    const cVisita = visita + cProposta
+    const cAtend = atendimento + cVisita
+    const cNovos = novos + cAtend
+
+    const tAtend = cNovos > 0 ? (cAtend / cNovos) * 100 : 0
+    const tVisita = cAtend > 0 ? (cVisita / cAtend) * 100 : 0
+    const tProposta = cVisita > 0 ? (cProposta / cVisita) * 100 : 0
+    const tVenda = cProposta > 0 ? (cVenda / cProposta) * 100 : 0
+
+    const getStatus = (val: number, meta: number) => {
+      if (val >= meta) return { label: 'Excelente', color: 'text-green-400 border-green-500/20 bg-green-500/10' }
+      if (val >= meta * 0.7) return { label: 'Bom', color: 'text-sky-400 border-sky-500/20 bg-sky-500/10' }
+      if (val >= meta * 0.45) return { label: 'Regular', color: 'text-amber-400 border-amber-500/20 bg-amber-500/10' }
+      return { label: 'Abaixo da Meta', color: 'text-red-400 border-red-500/20 bg-red-500/10' }
+    }
+
+    return [
+      { name: '1. Captação (Novos)', count: cNovos, pctOfTotal: 100, convRate: 100, diag: { label: 'Início', color: 'text-zinc-400 border-zinc-700 bg-zinc-800/40' } },
+      { name: '2. Em Atendimento', count: cAtend, pctOfTotal: cNovos > 0 ? Math.round((cAtend / cNovos) * 100) : 0, convRate: Math.round(tAtend), diag: getStatus(tAtend, 85) },
+      { name: '3. Visita Realizada/Agendada', count: cVisita, pctOfTotal: cNovos > 0 ? Math.round((cVisita / cNovos) * 100) : 0, convRate: Math.round(tVisita), diag: getStatus(tVisita, 45) },
+      { name: '4. Com Proposta/Reserva', count: cProposta, pctOfTotal: cNovos > 0 ? Math.round((cProposta / cNovos) * 100) : 0, convRate: Math.round(tProposta), diag: getStatus(tProposta, 20) },
+      { name: '5. Venda Fechada', count: cVenda, pctOfTotal: cNovos > 0 ? Math.round((cVenda / cNovos) * 100) : 0, convRate: Math.round(tVenda), diag: getStatus(tVenda, 35) },
+    ]
   }, [leads])
 
-  const maxCount = Math.max(...stages.map(s => s.count), 1)
-
   return (
-    <div className="flex flex-col gap-4 py-2">
-      {/* Header */}
+    <div className="flex flex-col gap-5 py-2">
+      {/* Cabeçalho */}
       <div className="flex items-center justify-between border-b border-white/10 pb-3">
         <div className="flex items-center gap-2">
-          <h3 className="text-sm font-bold text-white uppercase tracking-wider">Etapas de Leads no Funil</h3>
-          <span className="bg-orange-500/10 text-orange-400 border border-orange-500/20 px-2 py-0.5 rounded text-[11px] font-semibold">
-            Todas as Etapas CRM
+          <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+            <Activity size={15} className="text-orange-500" /> Funil Comercial Consolidado
+          </h3>
+          <span className="bg-orange-500/10 text-orange-400 border border-orange-500/20 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
+            Pipeline
           </span>
         </div>
         <span className="text-xs text-zinc-400">
-          Total de <strong>{formatNumber(leads.length)}</strong> leads analisados
+          Total de <strong>{formatNumber(leads.length)}</strong> leads no período
         </span>
       </div>
 
-      {/* Funil Visual Centralizado com Todas as Etapas */}
-      <div className="flex flex-col gap-2 my-1">
-        {stages.map((stage, idx) => {
-          const barW = maxCount > 0 ? (stage.count / maxCount) * 100 : 0
-          const colorHex = stage.key === 'venda realizada' ? '#10b981' : stage.color
+      {/* Funil Visual Progressivo */}
+      <div className="flex flex-col gap-3 pr-1 w-full max-w-xl mx-auto py-2">
+        {funnelConsolidated.length === 0 || leads.length === 0 ? (
+          <p className="text-zinc-500 text-center text-xs py-12">Nenhum lead encontrado para os filtros selecionados.</p>
+        ) : (
+          funnelConsolidated.map((step, idx) => {
+            const blockWidth = `${Math.max(35, step.pctOfTotal)}%`
 
-          return (
-            <div key={stage.key} className="flex flex-col gap-1 w-full">
-              {/* Informações da Etapa */}
-              <div className="flex justify-between items-center text-xs px-2">
-                <span className="font-semibold text-zinc-300 flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: colorHex }} />
-                  {stage.label}
-                </span>
-                <div className="flex items-center gap-3 text-zinc-400">
-                  <span className="font-bold text-white text-[12px]">{formatNumber(stage.count)} leads</span>
-                  <span className="text-[10px] text-zinc-500">({stage.pctOfTotal}%)</span>
-                </div>
-              </div>
-
-              {/* Barra de Funil Centralizada */}
-              <div className="flex items-center gap-4">
-                {/* Indicador de conversão da etapa anterior */}
-                <div className="w-16 shrink-0 text-right">
-                  {stage.convFromPrev !== null ? (
-                    <span 
-                      className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/5 border border-white/10"
-                      style={{
-                        color: Number(stage.convFromPrev) >= 50 ? '#10b981'
-                             : Number(stage.convFromPrev) >= 20 ? '#f59e0b'
-                             : '#ef4444'
-                      }}
-                      title="Conversão em relação à etapa anterior imediata"
-                    >
-                      {stage.convFromPrev}%
-                    </span>
-                  ) : (
-                    <span className="text-[9px] text-zinc-600 font-medium">—</span>
-                  )}
-                </div>
-
-                {/* Container da barra */}
-                <div className="flex-1 h-7 rounded-lg overflow-hidden border border-white/5 relative flex justify-center bg-white/[0.01]">
-                  <div
-                    className="h-full rounded-md transition-all duration-500"
-                    style={{
-                      width: `${Math.max(barW, 3)}%`,
-                      backgroundColor: colorHex,
-                      opacity: stage.count > 0 ? 0.8 : 0.15,
-                    }}
-                  />
+            return (
+              <div key={step.name} className="flex flex-col items-center w-full">
+                {/* Bloco do Funil */}
+                <div
+                  onClick={() => {
+                    const baseFilters = { ...leadFilters }
+                    if (step.name.includes('Atendimento')) baseFilters.situacao = 'Em Atendimento'
+                    else if (step.name.includes('Visita')) baseFilters.situacao = 'Visita Realizada'
+                    else if (step.name.includes('Proposta')) baseFilters.situacao = 'Com Proposta'
+                    else if (step.name.includes('Venda')) baseFilters.situacao = 'Venda Realizada'
+                    else delete baseFilters.situacao
+                    setLeadFilters(baseFilters)
+                  }}
+                  style={{ width: blockWidth }}
+                  className="group relative overflow-hidden rounded-xl border border-white/10 bg-gradient-to-r from-white/[0.03] to-white/[0.01] hover:from-white/[0.08] hover:to-white/[0.04] p-3 flex items-center justify-between cursor-pointer transition-all hover:scale-[1.01] duration-300 shadow-lg"
+                >
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-orange-500/50 group-hover:bg-orange-500 transition-colors" />
                   
-                  {/* Seta interna ilustrativa de afunilamento */}
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <span className="text-[9px] font-bold text-zinc-100 uppercase tracking-wider drop-shadow-md">
-                      {stage.count > 0 ? `${stage.pctOfTotal}%` : ''}
+                  <div className="flex flex-col gap-0.5 pl-1.5">
+                    <span className="text-[11px] font-bold text-zinc-300 group-hover:text-white transition-colors">
+                      {step.name}
                     </span>
+                    <span className="text-[10px] text-zinc-500">
+                      Volume: <strong className="text-zinc-300 font-semibold">{formatNumber(step.count)}</strong> ({step.pctOfTotal}%)
+                    </span>
+                  </div>
+
+                  <div className="text-right flex items-center gap-3">
+                    <div className="flex flex-col">
+                      <span className="text-xs font-bold text-zinc-100">
+                        {idx === 0 ? 'Conversão' : `Conv: ${step.convRate}%`}
+                      </span>
+                      {idx > 0 && (
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full mt-0.5 border ${step.diag.color}`}>
+                          {step.diag.label}
+                        </span>
+                      )}
+                    </div>
+                    <ArrowRight size={12} className="text-zinc-500 group-hover:text-white transition-colors translate-x-0 group-hover:translate-x-1 duration-300" />
                   </div>
                 </div>
 
-                {/* Indicador visual de sequência */}
-                <div className="w-10 shrink-0 text-zinc-600 text-center font-bold text-xs">
-                  {idx < stages.length - 1 ? '↓' : '🏆'}
-                </div>
+                {/* Seta de Conversão */}
+                {idx < funnelConsolidated.length - 1 && (
+                  <div className="flex flex-col items-center justify-center my-1.5">
+                    <ArrowDown size={14} className="text-zinc-700 animate-pulse" />
+                  </div>
+                )}
               </div>
-            </div>
-          )
-        })}
+            )
+          })
+        )}
       </div>
     </div>
   )

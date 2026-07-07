@@ -9,6 +9,11 @@ export interface LeadFilters {
   origem?: string;
   situacao?: string;
   empreendimento?: string;
+  corretor?: string;
+  imobiliaria?: string;
+  gestor?: string;
+  startDate?: string;
+  endDate?: string;
 }
 
 interface DataContextValue {
@@ -118,15 +123,17 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
   const filteredLeads = useMemo(() => {
     let result = allLeads;
 
-    // Date filter
-    if (dateRange.start || dateRange.end) {
+    // Date filter: local filters override global filters
+    const start = leadFilters.startDate || dateRange.start;
+    const end = leadFilters.endDate || dateRange.end;
+    if (start || end) {
       result = result.filter(lead => {
         const raw = lead.data_cad || lead.data_cadastro || lead.data_cadastramento;
         if (!raw) return false;
         const d = toISODate(raw);
         if (!d) return false;
-        if (dateRange.start && d < dateRange.start) return false;
-        if (dateRange.end && d > dateRange.end) return false;
+        if (start && d < start) return false;
+        if (end && d > end) return false;
         return true;
       });
     }
@@ -153,6 +160,27 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
         return Array.isArray(emp)
           ? emp.some(e => (e.nome || '').toLowerCase().includes(filterVal))
           : (emp as { nome?: string } | undefined)?.nome?.toLowerCase().includes(filterVal);
+      });
+    }
+    if (leadFilters.corretor) {
+      const filterVal = leadFilters.corretor.toLowerCase();
+      result = result.filter(lead => {
+        const name = String(lead.corretor?.nome || '').toLowerCase();
+        return name === filterVal;
+      });
+    }
+    if (leadFilters.imobiliaria) {
+      const filterVal = leadFilters.imobiliaria.toLowerCase();
+      result = result.filter(lead => {
+        const name = String(lead.imobiliaria?.nome || '').toLowerCase();
+        return name === filterVal;
+      });
+    }
+    if (leadFilters.gestor) {
+      const filterVal = leadFilters.gestor.toLowerCase();
+      result = result.filter(lead => {
+        const name = String(lead.gestor?.nome || (lead.raw as any)?.gestor?.nome || '').toLowerCase();
+        return name === filterVal;
       });
     }
 

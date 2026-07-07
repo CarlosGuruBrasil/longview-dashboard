@@ -325,6 +325,7 @@ async function readLeadsFromPg(
         base.motivo_cancelamento = leadObj.motivo_cancelamento || null;
         base.tags = leadObj.tags || [];
         base.data_atualizacao = r.data_atualizacao || leadObj.data_atualizacao;
+        base.interacao = leadObj.interacao || [];
       }
 
       return base;
