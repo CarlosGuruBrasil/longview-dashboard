@@ -322,27 +322,38 @@ async function updateIdDataReferences(): Promise<void> {
   `;
 }
 
+async function safe(name: string, fn: () => Promise<number>, results: Record<string, number | string>) {
+  try {
+    results[name] = await fn();
+  } catch (e: unknown) {
+    results[name] = `ERROR: ${e instanceof Error ? e.message : String(e)}`;
+  }
+}
+
 export async function POST(request: NextRequest) {
   if (!isCronAuthorized(request)) return unauthorizedJson();
 
-  await ensureSchema();
+  try {
+    await ensureSchema();
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: `ensureSchema: ${e instanceof Error ? e.message : String(e)}` }, { status: 500 });
+  }
 
   const results: Record<string, number | string> = {};
 
-  results.dim_tempo = await upsertDimTempo();
-  results.dim_empreendimentos = await upsertDimEmpreendimentos();
-  results.dim_campanhas_meta = await upsertDimCampanhasMeta();
-  results.fato_leads = await upsertFatoLeads();
-  results.fato_vendas = await upsertFatoVendas();
-  results.fato_interacoes = await upsertFatoInteracoes();
-  results.fato_midia_paga = await upsertFatoMidiaPaga();
-  results.fato_atribuicao = await upsertFatoAtribuicao();
+  await safe('dim_tempo',           upsertDimTempo,           results);
+  await safe('dim_empreendimentos', upsertDimEmpreendimentos, results);
+  await safe('dim_campanhas_meta',  upsertDimCampanhasMeta,   results);
+  await safe('fato_leads',          upsertFatoLeads,          results);
+  await safe('fato_vendas',         upsertFatoVendas,         results);
+  await safe('fato_interacoes',     upsertFatoInteracoes,     results);
+  await safe('fato_midia_paga',     upsertFatoMidiaPaga,      results);
+  await safe('fato_atribuicao',     upsertFatoAtribuicao,     results);
 
-  await updateIdDataReferences();
+  try { await updateIdDataReferences(); } catch (e: unknown) {
+    results['updateIdDataReferences'] = `ERROR: ${e instanceof Error ? e.message : String(e)}`;
+  }
 
-  return NextResponse.json({
-    ok: true,
-    message: 'BI Star Schema sincronizado',
-    results,
-  });
+  const hasErrors = Object.values(results).some(v => typeof v === 'string' && v.startsWith('ERROR'));
+  return NextResponse.json({ ok: !hasErrors, message: 'BI Star Schema sincronizado', results });
 }
