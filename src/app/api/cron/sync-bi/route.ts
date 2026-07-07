@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql, ensureSchema } from '@/lib/pg';
 import { isCronAuthorized, unauthorizedJson } from '@/lib/internal-auth';
+import axios from 'axios';
 
 export const maxDuration = 300;
 export const runtime = 'nodejs';
@@ -158,25 +159,68 @@ async function upsertFatoInteracoes(): Promise<number> {
 async function upsertFatoMidiaPaga(): Promise<number> {
   await sql`DELETE FROM fato_midia_paga`;
 
-  const email = process.env.CV_CRM_EMAIL;
-  const token = process.env.CV_CRM_TOKEN;
-  if (!email || !token) return 0;
+  const metaToken = process.env.META_TOKEN;
+  const actId     = process.env.META_ACT_ID;
+  if (!metaToken || !actId) return 0;
 
   try {
-    await sql`
-      INSERT INTO fato_midia_paga (id_campanha, data, spend, impressions, clicks, leads_meta)
-      SELECT
-        'meta_ads',
-        d::date AS data,
-        0, 0, 0, 0
-      FROM generate_series(
-        (SELECT COALESCE(MIN(data_cadastro), CURRENT_DATE - 90) FROM leads),
-        CURRENT_DATE,
-        '1 day'
-      ) AS d
-      ON CONFLICT DO NOTHING
-    `;
-    return 1;
+    // Busca insights por campanha, por dia, últimos 90 dias
+    const res = await axios.get(`https://graph.facebook.com/v21.0/${actId}/insights`, {
+      params: {
+        level:         'campaign',
+        fields:        'campaign_id,campaign_name,spend,impressions,clicks,reach,frequency,cpc,cpm,ctr,actions',
+        date_preset:   'last_90d',
+        time_increment: 1,
+        limit:         500,
+        access_token:  metaToken,
+      },
+      timeout: 30000,
+    });
+
+    type InsightRow = {
+      campaign_id: string; campaign_name: string;
+      date_start: string; spend: string; impressions: string;
+      clicks: string; reach: string; frequency: string;
+      cpc: string; cpm: string; ctr: string;
+      actions?: { action_type: string; value: string }[];
+    };
+
+    const rows: InsightRow[] = res.data?.data ?? [];
+    if (rows.length === 0) return 0;
+
+    // Garante que as campanhas existam na dim
+    const campaignNames = [...new Set(rows.map(r => ({ id: r.campaign_id, nome: r.campaign_name })))];
+    for (const c of campaignNames) {
+      await sql`
+        INSERT INTO dim_campanhas_meta (id_campanha, nome)
+        VALUES (${c.id}, ${c.nome})
+        ON CONFLICT (id_campanha) DO UPDATE SET nome = EXCLUDED.nome
+      `;
+    }
+
+    let inserted = 0;
+    for (const r of rows) {
+      const leadsAction = r.actions?.find(a => a.action_type === 'lead')?.value ?? '0';
+      await sql`
+        INSERT INTO fato_midia_paga (id_campanha, data, spend, impressions, clicks, reach, frequency, cpc, cpm, ctr, leads_meta)
+        VALUES (
+          ${r.campaign_id},
+          ${r.date_start}::date,
+          ${parseFloat(r.spend || '0')},
+          ${parseInt(r.impressions || '0')},
+          ${parseInt(r.clicks || '0')},
+          ${parseInt(r.reach || '0')},
+          ${parseFloat(r.frequency || '0')},
+          ${parseFloat(r.cpc || '0')},
+          ${parseFloat(r.cpm || '0')},
+          ${parseFloat(r.ctr || '0')},
+          ${parseInt(leadsAction)}
+        )
+        ON CONFLICT DO NOTHING
+      `;
+      inserted++;
+    }
+    return inserted;
   } catch {
     return 0;
   }
@@ -185,27 +229,48 @@ async function upsertFatoMidiaPaga(): Promise<number> {
 async function upsertFatoAtribuicao(): Promise<number> {
   await sql`DELETE FROM fato_atribuicao_marketing`;
 
+  // Usa cv_vendas para identificar vendas reais (valor_venda quase sempre 0 nos leads)
   const result = await sql`
     INSERT INTO fato_atribuicao_marketing (
       id_campanha, nome_campanha, data,
+      spend, impressions, clicks,
       leads_gerados, leads_com_venda, valor_vendas,
       cpl, cac, roas
     )
     SELECT
-      COALESCE(NULLIF(l.midia, ''), 'Sem origem'),
-      COALESCE(NULLIF(l.midia, ''), 'Sem origem'),
-      l.data_cadastro,
-      COUNT(*)::bigint AS leads_gerados,
-      COUNT(*) FILTER (WHERE l.valor_venda > 0)::bigint AS leads_com_venda,
-      COALESCE(SUM(l.valor_venda), 0) AS valor_vendas,
-      CASE WHEN COUNT(*) > 0 THEN 0 ELSE 0 END AS cpl,
-      CASE WHEN COUNT(*) FILTER (WHERE l.valor_venda > 0) > 0
-        THEN 0 ELSE 0 END AS cac,
-      CASE WHEN COUNT(*) > 0 AND COALESCE(SUM(l.valor_venda), 0) > 0
-        THEN 0 ELSE 0 END AS roas
+      COALESCE(NULLIF(l.midia, ''), 'Sem origem')      AS id_campanha,
+      COALESCE(
+        dc.nome,
+        NULLIF(l.midia, ''),
+        'Sem origem'
+      )                                                 AS nome_campanha,
+      l.data_cadastro                                   AS data,
+      COALESCE(SUM(mp.spend), 0)                        AS spend,
+      COALESCE(SUM(mp.impressions), 0)                  AS impressions,
+      COALESCE(SUM(mp.clicks), 0)                       AS clicks,
+      COUNT(DISTINCT l.id_lead)::bigint                 AS leads_gerados,
+      COUNT(DISTINCT v.id_venda)::bigint                AS leads_com_venda,
+      COALESCE(SUM(v.valor), 0)                         AS valor_vendas,
+      CASE WHEN COUNT(DISTINCT l.id_lead) > 0 AND COALESCE(SUM(mp.spend), 0) > 0
+        THEN ROUND(SUM(mp.spend) / COUNT(DISTINCT l.id_lead), 2)
+        ELSE 0 END                                      AS cpl,
+      CASE WHEN COUNT(DISTINCT v.id_venda) > 0 AND COALESCE(SUM(mp.spend), 0) > 0
+        THEN ROUND(SUM(mp.spend) / COUNT(DISTINCT v.id_venda), 2)
+        ELSE 0 END                                      AS cac,
+      CASE WHEN COALESCE(SUM(mp.spend), 0) > 0 AND COALESCE(SUM(v.valor), 0) > 0
+        THEN ROUND(SUM(v.valor) / SUM(mp.spend), 2)
+        ELSE 0 END                                      AS roas
     FROM fato_leads l
+    LEFT JOIN fato_vendas v      ON v.id_venda IN (
+      SELECT cv.id FROM cv_vendas cv WHERE cv.id IN (
+        SELECT raw->>'idvenda' FROM leads WHERE id = l.id_lead
+      )
+    )
+    LEFT JOIN fato_midia_paga mp ON mp.id_campanha = COALESCE(NULLIF(l.midia, ''), 'Sem origem')
+                                AND mp.data = l.data_cadastro
+    LEFT JOIN dim_campanhas_meta dc ON dc.id_campanha = COALESCE(NULLIF(l.midia, ''), 'Sem origem')
     WHERE l.data_cadastro IS NOT NULL
-    GROUP BY l.midia, l.data_cadastro
+    GROUP BY l.midia, dc.nome, l.data_cadastro
     ON CONFLICT DO NOTHING
   `;
   return result.count ?? 0;

@@ -65,47 +65,61 @@ export async function GET(_request: NextRequest) {
         GROUP BY range
         ORDER BY MIN(tempo_conversao_dias)
       `,
-      // Campaign attribution
+      // Campaign attribution — lê de fato_atribuicao_marketing (dados reais do Meta Ads)
       sql`
         SELECT
-          COALESCE(NULLIF(midia, ''), 'Sem origem') AS campaign_name,
-          0 AS spend, 0 AS impressions, 0 AS clicks,
-          COUNT(*)::int AS leads,
-          COUNT(*) FILTER (WHERE valor_venda > 0)::int AS sales,
-          COALESCE(SUM(valor_venda), 0) AS revenue,
-          0 AS cpl, 0 AS cac, 0 AS roas
-        FROM fato_leads
-        GROUP BY midia
+          nome_campanha                     AS campaign_name,
+          SUM(spend)::numeric               AS spend,
+          SUM(impressions)::bigint          AS impressions,
+          SUM(clicks)::bigint               AS clicks,
+          SUM(leads_gerados)::int           AS leads,
+          SUM(leads_com_venda)::int         AS sales,
+          SUM(valor_vendas)::numeric        AS revenue,
+          CASE WHEN SUM(leads_gerados) > 0 AND SUM(spend) > 0
+            THEN ROUND(SUM(spend) / SUM(leads_gerados), 2) ELSE 0 END AS cpl,
+          CASE WHEN SUM(leads_com_venda) > 0 AND SUM(spend) > 0
+            THEN ROUND(SUM(spend) / SUM(leads_com_venda), 2) ELSE 0 END AS cac,
+          CASE WHEN SUM(spend) > 0 AND SUM(valor_vendas) > 0
+            THEN ROUND(SUM(valor_vendas) / SUM(spend), 2) ELSE 0 END AS roas
+        FROM fato_atribuicao_marketing
+        GROUP BY nome_campanha
         ORDER BY leads DESC
         LIMIT 20
       `,
-      // Monthly series
+      // Monthly series — spend real do Meta Ads
       sql`
         SELECT
-          to_char(data_cadastro, 'YYYY-MM') AS month,
-          COUNT(*)::int AS leads,
-          COUNT(*) FILTER (WHERE valor_venda > 0)::int AS sales,
-          COALESCE(SUM(valor_venda), 0) AS vgv,
-          0 AS spend
-        FROM fato_leads
-        WHERE data_cadastro >= CURRENT_DATE - INTERVAL '18 months'
+          to_char(fl.data_cadastro, 'YYYY-MM')  AS month,
+          COUNT(DISTINCT fl.id_lead)::int        AS leads,
+          SUM(fa.leads_com_venda)::int           AS sales,
+          COALESCE(SUM(fa.valor_vendas), 0)      AS vgv,
+          COALESCE(SUM(fa.spend), 0)             AS spend
+        FROM fato_leads fl
+        LEFT JOIN fato_atribuicao_marketing fa
+          ON fa.id_campanha = COALESCE(NULLIF(fl.midia, ''), 'Sem origem')
+         AND fa.data = fl.data_cadastro
+        WHERE fl.data_cadastro >= CURRENT_DATE - INTERVAL '18 months'
         GROUP BY month
         ORDER BY month
       `,
-      // Summary
+      // Summary — totais reais
       sql`
         SELECT
-          COUNT(*)::int AS total_leads,
-          COUNT(*) FILTER (WHERE valor_venda > 0)::int AS total_sales,
-          COALESCE(SUM(valor_venda), 0) AS total_vgv,
-          CASE WHEN COUNT(*) FILTER (WHERE valor_venda > 0) > 0
-            THEN ROUND((SUM(valor_venda) / COUNT(*) FILTER (WHERE valor_venda > 0))::numeric, 2)
-            ELSE 0 END AS avg_ticket,
-          COALESCE(ROUND(AVG(tempo_conversao_dias)), 0)::int AS avg_conversion_days,
-          0 AS total_spend,
-          0 AS cpl, 0 AS cac, 0 AS roas,
-          COUNT(*) FILTER (WHERE valor_venda > 0)::int AS leads_with_sale
-        FROM fato_leads
+          SUM(leads_gerados)::int           AS total_leads,
+          SUM(leads_com_venda)::int         AS total_sales,
+          SUM(valor_vendas)::numeric        AS total_vgv,
+          CASE WHEN SUM(leads_com_venda) > 0
+            THEN ROUND(SUM(valor_vendas) / SUM(leads_com_venda), 2) ELSE 0 END AS avg_ticket,
+          0::int                            AS avg_conversion_days,
+          SUM(spend)::numeric               AS total_spend,
+          CASE WHEN SUM(leads_gerados) > 0 AND SUM(spend) > 0
+            THEN ROUND(SUM(spend) / SUM(leads_gerados), 2) ELSE 0 END AS cpl,
+          CASE WHEN SUM(leads_com_venda) > 0 AND SUM(spend) > 0
+            THEN ROUND(SUM(spend) / SUM(leads_com_venda), 2) ELSE 0 END AS cac,
+          CASE WHEN SUM(spend) > 0 AND SUM(valor_vendas) > 0
+            THEN ROUND(SUM(valor_vendas) / SUM(spend), 2) ELSE 0 END AS roas,
+          SUM(leads_com_venda)::int         AS leads_with_sale
+        FROM fato_atribuicao_marketing
       `,
       // Meta page insights (from dim_campanhas_meta or empty)
       Promise.resolve([{ followers: 0, instagram_followers: 0, profile_views: 0, reach: 0, engagement: 0 }]),
