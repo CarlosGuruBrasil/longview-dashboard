@@ -138,7 +138,8 @@ async function readLeadsFromPg(
   endDate?: string | null,
   detailed = false,
   page = 1,
-  limit = 50
+  limit = 50,
+  search?: string | null
 ): Promise<LeadResult | null> {
   if (!process.env.DATABASE_URL) return null;
   try {
@@ -147,6 +148,11 @@ async function readLeadsFromPg(
     const [countRow] = await sql<{ count: string }[]>`SELECT COUNT(*) AS count FROM leads`;
     const count = parseInt(countRow?.count ?? '0', 10);
     if (count === 0) return null;
+
+    const pct = search ? `%${search.replace(/%/g, '\\%').replace(/_/g, '\\_')}%` : null;
+    const searchCond = pct
+      ? sql`AND (nome ILIKE ${pct} OR email ILIKE ${pct})`
+      : sql``;
 
     const selectFields = sql`
       id,
@@ -171,6 +177,7 @@ async function readLeadsFromPg(
           FROM leads
           WHERE data_cadastro >= ${startDate}::date
             AND data_cadastro <  (${endDate}::date + INTERVAL '1 day')
+            ${searchCond}
           ORDER BY data_cadastro DESC NULLS LAST
           LIMIT ${limit} OFFSET ${(page - 1) * limit}
         `;
@@ -199,6 +206,7 @@ async function readLeadsFromPg(
           SELECT ${selectFields}
           FROM leads
           WHERE data_cadastro >= ${startDate}::date
+            ${searchCond}
           ORDER BY data_cadastro DESC NULLS LAST
           LIMIT ${limit} OFFSET ${(page - 1) * limit}
         `;
@@ -226,6 +234,7 @@ async function readLeadsFromPg(
           SELECT ${selectFields}
           FROM leads
           WHERE data_cadastro < (${endDate}::date + INTERVAL '1 day')
+            ${searchCond}
           ORDER BY data_cadastro DESC NULLS LAST
           LIMIT ${limit} OFFSET ${(page - 1) * limit}
         `;
@@ -243,6 +252,7 @@ async function readLeadsFromPg(
         rows = await sql`
           SELECT ${selectFields}
           FROM leads
+          WHERE true ${searchCond}
           ORDER BY data_cadastro DESC NULLS LAST
           LIMIT ${limit} OFFSET ${(page - 1) * limit}
         `;
@@ -835,6 +845,7 @@ export async function GET(request: NextRequest) {
   const limit        = Math.max(1, Math.min(500, parseInt(searchParams.get('limit') || '50', 10)));
   const detailed     = searchParams.get('detailed') === 'true';
   const aggregate    = searchParams.get('aggregate') === 'true';
+  const search       = searchParams.get('search') || null;
 
   // ── Modo agregado (payload leve — substituição do array bruto de leads) ──────
   // ?aggregate=true → retorna dados pré-calculados por SQL em vez do array de leads.
@@ -938,7 +949,7 @@ export async function GET(request: NextRequest) {
   }
 
   const [pgLeads, metaCache, pgEstoque] = await Promise.all([
-    readLeadsFromPg(startDate, endDate, detailed, page, limit),
+    readLeadsFromPg(startDate, endDate, detailed, page, limit, search),
     readPgCache<MetaCache>('meta_cache'),
     readEstoqueFromPg(),
   ]);

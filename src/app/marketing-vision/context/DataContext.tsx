@@ -34,7 +34,7 @@ interface DataContextValue {
   detailedLimit: number;
   detailedTotal: number;
   detailedLoading: boolean;
-  fetchDetailedLeads: (page: number, limit?: number, rangeOverride?: DateRange) => Promise<void>;
+  fetchDetailedLeads: (page: number, limit?: number, rangeOverride?: DateRange, search?: string) => Promise<void>;
 
   // filtered
   filteredLeads: Lead[];
@@ -159,7 +159,7 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
     return result;
   }, [allLeads, dateRange, leadFilters]);
 
-  const fetchDetailedLeads = useCallback(async (page: number, limit = 50, rangeOverride?: DateRange) => {
+  const fetchDetailedLeads = useCallback(async (page: number, limit = 50, rangeOverride?: DateRange, search?: string) => {
     setDetailedLoading(true);
     try {
       const r = rangeOverride ?? dateRange;
@@ -169,6 +169,7 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
       params.set('limit', String(limit));
       if (r.start) params.set('start', r.start);
       if (r.end) params.set('end', r.end);
+      if (search) params.set('search', search);
       const url = `/api/data?${params.toString()}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);

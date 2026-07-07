@@ -10,9 +10,17 @@ import { formatCurrency, formatNumber } from '../../utils/formatters'
 
 
 interface MetaStatusResponse {
-  connected: boolean
-  accountId?: string
-  accountName?: string
+  // Estrutura real retornada por /api/meta/status
+  sync?: { ok?: boolean | null; lastRun?: string | null; nextRun?: string; totalBuyers?: number | null; totalBase?: number | null }
+  leads?: { ok?: boolean | null; lastRun?: string | null; nextRun?: string; newLeads?: number; capiSent?: number }
+  scores?: { ok?: boolean | null; lastRun?: string | null; nextRun?: string; total?: number; quentes?: number; mornos?: number; frios?: number }
+  capi?: { last?: string | null; todayCount?: number; recentEvents?: unknown[] }
+  semConexao?: { lastReceived?: string | null; totalDisparos?: number; todayCount?: number }
+  audiences?: { id?: string; name?: string; status?: string; count_min?: number; count_max?: number }[]
+  // Legado (não vem da API, mas usamos como fallback)
+  connected?: boolean
+  accountName?: string | null
+  accountId?: string | null
   error?: string
 }
 

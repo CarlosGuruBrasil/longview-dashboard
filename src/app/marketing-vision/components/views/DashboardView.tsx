@@ -5,7 +5,7 @@ import {
   TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Info,
   Lightbulb, Users, DollarSign, Target, Clock, ShoppingCart,
   BarChart3, Activity, Globe, ArrowRight, Layers, HelpCircle,
-  Megaphone, Compass, Eye, MousePointerClick
+  Megaphone, Compass, Eye, MousePointerClick, ChevronDown
 } from 'lucide-react'
 import { useData } from '../../context/DataContext'
 import { generateInsights, type Insight } from '../../utils/insights'
@@ -105,6 +105,7 @@ export default function DashboardView() {
   const { allLeads, filteredLeads, crmTotal, loading, metaData, metaValidation, setActiveView, setLeadFilters } = useData()
   const [biData, setBiData] = useState<BiInsights | null>(null)
   const [, setBiLoading] = useState(true)
+  const [empFilterStage, setEmpFilterStage] = useState<string>('')
 
   useEffect(() => {
     let active = true
@@ -249,16 +250,32 @@ export default function DashboardView() {
   }, [outrosCanaisData]);
 
   // 3. Classificação de leads por Etapas Reais do CRM
+  const empOptions = useMemo(() => {
+    const set = new Set<string>()
+    filteredLeads.forEach(l => {
+      const emp = l.empreendimento?.[0]?.nome
+      if (emp) set.add(emp)
+    })
+    return Array.from(set).sort()
+  }, [filteredLeads])
+
+  const stageLeads = useMemo(() =>
+    empFilterStage
+      ? filteredLeads.filter(l => l.empreendimento?.[0]?.nome === empFilterStage)
+      : filteredLeads,
+    [filteredLeads, empFilterStage]
+  )
+
   const etapasCrmData = useMemo(() => {
     const map = new Map<string, { count: number; colorObj: ReturnType<typeof getStatusColor> }>();
-    filteredLeads.forEach(l => {
+    stageLeads.forEach(l => {
       const stageName = l.situacao?.nome || 'Sem etapa';
       const existing = map.get(stageName) ?? { count: 0, colorObj: getStatusColor(l) };
       existing.count += 1;
       map.set(stageName, existing);
     });
 
-    const total = filteredLeads.length;
+    const total = stageLeads.length;
     return Array.from(map.entries())
       .map(([name, data]) => ({
         name,
@@ -267,7 +284,27 @@ export default function DashboardView() {
         colorObj: data.colorObj
       }))
       .sort((a, b) => b.count - a.count);
-  }, [filteredLeads]);
+  }, [stageLeads]);
+
+  // Crescimento de leads (mês atual vs mês anterior, baseado em allLeads)
+  const crescimento = useMemo(() => {
+    const now = new Date()
+    const ym = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    const currMonth = ym(now)
+    const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    const prevMonth = ym(prevDate)
+
+    let curr = 0, prev = 0
+    for (const l of allLeads) {
+      const d = l.data_cad ?? l.data_cadastro ?? l.data_cadastramento ?? ''
+      if (!d) continue
+      const m = d.slice(0, 7)
+      if (m === currMonth) curr++
+      else if (m === prevMonth) prev++
+    }
+    const pct = prev > 0 ? Math.round(((curr - prev) / prev) * 100) : null
+    return { curr, prev, pct }
+  }, [allLeads])
 
   // Mix de leads (mídia paga Meta vs orgânicos)
   const mixData = useMemo(() => [
@@ -412,36 +449,78 @@ export default function DashboardView() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         {/* ── Seção B: Funil de Vendas e Etapas do CRM ── */}
-        <GlassCard title={`Linha do Tempo CRM — Distribuição por Etapas (${filteredLeads.length} leads)`}>
-          <div className="flex flex-col gap-3 max-h-[380px] overflow-y-auto pr-1">
-            {etapasCrmData.length === 0 ? (
-              <p className="text-zinc-500 text-center text-xs py-8">Sem leads para distribuir nas etapas.</p>
-            ) : (
-              etapasCrmData.map(e => (
-                <div
-                  key={e.name}
-                  onClick={() => filterAndNavigate({ situacao: e.name })}
-                  className="flex flex-col gap-1.5 p-3 rounded-xl bg-white/[0.01] border border-white/5 hover:bg-white/5 cursor-pointer transition-all"
-                >
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="font-semibold text-zinc-200 flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: e.colorObj.bg }} />
-                      {e.name}
-                    </span>
-                    <span className="text-zinc-400">
-                      <strong className="text-white font-bold">{e.count}</strong> lead{e.count !== 1 ? 's' : ''} ({e.percentage}%)
-                    </span>
-                  </div>
-                  {/* Barra de Progresso */}
-                  <div className="h-2 bg-white/5 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full rounded-full transition-all duration-500" 
-                      style={{ width: `${e.percentage}%`, backgroundColor: e.colorObj.bg }}
-                    />
+        <GlassCard title="Etapas do Funil de Leads">
+          <div className="flex flex-col gap-3">
+
+            {/* Crescimento + filtro por empreendimento */}
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              {/* Crescimento */}
+              <div className="flex items-center gap-2">
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">Crescimento mês atual</span>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="text-xl font-bold text-white">{stageLeads.length}</span>
+                    {crescimento.pct !== null && (
+                      <span className={`flex items-center gap-0.5 text-xs font-bold px-1.5 py-0.5 rounded-full ${
+                        crescimento.pct >= 0
+                          ? 'bg-emerald-500/15 text-emerald-400'
+                          : 'bg-red-500/15 text-red-400'
+                      }`}>
+                        {crescimento.pct >= 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                        {crescimento.pct >= 0 ? '+' : ''}{crescimento.pct}%
+                      </span>
+                    )}
+                    <span className="text-[10px] text-zinc-600">vs {crescimento.prev} no mês anterior</span>
                   </div>
                 </div>
-              ))
-            )}
+              </div>
+
+              {/* Filtro empreendimento */}
+              <div className="relative">
+                <select
+                  value={empFilterStage}
+                  onChange={e => setEmpFilterStage(e.target.value)}
+                  className="appearance-none h-8 pl-3 pr-7 text-xs bg-white/[0.04] border border-white/[0.09] rounded-xl text-zinc-300 focus:outline-none focus:border-orange-500/40 transition-all cursor-pointer"
+                >
+                  <option value="">Todos os empreendimentos</option>
+                  {empOptions.map(emp => (
+                    <option key={emp} value={emp}>{emp}</option>
+                  ))}
+                </select>
+                <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
+              </div>
+            </div>
+
+            {/* Barras de etapas */}
+            <div className="flex flex-col gap-2 max-h-[320px] overflow-y-auto pr-1">
+              {etapasCrmData.length === 0 ? (
+                <p className="text-zinc-500 text-center text-xs py-8">Sem leads para distribuir nas etapas.</p>
+              ) : (
+                etapasCrmData.map(e => (
+                  <div
+                    key={e.name}
+                    onClick={() => filterAndNavigate({ situacao: e.name, ...(empFilterStage ? { empreendimento: empFilterStage } : {}) })}
+                    className="flex flex-col gap-1.5 p-3 rounded-xl bg-white/[0.01] border border-white/5 hover:bg-white/5 cursor-pointer transition-all"
+                  >
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="font-semibold text-zinc-200 flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: e.colorObj.bg }} />
+                        {e.name}
+                      </span>
+                      <span className="text-zinc-400">
+                        <strong className="text-white font-bold">{e.count}</strong> lead{e.count !== 1 ? 's' : ''} <span className="text-zinc-600">({e.percentage}%)</span>
+                      </span>
+                    </div>
+                    <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{ width: `${e.percentage}%`, backgroundColor: e.colorObj.bg }}
+                      />
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </GlassCard>
 

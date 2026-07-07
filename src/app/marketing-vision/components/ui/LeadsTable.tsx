@@ -4,6 +4,7 @@
 
 import { useMemo, useState, useRef, useEffect } from 'react';
 import type { Lead } from '../../types';
+import type { DateRange } from '../../types';
 import {
   getOrigin,
   getStatusColor,
@@ -20,7 +21,7 @@ interface LeadsTableProps {
   limit: number;
   total: number;
   loading: boolean;
-  onPageChange: (page: number, limit?: number) => void;
+  onPageChange: (page: number, limit?: number, range?: DateRange, search?: string) => void;
   allLeadsForDropdowns: Lead[];
 }
 
@@ -44,6 +45,16 @@ export default function LeadsTable({
   onPageChange,
   allLeadsForDropdowns,
 }: LeadsTableProps) {
+  // ── Local date range (independent from global filter) ───────────────────
+  const [localStart, setLocalStart] = useState('');
+  const [localEnd, setLocalEnd]     = useState('');
+  const localRange = useMemo<DateRange>(() => ({ start: localStart, end: localEnd }), [localStart, localEnd]);
+
+  // ── Debounced name search → triggers server-side fetch ───────────────────
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestRange = useRef(localRange);
+  latestRange.current = localRange;
+
   // ── Filter states ────────────────────────────────────────────────────────
   const [filterNome, setFilterNome]                   = useState('');
   const [filterDate, setFilterDate]                   = useState('');
@@ -73,6 +84,22 @@ export default function LeadsTable({
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [showBottomSheet]);
+
+  // Initial load with empty date range (independent from global filter)
+  // and re-fetch when local date range changes
+  useEffect(() => {
+    onPageChange(1, limit, latestRange.current, filterNome || undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localStart, localEnd]);
+
+  // Debounced name search triggers server fetch
+  const handleNomeChange = (val: string) => {
+    setFilterNome(val);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      onPageChange(1, limit, latestRange.current, val || undefined);
+    }, 400);
+  };
 
   // ── Dropdown options ──────────────────────────────────────────────────────
   const options = useMemo(() => ({
@@ -132,8 +159,11 @@ export default function LeadsTable({
     setFilterEtapa('');
     setFilterTag('');
     setFilterBolsao('');
+    setLocalStart('');
+    setLocalEnd('');
     setShowAdvanced(false);
     setShowBottomSheet(false);
+    onPageChange(1, limit, { start: '', end: '' }, undefined);
   }
 
   // ── Active filter counts ──────────────────────────────────────────────────
@@ -199,7 +229,7 @@ export default function LeadsTable({
           type="text"
           placeholder="Buscar por nome..."
           value={filterNome}
-          onChange={(e) => setFilterNome(e.target.value)}
+          onChange={(e) => handleNomeChange(e.target.value)}
           className={`${filterNome ? chipActive : chipIdle} flex-1 min-w-0 placeholder:text-zinc-600`}
         />
         <button
@@ -215,13 +245,37 @@ export default function LeadsTable({
 
       {/* ── DESKTOP FILTER BAR ────────────────────────────────────────── */}
       <div className="hidden sm:flex flex-col gap-2">
+        {/* Row 0 — local date range (independent from global filter) */}
+        <div className="flex gap-2 items-center flex-wrap text-xs text-zinc-500">
+          <span className="text-[11px] font-semibold uppercase tracking-wider shrink-0">Período da lista:</span>
+          <input
+            type="date"
+            value={localStart}
+            onChange={(e) => setLocalStart(e.target.value)}
+            className={`${localStart ? chipActive : chipIdle} w-36 placeholder:text-zinc-600`}
+            placeholder="De..."
+          />
+          <input
+            type="date"
+            value={localEnd}
+            onChange={(e) => setLocalEnd(e.target.value)}
+            className={`${localEnd ? chipActive : chipIdle} w-36 placeholder:text-zinc-600`}
+            placeholder="Até..."
+          />
+          {(localStart || localEnd) && (
+            <button onClick={() => { setLocalStart(''); setLocalEnd(''); }} className={`${chipIdle} !text-zinc-400 px-2.5`}>
+              ✕ Limpar data
+            </button>
+          )}
+          <span className="text-[10px] text-zinc-600 ml-1">Sem data selecionada = todos os leads, mais recentes primeiro</span>
+        </div>
         {/* Row 1 — primary filters */}
         <div className="flex gap-2 items-center flex-wrap">
           <input
             type="text"
-            placeholder="Buscar por nome..."
+            placeholder="Buscar por nome (todos os leads)..."
             value={filterNome}
-            onChange={(e) => setFilterNome(e.target.value)}
+            onChange={(e) => handleNomeChange(e.target.value)}
             className={`${filterNome ? chipActive : chipIdle} flex-1 min-w-[180px] placeholder:text-zinc-600`}
           />
           <FilterSelect value={filterEtapa}   setter={setFilterEtapa}   opts={options.etapas}    label="Etapa"   />
@@ -453,7 +507,7 @@ export default function LeadsTable({
 
         <div className="flex gap-2 items-center">
           <button
-            onClick={() => onPageChange(page - 1, limit)}
+            onClick={() => onPageChange(page - 1, limit, localRange, filterNome || undefined)}
             disabled={page === 1 || loading}
             className={`px-4 h-9 rounded-full text-xs font-semibold border border-white/12 transition-all ${
               page === 1 || loading
@@ -469,7 +523,7 @@ export default function LeadsTable({
           </span>
 
           <button
-            onClick={() => onPageChange(page + 1, limit)}
+            onClick={() => onPageChange(page + 1, limit, localRange, filterNome || undefined)}
             disabled={page * limit >= total || loading}
             className={`px-4 h-9 rounded-full text-xs font-semibold border border-white/12 transition-all ${
               page * limit >= total || loading
