@@ -111,6 +111,9 @@ export async function POST(request: NextRequest) {
     if (venda?.idvenda || body?.idvenda) {
       const v = venda || body;
       const vendaId = v.idvenda ?? body.idvenda ?? null;
+      if (!/^\d{1,15}$/.test(String(vendaId))) {
+        return NextResponse.json({ ok: false, error: 'idvenda inválido' }, { status: 400 });
+      }
       const dVenda = v.data_venda ? new Date(v.data_venda) : null;
       const valor = v.valor_venda ? parseFloat(String(v.valor_venda)) : null;
       await sql`
@@ -128,6 +131,9 @@ export async function POST(request: NextRequest) {
     if (unidade?.idunidade || body?.idunidade) {
       const u = unidade || body;
       const unidadeId = u.idunidade ?? body.idunidade ?? null;
+      if (!/^\d{1,15}$/.test(String(unidadeId))) {
+        return NextResponse.json({ ok: false, error: 'idunidade inválido' }, { status: 400 });
+      }
       const sitObj = asRecord(u.situacao);
       const statusVenda = Number(sitObj.situacao_para_venda ?? u.status_venda ?? 0);
       let statusText = 'Desconhecido';
@@ -153,6 +159,11 @@ export async function POST(request: NextRequest) {
     const leadId = lead?.idlead ?? lead?.id ?? body?.idlead ?? body?.referencia ?? null;
     if (leadId == null) {
       return NextResponse.json({ ok: false, error: 'payload sem id' }, { status: 400 });
+    }
+    // Webhook é público: só aceita id numérico (formato do CV CRM) —
+    // impede lixo/injeção de virar linha na tabela leads
+    if (!/^\d{1,15}$/.test(String(leadId))) {
+      return NextResponse.json({ ok: false, error: 'id inválido' }, { status: 400 });
     }
 
     // Se veio sem os campos (só id), busca o lead completo na API do CV.
@@ -223,6 +234,17 @@ export async function POST(request: NextRequest) {
     // ── CAPI: envia evento de etapa ao pixel da Meta ─────────────────────
     if (statusNomeV) {
       try {
+        // Recupera o leadgen_id original do Meta (capturado em /api/meta/webhook
+        // no momento da criação do lead e guardado em raw._meta_lead_id).
+        // É a chave de match de maior prioridade exigida pela spec oficial de
+        // Conversion Leads — sem ela, o Meta cai para match por email/telefone
+        // hasheado, que é mais fraco e não garante atribuição ao lead ad original.
+        let metaLeadId: string | undefined;
+        try {
+          const [row] = await sql`SELECT raw->>'_meta_lead_id' AS meta_lead_id FROM leads WHERE id = ${id}`;
+          metaLeadId = row?.meta_lead_id ?? undefined;
+        } catch { /* não bloqueia o envio do evento */ }
+
         const s = statusNomeV.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
         let eventName: string | null = null;
         let eventValue: number | undefined;
@@ -247,6 +269,7 @@ export async function POST(request: NextRequest) {
           const capiEvent: CAPIEvent = {
             event_name:  eventName,
             event_id:    `cvcrm_${id}_${eventName}`,
+            lead_id:     metaLeadId,
             email:       full.email ?? undefined,
             phone:       full.telefone ?? full.celular ?? undefined,
             first_name:  full.nome ?? undefined,

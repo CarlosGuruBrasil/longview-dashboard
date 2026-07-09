@@ -237,10 +237,13 @@ export async function GET(request: NextRequest) {
         const rdOk = await sendToRD(lead, score);
         if (rdOk) stats.sentToRD++;
 
-        // Prepara evento CAPI Lead
+        // Prepara evento CAPI Lead — lead.id AQUI é o leadgen_id do Meta
+        // (vem direto de /{form_id}/leads), então já vai como lead_id,
+        // a chave de match de maior prioridade para Conversion Leads.
         if (email || phone) {
           capiEvents.push({
             event_name:  'Lead',
+            lead_id:     lead.id,
             email:       email  || undefined,
             phone:       phone  || undefined,
             first_name:  nome   || undefined,

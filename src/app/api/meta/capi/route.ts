@@ -1,21 +1,40 @@
 /**
  * /api/meta/capi
  *
- * Envia eventos offline para o Meta Conversions API (CAPI).
- * Chamado automaticamente pelos cron jobs — não requer interação do usuário.
+ * Envia eventos para o Meta Conversions API (CAPI) usando a especificação
+ * oficial de "Conversion Leads" (integração de CRM), documentada em:
+ * developers.facebook.com/documentation/ads-commerce/conversions-api/conversion-leads-integration
+ *
+ * Isso é o que faz o algoritmo do Meta entender qualidade de lead
+ * (visita agendada, compra, etc.) e otimizar entrega para todas as
+ * campanhas com meta de desempenho "Leads de conversão" (QUALITY_LEAD) —
+ * não é uma configuração por campanha, é conta-wide via este pixel/dataset.
+ *
+ * Chamado automaticamente pelo webhook do CV CRM e pelos cron jobs —
+ * não requer interação do usuário.
  *
  * POST → envia um ou mais eventos
  * Body: { events: Array<CAPIEvent> }
  *
  * CAPIEvent:
- *   event_name: 'Lead' | 'Purchase' | 'ViewContent' | 'InitiateCheckout' | 'Contact'
- *   email?:      string  (será hashed SHA-256)
+ *   event_name:  string  (texto livre — estágio do funil: "Lead", "Visita agendada",
+ *                         "Venda realizada" etc. Não precisa ser evento padrão do Meta)
+ *   lead_id?:    string | number  (leadgen_id do Meta — PRIORIDADE MÁXIMA de match,
+ *                         obrigatório sempre que disponível, per doc oficial)
+ *   email?:      string  (será hashed SHA-256 — fallback de match se não houver lead_id)
  *   phone?:      string  (será hashed SHA-256, normalizado +55)
  *   first_name?: string  (será hashed SHA-256)
  *   value?:      number  (para Purchase — valor do contrato em BRL)
  *   event_id?:   string  (dedup key — normalmente o ID do lead no CRM)
  *   event_time?: number  (unix timestamp — padrão: agora)
  *   source_url?: string
+ *
+ * Campos fixos exigidos pela spec (não configuráveis por chamada):
+ *   action_source        = "system_generated" (evento gerado por automação do CRM, não por ação direta do usuário)
+ *   custom_data.event_source       = "crm"
+ *   custom_data.lead_event_source  = "CV CRM"
+ * Sem esses dois campos de custom_data, o evento pode aparecer no Gerenciador
+ * de Eventos mas NÃO conta para o treinamento de "Leads de conversão".
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { kv } from '@/lib/kv';
@@ -50,6 +69,8 @@ function isCronOrInternal(request: NextRequest): boolean {
 
 export interface CAPIEvent {
   event_name:  string;
+  /** leadgen_id do Meta — chave de match de maior prioridade para Conversion Leads */
+  lead_id?:    string | number;
   email?:      string;
   phone?:      string;
   first_name?: string;
@@ -77,22 +98,39 @@ export async function sendCAPIEvents(events: CAPIEvent[]): Promise<{
   const now = Math.floor(Date.now() / 1000);
 
   const metaEvents = events.map(ev => {
+    // user_data: lead_id é a chave de match de maior prioridade (leadgen_id do
+    // formulário Meta). Mantido como string para não perder precisão — IDs de
+    // leadgen têm 15-17 dígitos, acima de Number.MAX_SAFE_INTEGER (~9e15).
     const userData: Record<string, string> = {};
+    if (ev.lead_id != null) userData.lead_id = String(ev.lead_id);
     if (ev.email)      userData.em  = hash(ev.email);
     if (ev.phone)      userData.ph  = hashPhone(ev.phone);
     if (ev.first_name) userData.fn  = hash(ev.first_name.split(' ')[0]);
+
+    // custom_data: event_source + lead_event_source são OBRIGATÓRIOS pela spec
+    // oficial de Conversion Leads — sem eles o evento não conta para o
+    // treinamento do modelo de qualidade de lead, mesmo aparecendo no painel.
+    const customData: Record<string, unknown> = {
+      event_source:      'crm',
+      lead_event_source: 'CV CRM',
+    };
+    if (ev.value !== undefined) {
+      customData.value    = ev.value;
+      customData.currency = 'BRL';
+    }
 
     const data: Record<string, unknown> = {
       event_name:        ev.event_name,
       event_time:        ev.event_time || now,
       event_id:          ev.event_id   || `${ev.event_name}_${now}_${Math.random().toString(36).slice(2)}`,
-      action_source:     'crm',
+      // Fixo pela spec oficial: evento gerado por automação do CRM, não por
+      // ação direta do usuário no site/app ('crm' não é um valor válido de
+      // action_source na API do Meta).
+      action_source:     'system_generated',
       user_data:         userData,
+      custom_data:       customData,
     };
 
-    if (ev.value !== undefined) {
-      data.custom_data = { value: ev.value, currency: 'BRL' };
-    }
     if (ev.source_url) {
       data.event_source_url = ev.source_url;
     }
