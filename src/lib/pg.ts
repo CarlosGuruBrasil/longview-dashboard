@@ -138,8 +138,11 @@ export async function ensureSchema(): Promise<void> {
         id               BIGINT PRIMARY KEY,
         code             TEXT,
         modelo           TEXT,
+        override_modelo  TEXT,
         obra             TEXT,
+        override_obra    TEXT,
         local            TEXT,
+        override_local   TEXT,
         inspetor         TEXT,
         status           TEXT,
         data_criacao     TIMESTAMPTZ,
@@ -148,6 +151,15 @@ export async function ensureSchema(): Promise<void> {
         nota             NUMERIC,
         raw              JSONB NOT NULL DEFAULT '{}',
         synced_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS construpoint_inspecoes_overrides (
+        inspection_id BIGINT PRIMARY KEY,
+        override_modelo TEXT,
+        override_obra TEXT,
+        override_local TEXT
       )
     `;
 

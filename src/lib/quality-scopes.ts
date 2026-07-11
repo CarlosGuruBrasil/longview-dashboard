@@ -38,22 +38,23 @@ export async function refreshAutomaticQualityScopes(): Promise<void> {
       INSERT INTO quality_inspection_scopes (inspection_id, scope_id, source)
       SELECT i.id,
         CASE
-          WHEN lower(i.obra) = 'nautic' THEN 'nautic'
-          WHEN lower(i.obra) IN ('hub beira-mar', 'hub beira mar') THEN 'hub-beira-mar'
-          WHEN lower(i.obra) = 'longview'
-            AND lower(COALESCE(i.local, '')) <> 'obras - nautic e hub' THEN 'longview'
+          WHEN lower(COALESCE(NULLIF(o.override_obra, ''), i.obra, '')) = 'nautic' THEN 'nautic'
+          WHEN lower(COALESCE(NULLIF(o.override_obra, ''), i.obra, '')) IN ('hub beira-mar', 'hub beira mar') THEN 'hub-beira-mar'
+          WHEN lower(COALESCE(NULLIF(o.override_obra, ''), i.obra, '')) = 'longview'
+            AND lower(COALESCE(NULLIF(o.override_local, ''), i.local, '')) <> 'obras - nautic e hub' THEN 'longview'
         END,
         'automatic'
       FROM construpoint_inspecoes i
+      LEFT JOIN construpoint_inspecoes_overrides o ON i.id = o.inspection_id
       WHERE NOT EXISTS (
         SELECT 1 FROM quality_inspection_scopes manual
         WHERE manual.inspection_id = i.id AND manual.source = 'manual'
-      )
+        )
         AND (
-          lower(i.obra) IN ('nautic', 'hub beira-mar', 'hub beira mar')
+          lower(COALESCE(NULLIF(o.override_obra, ''), i.obra, '')) IN ('nautic', 'hub beira-mar', 'hub beira mar')
           OR (
-            lower(i.obra) = 'longview'
-            AND lower(COALESCE(i.local, '')) <> 'obras - nautic e hub'
+            lower(COALESCE(NULLIF(o.override_obra, ''), i.obra, '')) = 'longview'
+            AND lower(COALESCE(NULLIF(o.override_local, ''), i.local, '')) <> 'obras - nautic e hub'
           )
         )
       ON CONFLICT (inspection_id, scope_id) DO NOTHING
@@ -64,10 +65,11 @@ export async function refreshAutomaticQualityScopes(): Promise<void> {
       INSERT INTO quality_inspection_scopes (inspection_id, scope_id, source)
       SELECT i.id, scope.id, 'automatic'
       FROM construpoint_inspecoes i
+      LEFT JOIN construpoint_inspecoes_overrides o ON i.id = o.inspection_id
       CROSS JOIN (VALUES ('nautic'), ('hub-beira-mar')) AS scope(id)
-      WHERE lower(i.obra) = 'longview'
-        AND lower(COALESCE(i.local, '')) = 'obras - nautic e hub'
-        AND i.modelo ILIKE 'Segurança - Inspeção Mensal da Qualidade%'
+      WHERE lower(COALESCE(NULLIF(o.override_obra, ''), i.obra, '')) = 'longview'
+        AND lower(COALESCE(NULLIF(o.override_local, ''), i.local, '')) = 'obras - nautic e hub'
+        AND COALESCE(NULLIF(o.override_modelo, ''), i.modelo, '') ILIKE 'Segurança - Inspeção Mensal da Qualidade%'
         AND NOT EXISTS (
           SELECT 1 FROM quality_inspection_scopes manual
           WHERE manual.inspection_id = i.id AND manual.source = 'manual'
