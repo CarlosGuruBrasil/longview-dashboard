@@ -4,6 +4,7 @@ import { DataProvider } from '../context/DataContext';
 import AppShell from './AppShell';
 import { useData } from '../context/DataContext';
 import type { DashboardApiResponse } from '../types';
+import LogoLoader from '@/components/ui/LogoLoader';
 
 const DashboardView         = lazy(() => import('./views/DashboardView'));
 const LeadsView             = lazy(() => import('./views/LeadsView'));
@@ -42,8 +43,8 @@ function ViewRouter() {
 
   return (
     <Suspense fallback={
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" />
+      <div className="flex flex-col items-center justify-center p-12" style={{ minHeight: '60vh' }}>
+        <LogoLoader module="marketing" text="Carregando módulo..." />
       </div>
     }>
       {viewMap[activeView] ?? <DashboardView />}
