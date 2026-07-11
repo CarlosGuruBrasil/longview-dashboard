@@ -1,5 +1,5 @@
 /**
- * Postgres-backed KV store — substituto drop-in para @vercel/kv.
+ * Postgres-backed KV store.
  * Interface compatível: get, set (com TTL), del, keys (com wildcard *).
  * Usa a tabela kv_store no Postgres.
  */
@@ -44,7 +44,6 @@ export const kv = {
       `;
       if (!rows[0]) return null;
       if (rows[0].expires_at && new Date(rows[0].expires_at) < new Date()) {
-        // Expirado — limpa e retorna null
         await sql`DELETE FROM kv_store WHERE key = ${key}`.catch(() => logger.warn('[kv] erro ao deletar chave expirada'));
         return null;
       }

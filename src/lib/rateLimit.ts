@@ -8,7 +8,7 @@ export interface RateLimitResult {
 }
 
 /**
- * Rate limiter usando Vercel KV (Redis).
+ * Rate limiter usando Postgres KV.
  * Usa janela deslizante simples com contador de incremento.
  *
  * @param identifier - IP ou userId do requisitante
@@ -52,7 +52,7 @@ export async function rateLimit(
 }
 
 /**
- * Retorna o IP real do cliente considerando proxies (Vercel/Cloudflare).
+ * Retorna o IP real do cliente considerando proxies (Cloudflare).
  */
 export function getClientIp(request: Request): string {
   const forwarded = request.headers.get('x-forwarded-for');

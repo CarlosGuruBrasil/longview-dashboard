@@ -17,10 +17,6 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'images.unsplash.com',
       },
-      {
-        protocol: 'https',
-        hostname: '**.vercel-storage.com', // Vercel Blob (futuro)
-      },
     ],
   },
   // TypeScript strict habilitado — erros de tipo bloqueiam o build
