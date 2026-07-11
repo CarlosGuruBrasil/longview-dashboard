@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { AlertCircle, Calendar, X, Search, ChevronUp, ChevronDown } from 'lucide-react'
 import logger from '@/lib/logger'
+import LogoLoader from '@/components/ui/LogoLoader'
 import InspecaoDetailModal from '../components/InspecaoDetailModal'
 
 interface UltimaInspecao {
@@ -240,13 +241,16 @@ function InspecoesContent() {
         </div>
       </div>
 
-      {loading ? (
-        <div className="flex flex-col items-center justify-center gap-4 p-12" style={{ minHeight: '60vh' }}>
-          <div className="relative w-12 h-12">
-            <div className="absolute inset-0 rounded-full border-2 border-[#1E1E22]" />
-            <div className="absolute inset-0 rounded-full border-2 border-t-emerald-500 border-r-transparent border-b-transparent border-l-transparent animate-spin" />
+      <div className="relative min-h-[60vh]">
+        {loading && inspecoes.length > 0 && (
+          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#0d0d0f]/60 backdrop-blur-[2px] rounded-xl transition-all duration-300">
+            <LogoLoader module="quality" text="Buscando dados de inspeções..." />
           </div>
-          <p className="text-sm text-zinc-400">Buscando dados de inspeções…</p>
+        )}
+
+      {loading && inspecoes.length === 0 ? (
+        <div className="flex flex-col items-center justify-center p-12" style={{ minHeight: '60vh' }}>
+          <LogoLoader module="quality" text="Buscando dados de inspeções..." />
         </div>
       ) : error ? (
         <div className="flex flex-col items-center justify-center gap-3 p-12" style={{ minHeight: '60vh' }}>
@@ -255,7 +259,7 @@ function InspecoesContent() {
           <p className="text-xs text-zinc-500">{error}</p>
         </div>
       ) : (
-        <div className="rounded-xl border border-[#1E1E22] bg-[#121214]/60 p-5">
+        <div className={`rounded-xl border border-[#1E1E22] bg-[#121214]/60 p-5 transition-opacity duration-300 ${loading ? 'opacity-40 pointer-events-none' : ''}`}>
           <p className="text-[11px] text-zinc-500 mb-3">
             Mostrando {inspecoes.length.toLocaleString('pt-BR')} de {total.toLocaleString('pt-BR')}{' '}
             {attention === 'nonconformity'
@@ -326,6 +330,8 @@ function InspecoesContent() {
           )}
         </div>
       )}
+      </div>
+
       <InspecaoDetailModal id={selectedInspId} onClose={() => setSelectedInspId(null)} />
     </div>
   )

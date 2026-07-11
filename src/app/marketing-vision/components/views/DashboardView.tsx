@@ -11,6 +11,7 @@ import { useData } from '../../context/DataContext'
 import { generateInsights, type Insight } from '../../utils/insights'
 import { isSale, getLeadValueNumber, getStatusColor, getOrigin } from '../../utils/leads'
 import { funnelCounts } from '../../utils/funnel'
+import LogoLoader from '@/components/ui/LogoLoader'
 import { formatCurrency, formatNumber } from '../../utils/formatters'
 import GlassCard from '../ui/GlassCard'
 import FilterBar from '../ui/FilterBar'
@@ -398,13 +399,8 @@ export default function DashboardView() {
 
   if (loading && allLeads.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center gap-4" style={{ minHeight: '60vh' }}>
-        <div className="relative w-12 h-12">
-          <div className="absolute inset-0 rounded-full border-2 border-white/10" />
-          <div className="absolute inset-0 rounded-full border-2 border-t-sky-500 border-r-transparent border-b-transparent border-l-transparent animate-spin" />
-        </div>
-        <p className="text-[15px] font-medium text-zinc-300">Carregando Smart Dashboard</p>
-        <p className="text-[13px] text-zinc-500">Sincronizando dados e cruzando campanhas…</p>
+      <div className="flex flex-col items-center justify-center p-12" style={{ minHeight: '60vh' }}>
+        <LogoLoader module="marketing" text="Sincronizando dados e cruzando campanhas..." />
       </div>
     )
   }

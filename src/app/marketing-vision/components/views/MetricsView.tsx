@@ -8,6 +8,7 @@ import KpiGaugeHistoryCard from '../metrics/KpiGaugeHistoryCard'
 import CostPerLeadCard from '../metrics/CostPerLeadCard'
 import AlertsPanel from '../ui/AlertsPanel'
 import DataTable from '../ui/DataTable'
+import LogoLoader from '@/components/ui/LogoLoader'
 import { formatNumber } from '../../utils/formatters'
 
 type MediaStatRow = {
@@ -89,15 +90,8 @@ export default function MetricsView() {
 
   if (loading && filteredLeads.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center gap-4" style={{ minHeight: '60vh' }}>
-        <div className="relative w-12 h-12">
-          <div className="absolute inset-0 rounded-full border-2 border-white/10" />
-          <div className="absolute inset-0 rounded-full border-2 border-t-sky-500 border-r-transparent border-b-transparent border-l-transparent animate-spin" />
-        </div>
-        <div className="text-center">
-          <p className="text-[15px] font-medium text-zinc-300">Carregando métricas</p>
-          <p className="text-[13px] text-zinc-500 mt-1">Analisando dados do funil de vendas…</p>
-        </div>
+      <div className="flex flex-col items-center justify-center p-12" style={{ minHeight: '60vh' }}>
+        <LogoLoader module="marketing" text="Analisando dados do funil de vendas..." />
       </div>
     )
   }

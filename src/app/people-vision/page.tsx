@@ -9,6 +9,7 @@ import {
   Users, UserPlus, UserCheck, Gift, Clock, AlertCircle,
   Building2, TrendingUp, ChevronRight,
 } from 'lucide-react';
+import LogoLoader from '@/components/ui/LogoLoader';
 
 interface SafeUser {
   id: string;
@@ -122,8 +123,8 @@ export default function PeopleDashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center" style={{ minHeight: '60dvh' }}>
-        <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+      <div className="flex items-center justify-center p-12" style={{ minHeight: '60vh' }}>
+        <LogoLoader module="people" text="Sincronizando Banco de Colaboradores..." />
       </div>
     );
   }

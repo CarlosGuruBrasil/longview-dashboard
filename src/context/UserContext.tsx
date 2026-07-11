@@ -16,6 +16,7 @@ export interface UserPermissions {
   deleteTasks: boolean;
   viewPeopleVision: boolean;
   viewQualityVision: boolean;
+  viewSalesVision: boolean;
   isAdmin: boolean;
 }
 
@@ -24,7 +25,13 @@ export interface User {
   name: string;
   role: 'Desenvolvedor' | 'Diretoria' | 'Operador' | 'Gestor' | 'Parceiro' | 'Corretor' | 'Visualizador';
   email: string;
+  mustChangePassword?: boolean;
   permissions?: UserPermissions;
+  profile?: {
+    category?: 'colaborador' | 'fornecedor';
+    department?: string;
+    position?: string;
+  };
 }
 
 interface UserContextType {
@@ -52,6 +59,7 @@ const defaultUser: User = {
     deleteTasks: false,
     viewPeopleVision: false,
     viewQualityVision: false,
+    viewSalesVision: false,
     isAdmin: false
   }
 };

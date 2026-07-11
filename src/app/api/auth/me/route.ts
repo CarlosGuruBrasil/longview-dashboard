@@ -28,6 +28,18 @@ export async function GET(request: NextRequest) {
       permissions = dbUser.permissions as unknown as typeof permissions;
       role = dbUser.role;
       name = dbUser.name;
+      return NextResponse.json({
+        isAuthenticated: true,
+        user: {
+          id: auth.userId,
+          name,
+          email: dbUser.email,
+          role,
+          permissions,
+          mustChangePassword: dbUser.profile?.mustChangePassword === true,
+          profile: dbUser.profile ?? {},
+        },
+      });
     }
   } catch { /* fallback para dados do JWT se banco indisponível */ }
 
@@ -39,6 +51,7 @@ export async function GET(request: NextRequest) {
       email:       auth.email,
       role,
       permissions,
+      mustChangePassword: auth.mustChangePassword === true,
     },
   });
 }

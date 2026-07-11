@@ -9,7 +9,6 @@ import {
   Users,
   ClipboardCheck,
   ShoppingBag,
-  Lock,
   ArrowRight,
   LogOut
 } from 'lucide-react';
@@ -131,6 +130,8 @@ export default async function SelectAppPage() {
     hasSalesAccess:     isDeveloper || permissions?.viewSalesVision === true,
   };
 
+  const visibleApps = APPS.filter((app) => access[app.permKey]);
+
   return (
     <main
       className="min-h-screen bg-[#09090b] flex flex-col px-5 pb-8 relative overflow-hidden"
@@ -184,8 +185,7 @@ export default async function SelectAppPage() {
       {/* Grid de Apps */}
       <div className="relative z-10 flex-1 w-full max-w-5xl mx-auto">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
-          {APPS.map((app) => {
-            const hasAccess = access[app.permKey];
+          {visibleApps.map((app) => {
             const Icon = app.icon;
             return (
               <div
@@ -194,7 +194,7 @@ export default async function SelectAppPage() {
                   bg-white/[0.035] border ${app.cardBorder} rounded-2xl p-5 flex flex-col gap-4
                   shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur-2xl
                   transition-all duration-300 group
-                  ${hasAccess ? `${app.cardHover} cursor-default` : 'opacity-40'}
+                  ${app.cardHover} cursor-default
                 `}
               >
                 {/* Icon + label */}
@@ -214,20 +214,13 @@ export default async function SelectAppPage() {
                 </p>
 
                 {/* Action */}
-                {hasAccess ? (
-                  <Link
-                    href={app.href}
-                    className={`flex items-center justify-center gap-1.5 text-xs font-bold text-white px-4 py-2.5 rounded-xl transition-all duration-200 ${app.btnClass}`}
-                  >
-                    <span>Entrar no App</span>
-                    <ArrowRight size={13} />
-                  </Link>
-                ) : (
-                  <div className="flex items-center justify-center gap-1.5 text-xs text-zinc-600 font-semibold bg-white/5 border border-white/5 px-4 py-2.5 rounded-xl">
-                    <Lock size={13} />
-                    <span>Acesso Restrito</span>
-                  </div>
-                )}
+                <Link
+                  href={app.href}
+                  className={`flex items-center justify-center gap-1.5 text-xs font-bold text-white px-4 py-2.5 rounded-xl transition-all duration-200 ${app.btnClass}`}
+                >
+                  <span>Entrar no App</span>
+                  <ArrowRight size={13} />
+                </Link>
               </div>
             );
           })}

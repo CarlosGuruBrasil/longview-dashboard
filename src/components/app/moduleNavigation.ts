@@ -4,7 +4,6 @@ import {
   Building2,
   ClipboardCheck,
   Grid3X3,
-  Settings,
   UsersRound,
   type LucideIcon,
 } from 'lucide-react';
@@ -91,13 +90,6 @@ export const appsItem = {
   shortName: 'Apps',
   href: '/select-app',
   icon: Grid3X3,
-};
-
-export const adminItem = {
-  name: 'Administração',
-  shortName: 'Admin',
-  href: '/admin/users',
-  icon: Settings,
 };
 
 export const switchIcon = ArrowRightLeft;

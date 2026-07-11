@@ -26,6 +26,8 @@ export interface UserEmergencyContact {
 
 /** Campos de perfil People Vision — armazenados em data JSONB via writeUsers */
 export interface UserProfileData {
+  category?: 'colaborador' | 'fornecedor';
+  mustChangePassword?: boolean;
   phone?: string;
   whatsapp?: string;
   position?: string;         // cargo

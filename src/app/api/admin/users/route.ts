@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { readUsers, writeUsers, DbUser } from '@/lib/db-kv';
 import { normalizePermissions } from '@/lib/permissions';
 import { rateLimit, getClientIp } from '@/lib/rateLimit';
-import { verifyAdminAuth } from '@/lib/auth';
+import { verifyAdminAuth, verifyAuth } from '@/lib/auth';
+import { canSeeUserInDirectory, canManageAllPeople, canViewAllPeopleReadOnly, sanitizeUserForDirectory } from '@/lib/user-access';
 import bcrypt from 'bcryptjs';
 import logger from '@/lib/logger'
 import { z } from 'zod';
@@ -40,20 +41,30 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Muitas requisições.' }, { status: 429 });
   }
 
-  const adminUser = await verifyAdminAuth();
-  if (!adminUser) {
-    return NextResponse.json({ error: 'Acesso negado. Apenas administradores podem gerenciar usuários.' }, { status: 403 });
-  }
+  const authUser = await verifyAuth();
+  if (!authUser) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 });
 
   try {
     const users = await readUsers();
-    // Ocultar os hashes de senha antes de retornar os usuários
-    const safeUsers = users.map(u => {
-      const { passwordHash: _, ...safeUser } = u;
-      return safeUser;
-    });
+    const currentUser = users.find((user) => user.id === authUser.userId);
+    if (!currentUser) return NextResponse.json({ error: 'Usuário não encontrado.' }, { status: 404 });
 
-    return NextResponse.json({ users: safeUsers });
+    const canAccessPeople = currentUser.role === 'Desenvolvedor' || currentUser.permissions?.viewPeopleVision === true || currentUser.permissions?.isAdmin === true;
+    if (!canAccessPeople) {
+      return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 });
+    }
+
+    const safeUsers = users
+      .filter((user) => canSeeUserInDirectory(currentUser, user))
+      .map((user) => sanitizeUserForDirectory(currentUser, user));
+
+    return NextResponse.json({
+      users: safeUsers,
+      meta: {
+        canCreate: canManageAllPeople(currentUser),
+        readOnly: canViewAllPeopleReadOnly(currentUser) && !canManageAllPeople(currentUser),
+      },
+    });
   } catch (error) {
     logger.error({ error }, 'Erro ao listar usuários:');
     return NextResponse.json({ error: 'Erro ao carregar usuários.' }, { status: 500 });

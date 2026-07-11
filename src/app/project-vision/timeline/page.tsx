@@ -1,14 +1,19 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import {
   SlidersHorizontal,
   RefreshCw,
+  Filter,
+  Briefcase,
   HelpCircle,
   ChevronLeft,
   ChevronRight,
   Calendar
 } from 'lucide-react';
+import Image from 'next/image';
+import LogoLoader from '@/components/ui/LogoLoader';
 import { Task, Project } from '@/lib/db';
 import { useUser } from '@/context/UserContext';
 import TaskDrawer from '../components/TaskDrawer';
@@ -293,9 +298,8 @@ export default function TimelinePage() {
         {/* Linhas do Gantt */}
         <div className="flex-1 overflow-y-auto max-h-[calc(100vh-280px)] divide-y divide-[#1C1C1E]">
           {loading ? (
-            <div className="py-20 text-center text-zinc-500 flex flex-col items-center justify-center gap-2">
-              <RefreshCw size={24} className="animate-spin text-zinc-400" />
-              <p className="text-sm">Carregando cronograma...</p>
+            <div className="py-20 text-center flex flex-col items-center justify-center">
+              <LogoLoader module="project" text="Carregando cronograma..." />
             </div>
           ) : filteredTasks.length === 0 ? (
             <div className="py-20 text-center text-zinc-500">

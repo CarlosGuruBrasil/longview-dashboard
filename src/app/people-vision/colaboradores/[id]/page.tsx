@@ -67,7 +67,7 @@ interface UserPerms {
   viewMarketingAds: boolean; viewMarketingVendas: boolean;
   viewProjectVision: boolean; manageProjects: boolean;
   manageCommentsDocs: boolean; deleteTasks: boolean;
-  viewPeopleVision: boolean; viewQualityVision: boolean;
+  viewPeopleVision: boolean; viewQualityVision: boolean; viewSalesVision: boolean;
   isAdmin: boolean;
 }
 
@@ -77,7 +77,7 @@ const DEFAULT_PERMS: UserPerms = {
   viewMarketingAds: false, viewMarketingVendas: false,
   viewProjectVision: false, manageProjects: false,
   manageCommentsDocs: false, deleteTasks: false,
-  viewPeopleVision: false, viewQualityVision: false,
+  viewPeopleVision: false, viewQualityVision: false, viewSalesVision: false,
   isAdmin: false,
 };
 
@@ -89,6 +89,7 @@ interface UserData {
   createdAt: string;
   permissions?: Partial<UserPerms>;
   profile?: {
+    category?: 'colaborador' | 'fornecedor';
     phone?: string; whatsapp?: string; position?: string; department?: string;
     company?: string; activatedAt?: string; birthDate?: string; linkedIn?: string;
     avatarUrl?: string; status?: string; notes?: string;
@@ -98,6 +99,15 @@ interface UserData {
     address?: { street?: string; number?: string; complement?: string; city?: string; state?: string; zip?: string };
     emergencyContact?: { name?: string; phone?: string; relationship?: string };
   };
+}
+
+interface PageMeta {
+  canEdit: boolean;
+  canManageDocuments: boolean;
+  canManagePermissions?: boolean;
+  canChangeRole?: boolean;
+  canViewSensitive: boolean;
+  readOnly?: boolean;
 }
 
 const ROLES = ['Desenvolvedor', 'Diretoria', 'Gestor', 'Operador', 'Parceiro', 'Corretor', 'Visualizador'];
@@ -191,7 +201,6 @@ export default function ColaboradorPage() {
   const router          = useRouter();
   const { currentUser } = useUser();
   const isAdmin         = currentUser?.role === 'Desenvolvedor' || currentUser?.permissions?.isAdmin === true;
-  const canManageDocs   = ['Desenvolvedor', 'Diretoria', 'Gestor'].includes(currentUser?.role ?? '');
   const isSelf          = currentUser?.id === id || id === 'me';
 
   const [user, setUser]       = useState<UserData | null>(null);
@@ -199,6 +208,7 @@ export default function ColaboradorPage() {
   const [saving, setSaving]   = useState(false);
   const [saved, setSaved]     = useState(false);
   const [error, setError]     = useState('');
+  const [pageMeta, setPageMeta] = useState<PageMeta>({ canEdit: false, canManageDocuments: false, canViewSensitive: false });
 
   // Form state — dados básicos
   const [name, setName]             = useState('');
@@ -255,7 +265,8 @@ export default function ColaboradorPage() {
   const [docExpiry, setDocExpiry] = useState('');
   const [showDocForm, setShowDocForm] = useState(false);
 
-  const canEdit = isAdmin || isSelf || id === currentUser?.id;
+  const canEdit = pageMeta.canEdit;
+  const canManageDocs = pageMeta.canManageDocuments;
 
   // Permissões (apenas admin pode ver/alterar permissões de outros)
   const [perms, setPerms] = useState<UserPerms>({ ...DEFAULT_PERMS });
@@ -284,6 +295,7 @@ export default function ColaboradorPage() {
     const ep = isSelf ? '/api/user/me' : `/api/admin/users/${id}`;
     fetch(ep).then(r => r.json()).then(d => {
       const u: UserData = d.user ?? d;
+      setPageMeta(d.meta ?? { canEdit: isSelf || isAdmin, canManageDocuments: false, canViewSensitive: isSelf || isAdmin });
       setUser(u);
       setPerms({ ...DEFAULT_PERMS, ...(u.permissions ?? {}) });
       setName(u.name ?? '');
@@ -322,13 +334,13 @@ export default function ColaboradorPage() {
 
   // ── Load documents ─────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!id || id === 'me') return;
+    if (!id || id === 'me' || !canManageDocs) return;
     const timer = window.setTimeout(() => setDocsLoading(true), 0);
     fetch(`/api/admin/users/${id}/documents`)
       .then(r => r.json()).then(d => setDocs(d.docs ?? []))
       .catch(() => logger.warn('[colaborador] documentos falhou')).finally(() => setDocsLoading(false));
     return () => window.clearTimeout(timer);
-  }, [id]);
+  }, [canManageDocs, id]);
 
   // ── Save profile ───────────────────────────────────────────────────────────
   const handleSave = async () => {
@@ -366,7 +378,7 @@ export default function ColaboradorPage() {
         body.currentPassword = currentPwd;
         body.newPassword     = newPwd;
       }
-      if (isAdmin && !isSelf) body.role = role;
+      if (pageMeta.canChangeRole && !isSelf) body.role = role;
 
       const ep  = isSelf ? '/api/user/me' : `/api/admin/users/${id}`;
       const res = await fetch(ep, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -485,7 +497,10 @@ export default function ColaboradorPage() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-zinc-100 truncate">{user.name}</p>
-            <p className="text-xs text-zinc-500">{role}</p>
+            <p className="text-xs text-zinc-500">
+              {role}
+              {user.profile?.category === 'fornecedor' ? ' · Fornecedor' : ''}
+            </p>
             {canEdit && (
               <p className="text-[11px] text-zinc-600 mt-1">Clique na câmera para trocar a foto (JPG, PNG, WebP · máx. 5 MB)</p>
             )}
@@ -510,7 +525,7 @@ export default function ColaboradorPage() {
           <Field label="Empresa">
             <Input value={company} onChange={canEdit ? setCompany : undefined} placeholder="Ex: Longview" readOnly={!canEdit} />
           </Field>
-          {isAdmin ? (
+          {pageMeta.canChangeRole ? (
             <Field label="Perfil (role)">
               <Select value={role} onChange={v => { setRole(v); setProfIdType(PROF_ID_BY_ROLE[v]?.type ?? 'outro'); }}
                 options={ROLES.map(r => ({ value: r, label: r }))} />
@@ -532,6 +547,7 @@ export default function ColaboradorPage() {
       </Section>
 
       {/* ── Documentos Pessoais ── */}
+      {pageMeta.canViewSensitive && (
       <Section title="Documentos Pessoais" icon={ShieldCheck} accent="text-sky-400">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="CPF" required>
@@ -552,8 +568,10 @@ export default function ColaboradorPage() {
           </Field>
         </div>
       </Section>
+      )}
 
       {/* ── Registro Profissional (condicional por cargo) ── */}
+      {pageMeta.canViewSensitive && (
       <Section title={profConfig ? `Registro Profissional — ${profConfig.type}` : 'Registro Profissional'} icon={FileText} accent="text-violet-400">
         {!profConfig && (
           <p className="text-xs text-zinc-500 mb-3">
@@ -598,6 +616,7 @@ export default function ColaboradorPage() {
           </Field>
         </div>
       </Section>
+      )}
 
       {/* ── Contato ── */}
       <Section title="Contato" icon={Phone}>
@@ -770,7 +789,7 @@ export default function ColaboradorPage() {
       )}
 
       {/* ── Permissões do sistema (somente admin, não é o próprio) ── */}
-      {isAdmin && !isSelf && (
+      {pageMeta.canManagePermissions && !isSelf && (
         <Section title="Permissões do Sistema" icon={ShieldCheck} accent="text-amber-400">
           <div className="space-y-4">
             {/* Marketing Vision */}
@@ -820,11 +839,13 @@ export default function ColaboradorPage() {
                 {([
                   ['viewPeopleVision',  'People Vision'],
                   ['viewQualityVision', 'Quality Vision'],
+                  ['viewSalesVision',   'Sales Vision'],
                   ['isAdmin',           'Administrador (acesso total)'],
                 ] as [keyof UserPerms, string][]).map(([key, label]) => (
                   <label key={key} className="flex items-center gap-2 text-sm text-zinc-400 hover:text-white cursor-pointer select-none">
                     <input type="checkbox" checked={perms[key] as boolean}
                       onChange={() => setPerms(p => ({ ...p, [key]: !p[key] }))}
+                      disabled={!pageMeta.canChangeRole && key === 'isAdmin'}
                       className="w-3.5 h-3.5 rounded bg-[#1b1b1f] border-[#2e2e34] text-amber-500 focus:ring-0" />
                     {label}
                   </label>

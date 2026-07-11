@@ -52,6 +52,7 @@ export async function POST(request: NextRequest) {
         email:       user.email,
         role:        user.role,
         permissions: user.permissions,
+        mustChangePassword: user.profile?.mustChangePassword === true,
       },
       JWT_SECRET,
       { expiresIn: '7d' }
@@ -65,6 +66,7 @@ export async function POST(request: NextRequest) {
         email:       user.email,
         role:        user.role,
         permissions: user.permissions,
+        mustChangePassword: user.profile?.mustChangePassword === true,
       },
     });
 

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Task, Responsible } from '@/lib/db';
 import { useUser } from '@/context/UserContext';
+import LogoLoader from '@/components/ui/LogoLoader';
 import ResponsibleModal from '../components/ResponsibleModal';
 import TaskDrawer from '../components/TaskDrawer';
 import logger from '@/lib/logger'
@@ -233,11 +234,10 @@ export default function ResponsiblesPage() {
       </section>
 
       {/* Grid de Responsáveis */}
-      {loading ? (
-        <div className="py-20 text-center text-zinc-500 flex flex-col items-center justify-center gap-3">
-          <RefreshCw size={24} className="animate-spin text-zinc-400" />
-          <p className="text-sm">Carregando painel de responsáveis...</p>
-        </div>
+        {loading ? (
+          <div className="py-20 text-center flex flex-col items-center justify-center">
+            <LogoLoader module="project" text="Carregando painel de responsáveis..." />
+          </div>
       ) : filteredStats.length === 0 ? (
         <div className="py-20 text-center text-zinc-500 border border-dashed border-[#1E1E22] rounded-xl">
           Nenhum executor cadastrado atende a esses critérios.

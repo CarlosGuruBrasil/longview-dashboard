@@ -20,6 +20,7 @@ type MonthlySeriesPoint = {
   aprovadas: number;
   reprovadas: number;
   naoAplica: number;
+  [key: string]: string | number;
 };
 
 function errorMessage(error: unknown): string {
@@ -101,23 +102,69 @@ export async function GET(req: Request) {
     `;
     const vs = verifStatsQuery[0] || { total: 0, aprovadas: 0, reprovadas: 0, nao_aplica: 0 };
 
-    // 2. Inspecoes por Disciplina (0-TERRENO...9-IMPERMEABILIZAÇÕES) — agrupar pelo "modelo" cru (118 valores)
-    // não é legível; a classificação por disciplina (construpoint_disciplinas) é o agrupamento útil pra gráfico.
+    // 2. Inspecoes por Disciplina (0-TERRENO...9-IMPERMEABILIZAÇÕES) com detalhamento de Status
     const inspPorDisciplinaQuery = await sql`
-      SELECT COALESCE(d.disciplina, ${SEM_DISCIPLINA}) as key, COUNT(*)::int as count
+      SELECT 
+        COALESCE(d.disciplina, ${SEM_DISCIPLINA}) as key, 
+        COALESCE(i.status, 'Sem status') as status,
+        COUNT(*)::int as count
+      FROM construpoint_inspecoes i
+      LEFT JOIN construpoint_disciplinas d ON d.modelo = i.modelo
+      WHERE COALESCE(i.data_agendamento, i.data_criacao) >= ${startDate}::date
+        AND COALESCE(i.data_agendamento, i.data_criacao) < (${endDate}::date + 1)
+      ${inspFilters}
+      GROUP BY 1, 2
+    `;
+    const inspecoesPorDisciplina: Record<string, { total: number, [status: string]: number }> = {};
+    let totalInspections = 0;
+    for (const row of inspPorDisciplinaQuery) {
+      if (!inspecoesPorDisciplina[row.key]) {
+        inspecoesPorDisciplina[row.key] = { total: 0 };
+      }
+      inspecoesPorDisciplina[row.key][row.status] = row.count;
+      inspecoesPorDisciplina[row.key].total += row.count;
+      totalInspections += row.count;
+    }
+
+    // 2.5. Inspeções por Local - n1
+    const inspPorLocalN1Query = await sql`
+      SELECT 
+        COALESCE(i.raw->>'Nivel1', '(Em branco)') as local,
+        COUNT(*)::int as mapeadas,
+        COUNT(*) FILTER (WHERE i.status = 'Aceito')::int as realizadas
       FROM construpoint_inspecoes i
       LEFT JOIN construpoint_disciplinas d ON d.modelo = i.modelo
       WHERE COALESCE(i.data_agendamento, i.data_criacao) >= ${startDate}::date
         AND COALESCE(i.data_agendamento, i.data_criacao) < (${endDate}::date + 1)
       ${inspFilters}
       GROUP BY 1
+      ORDER BY mapeadas DESC
     `;
-    const inspecoesPorDisciplina: Record<string, number> = {};
-    let totalInspections = 0;
-    for (const row of inspPorDisciplinaQuery) {
-      inspecoesPorDisciplina[row.key] = row.count;
-      totalInspections += row.count;
-    }
+    const inspecoesPorLocalN1 = inspPorLocalN1Query.map(row => ({
+      local: row.local,
+      mapeadas: row.mapeadas,
+      realizadas: row.realizadas
+    }));
+
+    // 2.6. Inspeções por Local - n2
+    const inspPorLocalN2Query = await sql`
+      SELECT 
+        COALESCE(i.raw->>'Nivel2', '(Em branco)') as local,
+        COUNT(*)::int as mapeadas,
+        COUNT(*) FILTER (WHERE i.status = 'Aceito')::int as realizadas
+      FROM construpoint_inspecoes i
+      LEFT JOIN construpoint_disciplinas d ON d.modelo = i.modelo
+      WHERE COALESCE(i.data_agendamento, i.data_criacao) >= ${startDate}::date
+        AND COALESCE(i.data_agendamento, i.data_criacao) < (${endDate}::date + 1)
+      ${inspFilters}
+      GROUP BY 1
+      ORDER BY mapeadas DESC
+    `;
+    const inspecoesPorLocalN2 = inspPorLocalN2Query.map(row => ({
+      local: row.local,
+      mapeadas: row.mapeadas,
+      realizadas: row.realizadas
+    }));
 
     // 3. Status das inspeções no período (pipeline: Agendado, Em Andamento, Aceito, Recusado...)
     const statusBreakdownQuery = await sql`
@@ -139,6 +186,30 @@ export async function GET(req: Request) {
     const statusBreakdown: Record<string, number> = {};
     for (const row of statusBreakdownQuery) statusBreakdown[row.key] = row.count;
 
+    // 3.5 Inspeções por Obra
+    const inspecoesPorObraQuery = await sql`
+      SELECT COALESCE(i.obra, 'Sem Obra') as obra, COALESCE(i.status, 'Sem Status') as status, COUNT(*)::int as count
+      FROM construpoint_inspecoes i
+      LEFT JOIN construpoint_disciplinas d ON d.modelo = i.modelo
+      WHERE COALESCE(i.data_agendamento, i.data_criacao) >= ${startDate}::date
+        AND COALESCE(i.data_agendamento, i.data_criacao) < (${endDate}::date + 1)
+        ${status ? sql`AND i.status = ${status}` : sql``}
+        ${inspetor ? sql`AND i.inspetor = ${inspetor}` : sql``}
+        ${codeSearch ? sql`AND i.code ILIKE ${'%' + codeSearch + '%'}` : sql``}
+        ${disciplinaFiltro === SEM_DISCIPLINA
+          ? sql`AND d.disciplina IS NULL`
+          : disciplinaFiltro
+            ? sql`AND d.disciplina = ${disciplinaFiltro}`
+            : sql``}
+      GROUP BY 1, 2
+    `;
+    const inspecoesPorObra: Record<string, { total: number, statusCounts: Record<string, number> }> = {};
+    for (const row of inspecoesPorObraQuery) {
+      if (!inspecoesPorObra[row.obra]) inspecoesPorObra[row.obra] = { total: 0, statusCounts: {} };
+      inspecoesPorObra[row.obra].total += row.count;
+      inspecoesPorObra[row.obra].statusCounts[row.status] = row.count;
+    }
+
     // 4. Por inspetor (verificações do período, mesmos filtros exceto inspetor — pra manter o ranking completo).
     // Sem LIMIT: só existem ~14 inspetores reais na base, ordenação/busca fica por conta do frontend.
     const porInspetorQuery = await sql`
@@ -159,13 +230,80 @@ export async function GET(req: Request) {
       GROUP BY 1
       ORDER BY 2 DESC
     `;
-    const porInspetor = porInspetorQuery.map(row => ({
-      inspetor: row.inspetor as string,
-      total: row.total as number,
-      aprovadas: row.aprovadas as number,
-      reprovadas: row.reprovadas as number,
-      taxaAprovacao: row.total > 0 ? Math.round((row.aprovadas / row.total) * 1000) / 10 : 0,
-    }));
+
+    // 4.5 Statuses das Inspeções por Inspetor (para os cards de inspetor)
+    const inspetorStatusQuery = await sql`
+      SELECT COALESCE(i.inspetor, 'Sem Inspetor') as inspetor, COALESCE(i.status, 'Sem status') as status, COUNT(*)::int as count
+      FROM construpoint_inspecoes i
+      LEFT JOIN construpoint_disciplinas d ON d.modelo = i.modelo
+      WHERE COALESCE(i.data_agendamento, i.data_criacao) >= ${startDate}::date
+        AND COALESCE(i.data_agendamento, i.data_criacao) < (${endDate}::date + 1)
+        ${obra ? sql`AND i.obra = ${obra}` : sql``}
+        ${disciplinaFiltro === SEM_DISCIPLINA
+          ? sql`AND d.disciplina IS NULL`
+          : disciplinaFiltro
+            ? sql`AND d.disciplina = ${disciplinaFiltro}`
+            : sql``}
+      GROUP BY 1, 2
+    `;
+    const statusPorInspetorMap: Record<string, Record<string, number>> = {};
+    for (const row of inspetorStatusQuery) {
+      if (!statusPorInspetorMap[row.inspetor]) statusPorInspetorMap[row.inspetor] = {};
+      statusPorInspetorMap[row.inspetor][row.status] = row.count;
+    }
+
+    const projetosQuery = await sql`
+      SELECT 
+        COALESCE(i.inspetor, 'Sem Inspetor') as inspetor, 
+        COALESCE(i.obra, 'Sem Obra') as obra, 
+        COALESCE(i.status, 'Sem status') as status,
+        COUNT(*)::int as count
+      FROM construpoint_inspecoes i
+      LEFT JOIN construpoint_disciplinas d ON d.modelo = i.modelo
+      WHERE COALESCE(i.data_agendamento, i.data_criacao) >= ${startDate}::date
+        AND COALESCE(i.data_agendamento, i.data_criacao) < (${endDate}::date + 1)
+        ${obra ? sql`AND i.obra = ${obra}` : sql``}
+        ${disciplinaFiltro === SEM_DISCIPLINA
+          ? sql`AND d.disciplina IS NULL`
+          : disciplinaFiltro
+            ? sql`AND d.disciplina = ${disciplinaFiltro}`
+            : sql``}
+      GROUP BY 1, 2, 3
+    `;
+
+    const projetosMap: Record<string, { obra: string; statusCounts: Record<string, number> }[]> = {};
+    for (const row of projetosQuery) {
+      const inspetor = row.inspetor as string;
+      const obra = row.obra as string;
+      const status = row.status as string;
+      const count = row.count as number;
+      
+      if (!projetosMap[inspetor]) projetosMap[inspetor] = [];
+      let projeto = projetosMap[inspetor].find(p => p.obra === obra);
+      if (!projeto) {
+        projeto = { obra, statusCounts: {} };
+        projetosMap[inspetor].push(projeto);
+      }
+      projeto.statusCounts[status] = count;
+    }
+
+    const porInspetor = porInspetorQuery.map(row => {
+      const counts = statusPorInspetorMap[row.inspetor as string] || {};
+      const totalInspecoes = Object.values(counts).reduce((a, b) => a + b, 0) || 1;
+      const aceitas = counts['Aceito'] || 0;
+      const taxa = Math.round((aceitas / totalInspecoes) * 1000) / 10;
+      
+      return {
+        inspetor: row.inspetor as string,
+        total: row.total as number,
+        aprovadas: row.aprovadas as number,
+        reprovadas: row.reprovadas as number,
+        taxaAprovacao: row.total > 0 ? Math.round((row.aprovadas / row.total) * 1000) / 10 : 0,
+        statusCounts: counts,
+        taxa: taxa,
+        projetos: projetosMap[row.inspetor as string] || []
+      };
+    });
 
     // 5. Ultimas Inspecoes — 100 por página, "carregar mais" avança via offset. Mesma paginação nas
     // 3 variações (lista normal e as duas telas de atenção) — nenhuma delas trava num total escondido.
@@ -176,7 +314,8 @@ export async function GET(req: Request) {
     const ultimasInspecoesQuery = attention === 'nonconformity'
       ? await sql`
           SELECT i.id, i.code, i.modelo, i.obra, i.inspetor, i.status, i.raw->>'StatusId' as status_id,
-                 COALESCE(i.data_agendamento, i.data_criacao) as data
+                 i.raw->>'Nivel1' as n1, i.raw->>'Nivel2' as n2, i.raw->>'Nivel3' as n3, i.raw->>'Nivel4' as n4,
+                 COALESCE(i.data_agendamento, i.data_criacao) as data, d.disciplina
           FROM construpoint_inspecoes i
           LEFT JOIN construpoint_disciplinas d ON d.modelo = i.modelo
           WHERE i.status IN ('Recusado', 'Pendente Reinspeção')
@@ -188,7 +327,8 @@ export async function GET(req: Request) {
       : attention === 'overdue'
         ? await sql`
             SELECT i.id, i.code, i.modelo, i.obra, i.inspetor, i.status, i.raw->>'StatusId' as status_id,
-                   COALESCE(i.data_agendamento, i.data_criacao) as data
+                   i.raw->>'Nivel1' as n1, i.raw->>'Nivel2' as n2, i.raw->>'Nivel3' as n3, i.raw->>'Nivel4' as n4,
+                   COALESCE(i.data_agendamento, i.data_criacao) as data, d.disciplina
             FROM construpoint_inspecoes i
             LEFT JOIN construpoint_disciplinas d ON d.modelo = i.modelo
             WHERE i.status = 'Agendado' AND i.data_agendamento < now() - interval '7 days'
@@ -199,7 +339,8 @@ export async function GET(req: Request) {
           `
         : await sql`
             SELECT i.id, i.code, i.modelo, i.obra, i.inspetor, i.status, i.raw->>'StatusId' as status_id,
-                   COALESCE(i.data_agendamento, i.data_criacao) as data
+                   i.raw->>'Nivel1' as n1, i.raw->>'Nivel2' as n2, i.raw->>'Nivel3' as n3, i.raw->>'Nivel4' as n4,
+                   COALESCE(i.data_agendamento, i.data_criacao) as data, d.disciplina
             FROM construpoint_inspecoes i
             LEFT JOIN construpoint_disciplinas d ON d.modelo = i.modelo
             WHERE true
@@ -218,6 +359,11 @@ export async function GET(req: Request) {
       status: row.status,
       statusId: row.status_id ? parseInt(row.status_id) : null,
       data: row.data,
+      disciplina: row.disciplina,
+      n1: row.n1,
+      n2: row.n2,
+      n3: row.n3,
+      n4: row.n4,
     }));
 
     // Total real que bate com os mesmos filtros — mostrado como "X de Y" no frontend,
@@ -255,13 +401,14 @@ export async function GET(req: Request) {
       SELECT
         EXTRACT(YEAR FROM COALESCE(i.data_agendamento, i.data_criacao))::int as year,
         EXTRACT(MONTH FROM COALESCE(i.data_agendamento, i.data_criacao))::int as month,
+        COALESCE(i.obra, 'Desconhecida') as obra,
         COUNT(*)::int as total
       FROM construpoint_inspecoes i
       LEFT JOIN construpoint_disciplinas d ON d.modelo = i.modelo
       WHERE COALESCE(i.data_agendamento, i.data_criacao) >= ${startDate}::date
         AND COALESCE(i.data_agendamento, i.data_criacao) < (${endDate}::date + 1)
       ${inspFilters}
-      GROUP BY 1, 2
+      GROUP BY 1, 2, 3
     `;
 
     const verifMensalQuery = await sql`
@@ -284,15 +431,20 @@ export async function GET(req: Request) {
     for (const row of inspMensalQuery) {
       if (!row.year || !row.month) continue;
       const mk = `${row.year}-${String(row.month).padStart(2, '0')}`;
-      seriesMap[mk] = {
-        label: `${MONTHS_PT[row.month - 1]}/${String(row.year).slice(2)}`,
-        year: row.year,
-        month: row.month,
-        total: row.total,
-        aprovadas: 0,
-        reprovadas: 0,
-        naoAplica: 0
-      };
+      if (!seriesMap[mk]) {
+        seriesMap[mk] = {
+          label: `${MONTHS_PT[row.month - 1]}/${String(row.year).slice(2)}`,
+          year: row.year,
+          month: row.month,
+          total: 0,
+          aprovadas: 0,
+          reprovadas: 0,
+          naoAplica: 0
+        };
+      }
+      seriesMap[mk].total += row.total;
+      const obraKey = `obra_${row.obra}`;
+      seriesMap[mk][obraKey] = ((seriesMap[mk][obraKey] as number) || 0) + row.total;
     }
 
     for (const row of verifMensalQuery) {
@@ -340,7 +492,10 @@ export async function GET(req: Request) {
         reprovadas: vs.reprovadas,
         naoAplica: vs.nao_aplica,
       },
+      inspecoesPorObra,
       inspecoesPorDisciplina,
+      inspecoesPorLocalN1,
+      inspecoesPorLocalN2,
       statusBreakdown,
       porInspetor,
       serieMensal,

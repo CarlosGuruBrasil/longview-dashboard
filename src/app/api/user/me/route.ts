@@ -16,7 +16,14 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
 
   const { passwordHash: _, ...safe } = user;
-  return NextResponse.json({ user: safe });
+  return NextResponse.json({
+    user: safe,
+    meta: {
+      canEdit: true,
+      canManageDocuments: false,
+      canViewSensitive: true,
+    },
+  });
 }
 
 /**
@@ -69,6 +76,10 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Nova senha precisa ter pelo menos 8 caracteres' }, { status: 400 });
     }
     user.passwordHash = await bcrypt.hash(body.newPassword, 12);
+    user.profile = {
+      ...(user.profile ?? {}),
+      mustChangePassword: false,
+    };
   }
 
   users[idx] = user;

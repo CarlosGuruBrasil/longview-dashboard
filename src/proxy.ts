@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server';
 
 interface ProxyJwtPayload {
   role?: string;
+  mustChangePassword?: boolean;
   permissions?: {
     isAdmin?: boolean;
     viewProjectVision?: boolean;
@@ -43,6 +44,7 @@ export function proxy(request: NextRequest) {
     pathname === '/api/meta/create-lead-ad'        || // lead ad creation — auth via CRON_SECRET
     pathname.startsWith('/l/')                     || // links públicos de rastreio (encurtador)
     pathname === '/login' ||
+    pathname === '/primeiro-acesso' ||
     pathname === '/favicon.ico' ||
     pathname.includes('logo') || // imagens de logo
     pathname.includes('.')
@@ -51,7 +53,8 @@ export function proxy(request: NextRequest) {
     if (pathname === '/login' && token) {
       const payload = decodeJwtPayload(token);
       if (payload) {
-        return NextResponse.redirect(new URL('/select-app', request.url));
+        const destination = payload.mustChangePassword ? '/primeiro-acesso' : '/select-app';
+        return NextResponse.redirect(new URL(destination, request.url));
       }
     }
     return NextResponse.next();
@@ -71,7 +74,15 @@ export function proxy(request: NextRequest) {
     return response;
   }
 
-  const { permissions, role } = payload;
+  const { permissions, role, mustChangePassword } = payload;
+
+  if (mustChangePassword && pathname !== '/primeiro-acesso') {
+    return NextResponse.redirect(new URL('/primeiro-acesso', request.url));
+  }
+
+  if (!mustChangePassword && pathname === '/primeiro-acesso') {
+    return NextResponse.redirect(new URL('/select-app', request.url));
+  }
 
   // 4. Validação de rotas com base em permissões
   

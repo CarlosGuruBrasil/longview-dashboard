@@ -11,6 +11,7 @@ import {
   AlertTriangle, AlertCircle, Info, Flame, TrendingUp, TrendingDown,
   Lightbulb, RefreshCw, ClipboardCheck, ListChecks, Percent, Search, X,
 } from 'lucide-react'
+import LogoLoader from '@/components/ui/LogoLoader'
 import logger from '@/lib/logger'
 import InspecaoDetailModal from '../components/InspecaoDetailModal'
 
@@ -263,14 +264,10 @@ export default function InteligenciaQualidadePage() {
     return () => window.clearTimeout(id)
   }, [queryString])
 
-  if (loading) {
+  if (loading && !data) {
     return (
-      <div className="flex flex-col items-center justify-center gap-4 p-12" style={{ minHeight: '60vh' }}>
-        <div className="relative w-12 h-12">
-          <div className="absolute inset-0 rounded-full border-2 border-[#1E1E22]" />
-          <div className="absolute inset-0 rounded-full border-2 border-t-violet-500 border-r-transparent border-b-transparent border-l-transparent animate-spin" />
-        </div>
-        <p className="text-sm text-zinc-400">Analisando dados de qualidade…</p>
+      <div className="flex flex-col items-center justify-center p-12" style={{ minHeight: '60vh' }}>
+        <LogoLoader module="quality" text="Analisando dados de qualidade..." />
       </div>
     )
   }
@@ -295,9 +292,19 @@ export default function InteligenciaQualidadePage() {
   const serieRecente = serie.slice(-18)
 
   return (
-    <div className="w-full space-y-6 p-4 md:p-6">
+    <div className="w-full space-y-6 p-4 md:p-6 relative">
+      {loading && data && (
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#0d0d0f]/60 backdrop-blur-[2px] rounded-xl transition-all duration-300">
+          <div className="relative w-12 h-12 mb-4">
+            <div className="absolute inset-0 rounded-full border-2 border-[#1E1E22]" />
+            <div className="absolute inset-0 rounded-full border-2 border-t-violet-500 border-r-transparent border-b-transparent border-l-transparent animate-spin" />
+          </div>
+          <p className="text-sm text-zinc-400 font-medium">Analisando dados...</p>
+        </div>
+      )}
 
-      {/* Alertas */}
+      <div className={`space-y-6 transition-opacity duration-300 ${loading && data ? 'opacity-40 pointer-events-none' : ''}`}>
+        {/* Alertas */}
       {alertas.length > 0 && (
         <div className="space-y-2">
           <h3 className="text-sm font-semibold text-zinc-300">
@@ -538,6 +545,8 @@ export default function InteligenciaQualidadePage() {
           </table>
         </div>
       </GlassCard>
+      
+      </div>
 
       <p className="text-[10px] text-zinc-600 text-right">
         Análise gerada em {new Date(data.meta.geradoEm).toLocaleString('pt-BR')} · dados Construpoint D-1

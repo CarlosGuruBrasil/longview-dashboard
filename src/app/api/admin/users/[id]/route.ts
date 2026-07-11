@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth, verifyAdminAuth } from '@/lib/auth';
 import { readUsers, writeUsers, UserProfileData } from '@/lib/db-kv';
 import { normalizePermissions, type UserPermissions } from '@/lib/permissions';
+import { canEditTargetUser, canManageAllPeople, canManageUserPermissions, canViewFullPeopleProfile, canViewAllPeopleReadOnly, sanitizeUserForDetail } from '@/lib/user-access';
 
 /** GET /api/admin/users/[id] */
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -9,18 +10,29 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const auth   = await verifyAuth();
   if (!auth) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
 
-  // Usuário só pode ver o próprio; admin pode ver qualquer um
   const admin = await verifyAdminAuth();
-  if (!admin && auth.userId !== id) {
-    return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
-  }
 
   const users = await readUsers();
+  const viewer = users.find(u => u.id === auth.userId);
+  if (!viewer) return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
   const user  = users.find(u => u.id === id);
   if (!user) return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
 
-  const { passwordHash: _, ...safe } = user;
-  return NextResponse.json({ user: safe });
+  if (!admin && auth.userId !== id && !canViewFullPeopleProfile(viewer, user) && !canViewAllPeopleReadOnly(viewer)) {
+    return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
+  }
+
+  return NextResponse.json({
+    user: sanitizeUserForDetail(viewer, user),
+    meta: {
+      canEdit: canEditTargetUser(viewer, user),
+      canManageDocuments: canManageAllPeople(viewer),
+      canManagePermissions: canManageUserPermissions(viewer, user),
+      canChangeRole: admin?.userId === auth.userId,
+      canViewSensitive: canViewFullPeopleProfile(viewer, user),
+      readOnly: canViewAllPeopleReadOnly(viewer) && !canManageAllPeople(viewer),
+    },
+  });
 }
 
 /** PUT /api/admin/users/[id] — admin edita qualquer campo; usuário edita só o próprio */
@@ -32,10 +44,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   const admin   = await verifyAdminAuth();
   const isSelf  = auth.userId === id;
 
-  if (!admin && !isSelf) {
-    return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
-  }
-
   const body = await request.json() as {
     name?:        string;
     role?:        string;
@@ -44,10 +52,18 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   };
 
   const users = await readUsers();
+  const viewer = users.find(u => u.id === auth.userId);
+  if (!viewer) return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
   const idx   = users.findIndex(u => u.id === id);
   if (idx === -1) return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
 
   const user = { ...users[idx] };
+  const canEdit = canEditTargetUser(viewer, user);
+  const canManagePermissions = canManageUserPermissions(viewer, user);
+
+  if (!admin && !isSelf && !canEdit && !canManagePermissions) {
+    return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
+  }
 
   if (body.name && body.name.trim().length >= 2) user.name = body.name.trim();
 
@@ -55,7 +71,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   if (admin && body.role && ['Desenvolvedor','Diretoria','Gestor','Operador','Parceiro','Corretor','Visualizador'].includes(body.role)) {
     user.role = body.role as typeof user.role;
   }
-  if (admin && body.permissions) {
+  if ((admin || canManagePermissions) && body.permissions) {
     user.permissions = normalizePermissions({ ...user.permissions, ...body.permissions });
   }
 

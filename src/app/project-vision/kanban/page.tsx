@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { Task, Project } from '@/lib/db';
 import { useUser } from '@/context/UserContext';
+import LogoLoader from '@/components/ui/LogoLoader';
 import TaskDrawer from '../components/TaskDrawer';
 import ResponsibleModal from '../components/ResponsibleModal';
 import logger from '@/lib/logger'
@@ -240,9 +241,8 @@ export default function KanbanPage() {
       {/* Grid de Colunas Kanban */}
       <section className="flex-1 overflow-x-auto flex gap-4 pb-4 select-none scrollbar-thin">
         {loading ? (
-          <div className="w-full text-center text-zinc-500 flex flex-col items-center justify-center gap-2">
-            <RefreshCw size={24} className="animate-spin text-zinc-400" />
-            <p className="text-sm">Carregando quadro...</p>
+          <div className="py-20 text-center flex flex-col items-center justify-center">
+            <LogoLoader module="project" text="Carregando quadro..." />
           </div>
         ) : (
           columns.map((column) => {

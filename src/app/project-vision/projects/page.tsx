@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
+import LogoLoader from '@/components/ui/LogoLoader';
 import { Task, Project } from '@/lib/db';
 import { useUser } from '@/context/UserContext';
 import logger from '@/lib/logger'
@@ -163,9 +164,8 @@ export default function ProjectsPage() {
 
       {/* Grid de Empreendimentos */}
       {loading ? (
-        <div className="py-20 text-center text-zinc-500 flex flex-col items-center justify-center gap-2">
-          <RefreshCw size={24} className="animate-spin text-zinc-400" />
-          <p className="text-sm">Carregando carteira de projetos...</p>
+        <div className="py-20 text-center flex flex-col items-center justify-center">
+          <LogoLoader module="project" text="Carregando carteira de projetos..." />
         </div>
       ) : (
         <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

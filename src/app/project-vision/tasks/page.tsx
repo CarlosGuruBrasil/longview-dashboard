@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { Task, Project } from '@/lib/db';
 import { useUser } from '@/context/UserContext';
+import LogoLoader from '@/components/ui/LogoLoader';
 import TaskDrawer from '../components/TaskDrawer';
 import ResponsibleModal from '../components/ResponsibleModal';
 import logger from '@/lib/logger'
@@ -316,9 +317,8 @@ export default function TasksPage() {
       <section className="bg-[#121214]/60 border border-[#1E1E22] rounded-xl overflow-hidden shadow-xl">
         <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
           {loading ? (
-            <div className="p-10 text-center text-zinc-500 flex flex-col items-center justify-center gap-3">
-              <RefreshCw size={24} className="animate-spin text-zinc-400" />
-              <p className="text-sm">Carregando banco de dados...</p>
+            <div className="py-20 text-center flex flex-col items-center justify-center">
+              <LogoLoader module="project" text="Carregando banco de dados..." />
             </div>
           ) : filteredTasks.length === 0 ? (
             <div className="p-16 text-center text-zinc-500 flex flex-col items-center justify-center gap-3">

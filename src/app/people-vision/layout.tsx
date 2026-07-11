@@ -4,6 +4,8 @@ import AppHeader from '@/components/app/AppHeader';
 
 const TITLE_MAP = {
   '/people-vision/colaboradores': 'Colaboradores',
+  '/people-vision/fornecedores': 'Fornecedores',
+  '/people-vision/rh': 'Inteligência RH',
   '/people-vision/cadastro': 'Cadastro',
   '/people-vision/notificacoes': 'Notificações',
   '/people-vision': 'Dashboard',

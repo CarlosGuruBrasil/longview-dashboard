@@ -15,6 +15,7 @@ export interface AuthUser {
   email:       string;
   role:        'Desenvolvedor' | 'Diretoria' | 'Operador' | 'Gestor' | 'Parceiro' | 'Corretor' | 'Visualizador';
   permissions: Record<string, boolean>;
+  mustChangePassword?: boolean;
 }
 
 /**

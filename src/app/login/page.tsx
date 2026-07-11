@@ -32,8 +32,7 @@ export default function LoginPage() {
         throw new Error(data.error || 'Credenciais inválidas.');
       }
 
-      // Redireciona para a tela de seleção de aplicativo
-      router.push('/select-app');
+      router.push(data.user?.mustChangePassword ? '/primeiro-acesso' : '/select-app');
       router.refresh();
     } catch (err) {
       logger.error({ err }, 'Erro de login:');

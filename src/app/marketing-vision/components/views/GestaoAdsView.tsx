@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Play, Pause, RefreshCw, AlertTriangle, CheckCircle2, Clock } from 'lucide-react'
 import { formatCurrency } from '../../utils/formatters'
+import LogoLoader from '@/components/ui/LogoLoader'
 
 type Campaign = {
   id: string
@@ -176,9 +177,8 @@ export default function GestaoAdsView() {
 
       {/* Conteúdo */}
       {loading ? (
-        <div className="flex items-center justify-center py-16 gap-3 text-zinc-500">
-          <RefreshCw size={16} className="animate-spin" />
-          <span className="text-sm">Carregando campanhas da Meta...</span>
+        <div className="flex items-center justify-center py-16">
+          <LogoLoader module="marketing" text="Carregando campanhas da Meta..." />
         </div>
       ) : error ? (
         <div className="flex items-center gap-2 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">

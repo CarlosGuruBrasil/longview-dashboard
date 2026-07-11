@@ -2,6 +2,6 @@
 
 import PeopleDirectoryList from '@/app/people-vision/components/PeopleDirectoryList';
 
-export default function ColaboradoresPage() {
-  return <PeopleDirectoryList mode="colaboradores" />;
+export default function FornecedoresPage() {
+  return <PeopleDirectoryList mode="fornecedores" />;
 }
