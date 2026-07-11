@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import {
   ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, BarChart, Cell,
@@ -42,6 +43,7 @@ interface InspetorRank {
 interface Alerta {
   severidade: 'critico' | 'alto' | 'atencao' | 'info'
   titulo: string; detalhe: string; recomendacao: string
+  actionHref?: string
 }
 
 interface IntelligenceData {
@@ -51,7 +53,10 @@ interface IntelligenceData {
   itensSistemicos: ItemSistemico[]
   rankingInspetores: InspetorRank[]
   alertas: Alerta[]
-  meta: { taxaGeral90: number; inspecoesPendentes: number; geradoEm: string }
+  meta: {
+    taxaGeral90: number; inspecoesPendentes: number; semClassificacao: number
+    agendadasAtrasadas: number; recusadas: number; pendentesReinspecao: number; geradoEm: string
+  }
 }
 
 // ---------- estilo ----------
@@ -132,7 +137,10 @@ export default function InteligenciaQualidadePage() {
     }
   }
 
-  useEffect(() => { void load() }, [])
+  useEffect(() => {
+    const id = window.setTimeout(() => { void load() }, 0)
+    return () => window.clearTimeout(id)
+  }, [])
 
   if (loading) {
     return (
@@ -193,6 +201,11 @@ export default function InteligenciaQualidadePage() {
                         <Lightbulb size={12} className="text-amber-300 mt-0.5 shrink-0" />
                         <span>{a.recomendacao}</span>
                       </p>
+                      {a.actionHref && (
+                        <Link href={a.actionHref} className="inline-flex mt-3 text-xs font-semibold hover:underline" style={{ color: s.color }}>
+                          Ver registros que precisam de atenção →
+                        </Link>
+                      )}
                     </div>
                   </div>
                 </div>

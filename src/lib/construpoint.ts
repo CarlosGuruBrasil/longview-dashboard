@@ -5,8 +5,8 @@ import logger from '@/lib/logger'
  * Autenticação via OAuth2 (password grant) com Basic Auth.
  * Credenciais configuradas via variáveis de ambiente do Coolify:
  *   CONSTRUPOINT_BASIC_AUTH   — header Authorization Basic ...
- *   CONSTRUPOINT_USERNAME     — adminapi_longview@e-construmarket.com.br
- *   CONSTRUPOINT_PASSWORD     — *GSuG8U8
+ *   CONSTRUPOINT_USERNAME     — usuário da integração
+ *   CONSTRUPOINT_PASSWORD     — senha da integração
  *
  * Endpoints:
  *   Relatório customizado por modelo — fichas por tipo + período

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sql, ensureSchema } from '@/lib/pg';
 import { getBearerToken } from '@/lib/internal-auth';
 import { parseConstrupointDate } from '@/lib/construpoint';
+import { refreshAutomaticQualityScopes } from '@/lib/quality-scopes';
 import logger from '@/lib/logger'
 
 type ConstrupointPayload = Record<string, unknown> & {
@@ -61,7 +62,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
     }
 
-    logger.info({ bodyPreview: JSON.stringify(body).slice(0, 500) }, '[webhook/construpoint] Recebido');
+    logger.info({ id: body.Id ?? body.id, code: body.Code ?? body.code }, '[webhook/construpoint] Recebido');
     await ensureSchema();
 
     // Como não temos a doc exata do webhook da Construpoint, vamos fazer um parser defensivo
@@ -103,6 +104,7 @@ export async function POST(request: NextRequest) {
           raw = EXCLUDED.raw,
           synced_at = EXCLUDED.synced_at
       `;
+      await refreshAutomaticQualityScopes();
     } else {
       // Se não reconhecermos o formato, podemos logar em uma tabela de webhooks genérica ou ignorar por enquanto
       logger.info('[webhook/construpoint] Payload não reconhecido como inspeção (sem ID). Ignorando inserção.');

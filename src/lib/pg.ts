@@ -181,6 +181,43 @@ export async function ensureSchema(): Promise<void> {
     `;
 
     await sql`
+      CREATE TABLE IF NOT EXISTS quality_scopes (
+        id         TEXT PRIMARY KEY,
+        nome       TEXT NOT NULL,
+        tipo       TEXT NOT NULL CHECK (tipo IN ('corporate', 'development')),
+        ativo      BOOLEAN NOT NULL DEFAULT true,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `;
+
+    await sql`
+      INSERT INTO quality_scopes (id, nome, tipo) VALUES
+        ('longview', 'LongView', 'corporate'),
+        ('nautic', 'Nautic', 'development'),
+        ('hub-beira-mar', 'Hub Beira-Mar', 'development')
+      ON CONFLICT (id) DO UPDATE SET nome = EXCLUDED.nome, tipo = EXCLUDED.tipo
+    `;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS quality_inspection_scopes (
+        inspection_id BIGINT NOT NULL REFERENCES construpoint_inspecoes(id) ON DELETE CASCADE,
+        scope_id       TEXT NOT NULL REFERENCES quality_scopes(id),
+        source         TEXT NOT NULL CHECK (source IN ('automatic', 'manual')),
+        classified_by  TEXT,
+        classified_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (inspection_id, scope_id)
+      )
+    `;
+
+    await optionalSchemaStep('construpoint inspection code index', () => sql`CREATE INDEX IF NOT EXISTS construpoint_inspecoes_code_idx ON construpoint_inspecoes (code)`);
+    await optionalSchemaStep('construpoint inspection filters index', () => sql`CREATE INDEX IF NOT EXISTS construpoint_inspecoes_filters_idx ON construpoint_inspecoes (obra, status, modelo)`);
+    await optionalSchemaStep('construpoint inspection date index', () => sql`CREATE INDEX IF NOT EXISTS construpoint_inspecoes_date_idx ON construpoint_inspecoes (data_agendamento DESC)`);
+    await optionalSchemaStep('construpoint verification code index', () => sql`CREATE INDEX IF NOT EXISTS construpoint_verificacoes_codigo_idx ON construpoint_verificacoes (codigo)`);
+    await optionalSchemaStep('construpoint verification filters index', () => sql`CREATE INDEX IF NOT EXISTS construpoint_verificacoes_filters_idx ON construpoint_verificacoes (obra, resultado, modelo)`);
+    await optionalSchemaStep('construpoint verification date index', () => sql`CREATE INDEX IF NOT EXISTS construpoint_verificacoes_data_idx ON construpoint_verificacoes (data DESC)`);
+    await optionalSchemaStep('quality scope reverse index', () => sql`CREATE INDEX IF NOT EXISTS quality_inspection_scopes_scope_idx ON quality_inspection_scopes (scope_id, inspection_id)`);
+
+    await sql`
       CREATE TABLE IF NOT EXISTS cv_empreendimentos (
         id               BIGINT PRIMARY KEY,
         nome             TEXT,

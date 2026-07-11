@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { sql, ensureSchema } from '@/lib/pg';
+import { verifyPermission } from '@/lib/auth';
 import logger from '@/lib/logger'
 
 export const runtime = 'nodejs';
@@ -24,9 +25,13 @@ function errorMessage(error: unknown): string {
 }
 
 export async function GET(req: Request) {
+  const user = await verifyPermission('viewQualityVision');
+  if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+
   const { searchParams } = new URL(req.url);
   const startYear = parseInt(searchParams.get('startYear') ?? String(new Date().getFullYear() - 1));
   const endYear   = parseInt(searchParams.get('endYear')   ?? String(new Date().getFullYear()));
+  const attention = searchParams.get('attention');
 
   try {
     await ensureSchema();
@@ -59,13 +64,34 @@ export async function GET(req: Request) {
     }
 
     // 3. Ultimas Inspecoes (top 20)
-    const ultimasInspecoesQuery = await sql`
-      SELECT id, code, modelo, obra, inspetor, status, raw->>'StatusId' as status_id, COALESCE(data_agendamento, data_criacao) as data, nota
-      FROM construpoint_inspecoes
-      WHERE COALESCE(data_agendamento, data_criacao) IS NOT NULL
-      ORDER BY COALESCE(data_agendamento, data_criacao) DESC
-      LIMIT 20
-    `;
+    const ultimasInspecoesQuery = attention === 'nonconformity'
+      ? await sql`
+          SELECT id, code, modelo, obra, inspetor, status, raw->>'StatusId' as status_id,
+                 COALESCE(data_agendamento, data_criacao) as data, nota
+          FROM construpoint_inspecoes
+          WHERE status IN ('Recusado', 'Pendente Reinspeção')
+          ORDER BY COALESCE(data_atualizacao, data_agendamento, data_criacao) DESC NULLS LAST
+          LIMIT 200
+        `
+      : attention === 'overdue'
+        ? await sql`
+            SELECT id, code, modelo, obra, inspetor, status, raw->>'StatusId' as status_id,
+                   COALESCE(data_agendamento, data_criacao) as data, nota
+            FROM construpoint_inspecoes
+            WHERE status = 'Agendado' AND data_agendamento < now() - interval '7 days'
+            ORDER BY data_agendamento ASC
+            LIMIT 200
+          `
+        : await sql`
+            SELECT id, code, modelo, obra, inspetor, status, raw->>'StatusId' as status_id,
+                   COALESCE(data_agendamento, data_criacao) as data, nota
+            FROM construpoint_inspecoes
+            WHERE COALESCE(data_agendamento, data_criacao) IS NOT NULL
+              AND EXTRACT(YEAR FROM COALESCE(data_agendamento, data_criacao)) >= ${startYear}
+              AND EXTRACT(YEAR FROM COALESCE(data_agendamento, data_criacao)) <= ${endYear}
+            ORDER BY COALESCE(data_agendamento, data_criacao) DESC
+            LIMIT 20
+          `;
     const ultimasInspecoes = ultimasInspecoesQuery.map(row => ({
       id: row.id,
       code: row.code,

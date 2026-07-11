@@ -10,6 +10,7 @@ const TITLE_MAP = {
   '/quality-vision/inteligencia': 'Inteligência',
   '/quality-vision/inspecoes': 'Inspeções',
   '/quality-vision/relatorios': 'Relatórios',
+  '/quality-vision/classificacao': 'Classificação',
   '/quality-vision': 'Dashboard',
 }
 

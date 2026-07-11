@@ -34,13 +34,17 @@ export default function InspecoesPage() {
   const [inspecoes, setInspecoes] = useState<UltimaInspecao[]>([])
   const [loading,   setLoading]   = useState(true)
   const [error,     setError]     = useState<string | null>(null)
+  const [attention, setAttention] = useState('')
 
   useEffect(() => {
     async function load() {
       setLoading(true)
       setError(null)
       try {
-        const r = await fetch(`/api/construpoint?startYear=${startYear}&endYear=${endYear}`)
+        const attentionParam = new URLSearchParams(window.location.search).get('attention') ?? ''
+        setAttention(attentionParam)
+        const suffix = attentionParam ? `&attention=${encodeURIComponent(attentionParam)}` : ''
+        const r = await fetch(`/api/construpoint?startYear=${startYear}&endYear=${endYear}${suffix}`)
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         const d = await r.json()
         setInspecoes(d.ultimasInspecoes || [])
@@ -56,6 +60,13 @@ export default function InspecoesPage() {
 
   return (
     <div className="w-full space-y-6 p-4 md:p-6 lg:px-6 lg:py-4">
+      {attention && (
+        <div className="rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+          {attention === 'nonconformity'
+            ? 'Atenção: inspeções recusadas ou aguardando reinspeção.'
+            : 'Atenção: inspeções que continuam agendadas mais de 7 dias após a data prevista.'}
+        </div>
+      )}
       <div className="flex justify-end">
         <div className="flex items-center gap-2 rounded-xl border border-[#1E1E22] bg-[#121214]/60 px-4 py-2">
           <Calendar size={14} className="text-zinc-500" />

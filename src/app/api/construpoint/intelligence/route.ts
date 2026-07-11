@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { sql, ensureSchema } from '@/lib/pg';
+import { verifyPermission } from '@/lib/auth';
 import logger from '@/lib/logger'
 
 export const runtime = 'nodejs';
@@ -23,6 +24,7 @@ export interface Alerta {
   titulo: string;
   detalhe: string;
   recomendacao: string;
+  actionHref?: string;
 }
 
 function pct(part: number, total: number): number {
@@ -43,6 +45,9 @@ function errorMessage(error: unknown): string {
 }
 
 export async function GET() {
+  const user = await verifyPermission('viewQualityVision');
+  if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+
   try {
     await ensureSchema();
 
@@ -199,12 +204,63 @@ export async function GET() {
     `;
     const inspecoesPendentes = (pendentes[0]?.n as number) ?? 0;
 
+    const attention = await sql`
+      SELECT
+        COUNT(*) FILTER (WHERE q.inspection_id IS NULL)::int AS sem_classificacao,
+        COUNT(*) FILTER (
+          WHERE i.status = 'Agendado'
+            AND i.data_agendamento < now() - interval '7 days'
+        )::int AS agendadas_atrasadas,
+        COUNT(*) FILTER (WHERE i.status = 'Recusado')::int AS recusadas,
+        COUNT(*) FILTER (WHERE i.status = 'Pendente Reinspeção')::int AS pendentes_reinspecao
+      FROM construpoint_inspecoes i
+      LEFT JOIN (
+        SELECT DISTINCT inspection_id FROM quality_inspection_scopes
+      ) q ON q.inspection_id = i.id
+    `;
+    const attentionCounts = attention[0] ?? {
+      sem_classificacao: 0,
+      agendadas_atrasadas: 0,
+      recusadas: 0,
+      pendentes_reinspecao: 0,
+    };
+
     // ── Motor de alertas ──────────────────────────────────────────────
     const alertas: Alerta[] = [];
     const taxaGeral90 = pct(
       rankingObras.reduce((s, o) => s + o.reprovadas, 0),
       rankingObras.reduce((s, o) => s + o.verificacoes, 0),
     );
+
+    if ((attentionCounts.sem_classificacao as number) > 0) {
+      alertas.push({
+        severidade: 'alto',
+        titulo: `${attentionCounts.sem_classificacao} inspeção(ões) sem classificação de escopo`,
+        detalhe: 'Esses registros não entram com segurança em Corporativo, Nautic ou Hub Beira-Mar.',
+        recomendacao: 'Revisar a fila de classificação antes de usar os totais por empreendimento.',
+        actionHref: '/quality-vision/classificacao',
+      });
+    }
+
+    if ((attentionCounts.recusadas as number) > 0 || (attentionCounts.pendentes_reinspecao as number) > 0) {
+      alertas.push({
+        severidade: 'critico',
+        titulo: `${attentionCounts.recusadas} recusada(s) e ${attentionCounts.pendentes_reinspecao} aguardando reinspeção`,
+        detalhe: 'São fichas com falha confirmada ou correção ainda não validada.',
+        recomendacao: 'Priorizar responsáveis, prazo de correção e evidência da reinspeção.',
+        actionHref: '/quality-vision/inspecoes?attention=nonconformity',
+      });
+    }
+
+    if ((attentionCounts.agendadas_atrasadas as number) > 0) {
+      alertas.push({
+        severidade: 'atencao',
+        titulo: `${attentionCounts.agendadas_atrasadas} inspeção(ões) continuam agendadas após a data`,
+        detalhe: 'Fichas agendadas há mais de 7 dias podem indicar atraso operacional ou status desatualizado.',
+        recomendacao: 'Confirmar execução em campo e corrigir o status na origem.',
+        actionHref: '/quality-vision/inspecoes?attention=overdue',
+      });
+    }
 
     for (const o of rankingObras) {
       if (o.verificacoes >= 30 && o.taxaReprovacao >= Math.max(5, taxaGeral90 * 2)) {
@@ -278,7 +334,15 @@ export async function GET() {
       itensSistemicos,
       rankingInspetores,
       alertas,
-      meta: { taxaGeral90, inspecoesPendentes, geradoEm: new Date().toISOString() },
+      meta: {
+        taxaGeral90,
+        inspecoesPendentes,
+        semClassificacao: attentionCounts.sem_classificacao as number,
+        agendadasAtrasadas: attentionCounts.agendadas_atrasadas as number,
+        recusadas: attentionCounts.recusadas as number,
+        pendentesReinspecao: attentionCounts.pendentes_reinspecao as number,
+        geradoEm: new Date().toISOString(),
+      },
     });
   } catch (error: unknown) {
     logger.error({ error }, '[API/construpoint/intelligence]');
