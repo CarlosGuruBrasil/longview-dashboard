@@ -5,6 +5,32 @@ import { rateLimit, getClientIp } from '@/lib/rateLimit';
 import { verifyAdminAuth } from '@/lib/auth';
 import bcrypt from 'bcryptjs';
 import logger from '@/lib/logger'
+import { z } from 'zod';
+
+const USER_ROLES = ['Desenvolvedor', 'Diretoria', 'Operador', 'Gestor', 'Parceiro', 'Corretor', 'Visualizador'] as const;
+const roleSchema = z.enum(USER_ROLES);
+
+const createUserSchema = z.object({
+  name: z.string().trim().min(1, 'Nome é obrigatório').max(200),
+  email: z.string().trim().email('E-mail inválido').max(320),
+  password: z.string().min(8, 'Senha deve ter no mínimo 8 caracteres').max(200),
+  role: roleSchema,
+  permissions: z.record(z.string(), z.unknown()),
+});
+
+const updateUserSchema = z.object({
+  id: z.string().trim().min(1, 'ID do usuário é obrigatório'),
+  name: z.string().trim().min(1).max(200).optional(),
+  email: z.string().trim().email('E-mail inválido').max(320).optional(),
+  // '' = não alterar a senha (comportamento do form de edição)
+  password: z.string().max(200).refine(p => p === '' || p.length >= 8, 'Senha deve ter no mínimo 8 caracteres').optional(),
+  role: roleSchema.optional(),
+  permissions: z.record(z.string(), z.unknown()).optional(),
+});
+
+function zodError(e: z.ZodError) {
+  return NextResponse.json({ error: e.issues[0]?.message ?? 'Dados inválidos.' }, { status: 400 });
+}
 
 // GET: Listar usuários cadastrados
 export async function GET(request: NextRequest) {
@@ -42,12 +68,9 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const body = await request.json();
-    const { name, email, password, role, permissions } = body;
-
-    if (!name || !email || !password || !role || !permissions) {
-      return NextResponse.json({ error: 'Todos os campos são obrigatórios (nome, e-mail, senha, perfil e permissões).' }, { status: 400 });
-    }
+    const parsed = createUserSchema.safeParse(await request.json());
+    if (!parsed.success) return zodError(parsed.error);
+    const { name, email, password, role, permissions } = parsed.data;
 
     const emailLower = email.toLowerCase().trim();
     const users = await readUsers();
@@ -90,12 +113,9 @@ export async function PUT(request: NextRequest) {
   }
 
   try {
-    const body = await request.json();
-    const { id, name, email, password, role, permissions } = body;
-
-    if (!id) {
-      return NextResponse.json({ error: 'ID do usuário é obrigatório.' }, { status: 400 });
-    }
+    const parsed = updateUserSchema.safeParse(await request.json());
+    if (!parsed.success) return zodError(parsed.error);
+    const { id, name, email, password, role, permissions } = parsed.data;
 
     const users = await readUsers();
     const userIndex = users.findIndex(u => u.id === id);

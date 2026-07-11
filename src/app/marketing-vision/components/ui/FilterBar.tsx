@@ -4,6 +4,14 @@ import { X } from 'lucide-react'
 import { useData } from '../../context/DataContext'
 import { useMemo } from 'react'
 import { getOrigin } from '../../utils/leads'
+import type { FunnelStage } from '../../utils/funnel'
+
+const funnelStageOptions: Array<{ value: FunnelStage; label: string }> = [
+  { value: 'atendimento', label: 'Etapa: atendimento ou além' },
+  { value: 'visita', label: 'Etapa: visita ou além' },
+  { value: 'reserva', label: 'Etapa: reserva ou além' },
+  { value: 'venda', label: 'Etapa: venda' },
+]
 
 export default function FilterBar() {
   const { allLeads, leadFilters, setLeadFilters, clearFilters } = useData()
@@ -60,7 +68,9 @@ export default function FilterBar() {
   const gestorOptions = useMemo(() => {
     const set = new Set<string>()
     for (const lead of allLeads) {
-      const name = lead.gestor?.nome || (lead.raw as any)?.gestor?.nome
+      const rawGestor = lead.raw?.gestor
+      const rawName = rawGestor && typeof rawGestor === 'object' ? (rawGestor as { nome?: unknown }).nome : undefined
+      const name = lead.gestor?.nome || (typeof rawName === 'string' ? rawName : undefined)
       if (name) set.add(name)
     }
     return Array.from(set).sort()
@@ -68,7 +78,7 @@ export default function FilterBar() {
 
   const hasFilters = !!leadFilters.origem || !!leadFilters.situacao || !!leadFilters.empreendimento ||
                      !!leadFilters.corretor || !!leadFilters.imobiliaria || !!leadFilters.gestor ||
-                     !!leadFilters.startDate || !!leadFilters.endDate
+                     !!leadFilters.startDate || !!leadFilters.endDate || !!leadFilters.funnelStage
 
   const selectStyle = "h-9 px-3 text-[12px] rounded-xl bg-zinc-900 border border-white/10 text-zinc-300 focus:outline-none focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/20 max-w-[170px] truncate cursor-pointer transition-all hover:bg-zinc-800/80 font-semibold"
 
@@ -112,12 +122,24 @@ export default function FilterBar() {
       {/* Situação */}
       <select
         value={leadFilters.situacao ?? ''}
-        onChange={e => setLeadFilters({ ...leadFilters, situacao: e.target.value || undefined })}
+        onChange={e => setLeadFilters({ ...leadFilters, situacao: e.target.value || undefined, funnelStage: undefined })}
         className={selectStyle}
       >
         <option value="">Situação: todas</option>
         {situacaoOptions.map(s => (
           <option key={s} value={s}>{s}</option>
+        ))}
+      </select>
+
+      {/* Etapa cumulativa do funil */}
+      <select
+        value={leadFilters.funnelStage ?? ''}
+        onChange={e => setLeadFilters({ ...leadFilters, funnelStage: (e.target.value || undefined) as FunnelStage | undefined, situacao: undefined })}
+        className={selectStyle}
+      >
+        <option value="">Etapa do funil: todas</option>
+        {funnelStageOptions.map(stage => (
+          <option key={stage.value} value={stage.value}>{stage.label}</option>
         ))}
       </select>
 

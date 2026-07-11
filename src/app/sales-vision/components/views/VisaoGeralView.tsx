@@ -4,7 +4,7 @@ import { TrendingUp, Users, Clock, RefreshCw, GitMerge } from 'lucide-react';
 import logger from '@/lib/logger';
 
 interface SalesData {
-  overview: { totalVendas: number; cicloMedioDias: number; leadsMes: number; vendasMes: number };
+  overview: { totalVendas: number; leadsConvertidos: number; cicloMedioDias: number; leadsMes: number; vendasMes: number };
   funil: { nome: string; ordem: number; qtd: number }[];
   cicloDistribuicao: { faixa: string; qtd: number }[];
 }
@@ -28,19 +28,20 @@ export default function VisaoGeralView() {
   useEffect(() => { fetchData(); }, []);
 
   const kpis = data ? [
-    { label: 'Total de Vendas', value: String(data.overview.totalVendas), icon: <TrendingUp size={16} />, color: 'text-sky-300 bg-sky-500/10 border-sky-500/20' },
-    { label: 'Vendas no Mês', value: String(data.overview.vendasMes), icon: <Users size={16} />, color: 'text-violet-300 bg-violet-500/10 border-violet-500/20' },
+    { label: 'Unidades Vendidas', value: String(data.overview.totalVendas), icon: <TrendingUp size={16} />, color: 'text-sky-300 bg-sky-500/10 border-sky-500/20' },
+    { label: 'Leads Convertidos', value: String(data.overview.leadsConvertidos), icon: <Users size={16} />, color: 'text-violet-300 bg-violet-500/10 border-violet-500/20' },
     { label: 'Leads no Mês', value: String(data.overview.leadsMes), icon: <GitMerge size={16} />, color: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20' },
     { label: 'Ciclo Médio', value: `${data.overview.cicloMedioDias} dias`, icon: <Clock size={16} />, color: 'text-amber-300 bg-amber-500/10 border-amber-500/20' },
   ] : [];
 
-  // Agrupa funil em macro-etapas para o funil visual
+  // Agrupa funil em macro-etapas (ordem da funil_etapas renumerada 2026-07-07)
   const MACRO: { label: string; ordem: number[]; cor: string }[] = [
-    { label: 'Novos', ordem: [1], cor: '#3b82f6' },
-    { label: 'Em Atendimento', ordem: [2, 3], cor: '#06b6d4' },
-    { label: 'Qualificados', ordem: [4, 5, 6], cor: '#8b5cf6' },
-    { label: 'Negociação', ordem: [7], cor: '#f59e0b' },
-    { label: 'Vendas', ordem: [8], cor: '#10b981' },
+    { label: 'Novos', ordem: [1, 2], cor: '#3b82f6' },
+    { label: 'Em Atendimento', ordem: [3, 4], cor: '#06b6d4' },
+    { label: 'Sem Conexão', ordem: [5], cor: '#64748b' },
+    { label: 'Visita', ordem: [6, 7], cor: '#8b5cf6' },
+    { label: 'Reserva', ordem: [8], cor: '#f59e0b' },
+    { label: 'Vendas (leads)', ordem: [9], cor: '#10b981' },
   ];
 
   const funilMacro = data ? MACRO.map((m) => ({

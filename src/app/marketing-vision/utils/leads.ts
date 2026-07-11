@@ -228,6 +228,9 @@ export function groupLeadsByYearMonth(leads: Lead[]): Record<number, number[]> {
 export function hasLeadComments(lead: Lead): boolean {
   if (!lead) return false;
 
+  // 0. Flag pré-computada no servidor (modo analítico não envia o array interacao)
+  if ((lead as { tem_comentarios?: boolean }).tem_comentarios === true) return true;
+
   // 1. Tenta ler do array de interacao padrão
   const interacoes = lead.interacao ?? (lead.raw as any)?.interacao;
   if (Array.isArray(interacoes)) {

@@ -131,7 +131,13 @@ async function upsertFatoLeads(): Promise<number> {
       END AS tempo_conversao_dias,
       l.raw
     FROM leads l
-    LEFT JOIN cv_vendas v ON v.raw->>'idlead' = l.id
+    -- LATERAL agregado: 1 linha por lead mesmo quando o lead comprou N unidades
+    -- (JOIN direto em cv_vendas duplicava o lead — fan-out de 3832→3900 linhas)
+    LEFT JOIN LATERAL (
+      SELECT MIN(cv.data_venda)::date AS data_venda, SUM(cv.valor) AS valor
+      FROM cv_vendas cv
+      WHERE cv.raw->>'idlead' = l.id AND cv.data_venda IS NOT NULL
+    ) v ON true
     LEFT JOIN dim_empreendimentos de ON lower(de.nome) = lower(l.empreendimento)
     WHERE l.data_cadastro IS NOT NULL
     ON CONFLICT DO NOTHING

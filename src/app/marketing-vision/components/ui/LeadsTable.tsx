@@ -52,6 +52,8 @@ export default function LeadsTable({
   onPageChange,
   allLeadsForDropdowns,
 }: LeadsTableProps) {
+  // Timestamp fixo do mount — "dias parado" não precisa de relógio vivo no render
+  const [now] = useState(() => Date.now());
   // ── Local date range (independent from global filter) ───────────────────
   const [localStart, setLocalStart] = useState('');
   const [localEnd, setLocalEnd]     = useState('');
@@ -364,7 +366,7 @@ export default function LeadsTable({
 
           const hasComments = hasLeadComments(lead);
           const lastUpdate = lead.data_atualizacao || lead.data_cadastro || lead.data_cad || '';
-          const daysIdle = lastUpdate ? Math.floor((Date.now() - new Date(lastUpdate).getTime()) / (1000 * 60 * 60 * 24)) : 0;
+          const daysIdle = lastUpdate ? Math.floor((now - new Date(lastUpdate).getTime()) / (1000 * 60 * 60 * 24)) : 0;
 
           return (
             <div
@@ -427,7 +429,7 @@ export default function LeadsTable({
 
                const hasComments = hasLeadComments(lead);
                const lastUpdate = lead.data_atualizacao || lead.data_cadastro || lead.data_cad || '';
-               const daysIdle = lastUpdate ? Math.floor((Date.now() - new Date(lastUpdate).getTime()) / (1000 * 60 * 60 * 24)) : 0;
+               const daysIdle = lastUpdate ? Math.floor((now - new Date(lastUpdate).getTime()) / (1000 * 60 * 60 * 24)) : 0;
 
                const RowContent = (
                 <>

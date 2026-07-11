@@ -6,7 +6,10 @@ import logger from '@/lib/logger';
 interface Corretor {
   nome: string;
   imobiliaria: string;
+  /** unidades vendidas (cv_vendas com status Vendida) */
   vendas: number;
+  /** total de reservas, incluindo em andamento */
+  reservas: number;
   cicloMedio: number;
 }
 
@@ -46,7 +49,7 @@ export default function CorretoresView() {
       <div className="bg-[#121214]/60 border border-[#1E1E22] rounded-xl overflow-hidden">
         <div className="p-4 border-b border-[#1C1C1E] flex items-center gap-2">
           <Trophy size={14} className="text-amber-400" />
-          <h4 className="text-sm font-semibold text-white">Ranking por Número de Vendas</h4>
+          <h4 className="text-sm font-semibold text-white">Ranking por Unidades Vendidas</h4>
         </div>
 
         {loading
@@ -73,7 +76,10 @@ export default function CorretoresView() {
                       </div>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="text-sm font-bold text-white">{c.vendas} <span className="text-zinc-500 font-normal text-[11px]">vendas</span></p>
+                      <p className="text-sm font-bold text-white">{c.vendas} <span className="text-zinc-500 font-normal text-[11px]">unidades</span></p>
+                      {c.reservas > c.vendas && (
+                        <p className="text-[11px] text-amber-400/70">{c.reservas - c.vendas} em andamento</p>
+                      )}
                       {c.cicloMedio > 0 && (
                         <p className="text-[11px] text-zinc-500 flex items-center gap-1 justify-end">
                           <Clock size={10} /> {c.cicloMedio}d médio

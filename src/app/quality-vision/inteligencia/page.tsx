@@ -1,16 +1,18 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, BarChart, Cell,
 } from 'recharts'
 import {
   AlertTriangle, AlertCircle, Info, Flame, TrendingUp, TrendingDown,
-  Lightbulb, RefreshCw, ClipboardCheck, ListChecks, Percent,
+  Lightbulb, RefreshCw, ClipboardCheck, ListChecks, Percent, Search, X,
 } from 'lucide-react'
 import logger from '@/lib/logger'
+import InspecaoDetailModal from '../components/InspecaoDetailModal'
 
 // ---------- tipos (espelham /api/construpoint/intelligence) ----------
 interface Comparativos {
@@ -53,10 +55,21 @@ interface IntelligenceData {
   itensSistemicos: ItemSistemico[]
   rankingInspetores: InspetorRank[]
   alertas: Alerta[]
+  filterOptions: { obras: string[]; inspetores: string[] }
   meta: {
     taxaGeral90: number; inspecoesPendentes: number; semClassificacao: number
     agendadasAtrasadas: number; recusadas: number; pendentesReinspecao: number; geradoEm: string
   }
+}
+
+interface Ocorrencia {
+  codigo?: string
+  obra?: string
+  inspetor?: string
+  data?: string
+  problema?: string
+  solucao?: string
+  inspecaoId?: number
 }
 
 // ---------- estilo ----------
@@ -116,17 +129,125 @@ function KpiCompareCard({ icon: Icon, label, value, color, mom, yoy, invert }: {
   )
 }
 
+function formatDateShort(d?: string) {
+  if (!d) return '-'
+  return new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
+}
+
+// Drill-down de uma linha de "falha sistêmica" — lista as ocorrências reais por trás do agregado,
+// cada uma abrindo o InspecaoDetailModal (todos os dados da inspeção + checklist inteiro).
+function ItemDetailModal({ item, onClose, onOpenInspecao }: {
+  item: { verificacao: string; modelo: string } | null
+  onClose: () => void
+  onOpenInspecao: (id: number) => void
+}) {
+  const [ocorrencias, setOcorrencias] = useState<Ocorrencia[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!item) { setOcorrencias([]); return }
+    async function load() {
+      setLoading(true)
+      setError(null)
+      try {
+        const p = new URLSearchParams({ verificacao: item!.verificacao, modelo: item!.modelo })
+        const r = await fetch(`/api/construpoint/intelligence/item?${p}`)
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        const d = await r.json()
+        setOcorrencias(d.ocorrencias ?? [])
+      } catch (e) {
+        logger.error({ err: e }, '[ItemDetailModal] fetch falhou')
+        setError(e instanceof Error ? e.message : String(e))
+      } finally {
+        setLoading(false)
+      }
+    }
+    void load()
+  }, [item])
+
+  if (!item) return null
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/70" onClick={onClose}>
+      <div
+        className="w-full max-w-2xl max-h-[80vh] overflow-y-auto rounded-2xl border border-[#1E1E22] bg-[#0d0d0f] shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="sticky top-0 flex items-center justify-between gap-3 px-6 py-4 border-b border-[#1E1E22] bg-[#0d0d0f]/95 backdrop-blur">
+          <div>
+            <p className="text-xs text-zinc-500">{item.modelo}</p>
+            <h3 className="text-base font-semibold text-zinc-100">{item.verificacao}</h3>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-white/10 text-zinc-400 hover:text-zinc-200 transition">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="p-6">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="relative w-8 h-8">
+                <div className="absolute inset-0 rounded-full border-2 border-[#1E1E22]" />
+                <div className="absolute inset-0 rounded-full border-2 border-t-violet-500 border-r-transparent border-b-transparent border-l-transparent animate-spin" />
+              </div>
+            </div>
+          ) : error ? (
+            <p className="text-sm text-red-400 text-center py-8">{error}</p>
+          ) : ocorrencias.length === 0 ? (
+            <p className="text-sm text-zinc-500 text-center py-8">Nenhuma ocorrência encontrada.</p>
+          ) : (
+            <div className="space-y-2">
+              {ocorrencias.map((o, i) => (
+                <button
+                  key={i}
+                  onClick={() => o.inspecaoId && onOpenInspecao(o.inspecaoId)}
+                  disabled={!o.inspecaoId}
+                  className="w-full text-left rounded-xl border border-[#1E1E22] bg-[#121214]/60 p-3 hover:bg-white/5 transition disabled:cursor-default disabled:hover:bg-[#121214]/60"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs font-mono text-zinc-300">{o.codigo ?? '-'}</span>
+                    <span className="text-[11px] text-zinc-500">{o.obra} · {o.inspetor} · {formatDateShort(o.data)}</span>
+                  </div>
+                  {o.problema && <p className="text-xs text-zinc-400 mt-1">{o.problema}</p>}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ---------- main ----------
 export default function InteligenciaQualidadePage() {
+  const router = useRouter()
   const [data, setData] = useState<IntelligenceData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // Filtros locais — cada tabela tem o seu, não afetam alertas/comparativos/ranking de obras.
+  const [obraInspetores, setObraInspetores] = useState('')
+  const [inspetorSearch, setInspetorSearch] = useState('')
+  const [obraItens, setObraItens] = useState('')
+  const [inspetorItens, setInspetorItens] = useState('')
+
+  const [selectedItem, setSelectedItem] = useState<{ verificacao: string; modelo: string } | null>(null)
+  const [selectedInspId, setSelectedInspId] = useState<number | null>(null)
+
+  const queryString = useMemo(() => {
+    const p = new URLSearchParams()
+    if (obraInspetores) p.set('obraInspetores', obraInspetores)
+    if (obraItens) p.set('obraItens', obraItens)
+    if (inspetorItens) p.set('inspetorItens', inspetorItens)
+    return p.toString()
+  }, [obraInspetores, obraItens, inspetorItens])
 
   async function load() {
     setLoading(true)
     setError(null)
     try {
-      const r = await fetch('/api/construpoint/intelligence')
+      const r = await fetch(`/api/construpoint/intelligence?${queryString}`)
       if (!r.ok) throw new Error(`HTTP ${r.status}`)
       setData(await r.json() as IntelligenceData)
     } catch (e) {
@@ -140,7 +261,7 @@ export default function InteligenciaQualidadePage() {
   useEffect(() => {
     const id = window.setTimeout(() => { void load() }, 0)
     return () => window.clearTimeout(id)
-  }, [])
+  }, [queryString])
 
   if (loading) {
     return (
@@ -296,7 +417,29 @@ export default function InteligenciaQualidadePage() {
           </p>
         </GlassCard>
 
-        <GlassCard title="Inspetores — volume e taxa de reprovação (180 dias)">
+        <GlassCard>
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <h3 className="text-sm font-semibold text-zinc-300">Inspetores — volume e taxa de reprovação (180 dias)</h3>
+            <div className="flex items-center gap-2">
+              <select
+                value={obraInspetores}
+                onChange={e => setObraInspetores(e.target.value)}
+                className="h-8 px-2 text-[11px] rounded-lg bg-zinc-900 border border-white/10 text-zinc-300 focus:outline-none cursor-pointer"
+              >
+                <option value="">Empreendimento: todos</option>
+                {data.filterOptions.obras.map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+              <div className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-zinc-900 px-2 h-8">
+                <Search size={11} className="text-zinc-600" />
+                <input
+                  value={inspetorSearch}
+                  onChange={e => setInspetorSearch(e.target.value)}
+                  placeholder="Buscar…"
+                  className="bg-transparent text-[11px] text-zinc-300 outline-none placeholder:text-zinc-600 w-24"
+                />
+              </div>
+            </div>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
@@ -307,16 +450,22 @@ export default function InteligenciaQualidadePage() {
                 </tr>
               </thead>
               <tbody>
-                {rankingInspetores.map((i, idx) => (
-                  <tr key={idx} className="border-b border-[#1C1C1E] hover:bg-[#17171A] transition">
-                    <td className="py-2.5 px-3 text-zinc-300">{i.inspetor}</td>
-                    <td className="py-2.5 px-3 text-zinc-400">{i.verificacoes.toLocaleString('pt-BR')}</td>
-                    <td className="py-2.5 px-3 text-zinc-400">{i.reprovadas.toLocaleString('pt-BR')}</td>
-                    <td className={`py-2.5 px-3 font-semibold ${i.taxaReprovacao > data.meta.taxaGeral90 ? 'text-rose-400' : 'text-emerald-400'}`}>
-                      {i.taxaReprovacao}%
-                    </td>
-                  </tr>
-                ))}
+                {rankingInspetores
+                  .filter(i => !inspetorSearch.trim() || i.inspetor.toLowerCase().includes(inspetorSearch.trim().toLowerCase()))
+                  .map((i, idx) => (
+                    <tr
+                      key={idx}
+                      onClick={() => router.push(`/quality-vision/inspecoes?inspetor=${encodeURIComponent(i.inspetor)}`)}
+                      className="border-b border-[#1C1C1E] hover:bg-[#17171A] transition cursor-pointer"
+                    >
+                      <td className="py-2.5 px-3 text-zinc-300">{i.inspetor}</td>
+                      <td className="py-2.5 px-3 text-zinc-400">{i.verificacoes.toLocaleString('pt-BR')}</td>
+                      <td className="py-2.5 px-3 text-zinc-400">{i.reprovadas.toLocaleString('pt-BR')}</td>
+                      <td className={`py-2.5 px-3 font-semibold ${i.taxaReprovacao > data.meta.taxaGeral90 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                        {i.taxaReprovacao}%
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>
@@ -324,9 +473,30 @@ export default function InteligenciaQualidadePage() {
       </div>
 
       {/* Itens sistêmicos com solução recomendada */}
-      <GlassCard title="Falhas recorrentes e soluções recomendadas — últimos 180 dias">
-        <p className="text-[11px] text-zinc-500 -mt-2 mb-4">
-          Itens de verificação que mais reprovam. A solução recomendada é a mais registrada pelos próprios inspetores em campo para o item.
+      <GlassCard>
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+          <h3 className="text-sm font-semibold text-zinc-300">Falhas recorrentes e soluções recomendadas — últimos 180 dias</h3>
+          <div className="flex items-center gap-2">
+            <select
+              value={obraItens}
+              onChange={e => setObraItens(e.target.value)}
+              className="h-8 px-2 text-[11px] rounded-lg bg-zinc-900 border border-white/10 text-zinc-300 focus:outline-none cursor-pointer"
+            >
+              <option value="">Empreendimento: todos</option>
+              {data.filterOptions.obras.map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
+            <select
+              value={inspetorItens}
+              onChange={e => setInspetorItens(e.target.value)}
+              className="h-8 px-2 text-[11px] rounded-lg bg-zinc-900 border border-white/10 text-zinc-300 focus:outline-none cursor-pointer"
+            >
+              <option value="">Inspetor: todos</option>
+              {data.filterOptions.inspetores.map(i => <option key={i} value={i}>{i}</option>)}
+            </select>
+          </div>
+        </div>
+        <p className="text-[11px] text-zinc-500 mb-4">
+          Itens de verificação que mais reprovam. A solução recomendada é a mais registrada pelos próprios inspetores em campo para o item. Clique numa linha pra ver as ocorrências.
         </p>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
@@ -342,7 +512,11 @@ export default function InteligenciaQualidadePage() {
                 <tr><td colSpan={5} className="py-8 text-center text-zinc-600">Nenhuma reprovação recorrente no período 🎉</td></tr>
               ) : (
                 itensSistemicos.map((item, i) => (
-                  <tr key={i} className="border-b border-[#1C1C1E] hover:bg-[#17171A] transition align-top">
+                  <tr
+                    key={i}
+                    onClick={() => setSelectedItem({ verificacao: item.verificacao, modelo: item.modelo })}
+                    className="border-b border-[#1C1C1E] hover:bg-[#17171A] transition align-top cursor-pointer"
+                  >
                     <td className="py-2.5 px-3 text-zinc-300 max-w-[280px]">{item.verificacao}</td>
                     <td className="py-2.5 px-3 text-zinc-500 whitespace-nowrap">{item.modelo}</td>
                     <td className="py-2.5 px-3">
@@ -368,6 +542,13 @@ export default function InteligenciaQualidadePage() {
       <p className="text-[10px] text-zinc-600 text-right">
         Análise gerada em {new Date(data.meta.geradoEm).toLocaleString('pt-BR')} · dados Construpoint D-1
       </p>
+
+      <ItemDetailModal
+        item={selectedItem}
+        onClose={() => setSelectedItem(null)}
+        onOpenInspecao={setSelectedInspId}
+      />
+      <InspecaoDetailModal id={selectedInspId} onClose={() => setSelectedInspId(null)} />
     </div>
   )
 }

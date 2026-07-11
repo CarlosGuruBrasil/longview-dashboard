@@ -71,6 +71,8 @@ export interface Lead {
   /** Status da etapa do funil — campo direto do banco (confiável) */
   status?: string;
   empreendimento_id?: number;
+  /** Flag do servidor: lead tem comentários (modo analítico não envia interacao) */
+  tem_comentarios?: boolean;
 }
 
 export interface LeadsApiResponse {

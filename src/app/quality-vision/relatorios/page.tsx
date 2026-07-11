@@ -20,7 +20,7 @@ interface MonthlyPoint {
 }
 
 interface QualityData {
-  inspecoesPorTipo: Record<string, number>
+  inspecoesPorDisciplina: Record<string, number>
   serieMensal: MonthlyPoint[]
   kpis: {
     aprovadas: number
@@ -31,13 +31,10 @@ interface QualityData {
 
 const TICK_COLOR  = '#71717a'
 const GRID_COLOR  = 'rgba(255,255,255,0.05)'
-const COLORS_TIPO = {
-  FVS: '#0ea5e9',
-  FVM: '#a855f7',
-  CHK: '#f59e0b',
-  SEG: '#f43f5e',
-  MA:  '#10b981',
-  EDU: '#64748b',
+// Paleta cíclica pras ~11 disciplinas reais (0-TERRENO...9-IMPERMEABILIZAÇÕES + Sem classificação)
+const DISCIPLINA_PALETTE = ['#0ea5e9', '#a855f7', '#f59e0b', '#f43f5e', '#10b981', '#eab308', '#6366f1', '#ec4899', '#14b8a6', '#f97316', '#64748b']
+function disciplinaColor(index: number) {
+  return DISCIPLINA_PALETTE[index % DISCIPLINA_PALETTE.length]
 }
 
 const APROVADA_COLOR   = '#10b981'
@@ -70,9 +67,10 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
 }
 
 export default function RelatoriosPage() {
-  const currentYear = new Date().getFullYear()
-  const [startYear, setStartYear] = useState(currentYear - 1)
-  const [endYear,   setEndYear]   = useState(currentYear)
+  const todayIso = () => new Date().toISOString().slice(0, 10)
+  const isoMinusYears = (years: number) => { const d = new Date(); d.setFullYear(d.getFullYear() - years); return d.toISOString().slice(0, 10) }
+  const [startDate, setStartDate] = useState(isoMinusYears(1))
+  const [endDate,   setEndDate]   = useState(todayIso())
   const [data,      setData]      = useState<QualityData | null>(null)
   const [loading,   setLoading]   = useState(true)
   const [error,     setError]     = useState<string | null>(null)
@@ -82,7 +80,7 @@ export default function RelatoriosPage() {
       setLoading(true)
       setError(null)
       try {
-        const r = await fetch(`/api/construpoint?startYear=${startYear}&endYear=${endYear}`)
+        const r = await fetch(`/api/construpoint?startDate=${startDate}&endDate=${endDate}`)
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         const d = await r.json() as QualityData
         setData(d)
@@ -94,11 +92,11 @@ export default function RelatoriosPage() {
       }
     }
     void load()
-  }, [startYear, endYear])
+  }, [startDate, endDate])
 
   const tipoBarData = useMemo(() => {
     if (!data) return []
-    return Object.entries(data.inspecoesPorTipo)
+    return Object.entries(data.inspecoesPorDisciplina)
       .map(([key, value]) => ({ name: key, value }))
       .sort((a, b) => b.value - a.value)
   }, [data])
@@ -116,27 +114,26 @@ export default function RelatoriosPage() {
   return (
     <div className="w-full space-y-6 p-4 md:p-6 lg:px-6 lg:py-4">
       <div className="flex justify-end">
-        <div className="flex items-center gap-2 rounded-xl border border-[#1E1E22] bg-[#121214]/60 px-4 py-2">
+        <div className="flex items-center gap-2 rounded-xl border border-[#1E1E22] bg-[#121214]/60 px-3 py-2">
           <Calendar size={14} className="text-zinc-500" />
-          <select
-            value={startYear}
-            onChange={e => setStartYear(Number(e.target.value))}
-            className="bg-transparent text-xs text-zinc-300 outline-none"
-          >
-            {[currentYear - 2, currentYear - 1, currentYear].map(y => (
-              <option key={y} value={y} className="bg-zinc-900">{y}</option>
-            ))}
-          </select>
-          <span className="text-zinc-600 text-xs">-</span>
-          <select
-            value={endYear}
-            onChange={e => setEndYear(Number(e.target.value))}
-            className="bg-transparent text-xs text-zinc-300 outline-none"
-          >
-            {[currentYear - 1, currentYear].map(y => (
-              <option key={y} value={y} className="bg-zinc-900">{y}</option>
-            ))}
-          </select>
+          <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">De</span>
+          <input
+            type="date"
+            value={startDate}
+            max={endDate}
+            onChange={e => setStartDate(e.target.value)}
+            className="bg-transparent text-xs text-zinc-300 outline-none [color-scheme:dark]"
+          />
+          <span className="text-zinc-600 text-xs">–</span>
+          <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Até</span>
+          <input
+            type="date"
+            value={endDate}
+            min={startDate}
+            max={todayIso()}
+            onChange={e => setEndDate(e.target.value)}
+            className="bg-transparent text-xs text-zinc-300 outline-none [color-scheme:dark]"
+          />
         </div>
       </div>
 
@@ -171,16 +168,16 @@ export default function RelatoriosPage() {
             </ResponsiveContainer>
           </GlassCard>
 
-          <GlassCard title="Inspeções por Categoria">
+          <GlassCard title="Inspeções por Disciplina">
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={tipoBarData} margin={{ top: 0, right: 0, left: -10, bottom: 0 }} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} horizontal={false} />
                 <XAxis type="number" tick={{ fill: TICK_COLOR, fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
-                <YAxis dataKey="name" type="category" tick={{ fill: TICK_COLOR, fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis dataKey="name" type="category" tick={{ fill: TICK_COLOR, fontSize: 11 }} axisLine={false} tickLine={false} width={160} />
                 <Tooltip content={<CustomTooltip />} />
                 <Bar dataKey="value" name="Inspeções" radius={[0, 4, 4, 0]} barSize={24}>
                   {tipoBarData.map((entry, i) => (
-                    <Cell key={i} fill={COLORS_TIPO[entry.name as keyof typeof COLORS_TIPO] ?? '#64748b'} />
+                    <Cell key={i} fill={disciplinaColor(i)} />
                   ))}
                 </Bar>
               </BarChart>

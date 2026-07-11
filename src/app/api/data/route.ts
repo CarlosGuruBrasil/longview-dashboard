@@ -90,6 +90,7 @@ type CRMLeadsResponse = { leads?: CRMRawLead[]; total?: number };
 type MetaApiList<T> = { data?: T[] };
 type MetaCache = { data?: Partial<MetaData>; updatedAt?: string };
 type LeadResult = { leads: DashboardLead[]; total: number; crmTotal: number };
+type LeadInteraction = { descricao?: unknown; mensagem?: unknown; comentario?: unknown };
 
 function parseJsonValue<T = unknown>(value: unknown): T {
   let current = value;
@@ -316,7 +317,15 @@ async function readLeadsFromPg(
         bolsao: leadObj.bolsao ?? null,
         data_cadastro: r.data_cadastro || leadObj.data_cad || leadObj.data_cadastro,
         data_atualizacao: r.data_atualizacao || leadObj.data_atualizacao,
-        interacao: leadObj.interacao || [],
+        // Modo analítico: array de interações fica de fora (payload pesado — o
+        // LeadDrawer busca o lead completo via /api/leads/:id ao abrir).
+        // tem_comentarios preserva o indicador da LeadsTable.
+        interacao: detailed ? (leadObj.interacao || []) : [],
+        tem_comentarios: Array.isArray(leadObj.interacao) && leadObj.interacao.some((it: unknown) => {
+          const data = it && typeof it === 'object' ? it as LeadInteraction : null;
+          const desc = data ? (data.descricao ?? data.mensagem ?? data.comentario) : it;
+          return desc != null && String(desc).trim().length > 0;
+        }),
         tags: leadObj.tags || [],
         autor_ultima_alteracao: leadObj.autor_ultima_alteracao ?? null,
         qtde_reservas_associadas: leadObj.qtde_reservas_associadas ?? 0,

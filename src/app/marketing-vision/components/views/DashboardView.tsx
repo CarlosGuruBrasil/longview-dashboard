@@ -10,6 +10,7 @@ import {
 import { useData } from '../../context/DataContext'
 import { generateInsights, type Insight } from '../../utils/insights'
 import { isSale, getLeadValueNumber, getStatusColor, getOrigin } from '../../utils/leads'
+import { funnelCounts } from '../../utils/funnel'
 import { formatCurrency, formatNumber } from '../../utils/formatters'
 import GlassCard from '../ui/GlassCard'
 import FilterBar from '../ui/FilterBar'
@@ -344,18 +345,9 @@ export default function DashboardView() {
   }, [allLeads, funnelStart, funnelEnd, funnelCorretor, funnelImobiliaria, funnelGestor, funnelEmpreendimento])
 
   const funnelConsolidated = useMemo(() => {
-    const EXCL = new Set(['Perdido', 'Lançamento Sul da Ilha', 'Lançamento Trindade'])
-    const active = stageLeads.filter(l => !EXCL.has(l.status ?? ''))
-
-    const ATEND_S  = new Set(['Em Atendimento', 'Em Atendimento SDR', 'Sem conexão', 'Carteira Corretor', 'Visita Agendada', 'Visita Realizada', 'Com Reserva', 'Venda Realizada'])
-    const VISITA_S = new Set(['Visita Agendada', 'Visita Realizada', 'Com Reserva', 'Venda Realizada'])
-    const RESERVA_S = new Set(['Com Reserva', 'Venda Realizada'])
-
-    const cNovos   = active.length
-    const cAtend   = active.filter(l => ATEND_S.has(l.status ?? '')).length
-    const cVisita  = active.filter(l => VISITA_S.has(l.status ?? '')).length
-    const cReserva = active.filter(l => RESERVA_S.has(l.status ?? '')).length
-    const cVenda   = active.filter(l => l.status === 'Venda Realizada').length
+    // Etapas e contagens vêm de utils/funnel.ts — mesma fonte do FunnelVisualization
+    const c = funnelCounts(stageLeads)
+    const { ativos: cNovos, atendimento: cAtend, visita: cVisita, reserva: cReserva, venda: cVenda } = c
 
     const pct  = (n: number) => cNovos > 0 ? Math.round((n / cNovos) * 100) : 0
     const conv = (n: number, d: number) => d > 0 ? Math.round((n / d) * 100) : 0
@@ -372,7 +364,7 @@ export default function DashboardView() {
       { name: '2. Em Atendimento',          count: cAtend,   pctOfTotal: pct(cAtend),  convRate: conv(cAtend, cNovos),  diag: getStatus(conv(cAtend, cNovos), 75) },
       { name: '3. Visita Realizada',        count: cVisita,  pctOfTotal: pct(cVisita), convRate: conv(cVisita, cAtend), diag: getStatus(conv(cVisita, cAtend), 30) },
       { name: '4. Com Reserva',             count: cReserva, pctOfTotal: pct(cReserva),convRate: conv(cReserva, cVisita),diag: getStatus(conv(cReserva, cVisita), 25) },
-      { name: '5. Venda Realizada',         count: cVenda,   pctOfTotal: pct(cVenda),  convRate: conv(cVenda, cReserva),diag: getStatus(conv(cVenda, cReserva), 70) },
+      { name: '5. Venda (Leads Convertidos)', count: cVenda,   pctOfTotal: pct(cVenda),  convRate: conv(cVenda, cReserva),diag: getStatus(conv(cVenda, cReserva), 70) },
     ]
   }, [stageLeads])
 

@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 import { ArrowDown } from 'lucide-react'
 import type { Lead } from '../../types'
 import { formatNumber } from '../../utils/formatters'
+import { funnelCounts, type FunnelStage } from '../../utils/funnel'
 import { useData } from '../../context/DataContext'
 
 interface Props {
@@ -32,95 +33,56 @@ function getDiag(val: number, meta: number) {
   return                          { label: 'Abaixo da meta', ...DIAG_COLORS.abaixo }
 }
 
-// Status values excludídos do pipeline ativo (não são etapas de funil)
-const EXCLUDED_STATUS = new Set([
-  'Perdido',
-  'Lançamento Sul da Ilha',
-  'Lançamento Trindade',
-])
-
-// Status que indicam "Atendimento iniciado ou além"
-const ATENDIMENTO_STATUS = new Set([
-  'Em Atendimento',
-  'Em Atendimento SDR',
-  'Sem conexão',
-  'Carteira Corretor',
-  'Visita Agendada',
-  'Visita Realizada',
-  'Com Reserva',
-  'Venda Realizada',
-])
-
-// Status de visita ou além
-const VISITA_STATUS = new Set([
-  'Visita Agendada',
-  'Visita Realizada',
-  'Com Reserva',
-  'Venda Realizada',
-])
-
-// Status de reserva ou venda
-const RESERVA_STATUS = new Set([
-  'Com Reserva',
-  'Venda Realizada',
-])
-
 export default function FunnelVisualization({ leads }: Props) {
-  const { setLeadFilters } = useData()
+  const { leadFilters, setLeadFilters } = useData()
 
   const stages = useMemo(() => {
-    // Exclui leads "perdidos" e de lançamento — não são parte do funil ativo
-    const active = leads.filter(l => !EXCLUDED_STATUS.has(l.status ?? ''))
+    // Etapas e contagens vêm de utils/funnel.ts — mesma fonte do DashboardView
+    const c = funnelCounts(leads)
 
-    const cNovos    = active.length
-    const cAtend    = active.filter(l => ATENDIMENTO_STATUS.has(l.status ?? '')).length
-    const cVisita   = active.filter(l => VISITA_STATUS.has(l.status ?? '')).length
-    const cReserva  = active.filter(l => RESERVA_STATUS.has(l.status ?? '')).length
-    const cVenda    = active.filter(l => l.status === 'Venda Realizada').length
-
-    const pct = (n: number) => cNovos > 0 ? Math.round((n / cNovos) * 100) : 0
+    const pct = (n: number) => c.ativos > 0 ? Math.round((n / c.ativos) * 100) : 0
     const conv = (n: number, d: number) => d > 0 ? Math.round((n / d) * 100) : 0
 
     return [
       {
         name: 'Captação (Ativos)',
-        count: cNovos,
+        count: c.ativos,
         pct: 100,
         conv: 100,
         diag: null,
-        statusFilter: null,
+        stageFilter: null as FunnelStage | null,
       },
       {
         name: 'Em Atendimento',
-        count: cAtend,
-        pct: pct(cAtend),
-        conv: conv(cAtend, cNovos),
-        diag: getDiag(conv(cAtend, cNovos), 75),
-        statusFilter: 'Em Atendimento',
+        count: c.atendimento,
+        pct: pct(c.atendimento),
+        conv: conv(c.atendimento, c.ativos),
+        diag: getDiag(conv(c.atendimento, c.ativos), 75),
+        stageFilter: 'atendimento' as FunnelStage,
       },
       {
         name: 'Visita',
-        count: cVisita,
-        pct: pct(cVisita),
-        conv: conv(cVisita, cAtend),
-        diag: getDiag(conv(cVisita, cAtend), 30),
-        statusFilter: 'Visita Realizada',
+        count: c.visita,
+        pct: pct(c.visita),
+        conv: conv(c.visita, c.atendimento),
+        diag: getDiag(conv(c.visita, c.atendimento), 30),
+        stageFilter: 'visita' as FunnelStage,
       },
       {
         name: 'Reserva',
-        count: cReserva,
-        pct: pct(cReserva),
-        conv: conv(cReserva, cVisita),
-        diag: getDiag(conv(cReserva, cVisita), 25),
-        statusFilter: 'Com Reserva',
+        count: c.reserva,
+        pct: pct(c.reserva),
+        conv: conv(c.reserva, c.visita),
+        diag: getDiag(conv(c.reserva, c.visita), 25),
+        stageFilter: 'reserva' as FunnelStage,
       },
       {
-        name: 'Venda Realizada',
-        count: cVenda,
-        pct: pct(cVenda),
-        conv: conv(cVenda, cReserva),
-        diag: getDiag(conv(cVenda, cReserva), 70),
-        statusFilter: null, // dado analítico — pipeline de vendas está no Sales Vision
+        name: 'Venda (Leads Convertidos)',
+        count: c.venda,
+        pct: pct(c.venda),
+        conv: conv(c.venda, c.reserva),
+        diag: getDiag(conv(c.venda, c.reserva), 70),
+        stageFilter: null, // dado analítico — pipeline de vendas está no Sales Vision
       },
     ]
   }, [leads])
@@ -142,8 +104,8 @@ export default function FunnelVisualization({ leads }: Props) {
           <div key={step.name} className="flex flex-col items-center w-full">
             <div
               style={{ width: `${widthPct}%`, background: bg, borderColor: border }}
-              onClick={() => step.statusFilter ? setLeadFilters({ situacao: step.statusFilter }) : undefined}
-              className={`border rounded-xl px-4 py-3 transition-all duration-300 ${step.statusFilter ? 'cursor-pointer hover:scale-[1.02] hover:brightness-125' : 'cursor-default'} group`}
+              onClick={() => step.stageFilter ? setLeadFilters({ ...leadFilters, funnelStage: step.stageFilter, situacao: undefined }) : undefined}
+              className={`border rounded-xl px-4 py-3 transition-all duration-300 ${step.stageFilter ? 'cursor-pointer hover:scale-[1.02] hover:brightness-125' : 'cursor-default'} group`}
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">

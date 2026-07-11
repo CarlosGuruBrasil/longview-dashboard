@@ -44,9 +44,17 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   const user = await verifyPermission('viewQualityVision');
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+
+  const { searchParams } = new URL(req.url);
+  // Filtros independentes por tabela — não tocam em alertas/comparativos/ranking de obras,
+  // que precisam continuar representando o panorama geral (senão "obra X vs média geral"
+  // vira "obra X vs ela mesma" quando já filtrado).
+  const obraInspetores = searchParams.get('obraInspetores') || null;
+  const obraItens       = searchParams.get('obraItens') || null;
+  const inspetorItens    = searchParams.get('inspetorItens') || null;
 
   try {
     await ensureSchema();
@@ -152,6 +160,8 @@ export async function GET() {
       FROM construpoint_verificacoes
       WHERE resultado = 'Reprovado' AND data >= now() - interval '180 days'
         AND verificacao IS NOT NULL AND verificacao <> ''
+        ${obraItens ? sql`AND obra = ${obraItens}` : sql``}
+        ${inspetorItens ? sql`AND inspetor = ${inspetorItens}` : sql``}
       GROUP BY 1, 2
       ORDER BY reprovacoes DESC
       LIMIT 12
@@ -180,14 +190,15 @@ export async function GET() {
       solucaoRecomendada: solucaoPorItem.get(s.verificacao as string) ?? null,
     }));
 
-    // ── Inspetores (180d) ─────────────────────────────────────────────
+    // ── Inspetores (180d) — sem LIMIT: ~14 inspetores reais na base, cabe mostrar todos ──
     const inspetores = await sql`
       SELECT inspetor,
              COUNT(*)::int AS total,
              COUNT(*) FILTER (WHERE resultado = 'Reprovado')::int AS reprovadas
       FROM construpoint_verificacoes
       WHERE inspetor IS NOT NULL AND inspetor <> '' AND data >= now() - interval '180 days'
-      GROUP BY 1 ORDER BY 2 DESC LIMIT 10
+        ${obraInspetores ? sql`AND obra = ${obraInspetores}` : sql``}
+      GROUP BY 1 ORDER BY 2 DESC
     `;
     const rankingInspetores = inspetores.map(i => ({
       inspetor: i.inspetor as string,
@@ -327,6 +338,12 @@ export async function GET() {
     const ordem = { critico: 0, alto: 1, atencao: 2, info: 3 } as const;
     alertas.sort((a, b) => ordem[a.severidade] - ordem[b.severidade]);
 
+    // Opções pros filtros locais das tabelas de Inspetores e Falhas recorrentes.
+    const [obrasOpt, inspetoresOpt] = await Promise.all([
+      sql`SELECT DISTINCT obra FROM construpoint_verificacoes WHERE obra IS NOT NULL AND obra <> '' ORDER BY 1`,
+      sql`SELECT DISTINCT inspetor FROM construpoint_verificacoes WHERE inspetor IS NOT NULL AND inspetor <> '' ORDER BY 1`,
+    ]);
+
     return NextResponse.json({
       comparativos,
       serie,
@@ -334,6 +351,10 @@ export async function GET() {
       itensSistemicos,
       rankingInspetores,
       alertas,
+      filterOptions: {
+        obras: obrasOpt.map(r => r.obra as string),
+        inspetores: inspetoresOpt.map(r => r.inspetor as string),
+      },
       meta: {
         taxaGeral90,
         inspecoesPendentes,

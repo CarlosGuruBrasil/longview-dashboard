@@ -2,12 +2,15 @@
 import React, { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
 import type { Lead, MetaData, EstoqueData, MetaLeadForm, MetaPageInfo, DateRange, ActiveView, LeadSituacao, LeadSummary } from '../types';
 import { toISODate, getOrigin } from '../utils/leads';
+import { inFunnelStage, type FunnelStage } from '../utils/funnel';
 import logger from '@/lib/logger'
 
 
 export interface LeadFilters {
   origem?: string;
   situacao?: string;
+  /** Etapa cumulativa do funil — usa o MESMO predicado da contagem (utils/funnel.ts) */
+  funnelStage?: FunnelStage;
   empreendimento?: string;
   corretor?: string;
   imobiliaria?: string;
@@ -145,6 +148,10 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
         const sit = lead.situacao as LeadSituacao | undefined;
         return sit?.nome?.toLowerCase() === filterVal.toLowerCase();
       });
+    }
+    if (leadFilters.funnelStage) {
+      const stage = leadFilters.funnelStage;
+      result = result.filter(lead => inFunnelStage(lead, stage));
     }
     if (leadFilters.empreendimento) {
       const filterVal = leadFilters.empreendimento.toLowerCase();

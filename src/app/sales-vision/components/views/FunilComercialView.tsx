@@ -23,11 +23,17 @@ const RESERVA_COLORS: Record<string, string> = {
   'Vendida':                       '#10b981',
 }
 
+// Cores por ordem da funil_etapas (renumerada 2026-07-07: 1-13 sem duplicatas)
 const LEAD_STAGE_COLORS: Record<number, string> = {
-  1: '#3b82f6', 2: '#06b6d4', 3: '#06b6d4',
-  4: '#8b5cf6', 5: '#8b5cf6', 6: '#8b5cf6',
-  7: '#f59e0b', 8: '#10b981', 9: '#ef4444',
-  10: '#6366f1', 11: '#64748b',
+  1: '#3b82f6', 2: '#3b82f6',               // aguardando
+  3: '#06b6d4', 4: '#06b6d4',               // atendimento
+  5: '#64748b',                             // sem conexão
+  6: '#8b5cf6', 7: '#8b5cf6',               // visita
+  8: '#f59e0b',                             // reserva
+  9: '#10b981',                             // venda
+  10: '#ef4444',                            // perdido
+  11: '#6366f1',                            // carteira corretor
+  12: '#64748b', 13: '#64748b',             // lançamentos
 }
 
 // Etapas excluídas do funil de leads (não são pipeline ativo)
