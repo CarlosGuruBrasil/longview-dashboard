@@ -9,7 +9,7 @@ import {
 } from 'lucide-react'
 import { useData } from '../../context/DataContext'
 import { generateInsights, type Insight } from '../../utils/insights'
-import { isSale, getLeadValueNumber, getStatusColor, getOrigin } from '../../utils/leads'
+import { isSale, getLeadValueNumber, getStatusColor, getOrigin, toISODate } from '../../utils/leads'
 import { funnelCounts } from '../../utils/funnel'
 import LogoLoader from '@/components/ui/LogoLoader'
 import { formatCurrency, formatNumber } from '../../utils/formatters'
@@ -109,7 +109,11 @@ export default function DashboardView() {
   // Smart Dashboard usa sempre mês atual (não depende do filtro global)
   const currentMonthLeads = useMemo(() => {
     const ym = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
-    return allLeads.filter(l => String(l.data_cad ?? l.data_cadastro ?? l.data_cadastramento ?? '').slice(0, 7) === ym)
+    return allLeads.filter(l => {
+      const dtStr = String(l.data_cad ?? l.data_cadastro ?? l.data_cadastramento ?? '')
+      const iso = dtStr.includes('/') ? toISODate(dtStr) : dtStr
+      return iso.slice(0, 7) === ym
+    })
   }, [allLeads])
   const [biData, setBiData] = useState<BiInsights | null>(null)
   const [, setBiLoading] = useState(true)
@@ -217,7 +221,7 @@ export default function DashboardView() {
 
         // Obtém o status da campanha dos detalhes
         const details = metaData?.campaignDetails?.find(d => String(d.id) === String(c.campaign_id));
-        const status = details?.status || 'UNKNOWN';
+        const status = details?.effective_status || details?.status || 'UNKNOWN';
 
         const metaActions = c.actions ?? [];
         const leadAction = (metaActions as any[]).find(a => a.action_type === 'lead');

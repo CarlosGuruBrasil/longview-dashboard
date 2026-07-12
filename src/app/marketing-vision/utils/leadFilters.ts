@@ -40,7 +40,14 @@ export function applyLeadFilters(leads: Lead[], filters: LeadFilters, dateRange?
 
   if (filters.origem) {
     const filterVal = filters.origem.toLowerCase();
-    result = result.filter(lead => getOrigin(lead).toLowerCase().includes(filterVal));
+    result = result.filter(lead => {
+      if (getOrigin(lead).toLowerCase().includes(filterVal)) return true;
+      const raw = lead.raw || {};
+      const camp1 = String(raw.campanha || '').toLowerCase();
+      const camp2 = String(raw.utm_campaign || '').toLowerCase();
+      const campId = String(raw.utm_campaign_id || raw.idcampanha || '').toLowerCase();
+      return camp1.includes(filterVal) || camp2.includes(filterVal) || campId.includes(filterVal);
+    });
   }
   if (filters.situacao) {
     const filterVal = filters.situacao.toLowerCase();

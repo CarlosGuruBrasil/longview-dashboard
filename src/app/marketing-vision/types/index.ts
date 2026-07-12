@@ -113,6 +113,7 @@ export interface MetaCampaignDetail {
   id: string;
   name: string;
   status: string;
+  effective_status?: string;
   objective?: string;
   buying_type?: string;
   daily_budget?: string;
