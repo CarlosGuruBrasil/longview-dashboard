@@ -8,13 +8,14 @@ import {
   Megaphone, Compass, Eye, MousePointerClick, ChevronDown
 } from 'lucide-react'
 import { useData } from '../../context/DataContext'
+import FilterBar from '../ui/FilterBar'
+import FunnelVisualization from '../ui/FunnelVisualization'
 import { generateInsights, type Insight } from '../../utils/insights'
 import { isSale, getLeadValueNumber, getStatusColor, getOrigin, toISODate } from '../../utils/leads'
 import { funnelCounts } from '../../utils/funnel'
 import LogoLoader from '@/components/ui/LogoLoader'
 import { formatCurrency, formatNumber } from '../../utils/formatters'
 import GlassCard from '../ui/GlassCard'
-import FilterBar from '../ui/FilterBar'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import type { BiInsights } from '../../types'
 import logger from '@/lib/logger'
@@ -163,13 +164,18 @@ export default function DashboardView() {
     return currentMonthLeads.filter(l => !metaLeads.some(ml => ml.id === l.id));
   }, [currentMonthLeads, metaLeads]);
 
-  // Gasto total (Meta) no período
+  // Gasto total (Meta) no mês atual (cruza com os leads do mês atual)
   const totalSpend = useMemo(() => {
-    const campaigns = metaData?.campaigns || [];
-    return campaigns.reduce((sum, c) => sum + Number(c.spend ?? 0), 0);
+    const ym = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+    const daily = metaData?.daily || [];
+    return daily.reduce((sum, d) => {
+      const dateStr = String(d.date_start || '');
+      if (dateStr.startsWith(ym)) return sum + Number(d.spend ?? 0);
+      return sum;
+    }, 0);
   }, [metaData]);
 
-  // CPL médio do Meta Ads
+  // CPL médio do Meta Ads no mês atual
   const avgCpl = metaLeads.length > 0 ? totalSpend / metaLeads.length : 0;
 
   // 1. Classificação e cruzamento inteligente de campanhas do Meta com leads do CRM por e-mail/telefone ou empreendimento
@@ -398,11 +404,19 @@ export default function DashboardView() {
     return { curr, prev, pct }
   }, [stageLeads])
 
-  // Mix de leads (mídia paga Meta vs orgânicos)
-  const mixData = useMemo(() => [
-    { name: 'Meta Ads', value: metaLeads.length, color: '#3b82f6' },
-    { name: 'Canais Orgânicos / Outros', value: outrosLeads.length, color: '#a855f7' }
-  ], [metaLeads, outrosLeads]);
+  // Origens dos Leads (mês atual)
+  const origensData = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const lead of currentMonthLeads) {
+      const origem = getOrigin(lead)
+      map.set(origem, (map.get(origem) ?? 0) + 1)
+    }
+    return Array.from(map.entries())
+      .map(([name, value]) => ({ name, value }))
+      .filter(d => d.name !== 'Não informado' || d.value > 0)
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10)
+  }, [currentMonthLeads]);
 
   const insights = useMemo(() => generateInsights(biData, allLeads, metaData), [biData, allLeads, metaData])
 
@@ -532,288 +546,161 @@ export default function DashboardView() {
         </div>
       </GlassCard>
 
-      {/* Grid de Funil CRM & Canais Orgânicos */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
-        {/* ── Seção B: Funil de Vendas e Etapas do CRM ── */}
-        <GlassCard title="Etapas do Funil de Leads">
-          <div className="flex flex-col gap-4">
+      {/* ── Seção B: Funil de Vendas e Etapas do CRM ── */}
+      <GlassCard title="Etapas do Funil de Leads">
+        <div className="flex flex-col gap-4">
 
-            {/* ── FILTROS INDEPENDENTES DO FUNIL ── */}
-            <div className="bg-white/[0.02] border border-white/5 rounded-xl p-3 flex flex-col gap-3">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Filtros Locais do Funil</span>
-                <button
-                  onClick={() => {
-                    setFunnelStart('')
-                    setFunnelEnd('')
-                    setFunnelCorretor('')
-                    setFunnelImobiliaria('')
-                    setFunnelGestor('')
-                    setFunnelEmpreendimento('')
-                  }}
-                  className="text-[10px] text-zinc-500 hover:text-orange-400 font-medium transition-colors"
+          {/* ── FILTROS INDEPENDENTES DO FUNIL ── */}
+          <div className="bg-white/[0.02] border border-white/5 rounded-xl p-3 flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Filtros Locais do Funil</span>
+              <button
+                onClick={() => {
+                  setFunnelStart('')
+                  setFunnelEnd('')
+                  setFunnelCorretor('')
+                  setFunnelImobiliaria('')
+                  setFunnelGestor('')
+                  setFunnelEmpreendimento('')
+                }}
+                className="text-[10px] text-zinc-500 hover:text-orange-400 font-medium transition-colors"
+              >
+                Limpar Filtros
+              </button>
+            </div>
+
+            {/* Grid de seletores */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {/* Data Início */}
+              <div className="flex flex-col gap-1">
+                <span className="text-[9px] text-zinc-500">De</span>
+                <input
+                  type="date"
+                  value={funnelStart}
+                  onChange={e => setFunnelStart(e.target.value)}
+                  className="h-7 px-2 text-[11px] bg-white/[0.04] border border-white/[0.09] rounded-lg text-zinc-300 focus:outline-none focus:border-orange-500/40 w-full"
+                />
+              </div>
+
+              {/* Data Fim */}
+              <div className="flex flex-col gap-1">
+                <span className="text-[9px] text-zinc-500">Até</span>
+                <input
+                  type="date"
+                  value={funnelEnd}
+                  onChange={e => setFunnelEnd(e.target.value)}
+                  className="h-7 px-2 text-[11px] bg-white/[0.04] border border-white/[0.09] rounded-lg text-zinc-300 focus:outline-none focus:border-orange-500/40 w-full"
+                />
+              </div>
+
+              {/* Empreendimento */}
+              <div className="flex flex-col gap-1">
+                <span className="text-[9px] text-zinc-500">Empreendimento</span>
+                <select
+                  value={funnelEmpreendimento}
+                  onChange={e => setFunnelEmpreendimento(e.target.value)}
+                  className="h-7 px-2 text-[11px] bg-[#121214] border border-white/[0.09] rounded-lg text-zinc-300 focus:outline-none focus:border-orange-500/40 w-full cursor-pointer"
                 >
-                  Limpar Filtros
-                </button>
+                  <option value="">Todos</option>
+                  {funnelOptions.empreendimentos.map(e => <option key={e} value={e}>{e}</option>)}
+                </select>
               </div>
 
-              {/* Grid de seletores */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {/* Data Início */}
-                <div className="flex flex-col gap-1">
-                  <span className="text-[9px] text-zinc-500">De</span>
-                  <input
-                    type="date"
-                    value={funnelStart}
-                    onChange={e => setFunnelStart(e.target.value)}
-                    className="h-7 px-2 text-[11px] bg-white/[0.04] border border-white/[0.09] rounded-lg text-zinc-300 focus:outline-none focus:border-orange-500/40 w-full"
-                  />
-                </div>
+              {/* Corretor */}
+              <div className="flex flex-col gap-1">
+                <span className="text-[9px] text-zinc-500">Corretor</span>
+                <select
+                  value={funnelCorretor}
+                  onChange={e => setFunnelCorretor(e.target.value)}
+                  className="h-7 px-2 text-[11px] bg-[#121214] border border-white/[0.09] rounded-lg text-zinc-300 focus:outline-none focus:border-orange-500/40 w-full cursor-pointer"
+                >
+                  <option value="">Todos</option>
+                  {funnelOptions.corretores.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
 
-                {/* Data Fim */}
-                <div className="flex flex-col gap-1">
-                  <span className="text-[9px] text-zinc-500">Até</span>
-                  <input
-                    type="date"
-                    value={funnelEnd}
-                    onChange={e => setFunnelEnd(e.target.value)}
-                    className="h-7 px-2 text-[11px] bg-white/[0.04] border border-white/[0.09] rounded-lg text-zinc-300 focus:outline-none focus:border-orange-500/40 w-full"
-                  />
-                </div>
+              {/* Imobiliária */}
+              <div className="flex flex-col gap-1">
+                <span className="text-[9px] text-zinc-500">Imobiliária</span>
+                <select
+                  value={funnelImobiliaria}
+                  onChange={e => setFunnelImobiliaria(e.target.value)}
+                  className="h-7 px-2 text-[11px] bg-[#121214] border border-white/[0.09] rounded-lg text-zinc-300 focus:outline-none focus:border-orange-500/40 w-full cursor-pointer"
+                >
+                  <option value="">Todos</option>
+                  {funnelOptions.imobiliarias.map(i => <option key={i} value={i}>{i}</option>)}
+                </select>
+              </div>
 
-                {/* Empreendimento */}
-                <div className="flex flex-col gap-1">
-                  <span className="text-[9px] text-zinc-500">Empreendimento</span>
-                  <select
-                    value={funnelEmpreendimento}
-                    onChange={e => setFunnelEmpreendimento(e.target.value)}
-                    className="h-7 px-2 text-[11px] bg-[#121214] border border-white/[0.09] rounded-lg text-zinc-300 focus:outline-none focus:border-orange-500/40 w-full cursor-pointer"
-                  >
-                    <option value="">Todos</option>
-                    {funnelOptions.empreendimentos.map(e => <option key={e} value={e}>{e}</option>)}
-                  </select>
-                </div>
-
-                {/* Corretor */}
-                <div className="flex flex-col gap-1">
-                  <span className="text-[9px] text-zinc-500">Corretor</span>
-                  <select
-                    value={funnelCorretor}
-                    onChange={e => setFunnelCorretor(e.target.value)}
-                    className="h-7 px-2 text-[11px] bg-[#121214] border border-white/[0.09] rounded-lg text-zinc-300 focus:outline-none focus:border-orange-500/40 w-full cursor-pointer"
-                  >
-                    <option value="">Todos</option>
-                    {funnelOptions.corretores.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-
-                {/* Imobiliária */}
-                <div className="flex flex-col gap-1">
-                  <span className="text-[9px] text-zinc-500">Imobiliária</span>
-                  <select
-                    value={funnelImobiliaria}
-                    onChange={e => setFunnelImobiliaria(e.target.value)}
-                    className="h-7 px-2 text-[11px] bg-[#121214] border border-white/[0.09] rounded-lg text-zinc-300 focus:outline-none focus:border-orange-500/40 w-full cursor-pointer"
-                  >
-                    <option value="">Todos</option>
-                    {funnelOptions.imobiliarias.map(i => <option key={i} value={i}>{i}</option>)}
-                  </select>
-                </div>
-
-                {/* Gestor */}
-                <div className="flex flex-col gap-1">
-                  <span className="text-[9px] text-zinc-500">Gestor</span>
-                  <select
-                    value={funnelGestor}
-                    onChange={e => setFunnelGestor(e.target.value)}
-                    className="h-7 px-2 text-[11px] bg-[#121214] border border-white/[0.09] rounded-lg text-zinc-300 focus:outline-none focus:border-orange-500/40 w-full cursor-pointer"
-                  >
-                    <option value="">Todos</option>
-                    {funnelOptions.gestores.map(g => <option key={g} value={g}>{g}</option>)}
-                  </select>
-                </div>
+              {/* Gestor */}
+              <div className="flex flex-col gap-1">
+                <span className="text-[9px] text-zinc-500">Gestor</span>
+                <select
+                  value={funnelGestor}
+                  onChange={e => setFunnelGestor(e.target.value)}
+                  className="h-7 px-2 text-[11px] bg-[#121214] border border-white/[0.09] rounded-lg text-zinc-300 focus:outline-none focus:border-orange-500/40 w-full cursor-pointer"
+                >
+                  <option value="">Todos</option>
+                  {funnelOptions.gestores.map(g => <option key={g} value={g}>{g}</option>)}
+                </select>
               </div>
             </div>
+          </div>
 
-            {/* ── INDICADORES GERAIS DO FUNIL FILTRADO ── */}
-            <div className="flex items-center justify-between gap-3 flex-wrap border-b border-white/5 pb-3">
-              <div className="flex flex-col">
-                <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">Crescimento mês atual (funil filtrado)</span>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="text-xl font-bold text-white">{stageLeads.length}</span>
-                  {crescimento.pct !== null && (
-                    <span className={`flex items-center gap-0.5 text-xs font-bold px-1.5 py-0.5 rounded-full ${
-                      crescimento.pct >= 0 ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400'
-                    }`}>
-                      {crescimento.pct >= 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-                      {crescimento.pct >= 0 ? '+' : ''}{crescimento.pct}%
-                    </span>
-                  )}
-                  <span className="text-[10px] text-zinc-600">vs {crescimento.prev} no mês anterior</span>
-                </div>
+          {/* ── INDICADORES GERAIS DO FUNIL FILTRADO ── */}
+          <div className="flex items-center justify-between gap-3 flex-wrap border-b border-white/5 pb-3">
+            <div className="flex flex-col">
+              <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">Crescimento mês atual (funil filtrado)</span>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="text-xl font-bold text-white">{stageLeads.length}</span>
+                {crescimento.pct !== null && (
+                  <span className={`flex items-center gap-0.5 text-xs font-bold px-1.5 py-0.5 rounded-full ${
+                    crescimento.pct >= 0 ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400'
+                  }`}>
+                    {crescimento.pct >= 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                    {crescimento.pct >= 0 ? '+' : ''}{crescimento.pct}%
+                  </span>
+                )}
+                <span className="text-[10px] text-zinc-600">vs {crescimento.prev} no mês anterior</span>
               </div>
             </div>
+          </div>
 
-            {/* ── FUNIL VISUAL PREMIUM (PIRÂMIDE INVERTIDA) ── */}
-            <div className="flex flex-col gap-3 pr-1">
-              {funnelConsolidated.length === 0 || stageLeads.length === 0 ? (
-                <p className="text-zinc-500 text-center text-xs py-12">Nenhum lead encontrado para os filtros selecionados.</p>
-              ) : (
-                funnelConsolidated.map((step, idx) => {
-                  // Determina largura do bloco de funil baseando-se no percentual do total
-                  const blockWidth = `${Math.max(30, step.pctOfTotal)}%`
-
-                  return (
-                    <div key={step.name} className="flex flex-col items-center w-full">
-                      {/* Bloco de Funil Invertido */}
-                      <div
-                        onClick={() => {
-                          if (step.name.includes('Venda')) return // dado analítico — pipeline no Sales Vision
-                          const baseFilters: Record<string, string> = {}
-                          if (funnelEmpreendimento) baseFilters.empreendimento = funnelEmpreendimento
-                          if (step.name.includes('Atendimento')) baseFilters.situacao = 'Em Atendimento'
-                          else if (step.name.includes('Visita')) baseFilters.situacao = 'Visita Realizada'
-                          else if (step.name.includes('Reserva')) baseFilters.situacao = 'Com Reserva'
-                          filterAndNavigate(baseFilters)
-                        }}
-                        style={{ width: blockWidth }}
-                        className={`group relative overflow-hidden rounded-xl border border-white/10 bg-gradient-to-r from-white/[0.03] to-white/[0.01] p-3 flex items-center justify-between transition-all duration-300 ${
-                          step.name.includes('Venda')
-                            ? 'cursor-default opacity-80'
-                            : 'hover:from-white/[0.08] hover:to-white/[0.04] cursor-pointer hover:scale-[1.01]'
-                        }`}
-                      >
-                        {/* Indicador de Meta do Estágio */}
-                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-sky-500/50 group-hover:bg-orange-500/60 transition-colors" />
-                        
-                        <div className="flex flex-col gap-0.5 pl-1.5">
-                          <span className="text-[11px] font-bold text-zinc-300 group-hover:text-white transition-colors">{step.name}</span>
-                          <span className="text-[10px] text-zinc-500">
-                            Volume: <strong className="text-zinc-300 font-semibold">{formatNumber(step.count)}</strong> ({step.pctOfTotal}% do total)
-                          </span>
-                        </div>
-
-                        {/* Conversão e Status */}
-                        <div className="text-right flex items-center gap-3">
-                          <div className="flex flex-col">
-                            <span className="text-xs font-bold text-zinc-100">
-                              {idx === 0 ? 'Conversão' : `Conv: ${step.convRate}%`}
-                            </span>
-                            {idx > 0 && (
-                              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full mt-0.5 ${step.diag.color} ${step.diag.bg}`}>
-                                {step.diag.label}
-                              </span>
-                            )}
-                          </div>
-                          <ArrowRight size={12} className="text-zinc-500 group-hover:text-white transition-colors translate-x-0 group-hover:translate-x-1 duration-300" />
-                        </div>
-                      </div>
-
-                      {/* Divisor de Fluxo (Seta de conversão) */}
-                      {idx < funnelConsolidated.length - 1 && (
-                        <div className="flex flex-col items-center justify-center my-1">
-                          <ArrowDown size={14} className="text-zinc-700 animate-pulse" />
-                        </div>
-                      )}
-                    </div>
-                  )
-                })
-              )}
-            </div>
+          {/* ── FUNIL VISUAL (USANDO COMPONENTE PADRÃO) ── */}
+            <FunnelVisualization leads={stageLeads} />
           </div>
         </GlassCard>
 
-        {/* Coluna Direita: Donut Chart + Lista de Canais Orgânicos */}
-        <div className="flex flex-col gap-6">
-          
-          {/* 📊 Novo Gráfico: Mix de Captação */}
-          <GlassCard title="Mix de Captação (Mídia Paga vs Orgânico)">
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-6 py-2 min-h-[140px] relative">
-              <div className="w-[120px] h-[120px] flex-shrink-0 relative flex items-center justify-center">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={mixData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={42}
-                      outerRadius={54}
-                      paddingAngle={3}
-                      dataKey="value"
-                    >
-                      {mixData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{ backgroundColor: '#18181b', borderColor: '#27272a', borderRadius: '8px', fontSize: '11px' }}
-                      itemStyle={{ color: '#fff' }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-                {/* Texto Centralizado */}
-                <div className="absolute flex flex-col items-center justify-center">
-                  <span className="text-lg font-bold text-white leading-none">{formatNumber(currentMonthLeads.length)}</span>
-                  <span className="text-[8px] text-zinc-500 font-semibold uppercase mt-0.5">Leads</span>
-                </div>
-              </div>
-
-              {/* Legenda Detalhada */}
-              <div className="flex flex-col gap-2 text-xs">
-                {mixData.map(d => {
-                  const pct = currentMonthLeads.length > 0 ? ((d.value / currentMonthLeads.length) * 100).toFixed(1) : '0.0';
-                  return (
-                    <div key={d.name} className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
-                      <div className="flex flex-col">
-                        <span className="text-zinc-200 font-semibold leading-tight">{d.name}</span>
-                        <span className="text-[10px] text-zinc-500">{formatNumber(d.value)} leads ({pct}%)</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </GlassCard>
-
-          {/* ── Seção C: Outros Canais de Captação (Orgânicos / Manuais) ── */}
-          <GlassCard title={`Captação Orgânica & Outros Canais (${outrosLeads.length} leads)`}>
-            <div className="flex flex-col gap-3 max-h-[420px] overflow-y-auto pr-1">
-              {outrosCanaisData.length === 0 ? (
-                <p className="text-zinc-500 text-center text-xs py-8">Nenhum lead captado fora do tráfego pago no período.</p>
-              ) : (
-                outrosCanaisData.map((c, i) => (
-                  <div
-                    key={c.name}
-                    onClick={() => filterAndNavigate({ origem: c.name })}
-                    className="flex flex-col gap-1.5 p-3 rounded-xl bg-white/[0.01] border border-white/5 hover:bg-white/5 cursor-pointer transition-all"
+      {/* ── Seção C: Origem dos Leads (Círculos) ── */}
+      <GlassCard title="Origem dos Leads (Top 10 do Mês)">
+        <div className="flex flex-wrap items-center justify-center gap-4 py-8 px-4">
+          {origensData.length === 0 ? (
+            <p className="text-zinc-500 text-center text-xs py-8">Nenhum lead encontrado no mês atual.</p>
+          ) : (
+            origensData.map((origem, i) => {
+              const color = PALETTE[i % PALETTE.length]
+              return (
+                <div
+                  key={origem.name}
+                  onClick={() => filterAndNavigate({ origem: origem.name })}
+                  className="flex items-center gap-3 px-5 py-2.5 rounded-full border-2 bg-white/[0.02] hover:bg-white/[0.06] hover:scale-105 cursor-pointer transition-all duration-300 shadow-sm"
+                  style={{ borderColor: color }}
+                >
+                  <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider whitespace-nowrap">
+                    {origem.name}
+                  </span>
+                  <div 
+                    className="flex items-center justify-center px-2.5 py-0.5 rounded-full"
+                    style={{ backgroundColor: `${color}20` }}
                   >
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="font-semibold text-zinc-200 flex items-center gap-2">
-                        <Compass size={14} className="text-zinc-500 shrink-0" />
-                        {c.name}
-                      </span>
-                      <span className="text-zinc-400">
-                        <strong className="text-white font-bold">{c.count}</strong> lead{c.count !== 1 ? 's' : ''} ({c.percentage}%)
-                      </span>
-                    </div>
-                    {/* Barra de Progresso com Paleta */}
-                    <div className="h-2 bg-white/5 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full rounded-full transition-all duration-500" 
-                        style={{ width: `${c.percentage}%`, backgroundColor: PALETTE[i % PALETTE.length] }}
-                      />
-                    </div>
+                    <span className="text-base font-black" style={{ color }}>{formatNumber(origem.value)}</span>
                   </div>
-                ))
-              )}
-            </div>
-          </GlassCard>
-
+                </div>
+              )
+            })
+          )}
         </div>
-
-      </div>
+      </GlassCard>
 
       {/* ── Alertas Inteligentes (AI) ── */}
       {insights.length > 0 && (

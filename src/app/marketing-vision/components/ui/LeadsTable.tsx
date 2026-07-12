@@ -420,7 +420,7 @@ export default function LeadsTable({
 
                const RowContent = (
                 <>
-                  <td className="px-3 py-2 whitespace-nowrap font-medium max-w-[160px] truncate" style={{ color: 'var(--text-primary)' }}>
+                  <td className="px-3 py-2 whitespace-nowrap font-medium max-w-[280px] truncate" style={{ color: 'var(--text-primary)' }}>
                     <div className="flex items-center gap-1.5">
                       <span className="truncate">{lead.nome || '-'}</span>
                       {!hasComments && (

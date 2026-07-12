@@ -92,59 +92,47 @@ export default function FunnelVisualization({ leads }: Props) {
   }
 
   return (
-    <div className="flex flex-col items-center gap-0.5 py-2 w-full">
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 w-full pt-2">
       {stages.map((step, idx) => {
-        const widthPct = Math.max(28, step.pct)
-        const nextStep = stages[idx + 1]
-        const dropped  = nextStep ? step.count - nextStep.count : 0
-        const dropPct  = step.count > 0 ? Math.round((dropped / step.count) * 100) : 0
         const { color, bg, border } = STAGES[idx]
 
         return (
-          <div key={step.name} className="flex flex-col items-center w-full">
-            <div
-              style={{ width: `${widthPct}%`, background: bg, borderColor: border }}
-              onClick={() => step.stageFilter ? setLeadFilters({ ...leadFilters, funnelStage: step.stageFilter, situacao: undefined }) : undefined}
-              className={`border rounded-xl px-4 py-3 transition-all duration-300 ${step.stageFilter ? 'cursor-pointer hover:scale-[1.02] hover:brightness-125' : 'cursor-default'} group`}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
-                  <div className="min-w-0">
-                    <p className="text-[11px] text-zinc-400 font-medium leading-tight truncate">{step.name}</p>
-                    <p className="text-xl font-black text-white leading-tight">{formatNumber(step.count)}</p>
-                  </div>
-                </div>
-
-                <div className="flex flex-col items-end shrink-0 gap-1">
-                  <span className="text-lg font-black leading-tight" style={{ color }}>{step.pct}%</span>
-                  {step.diag && (
-                    <span
-                      className="text-[10px] font-bold px-1.5 py-0.5 rounded-full border leading-none"
-                      style={{ color: step.diag.text, background: step.diag.bg, borderColor: step.diag.border }}
-                    >
-                      {step.diag.label}
-                    </span>
-                  )}
-                </div>
+          <div
+            key={step.name}
+            onClick={() => step.stageFilter ? setLeadFilters({ ...leadFilters, funnelStage: step.stageFilter, situacao: undefined }) : undefined}
+            className={`group relative overflow-hidden rounded-xl border p-3 flex flex-col gap-2 transition-all duration-300 ${
+              step.stageFilter 
+                ? 'hover:bg-white/[0.06] cursor-pointer hover:border-orange-500/40 hover:-translate-y-1' 
+                : 'cursor-default opacity-80'
+            }`}
+            style={{ backgroundColor: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.05)' }}
+          >
+            {/* Top border highlight based on stage color */}
+            <div className="absolute top-0 left-0 right-0 h-1 transition-colors" style={{ backgroundColor: color, opacity: 0.7 }} />
+            
+            <span className="text-[11px] font-bold text-zinc-300 group-hover:text-white transition-colors mt-1 uppercase tracking-wider line-clamp-2" title={step.name}>
+              {step.name.replace(/^\d+\.\s*/, '')}
+            </span>
+            <span className="text-3xl font-black text-white">{formatNumber(step.count)}</span>
+            
+            <div className="flex flex-col gap-1 mt-auto pt-2 border-t border-white/5">
+              <div className="flex justify-between items-center text-[10px]">
+                <span className="text-zinc-500">Conv. {idx === 0 ? 'Total' : 'da Etapa'}</span>
+                <span className="font-bold text-zinc-300">{idx === 0 ? '—' : `${step.conv}%`}</span>
               </div>
-
-              <div className="mt-2.5 h-1.5 rounded-full bg-white/5 overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all duration-700"
-                  style={{ width: `${step.pct}%`, backgroundColor: color }}
-                />
+              <div className="flex justify-between items-center text-[10px]">
+                <span className="text-zinc-500">Representa</span>
+                <span className="font-bold text-zinc-300">{step.pct}%</span>
               </div>
+              {step.diag && idx > 0 && (
+                <div 
+                  className="text-center mt-1 text-[9px] font-bold px-1.5 py-1 rounded truncate border"
+                  style={{ color: step.diag.text, background: step.diag.bg, borderColor: step.diag.border }}
+                >
+                  {step.diag.label}
+                </div>
+              )}
             </div>
-
-            {nextStep && (
-              <div className="flex items-center gap-1.5 py-1 text-[10px]">
-                <ArrowDown size={9} className="text-zinc-600" />
-                <span className="text-zinc-600">
-                  {dropped > 0 && <span className="text-red-400/70">-{formatNumber(dropped)} ({dropPct}%)</span>}
-                </span>
-              </div>
-            )}
           </div>
         )
       })}

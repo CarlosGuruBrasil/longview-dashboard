@@ -4,25 +4,28 @@
  * Cron a cada 2 horas — processa automaticamente novos leads dos formulários Meta.
  *
  * Fluxo por lead novo:
- *   1. Busca leads Meta capturados desde o último processamento
+ *   1. Busca leads Meta capturados desde o último processamento via API
  *   2. Para cada lead novo:
- *      a. Calcula score de intenção (match CRM + dados Meta)
- *      b. Cria/atualiza contato no RD Station com dados + score + temperatura
- *      c. Envia evento CAPI 'Lead' para o pixel Meta (loop de feedback)
+ *      a. Salva no banco (Postgres)
+ *      b. Envia ao CV CRM (com custom fields no campo 'mensagem')
+ *      c. Envia ao RD Station
+ *      d. Envia evento CAPI 'Lead' para o pixel Meta
+ *      e. Notifica via Push FCM
  *   3. Atualiza timestamp do último processamento no KV
- *   4. Registra estatísticas no KV para monitoramento
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { kv } from '@/lib/kv';
 import axios from 'axios';
 import { sendCAPIEvents, type CAPIEvent } from '@/app/api/meta/capi/route';
-import logger from '@/lib/logger'
+import { createCrmLead } from '@/lib/cvcrm';
+import logger from '@/lib/logger';
+import { sql, ensureSchema } from '@/lib/pg';
 
 const META_BASE = 'https://graph.facebook.com/v21.0';
 const PAGE_ID   = '259079394232614';
 
 type MetaForm = { id: string; name: string; status: string };
-type MetaFieldDatum = { name?: string; values?: string[] };
+type MetaFieldDatum = { name: string; values: string[] };
 type MetaLead = {
   id: string;
   created_time: string;
@@ -30,6 +33,8 @@ type MetaLead = {
   ad_id?: string;
   adset_id?: string;
   campaign_id?: string;
+  campaign_name?: string;
+  adset_name?: string;
   form_id?: string;
   _form_name?: string;
 };
@@ -39,6 +44,7 @@ type ProcessStats = {
   error?: string;
   newLeads: number;
   sentToRD: number;
+  sentToCV: number;
   capiSent: number;
   errors: number;
   ok: boolean;
@@ -46,13 +52,6 @@ type ProcessStats = {
 
 function metaAuth() {
   return { access_token: process.env.META_TOKEN };
-}
-
-function isCronRequest(request: NextRequest): boolean {
-  const cronSecret = process.env.CRON_SECRET;
-  const auth       = request.headers.get('Authorization') || '';
-  if (!cronSecret) return false; // fail-safe
-  return auth === `Bearer ${cronSecret}`;
 }
 
 // Pega page token para ler leadgen
@@ -87,7 +86,7 @@ async function fetchLeadsFromForm(formId: string, since: number, pageToken: stri
 
   do {
     const params: Record<string, string | number> = {
-      fields: 'id,created_time,field_data,ad_id,adset_id,campaign_id,form_id',
+      fields: 'id,created_time,field_data,ad_id,ad_name,adset_id,adset_name,campaign_id,campaign_name,form_id',
       limit:  100,
       access_token: pageToken,
       filtering: JSON.stringify([{ field: 'time_created', operator: 'GREATER_THAN', value: since }]),
@@ -110,20 +109,118 @@ async function fetchLeadsFromForm(formId: string, since: number, pageToken: stri
   return leads;
 }
 
-// Extrai campos do lead Meta
+// Extrai campos do lead Meta (buscando por substrings nas chaves)
 function extractField(fieldData: MetaFieldDatum[], keys: string[]): string {
   const entry = fieldData.find(f => keys.some(k => (f.name || '').toLowerCase().includes(k)));
   return entry?.values?.[0] || '';
 }
 
-// Calcula score básico para um lead recém-capturado (sem dados CRM ainda)
+/** Infere empreendimento pelo nome da campanha/conjunto/formulário */
+function empFromCampaign(text: string): string {
+  const s = (text || '').toLowerCase();
+  if (s.includes('nautic'))                        return 'Nautic';
+  if (s.includes('hub') || s.includes('beira mar') || s.includes('hbm')) return 'HUB Beira Mar';
+  if (s.includes('infiniti'))                      return 'Infiniti';
+  if (s.includes('sunclub') || s.includes('sun club')) return 'SunClub';
+  if (s.includes('gran reserva'))                  return 'Gran Reserva';
+  if (s.includes('le grand'))                      return 'Le Grand View';
+  if (s.includes('porto da lagoa'))                return 'Porto da Lagoa';
+  if (s.includes('south beach'))                   return 'South Beach';
+  if (s.includes('trindade'))                      return 'Trindade';
+  if (s.includes('exupery') || s.includes('exupéry')) return 'Exupéry';
+  return '';
+}
+
+// Extrai campos customizados do form do Meta (todas as respostas)
+function extractCustomFieldsAsMessage(fieldData: MetaFieldDatum[]): string {
+  const ignoredKeys = ['name', 'nome', 'full_name', 'email', 'e-mail', 'phone', 'telefone', 'cel', 'whatsapp'];
+  const extraInfo: string[] = [];
+
+  for (const field of fieldData) {
+    if (!field.name || !field.values || field.values.length === 0) continue;
+    const isIgnored = ignoredKeys.some(k => field.name.toLowerCase().includes(k));
+    if (!isIgnored) {
+      // Formata nome legível
+      const readableKey = field.name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+      extraInfo.push(`${readableKey}: ${field.values.join(', ')}`);
+    }
+  }
+  return extraInfo.join(' | ');
+}
+
+// Envia push FCM para equipe comercial
+function sendFCMPush(nome: string, empreendimento: string, campanha: string): void {
+  const baseUrl = process.env.NEXTAUTH_URL ?? 'https://app.guru.dev.br';
+  const body = [empreendimento, campanha].filter(Boolean).join(' • ');
+
+  fetch(`${baseUrl}/api/notifications/send`, {
+    method: 'POST',
+    headers: {
+      'Content-Type':  'application/json',
+      Authorization:   `Bearer ${process.env.CRON_SECRET}`,
+    },
+    body: JSON.stringify({
+      title: '🎯 Novo Lead Meta Ads',
+      body:  `${nome}${body ? ` — ${body}` : ''}`,
+      roles: ['Desenvolvedor', 'Diretoria', 'Gestor', 'Operador'],
+      data:  { url: '/marketing-vision', type: 'novo_lead' },
+    }),
+  }).catch(() => logger.warn('[process-leads] FCM push falhou'));
+}
+
+async function saveToPostgres(lead: MetaLead, parsed: any, cvId?: string | number): Promise<void> {
+  if (!process.env.DATABASE_URL) return;
+  try {
+    await ensureSchema();
+    const id = cvId ? String(cvId) : `meta_${lead.id}`;
+    const metaRaw = { ...lead, _source: 'process_leads_cron', _parsed: parsed };
+    const rawVal = cvId 
+      ? { _meta: metaRaw, _meta_lead_id: lead.id, origem: parsed.origem, midia_principal: parsed.midia }
+      : metaRaw;
+
+    await sql`
+      INSERT INTO leads (
+        id, nome, email, telefone, origem, status,
+        empreendimento, score, temperatura,
+        data_cadastro, data_atualizacao, raw, synced_at
+      ) VALUES (
+        ${id},
+        ${parsed.nome     || null},
+        ${parsed.email    || null},
+        ${parsed.telefone || null},
+        ${parsed.origem},
+        ${'Novo'},
+        ${parsed.empreendimento || null},
+        ${null}, ${null},
+        ${lead.created_time ? new Date(lead.created_time).toISOString() : null},
+        ${new Date().toISOString()},
+        ${rawVal as never},
+        NOW()
+      )
+      ON CONFLICT (id) DO UPDATE SET
+        nome             = EXCLUDED.nome,
+        email            = EXCLUDED.email,
+        telefone         = EXCLUDED.telefone,
+        origem           = COALESCE(leads.origem, EXCLUDED.origem),
+        empreendimento   = COALESCE(leads.empreendimento, EXCLUDED.empreendimento),
+        data_atualizacao = EXCLUDED.data_atualizacao,
+        raw              = leads.raw || jsonb_build_object('_meta', ${metaRaw as never}),
+        synced_at        = NOW()
+    `;
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'Erro desconhecido';
+    logger.warn({ msg }, '[process-leads] saveToPostgres falhou:');
+  }
+}
+
+// Calcula score básico para um lead recém-capturado
 function calcInitialScore(lead: MetaLead): number {
-  let score = 15; // +15 por ser lead ad Meta
+  let score = 15;
   const fields = lead.field_data || [];
   const phone = extractField(fields, ['phone', 'telefone', 'cel', 'whatsapp']);
   const email = extractField(fields, ['email', 'e-mail']);
-  if (phone) score += 5;  // +5 telefone válido
-  if (email) score += 5;  // +5 email preenchido
+  if (phone) score += 5;
+  if (email) score += 5;
   return Math.min(score, 100);
 }
 
@@ -134,7 +231,7 @@ function getTier(score: number) {
 }
 
 // Envia lead para o RD Station
-async function sendToRD(lead: MetaLead, score: number): Promise<boolean> {
+async function sendToRD(lead: MetaLead, score: number, midia: string, empreendimento: string): Promise<boolean> {
   const apiKey = process.env.RD_TOKEN_PUBLIC;
   if (!apiKey) return false;
 
@@ -145,15 +242,16 @@ async function sendToRD(lead: MetaLead, score: number): Promise<boolean> {
 
   if (!email && !phone) return false;
 
-  const tier    = getTier(score);
-
+  const tier = getTier(score);
   const payload: Record<string, unknown> = {
-    conversion_identifier: tier.conversion_id,
+    conversion_identifier: 'lead_meta_ads',
     cf_score_intencao:    String(score),
     cf_temperatura_lead:  tier.label,
     cf_origem_captacao:   'meta_ads_form',
     cf_data_score:        new Date().toISOString().split('T')[0],
-    tags:                 [`score_${tier.label}`, 'meta_form', 'auto_captured'],
+    cf_campanha_meta:     midia,
+    cf_empreendimento:    empreendimento,
+    tags:                 [`score_${tier.label}`, 'meta_form', 'auto_captured', 'process_leads_cron'],
     available_for_mailing: true,
     legal_bases: [{ category: 'communications', type: 'consent', status: 'granted' }],
   };
@@ -175,11 +273,9 @@ async function sendToRD(lead: MetaLead, score: number): Promise<boolean> {
 }
 
 export async function GET(request: NextRequest) {
-  return NextResponse.json({ ok: true, message: 'Cron desativada — fluxo processado via webhook em tempo real.' });
-
   const startedAt = new Date().toISOString();
   const log: string[]  = [];
-  const stats: ProcessStats = { startedAt, newLeads: 0, sentToRD: 0, capiSent: 0, errors: 0, ok: false };
+  const stats: ProcessStats = { startedAt, newLeads: 0, sentToRD: 0, sentToCV: 0, capiSent: 0, errors: 0, ok: false };
 
   try {
     // Timestamp da última execução (padrão: 2h atrás)
@@ -228,18 +324,44 @@ export async function GET(request: NextRequest) {
         const fields = lead.field_data || [];
         const email  = extractField(fields, ['email', 'e-mail']);
         const phone  = extractField(fields, ['phone', 'telefone', 'cel', 'whatsapp']);
-        const nome   = extractField(fields, ['name', 'nome', 'full_name']);
-
+        const nome   = extractField(fields, ['name', 'nome', 'full_name']) || email || 'Lead Meta';
+        
+        const campanha = lead.campaign_name || lead.adset_name || lead._form_name || '';
+        const midia = campanha;
+        const empreendimento = empFromCampaign(campanha);
+        const origem = 'Meta Lead Ads';
+        
         const score = calcInitialScore(lead);
         const tier  = getTier(score);
 
+        const customFieldsMessage = extractCustomFieldsAsMessage(fields);
+        
+        const parsed = {
+          nome,
+          email,
+          telefone: phone,
+          empreendimento,
+          midia,
+          origem,
+          mensagem: customFieldsMessage || undefined,
+        };
+
+        // Envia para o CV CRM
+        const cvRes = await createCrmLead(parsed);
+        if (cvRes.ok) stats.sentToCV++;
+        else log.push(`[ERR] Falha CV CRM Lead ${lead.id}: ${cvRes.error}`);
+
+        // Salva no Postgres
+        await saveToPostgres(lead, parsed, cvRes.ok ? cvRes.id : undefined);
+
         // Envia para RD Station
-        const rdOk = await sendToRD(lead, score);
+        const rdOk = await sendToRD(lead, score, midia, empreendimento);
         if (rdOk) stats.sentToRD++;
 
-        // Prepara evento CAPI Lead — lead.id AQUI é o leadgen_id do Meta
-        // (vem direto de /{form_id}/leads), então já vai como lead_id,
-        // a chave de match de maior prioridade para Conversion Leads.
+        // FCM Notificação
+        sendFCMPush(nome, empreendimento, campanha);
+
+        // Prepara evento CAPI
         if (email || phone) {
           capiEvents.push({
             event_name:  'Lead',
@@ -255,7 +377,7 @@ export async function GET(request: NextRequest) {
         // Marca como processado
         processedSet.add(lead.id);
 
-        log.push(`[OK] Lead ${lead.id} — score ${score} (${tier.label}) — RD: ${rdOk ? 'ok' : 'skip'}`);
+        log.push(`[OK] Lead ${lead.id} — CRM: ${cvRes.ok ? 'ok' : 'fail'} — RD: ${rdOk ? 'ok' : 'fail'}`);
       } catch (err: any) {
         stats.errors++;
         log.push(`[ERR] Lead ${lead.id}: ${err instanceof Error ? err.message : String(err)}`);
@@ -270,7 +392,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Atualiza KV
-    const processedArr = [...processedSet].slice(-2000); // mantém últimos 2000 IDs
+    const processedArr = [...processedSet].slice(-2000);
     await kv.set('meta:leads:processed', processedArr);
     await kv.set('meta:leads:lastFetch',  nowUnix);
 
@@ -280,7 +402,7 @@ export async function GET(request: NextRequest) {
     await kv.set('meta:leads:lastRun',   stats.finishedAt);
     await kv.set('meta:leads:lastStats', stats);
 
-    log.push(`[✓] Concluído: ${stats.newLeads} leads, ${stats.sentToRD} → RD, ${stats.capiSent} → CAPI`);
+    log.push(`[✓] Concluído: ${stats.newLeads} leads, ${stats.sentToCV} → CRM, ${stats.sentToRD} → RD, ${stats.capiSent} → CAPI`);
     logger.info({ stats }, '[cron/process-leads]');
 
     return NextResponse.json({ ...stats, log });

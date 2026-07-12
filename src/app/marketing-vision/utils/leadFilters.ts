@@ -46,7 +46,8 @@ export function applyLeadFilters(leads: Lead[], filters: LeadFilters, dateRange?
       const camp1 = String(raw.campanha || '').toLowerCase();
       const camp2 = String(raw.utm_campaign || '').toLowerCase();
       const campId = String(raw.utm_campaign_id || raw.idcampanha || '').toLowerCase();
-      return camp1.includes(filterVal) || camp2.includes(filterVal) || campId.includes(filterVal);
+      const midia = String(raw.midia_principal || '').toLowerCase();
+      return camp1.includes(filterVal) || camp2.includes(filterVal) || campId.includes(filterVal) || midia.includes(filterVal);
     });
   }
   if (filters.situacao) {
