@@ -219,6 +219,10 @@ export default function DashboardView() {
         const details = metaData?.campaignDetails?.find(d => String(d.id) === String(c.campaign_id));
         const status = details?.status || 'UNKNOWN';
 
+        const metaActions = c.actions ?? [];
+        const leadAction = (metaActions as any[]).find(a => a.action_type === 'lead');
+        const metaLeadsCount = leadAction ? parseInt(leadAction.value, 10) : 0;
+
         return {
           id: c.campaign_id,
           name: cName,
@@ -227,8 +231,9 @@ export default function DashboardView() {
           spend: spendVal,
           impressions: impressionsVal,
           clicks: clicksVal,
-          leadsCount: campLeads.length,
-          cpl: campLeads.length > 0 ? spendVal / campLeads.length : spendVal,
+          leadsCount: metaLeadsCount,
+          crmLeadsCount: campLeads.length,
+          cpl: metaLeadsCount > 0 ? spendVal / metaLeadsCount : spendVal,
           ctr: impressionsVal > 0 ? (clicksVal / impressionsVal) * 100 : 0
         };
       })
