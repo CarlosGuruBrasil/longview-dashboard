@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { AlertCircle, Calendar, X, Search, ChevronUp, ChevronDown } from 'lucide-react'
 import logger from '@/lib/logger'
 import LogoLoader from '@/components/ui/LogoLoader'
+import ModuleLoadingOverlay from '@/components/ui/ModuleLoadingOverlay'
 import InspecaoDetailModal from '../components/InspecaoDetailModal'
 
 interface UltimaInspecao {
@@ -243,15 +244,11 @@ function InspecoesContent() {
 
       <div className="relative min-h-[60vh]">
         {loading && inspecoes.length > 0 && (
-          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#0d0d0f]/60 backdrop-blur-[2px] rounded-xl transition-all duration-300">
-            <LogoLoader module="quality" text="Buscando dados de inspeções..." />
-          </div>
+          <ModuleLoadingOverlay module="quality" text="Buscando dados de inspeções..." fixed />
         )}
 
       {loading && inspecoes.length === 0 ? (
-        <div className="flex flex-col items-center justify-center p-12" style={{ minHeight: '60vh' }}>
-          <LogoLoader module="quality" text="Buscando dados de inspeções..." />
-        </div>
+        <ModuleLoadingOverlay module="quality" text="Buscando dados de inspeções..." fixed />
       ) : error ? (
         <div className="flex flex-col items-center justify-center gap-3 p-12" style={{ minHeight: '60vh' }}>
           <AlertCircle className="text-red-400" size={32} />
@@ -340,12 +337,7 @@ function InspecoesContent() {
 export default function InspecoesPage() {
   return (
     <Suspense fallback={
-      <div className="flex flex-col items-center justify-center gap-4 p-12" style={{ minHeight: '60vh' }}>
-        <div className="relative w-12 h-12">
-          <div className="absolute inset-0 rounded-full border-2 border-[#1E1E22]" />
-          <div className="absolute inset-0 rounded-full border-2 border-t-emerald-500 border-r-transparent border-b-transparent border-l-transparent animate-spin" />
-        </div>
-      </div>
+      <ModuleLoadingOverlay module="quality" text="Buscando dados de inspeções..." fixed />
     }>
       <InspecoesContent />
     </Suspense>

@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 
 type ModuleKey = 'project' | 'marketing' | 'people' | 'quality' | 'sales' | 'default';
 
@@ -48,10 +49,13 @@ export default function LogoLoader({ module = 'default', text = 'Sincronizando D
 
   return (
     <div className={`flex flex-col items-center justify-center gap-3 ${className}`}>
-      <img 
-        src="/logolongview.png" 
-        alt="Carregando..." 
-        className={`w-28 h-auto object-contain animate-pulse ${theme.dropShadow}`} 
+      <Image
+        src="/logolongview.png"
+        alt="Carregando..."
+        width={112}
+        height={34}
+        priority
+        className={`h-auto w-28 object-contain animate-pulse ${theme.dropShadow}`}
       />
       <div className="flex flex-col sm:flex-row items-center gap-2 mt-1">
         <div className="flex items-center gap-1.5">

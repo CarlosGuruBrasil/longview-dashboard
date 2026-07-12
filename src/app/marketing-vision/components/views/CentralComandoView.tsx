@@ -210,11 +210,14 @@ export default function CentralComandoView() {
       const revenue = leads * 500 // estimativa
       const roas = spend > 0 ? revenue / spend : 0
 
+      const details = (meta?.campaignDetails ?? []).find((d: any) => String(d.id) === String(c.campaign_id));
+      const status = (details?.status || 'UNKNOWN') as any;
+
       const perf = { spend, leads, cpl, ctr, roas }
       return {
         campaignId: c.campaign_id,
         campaignName: c.campaign_name,
-        status: 'ACTIVE' as const,
+        status,
         score: calcScore(perf),
         spend, leads, cpl, ctr, roas,
         impressions, clicks,
@@ -320,6 +323,11 @@ export default function CentralComandoView() {
           </div>
 
           {/* Mini lista das campanhas */}
+          {campaigns.length > 8 && (
+            <p className="text-[11px] text-zinc-500 -mb-1">
+              Mostrando 8 de {campaigns.length} campanhas — clique pra ver todas em Gestão de Ads
+            </p>
+          )}
           <div className="flex flex-col gap-2 max-h-[280px] overflow-y-auto pr-1">
             {campaigns.length === 0 ? (
               <p className="text-xs text-zinc-500 text-center py-4">Nenhuma campanha com dados disponíveis</p>

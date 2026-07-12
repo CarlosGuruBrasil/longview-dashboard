@@ -513,8 +513,21 @@ export default function LeadDrawer({ lead, onClose }: Props) {
                   <GridField icon={Building} label="Empreendimento de Interesse" value={activeLead.empreendimento?.map((e) => e.nome).join(', ')} />
                   <GridField icon={User} label="Corretor Responsável" value={activeLead.corretor?.nome} />
                   <GridField icon={Building} label="Imobiliária" value={activeLead.imobiliaria?.nome} />
+                  <GridField icon={Star} label="Reservas Associadas" value={activeLead.qtde_reservas_associadas || null} />
+                  <GridField icon={Star} label="Simulações Associadas" value={activeLead.qtde_simulacoes_associadas || null} />
                 </div>
               </div>
+
+              {/* Motivo de cancelamento — dado crítico pra entender perda, vindo do CRM */}
+              {activeLead.motivo_cancelamento?.nome && (
+                <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-xs flex items-start gap-2.5">
+                  <ShieldAlert size={14} className="shrink-0 mt-0.5 text-red-400" />
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[10px] uppercase tracking-wider text-red-400/80 font-bold">Motivo do Cancelamento</span>
+                    <span className="text-red-300 text-sm">{activeLead.motivo_cancelamento.nome}</span>
+                  </div>
+                </div>
+              )}
 
               {/* Tags do Lead */}
               {tags.length > 0 && (

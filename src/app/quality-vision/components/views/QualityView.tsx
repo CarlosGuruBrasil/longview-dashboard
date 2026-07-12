@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import LogoLoader from '@/components/ui/LogoLoader'
+import ModuleLoadingOverlay from '@/components/ui/ModuleLoadingOverlay'
 import {
   BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell,
+  Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
 import {
   ClipboardCheck, CheckCircle2, XCircle, AlertCircle,
@@ -53,6 +54,8 @@ interface InspetorStat {
   reprovadas: number
   taxaAprovacao: number
   taxa: number
+  totalAceitasInspecao?: number
+  totalFinalizadasInspecao?: number
   statusCounts: Record<string, number>
   projetos?: { obra: string; statusCounts: Record<string, number> }[]
 }
@@ -66,8 +69,10 @@ interface FilterOptions {
 
 interface QualityData {
   kpis: KpiData
+  verificacoesPorObra: Record<string, { total: number; aprovadas: number; reprovadas: number; naoAplica: number }>
   inspecoesPorObra: Record<string, { total: number; statusCounts: Record<string, number> }>
   inspecoesPorDisciplina: Record<string, { total: number; [key: string]: number }>
+  inspecoesPorDisciplinaPorObra: Record<string, Record<string, { total: number; [key: string]: number }>>
   statusBreakdown: Record<string, number>
   porInspetor: InspetorStat[]
   serieMensal: MonthlyPoint[]
@@ -129,11 +134,19 @@ const STATUS_COLORS: Record<string, string> = {
   'Recusado': '#f43f5e',
   'Pendente Aprovação': '#a855f7',
   'Pendente Reinspeção': '#ec4899',
+  'Sem status': '#64748b',
 }
 
 // ---------- utilitários ----------
 function pct(n: number, total: number) {
   return total > 0 ? Math.round((n / total) * 1000) / 10 : 0
+}
+
+function disciplinaSortKey(value: string): [number, string] {
+  const match = value.match(/^(\d+)\s*-\s*(.*)$/)
+  if (match) return [Number(match[1]), match[2].trim().toLowerCase()]
+  if (value === 'Sem classificação') return [9998, value.toLowerCase()]
+  return [9999, value.toLowerCase()]
 }
 
 function formatDate(d?: string) {
@@ -307,7 +320,6 @@ export default function QualityView() {
     if (filters.inspetor) p.set('inspetor', filters.inspetor)
     if (filters.disciplina) p.set('disciplina', filters.disciplina)
     if (codeSearch.trim()) p.set('code', codeSearch.trim())
-    p.set('_t', Date.now().toString()) // Desabilita cache de fetch do navegador/Next
     return p.toString()
   }, [startDate, endDate, filters, codeSearch])
 
@@ -319,10 +331,7 @@ export default function QualityView() {
         const r = await fetch(`/api/construpoint?${queryString}`, { cache: 'no-store' })
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         const d = await r.json() as QualityData
-        setData({
-          ...d,
-          porInspetor: d.porInspetor.map(i => ({ ...i, taxa: i.taxaAprovacao }))
-        })
+        setData(d)
         setRecentRows(d.ultimasInspecoes)
         setHasMoreRecent(d.hasMoreInspecoes)
         setTotalRecent(d.totalInspecoesFiltradas)
@@ -383,8 +392,38 @@ export default function QualityView() {
   const disciplinaBarData = useMemo(() => {
     if (!data) return []
     return Object.entries(data.inspecoesPorDisciplina)
-      .map(([key, value]) => ({ name: key, value: value.total }))
-      .sort((a, b) => b.value - a.value)
+      .map(([key, value]) => ({ name: key, ...value }))
+      .sort((a, b) => {
+        const [aNum, aText] = disciplinaSortKey(a.name)
+        const [bNum, bText] = disciplinaSortKey(b.name)
+        return aNum === bNum ? aText.localeCompare(bText, 'pt-BR') : aNum - bNum
+      })
+  }, [data])
+
+  const disciplinaPorObraCharts = useMemo(() => {
+    if (!data) return []
+    const source = data.inspecoesPorDisciplinaPorObra || {}
+    return Object.entries(source).map(([obra, disciplinas]) => ({
+      obra,
+      data: Object.entries(disciplinas)
+        .map(([key, value]) => ({ name: key, ...value }))
+        .sort((a, b) => {
+          const [aNum, aText] = disciplinaSortKey(a.name)
+          const [bNum, bText] = disciplinaSortKey(b.name)
+          return aNum === bNum ? aText.localeCompare(bText, 'pt-BR') : aNum - bNum
+        }),
+    }))
+  }, [data])
+
+  const disciplinaStatusKeys = useMemo(() => {
+    const keys = new Set<string>()
+    Object.keys(data?.statusBreakdown || {}).forEach((key) => keys.add(key))
+    if (keys.size === 0) keys.add('Sem status')
+    return Array.from(keys).sort((a, b) => {
+      const aCount = data?.statusBreakdown?.[a] ?? 0
+      const bCount = data?.statusBreakdown?.[b] ?? 0
+      return bCount - aCount
+    })
   }, [data])
 
   const pieData = useMemo(() => {
@@ -397,6 +436,22 @@ export default function QualityView() {
     ].filter(d => d.value > 0)
   }, [data])
 
+  const verificacoesPorObraCards = useMemo(() => {
+    if (!data) return []
+    return Object.entries(data.verificacoesPorObra || {})
+      .map(([obra, stats]) => ({
+        obra,
+        total: stats.total || 0,
+        aprovadas: stats.aprovadas || 0,
+        reprovadas: stats.reprovadas || 0,
+        naoAplica: stats.naoAplica || 0,
+      }))
+      .sort((a, b) => {
+        if (!!filters.obra) return a.obra.localeCompare(b.obra, 'pt-BR')
+        return b.total - a.total || a.obra.localeCompare(b.obra, 'pt-BR')
+      })
+  }, [data, filters.obra])
+
   const statusData = useMemo(() => {
     if (!data) return []
     const totalStatus = Object.values(data.statusBreakdown).reduce((s, n) => s + n, 0)
@@ -405,8 +460,14 @@ export default function QualityView() {
       .sort((a, b) => b.value - a.value)
   }, [data])
 
-  const inspetoresData = useMemo(() => data?.porInspetor || [], [data])
-  const filteredInspetores = useMemo(() => inspetoresData.filter(i => i.inspetor.toLowerCase().includes(inspSearch.toLowerCase())), [inspetoresData, inspSearch])
+  const inspetoresData = useMemo(
+    () => [...(data?.porInspetor || [])].sort((a, b) => a.inspetor.localeCompare(b.inspetor, 'pt-BR')),
+    [data]
+  )
+  const filteredInspetores = useMemo(
+    () => inspSearch ? inspetoresData.filter(i => i.inspetor === inspSearch) : inspetoresData,
+    [inspetoresData, inspSearch]
+  )
 
   const ultimasInspecoesSorted = useMemo(() => {
     return sortRows(recentRows, recentSort.key, recentSort.dir)
@@ -417,11 +478,7 @@ export default function QualityView() {
   }
 
   if (loading && !data) {
-    return (
-      <div className="flex flex-col items-center justify-center p-12" style={{ minHeight: '60vh' }}>
-        <LogoLoader module="quality" text="Buscando dados Construpoint..." />
-      </div>
-    )
+    return <ModuleLoadingOverlay module="quality" text="Buscando dados Construpoint..." fixed />
   }
 
   if (error) {
@@ -490,13 +547,7 @@ export default function QualityView() {
 
       <div className="relative min-h-[50vh]">
         {loading && data && (
-          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#0d0d0f]/60 backdrop-blur-[2px] rounded-xl transition-all duration-300">
-            <div className="relative w-12 h-12 mb-4">
-              <div className="absolute inset-0 rounded-full border-2 border-[#1E1E22]" />
-              <div className="absolute inset-0 rounded-full border-2 border-t-emerald-500 border-r-transparent border-b-transparent border-l-transparent animate-spin" />
-            </div>
-            <p className="text-sm text-zinc-400 font-medium">Atualizando painel...</p>
-          </div>
+          <ModuleLoadingOverlay module="quality" text="Atualizando painel..." fixed />
         )}
 
         <div className={`space-y-6 transition-opacity duration-300 ${loading && data ? 'opacity-40 pointer-events-none' : ''}`}>
@@ -543,59 +594,166 @@ export default function QualityView() {
         )}
       </GlassCard>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <GlassCard title="Inspeções por Disciplina">
-          <ResponsiveContainer width="100%" height={340}>
+      <GlassCard title="Resultado das Verificações">
+        {verificacoesPorObraCards.length > 0 ? (
+          <div className="space-y-4">
+            {!filters.obra && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="rounded-xl border border-[#1E1E22] bg-[#0d0d0f] px-4 py-3">
+                  <p className="text-[11px] font-medium text-zinc-500">Total Verificações</p>
+                  <div className="mt-2 flex items-end justify-between gap-3">
+                    <span className="text-2xl font-bold text-zinc-100">{safeKpis.totalVerificacoes.toLocaleString('pt-BR')}</span>
+                    <span className="text-xs font-semibold text-zinc-500">Base geral</span>
+                  </div>
+                </div>
+
+                {pieData
+                  .filter((item) => item.name !== 'Não se aplica')
+                  .map(d => (
+                    <div key={d.name} className="rounded-xl border border-[#1E1E22] bg-[#0d0d0f] px-4 py-3">
+                      <div className="mb-2 flex items-center gap-2">
+                        <div className="w-2.5 h-2.5 rounded-full" style={{ background: d.color }} />
+                        <span className="text-[11px] font-medium text-zinc-500">
+                          {d.name === 'Aprovadas' ? 'Total Aprovadas' : 'Total Reprovadas'}
+                        </span>
+                      </div>
+                      <div className="flex items-end justify-between gap-3">
+                        <span className="text-2xl font-bold text-zinc-100">{d.value.toLocaleString('pt-BR')}</span>
+                        <span className="text-xs font-semibold text-zinc-400">{pct(d.value, safeKpis.totalVerificacoes)}%</span>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-4">
+              {verificacoesPorObraCards.map((obraStats) => (
+                <div key={obraStats.obra} className="rounded-xl border border-[#1E1E22] bg-[#0d0d0f] p-4">
+                  <div className="mb-3 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h4 className="truncate text-sm font-semibold text-zinc-100">{obraStats.obra}</h4>
+                      <p className="mt-1 text-[11px] text-zinc-500">
+                        {obraStats.total.toLocaleString('pt-BR')} verificações
+                      </p>
+                    </div>
+                    <span className="shrink-0 rounded-full border border-emerald-500/15 bg-emerald-500/8 px-2.5 py-1 text-[10px] font-semibold text-emerald-300">
+                      Taxa de entrega {pct(obraStats.aprovadas, obraStats.total)}%
+                    </span>
+                  </div>
+
+                  <div className="mb-4 flex h-3 w-full overflow-hidden rounded-full bg-[#1E1E22]">
+                    {obraStats.aprovadas > 0 && (
+                      <div
+                        className="h-full"
+                        style={{ width: `${pct(obraStats.aprovadas, obraStats.total)}%`, backgroundColor: APROVADA_COLOR }}
+                        title={`Aprovadas: ${obraStats.aprovadas}`}
+                      />
+                    )}
+                    {obraStats.reprovadas > 0 && (
+                      <div
+                        className="h-full"
+                        style={{ width: `${pct(obraStats.reprovadas, obraStats.total)}%`, backgroundColor: REPROVADA_COLOR }}
+                        title={`Reprovadas: ${obraStats.reprovadas}`}
+                      />
+                    )}
+                    {obraStats.naoAplica > 0 && (
+                      <div
+                        className="h-full"
+                        style={{ width: `${pct(obraStats.naoAplica, obraStats.total)}%`, backgroundColor: NAOAPLICA_COLOR }}
+                        title={`Não se aplica: ${obraStats.naoAplica}`}
+                      />
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="rounded-lg border border-emerald-500/10 bg-emerald-500/5 p-3">
+                      <div className="mb-1 flex items-center gap-1.5">
+                        <div className="h-2 w-2 rounded-full bg-emerald-500" />
+                        <span className="text-[10px] text-zinc-500">Aprovadas</span>
+                      </div>
+                      <p className="text-base font-bold text-zinc-100">{obraStats.aprovadas.toLocaleString('pt-BR')}</p>
+                      <p className="text-[10px] text-zinc-500">{pct(obraStats.aprovadas, obraStats.total)}%</p>
+                    </div>
+
+                    <div className="rounded-lg border border-rose-500/10 bg-rose-500/5 p-3">
+                      <div className="mb-1 flex items-center gap-1.5">
+                        <div className="h-2 w-2 rounded-full bg-rose-500" />
+                        <span className="text-[10px] text-zinc-500">Reprovadas</span>
+                      </div>
+                      <p className="text-base font-bold text-zinc-100">{obraStats.reprovadas.toLocaleString('pt-BR')}</p>
+                      <p className="text-[10px] text-zinc-500">{pct(obraStats.reprovadas, obraStats.total)}%</p>
+                    </div>
+
+                    <div className="rounded-lg border border-zinc-500/10 bg-zinc-500/5 p-3">
+                      <div className="mb-1 flex items-center gap-1.5">
+                        <div className="h-2 w-2 rounded-full bg-zinc-500" />
+                        <span className="text-[10px] text-zinc-500">N/A</span>
+                      </div>
+                      <p className="text-base font-bold text-zinc-100">{obraStats.naoAplica.toLocaleString('pt-BR')}</p>
+                      <p className="text-[10px] text-zinc-500">{pct(obraStats.naoAplica, obraStats.total)}%</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center h-48 text-zinc-600 text-sm">Sem dados de verificações</div>
+        )}
+      </GlassCard>
+
+      <GlassCard title={filters.obra ? `Inspeções por Disciplina — ${filters.obra}` : 'Inspeções por Disciplina por Empreendimento'}>
+        {filters.obra ? (
+          <ResponsiveContainer width="100%" height={Math.max(260, disciplinaBarData.length * 28)}>
             <BarChart data={disciplinaBarData} margin={{ top: 0, right: 10, left: -10, bottom: 0 }} layout="vertical">
               <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} horizontal={false} />
               <XAxis type="number" tick={{ fill: TICK_COLOR, fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
               <YAxis dataKey="name" type="category" tick={{ fill: TICK_COLOR, fontSize: 11 }} axisLine={false} tickLine={false} width={250} interval={0} />
               <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="value" name="Inspeções" radius={[0, 4, 4, 0]}>
-                {disciplinaBarData.map((entry, i) => (
-                  <Cell key={i} fill={disciplinaColor(i)} />
-                ))}
-              </Bar>
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              {disciplinaStatusKeys.map((statusKey, index) => (
+                <Bar
+                  key={statusKey}
+                  dataKey={statusKey}
+                  name={statusKey}
+                  stackId="status"
+                  radius={index === disciplinaStatusKeys.length - 1 ? [0, 4, 4, 0] : [0, 0, 0, 0]}
+                  fill={STATUS_COLORS[statusKey] ?? disciplinaColor(index)}
+                />
+              ))}
             </BarChart>
           </ResponsiveContainer>
-        </GlassCard>
-
-        <GlassCard title="Resultado das Verificações">
-          {pieData.length > 0 ? (
-            <div className="flex flex-col justify-center h-full gap-4 py-4">
-              <div className="w-full h-8 rounded-full overflow-hidden flex bg-[#1E1E22]">
-                {pieData.map(d => (
-                  <div
-                    key={d.name}
-                    style={{
-                      width: `${pct(d.value, safeKpis.totalVerificacoes)}%`,
-                      backgroundColor: d.color
-                    }}
-                    className="h-full hover:brightness-110 transition-all cursor-pointer"
-                    title={`${d.name}: ${d.value} (${pct(d.value, safeKpis.totalVerificacoes)}%)`}
-                  />
-                ))}
+        ) : (
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            {disciplinaPorObraCharts.map((chart) => (
+              <div key={chart.obra} className="rounded-xl border border-[#1E1E22] bg-[#0d0d0f] p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <h4 className="text-sm font-semibold text-zinc-200">{chart.obra}</h4>
+                  <span className="text-[11px] text-zinc-500">{chart.data.length} disciplinas</span>
+                </div>
+                <ResponsiveContainer width="100%" height={Math.max(220, chart.data.length * 24)}>
+                  <BarChart data={chart.data} margin={{ top: 0, right: 10, left: -10, bottom: 0 }} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} horizontal={false} />
+                    <XAxis type="number" tick={{ fill: TICK_COLOR, fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                    <YAxis dataKey="name" type="category" tick={{ fill: TICK_COLOR, fontSize: 11 }} axisLine={false} tickLine={false} width={250} interval={0} />
+                    <Tooltip content={<CustomTooltip />} />
+                    {disciplinaStatusKeys.map((statusKey, index) => (
+                      <Bar
+                        key={`${chart.obra}-${statusKey}`}
+                        dataKey={statusKey}
+                        name={statusKey}
+                        stackId={`status-${chart.obra}`}
+                        radius={index === disciplinaStatusKeys.length - 1 ? [0, 4, 4, 0] : [0, 0, 0, 0]}
+                        fill={STATUS_COLORS[statusKey] ?? disciplinaColor(index)}
+                      />
+                    ))}
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
-              <div className="flex flex-wrap items-center justify-between gap-4 mt-2">
-                {pieData.map(d => (
-                  <div key={d.name} className="flex flex-col">
-                    <div className="flex items-center gap-2 mb-1">
-                      <div className="w-2.5 h-2.5 rounded-full" style={{ background: d.color }} />
-                      <span className="text-[11px] text-zinc-400">{d.name}</span>
-                    </div>
-                    <div className="flex items-baseline gap-2 pl-4">
-                      <p className="text-xl font-bold text-zinc-100">{d.value.toLocaleString('pt-BR')}</p>
-                      <p className="text-[10px] text-zinc-500 font-medium">{pct(d.value, safeKpis.totalVerificacoes)}%</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center justify-center h-48 text-zinc-600 text-sm">Sem dados de verificações</div>
-          )}
-        </GlassCard>
-      </div>
+            ))}
+          </div>
+        )}
+      </GlassCard>
 
       <GlassCard>
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
@@ -698,16 +856,18 @@ export default function QualityView() {
           <h3 className="text-sm font-semibold text-zinc-300">
             Por Inspetor <span className="text-zinc-500 font-normal ml-2">{inspetoresData.length} inspetores no período</span>
           </h3>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={14} />
-            <input
-              type="text"
-              placeholder="Buscar inspetor..."
-              value={inspSearch}
-              onChange={e => setInspSearch(e.target.value)}
-              className="bg-[#121214]/60 border border-[#1E1E22] rounded-lg pl-9 pr-4 py-1.5 text-xs text-zinc-300 outline-none focus:border-zinc-500 transition-colors"
-            />
-          </div>
+          <select
+            value={inspSearch}
+            onChange={e => setInspSearch(e.target.value)}
+            className="min-w-[220px] bg-[#121214]/60 border border-[#1E1E22] rounded-lg px-3 py-1.5 text-xs text-zinc-300 outline-none focus:border-zinc-500 transition-colors"
+          >
+            <option value="">Todos os inspetores</option>
+            {inspetoresData.map((insp) => (
+              <option key={insp.inspetor} value={insp.inspetor}>
+                {insp.inspetor}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -762,10 +922,14 @@ export default function QualityView() {
                   </div>
                 )}
                 
-                <div className="flex items-end justify-between mt-auto pt-2 border-t border-[#1C1C1E]">
+                <div className="mt-auto grid grid-cols-[1fr_1fr_auto] items-end gap-3 pt-3 border-t border-[#1C1C1E]">
                   <div>
-                    <p className="text-xs text-zinc-500 mb-0.5">Total de Verificações</p>
-                    <p className="text-lg font-medium text-zinc-300">{insp.total}</p>
+                    <p className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1">Total Etapas</p>
+                    <p className="text-lg font-semibold text-zinc-200">{(insp.totalFinalizadasInspecao ?? 0).toLocaleString('pt-BR')}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1">Etapas Realizadas</p>
+                    <p className="text-lg font-semibold text-emerald-400">{(insp.totalAceitasInspecao ?? 0).toLocaleString('pt-BR')}</p>
                   </div>
                   <div className="relative w-12 h-12 flex items-center justify-center flex-col group">
                     <svg className="w-12 h-12 transform -rotate-90 absolute">
@@ -784,9 +948,28 @@ export default function QualityView() {
                     <span className={`absolute text-[10px] font-bold ${colorClass}`}>
                       {Math.round(insp.taxa)}%
                     </span>
-                    <div className="absolute bottom-full right-0 mb-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 w-48 p-2 bg-zinc-800/95 backdrop-blur-sm border border-zinc-700/50 rounded-lg shadow-xl text-[10px] text-zinc-300 z-50 text-center leading-tight">
-                      <strong>Taxa de Entrega:</strong><br/>
-                      Proporção de inspeções "Aceitas" sobre o total de inspeções vinculadas.
+                    <div className="absolute bottom-full right-0 mb-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 w-64 p-3 bg-zinc-800/95 backdrop-blur-sm border border-zinc-700/50 rounded-lg shadow-xl text-[10px] text-zinc-300 z-50 leading-tight">
+                      <p className="mb-2 text-center font-semibold text-zinc-100">Taxa de Conclusão</p>
+                      <p className="mb-2 text-center text-zinc-400">
+                        Etapas realizadas com status <strong className="text-emerald-300">Aceito</strong> sobre o total de etapas do inspetor.
+                      </p>
+                      <div className="space-y-1.5">
+                        {Object.entries(insp.statusCounts || {})
+                          .sort((a, b) => b[1] - a[1])
+                          .map(([status, count]) => {
+                            const total = insp.totalFinalizadasInspecao ?? 0
+                            const percent = total > 0 ? ((count / total) * 100).toFixed(1).replace('.', ',') : '0,0'
+                            return (
+                              <div key={status} className="flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: STATUS_COLORS[status] || '#71717A' }} />
+                                  <span className="truncate text-zinc-300">{status}</span>
+                                </div>
+                                <span className="shrink-0 text-zinc-400">{count} ({percent}%)</span>
+                              </div>
+                            )
+                          })}
+                      </div>
                     </div>
                   </div>
                 </div>

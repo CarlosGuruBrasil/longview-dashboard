@@ -4,6 +4,7 @@ import { X } from 'lucide-react'
 import { useData } from '../../context/DataContext'
 import { useMemo } from 'react'
 import { getOrigin } from '../../utils/leads'
+import { applyLeadFilters, type LeadFilters } from '../../utils/leadFilters'
 import type { FunnelStage } from '../../utils/funnel'
 
 const funnelStageOptions: Array<{ value: FunnelStage; label: string }> = [
@@ -16,28 +17,36 @@ const funnelStageOptions: Array<{ value: FunnelStage; label: string }> = [
 export default function FilterBar() {
   const { allLeads, leadFilters, setLeadFilters, clearFilters } = useData()
 
+  // Opções em cascata: cada dropdown lista só os valores que ainda são possíveis
+  // considerando TODOS os outros filtros ativos (exceto o dele mesmo) — evita
+  // combinação impossível que retorna 0 resultados sem explicação.
+  const leadsExcept = useMemo(() => {
+    return (except: keyof LeadFilters) =>
+      applyLeadFilters(allLeads, { ...leadFilters, [except]: undefined })
+  }, [allLeads, leadFilters])
+
   const originOptions = useMemo(() => {
     const set = new Set<string>()
-    for (const lead of allLeads) {
+    for (const lead of leadsExcept('origem')) {
       const origin = getOrigin(lead)
       if (origin && origin !== 'Desconhecido') set.add(origin)
     }
     return Array.from(set).sort()
-  }, [allLeads])
+  }, [leadsExcept])
 
   const situacaoOptions = useMemo(() => {
     const set = new Set<string>()
-    for (const lead of allLeads) {
+    for (const lead of leadsExcept('situacao')) {
       const sit = lead.situacao
       const name = typeof sit === 'object' && sit ? sit.nome : sit
       if (name && typeof name === 'string') set.add(name)
     }
     return Array.from(set).sort()
-  }, [allLeads])
+  }, [leadsExcept])
 
   const empreendimentoOptions = useMemo(() => {
     const set = new Set<string>()
-    for (const lead of allLeads) {
+    for (const lead of leadsExcept('empreendimento')) {
       const emp = lead.empreendimento
       const name = Array.isArray(emp)
         ? emp[0]?.nome
@@ -45,36 +54,36 @@ export default function FilterBar() {
       if (name) set.add(name)
     }
     return Array.from(set).sort()
-  }, [allLeads])
+  }, [leadsExcept])
 
   const corretorOptions = useMemo(() => {
     const set = new Set<string>()
-    for (const lead of allLeads) {
+    for (const lead of leadsExcept('corretor')) {
       const name = lead.corretor?.nome
       if (name) set.add(name)
     }
     return Array.from(set).sort()
-  }, [allLeads])
+  }, [leadsExcept])
 
   const imobiliariaOptions = useMemo(() => {
     const set = new Set<string>()
-    for (const lead of allLeads) {
+    for (const lead of leadsExcept('imobiliaria')) {
       const name = lead.imobiliaria?.nome
       if (name) set.add(name)
     }
     return Array.from(set).sort()
-  }, [allLeads])
+  }, [leadsExcept])
 
   const gestorOptions = useMemo(() => {
     const set = new Set<string>()
-    for (const lead of allLeads) {
+    for (const lead of leadsExcept('gestor')) {
       const rawGestor = lead.raw?.gestor
       const rawName = rawGestor && typeof rawGestor === 'object' ? (rawGestor as { nome?: unknown }).nome : undefined
       const name = lead.gestor?.nome || (typeof rawName === 'string' ? rawName : undefined)
       if (name) set.add(name)
     }
     return Array.from(set).sort()
-  }, [allLeads])
+  }, [leadsExcept])
 
   const hasFilters = !!leadFilters.origem || !!leadFilters.situacao || !!leadFilters.empreendimento ||
                      !!leadFilters.corretor || !!leadFilters.imobiliaria || !!leadFilters.gestor ||

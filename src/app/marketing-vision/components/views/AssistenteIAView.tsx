@@ -164,7 +164,9 @@ export default function AssistenteIAView() {
     const impressions = parseInt(c.impressions ?? '0')
     const ctr = impressions > 0 ? clicks / impressions : 0
     const cpl = leads > 0 ? spend / leads : 0
-    return { campaignId: c.campaign_id, campaignName: c.campaign_name, status: 'ACTIVE' as const, score: calcScore({ spend, leads, cpl, ctr }), spend, leads, cpl, ctr, roas: 0, impressions, clicks }
+    const details = (meta?.campaignDetails ?? []).find((d: any) => String(d.id) === String(c.campaign_id));
+    const status = (details?.status || 'UNKNOWN') as any;
+    return { campaignId: c.campaign_id, campaignName: c.campaign_name, status, score: calcScore({ spend, leads, cpl, ctr }), spend, leads, cpl, ctr, roas: 0, impressions, clicks }
   }), [meta])
 
   const ruleInsights = useMemo(() => generateInsights(campaigns, filteredLeads.length, totalSpend), [campaigns, filteredLeads.length, totalSpend])

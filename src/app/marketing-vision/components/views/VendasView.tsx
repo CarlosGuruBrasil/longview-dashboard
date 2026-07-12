@@ -9,7 +9,8 @@ import { getLeadStage } from '../../utils/metrics'
 import { formatCurrency, formatDate, CHART_PALETTE } from '../../utils/formatters'
 import GlassCard from '../ui/GlassCard'
 import KpiCard from '../ui/KpiCard'
-import type { CvdwVenda } from '../../types'
+import LeadDrawer from '../ui/LeadDrawer'
+import type { CvdwVenda, Lead } from '../../types'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -123,50 +124,169 @@ function RankingCard({ title, items }: RankingCardProps) {
   )
 }
 
+// ── venda detail modal — todos os dados vinculados da reserva ────────────────
+
+function DetailField({ label, value }: { label: string; value?: string | number | null }) {
+  if (value == null || value === '' || value === 0) return null
+  return (
+    <div>
+      <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-0.5">{label}</p>
+      <p className="text-sm text-zinc-200">{value}</p>
+    </div>
+  )
+}
+
+function VendaDetailModal({ venda, onClose, onOpenLead }: {
+  venda: CvdwVenda | null
+  onClose: () => void
+  onOpenLead: (idlead: string) => void
+}) {
+  if (!venda) return null
+  const dias = calcDaysToSale(venda)
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70" onClick={onClose}>
+      <div
+        className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl border border-white/10 bg-[#0d0d0f] shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="sticky top-0 flex items-center justify-between gap-3 px-6 py-4 border-b border-white/10 bg-[#0d0d0f]/95 backdrop-blur">
+          <div>
+            <p className="text-xs text-zinc-500">Reserva #{venda.idreserva ?? '-'}{venda.contrato_interno ? ` · Contrato ${venda.contrato_interno}` : ''}</p>
+            <h3 className="text-base font-semibold text-zinc-100">{venda.cliente ?? '-'}</h3>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-white/10 text-zinc-400 hover:text-zinc-200 transition">✕</button>
+        </div>
+
+        <div className="p-6 space-y-5">
+          {/* Venda */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 rounded-xl border border-white/10 bg-white/[0.03] p-4">
+            <DetailField label="Empreendimento" value={venda.empreendimento} />
+            <DetailField label="Bloco / Unidade" value={[venda.bloco, venda.unidade].filter(Boolean).join(' / ')} />
+            <DetailField label="Etapa" value={venda.etapa} />
+            <DetailField label="Planta" value={venda.planta} />
+            <DetailField label="Área privativa" value={venda.area_privativa ? `${venda.area_privativa} m²` : null} />
+            <DetailField label="Região" value={venda.regiao} />
+            <DetailField label="Reserva em" value={venda.data_reserva ? formatDate(venda.data_reserva) : null} />
+            <DetailField label="Venda em" value={venda.data_venda ? formatDate(venda.data_venda) : null} />
+            <DetailField label="Tempo até a compra" value={dias != null ? (dias === 0 ? 'No mesmo dia' : `${dias} dias`) : null} />
+            <DetailField label="Valor de contrato" value={(venda.valor_contrato ?? 0) > 0 ? formatCurrency(venda.valor_contrato!) : null} />
+            <DetailField label="Tipo de venda" value={venda.tipovenda} />
+            <DetailField label="Tabela" value={venda.nometabela} />
+          </div>
+
+          {/* Cliente */}
+          <div>
+            <h4 className="text-sm font-semibold text-zinc-300 mb-2">Cliente</h4>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 rounded-xl border border-white/10 bg-white/[0.03] p-4">
+              <DetailField label="Nome" value={venda.cliente} />
+              <DetailField label="E-mail" value={venda.email} />
+              <DetailField label="Cidade" value={venda.cidade} />
+              <DetailField label="Renda" value={(venda.renda ?? 0) > 0 ? formatCurrency(venda.renda!) : null} />
+              <DetailField label="Idade" value={venda.idade} />
+              <DetailField label="Sexo" value={venda.sexo} />
+              <DetailField label="Estado civil" value={venda.estado_civil} />
+            </div>
+          </div>
+
+          {/* Comercial */}
+          <div>
+            <h4 className="text-sm font-semibold text-zinc-300 mb-2">Comercial</h4>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 rounded-xl border border-white/10 bg-white/[0.03] p-4">
+              <DetailField label="Corretor" value={venda.corretor} />
+              <DetailField label="Imobiliária" value={venda.imobiliaria} />
+              <DetailField label="Mídia" value={venda.midia} />
+              <DetailField label="Campanha" value={venda.campanha} />
+            </div>
+          </div>
+
+          {/* Associados */}
+          {venda.associados && venda.associados.length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold text-zinc-300 mb-2">Associados ({venda.associados.length})</h4>
+              <div className="space-y-2">
+                {venda.associados.map((a, i) => (
+                  <div key={i} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm">
+                    <span className="text-zinc-300">{a.tipo_associacao ?? 'Associado'}</span>
+                    <span className="text-zinc-500 text-xs">
+                      {a.percentagem_participacao != null ? `${a.percentagem_participacao}% de participação` : '—'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Link pro lead de origem */}
+          {venda.idlead && (
+            <button
+              onClick={() => onOpenLead(String(venda.idlead))}
+              className="w-full h-10 rounded-xl border border-sky-500/30 bg-sky-500/10 text-sky-400 text-sm font-semibold hover:bg-sky-500/20 transition"
+            >
+              Ver lead de origem (histórico e interações) →
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── sales table ───────────────────────────────────────────────────────────────
+
+const SALES_PAGE = 300
 
 interface SalesTableProps {
   vendas: CvdwVenda[]
+  onSelect: (venda: CvdwVenda) => void
 }
 
-function SalesTable({ vendas }: SalesTableProps) {
+function SalesTable({ vendas, onSelect }: SalesTableProps) {
   const [search, setSearch] = useState('')
   const [corretor, setCorretor] = useState('')
   const [imobiliaria, setImobiliaria] = useState('')
   const [empreendimento, setEmpreendimento] = useState('')
+  const [visibleCount, setVisibleCount] = useState(SALES_PAGE)
 
-  const corretores = useMemo(() => {
-    const set = new Set(vendas.map(v => v.corretor).filter(Boolean) as string[])
-    return Array.from(set).sort()
-  }, [vendas])
+  // Predicado parametrizável — `except` permite opções em cascata nos dropdowns
+  // (cada um lista só valores possíveis dado o resto dos filtros ativos).
+  const applyFilters = useMemo(() => {
+    return (source: CvdwVenda[], except?: string) => source.filter(v => {
+      if (except !== 'search'         && search && !v.cliente?.toLowerCase().includes(search.toLowerCase())) return false
+      if (except !== 'corretor'       && corretor && v.corretor !== corretor) return false
+      if (except !== 'imobiliaria'    && imobiliaria && v.imobiliaria !== imobiliaria) return false
+      if (except !== 'empreendimento' && empreendimento && v.empreendimento !== empreendimento) return false
+      return true
+    })
+  }, [search, corretor, imobiliaria, empreendimento])
 
-  const imobiliarias = useMemo(() => {
-    const set = new Set(vendas.map(v => v.imobiliaria).filter(Boolean) as string[])
-    return Array.from(set).sort()
-  }, [vendas])
+  const corretores = useMemo(() =>
+    Array.from(new Set(applyFilters(vendas, 'corretor').map(v => v.corretor).filter(Boolean) as string[])).sort(),
+  [vendas, applyFilters])
 
-  const empreendimentos = useMemo(() => {
-    const set = new Set(vendas.map(v => v.empreendimento).filter(Boolean) as string[])
-    return Array.from(set).sort()
-  }, [vendas])
+  const imobiliarias = useMemo(() =>
+    Array.from(new Set(applyFilters(vendas, 'imobiliaria').map(v => v.imobiliaria).filter(Boolean) as string[])).sort(),
+  [vendas, applyFilters])
 
-  const filtered = useMemo(() => {
-    return vendas
-      .filter(v => {
-        if (search && !v.cliente?.toLowerCase().includes(search.toLowerCase())) return false
-        if (corretor && v.corretor !== corretor) return false
-        if (imobiliaria && v.imobiliaria !== imobiliaria) return false
-        if (empreendimento && v.empreendimento !== empreendimento) return false
-        return true
-      })
+  const empreendimentos = useMemo(() =>
+    Array.from(new Set(applyFilters(vendas, 'empreendimento').map(v => v.empreendimento).filter(Boolean) as string[])).sort(),
+  [vendas, applyFilters])
+
+  const filteredAll = useMemo(() => {
+    return applyFilters(vendas)
       // Ordena pela data da venda mais recente primeiro
       .sort((a, b) => {
         const da = a.data_venda ? new Date(a.data_venda.replace(' ', 'T')).getTime() : 0
         const db = b.data_venda ? new Date(b.data_venda.replace(' ', 'T')).getTime() : 0
         return db - da
       })
-      .slice(0, 300)
-  }, [vendas, search, corretor, imobiliaria, empreendimento])
+  }, [vendas, applyFilters])
+
+  // Reinicia a janela visível quando o filtro muda
+  useEffect(() => { setVisibleCount(SALES_PAGE) }, [search, corretor, imobiliaria, empreendimento])
+
+  const filtered = useMemo(() => filteredAll.slice(0, visibleCount), [filteredAll, visibleCount])
+  const hasMore = filteredAll.length > visibleCount
 
   const chip     = 'no-tap shrink-0 h-9 px-3 rounded-full text-[13px] font-medium transition-all outline-none [color-scheme:dark] max-w-[140px]'
   const chipIdle = `${chip} border border-white/12 bg-white/[0.03] text-zinc-400 focus:border-white/30`
@@ -213,7 +333,7 @@ function SalesTable({ vendas }: SalesTableProps) {
           </select>
         ))}
         <span className="ml-auto self-center text-[13px] text-zinc-500 shrink-0 pl-2">
-          {filtered.length} resultados
+          Mostrando {filtered.length.toLocaleString('pt-BR')} de {filteredAll.length.toLocaleString('pt-BR')} vendas
         </span>
       </div>
 
@@ -222,7 +342,11 @@ function SalesTable({ vendas }: SalesTableProps) {
         {filtered.length === 0 ? (
           <p className="text-center text-sm py-8" style={{ color: '#71717a' }}>Nenhuma venda encontrada</p>
         ) : filtered.map((v, i) => (
-          <div key={`m-${v.idreserva ?? i}`} className="rounded-xl border border-white/10 bg-white/5 p-3 flex flex-col gap-2">
+          <div
+            key={`m-${v.idreserva ?? i}`}
+            onClick={() => onSelect(v)}
+            className="rounded-xl border border-white/10 bg-white/5 p-3 flex flex-col gap-2 cursor-pointer active:bg-white/10"
+          >
             <div className="flex items-start justify-between gap-2">
               <span className="text-sm font-semibold" style={{ color: '#e4e4e7' }}>{v.cliente || '-'}</span>
               <span className="text-xs font-bold shrink-0" style={{ color: (v.valor_contrato ?? 0) > 0 ? '#10b981' : '#71717a' }}>
@@ -269,7 +393,8 @@ function SalesTable({ vendas }: SalesTableProps) {
               filtered.map((v, i) => (
                 <tr
                   key={`${v.idreserva ?? i}-${v.idunidade ?? i}`}
-                  className="border-b border-white/5 hover:bg-white/5 transition-colors"
+                  onClick={() => onSelect(v)}
+                  className="border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer"
                 >
                   {/* Cliente */}
                   <td className="px-3 py-2 font-medium whitespace-nowrap" style={{ color: '#e4e4e7' }}>
@@ -330,6 +455,15 @@ function SalesTable({ vendas }: SalesTableProps) {
           </tbody>
         </table>
       </div>
+
+      {hasMore && (
+        <button
+          onClick={() => setVisibleCount(c => c + SALES_PAGE)}
+          className="self-center px-4 py-2 text-xs rounded-lg border border-white/10 bg-white/[0.03] text-zinc-300 hover:bg-white/10 transition"
+        >
+          Carregar mais ({(filteredAll.length - filtered.length).toLocaleString('pt-BR')} restantes)
+        </button>
+      )}
     </div>
   )
 }
@@ -337,11 +471,24 @@ function SalesTable({ vendas }: SalesTableProps) {
 // ── main component ─────────────────────────────────────────────────────────
 
 export default function VendasView() {
-  const { filteredLeads } = useData()
+  const { filteredLeads, allLeads } = useData()
 
   const [cvdwVendas, setCvdwVendas] = useState<CvdwVenda[]>([])
   const [loadingVendas, setLoadingVendas] = useState(false)
   const [vendaError, setVendaError] = useState<string | null>(null)
+  const [selectedVenda, setSelectedVenda] = useState<CvdwVenda | null>(null)
+  const [drawerLead, setDrawerLead] = useState<Lead | null>(null)
+
+  // A partir da venda, abre o LeadDrawer do lead de origem (dados interligados)
+  const openLeadById = (idlead: string) => {
+    const lead = allLeads.find(l => String(l.idlead ?? l.id) === idlead)
+    if (lead) {
+      setSelectedVenda(null)
+      setDrawerLead(lead)
+    } else {
+      alert(`Lead ${idlead} não está na base local carregada — refine o período pra localizá-lo.`)
+    }
+  }
 
   // Busca vendas individuais do endpoint CVDW
   const fetchVendas = async (force = false) => {
@@ -482,7 +629,7 @@ export default function VendasView() {
       {/* Sales table — individual por reserva */}
       {usandoCvdw ? (
         <GlassCard title={`Tabela de Vendas — Detalhamento por Reserva (${cvdwVendas.length} registros)`}>
-          <SalesTable vendas={cvdwVendas} />
+          <SalesTable vendas={cvdwVendas} onSelect={setSelectedVenda} />
         </GlassCard>
       ) : (
         <GlassCard title="Tabela de Vendas (dados dos leads — aguardando CVDW)">
@@ -491,6 +638,9 @@ export default function VendasView() {
           </p>
         </GlassCard>
       )}
+
+      <VendaDetailModal venda={selectedVenda} onClose={() => setSelectedVenda(null)} onOpenLead={openLeadById} />
+      <LeadDrawer lead={drawerLead} onClose={() => setDrawerLead(null)} />
     </div>
   )
 }

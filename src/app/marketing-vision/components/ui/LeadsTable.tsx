@@ -4,7 +4,7 @@
 
 import { useMemo, useState, useRef, useEffect } from 'react';
 import type { Lead } from '../../types';
-import type { DateRange } from '../../types';
+import { useData } from '../../context/DataContext';
 import {
   getOrigin,
   getStatusColor,
@@ -17,16 +17,13 @@ import { formatDate } from '../../utils/formatters';
 import LeadDrawer from './LeadDrawer';
 
 interface LeadsTableProps {
+  /** Conjunto COMPLETO de leads já filtrado pelos filtros globais — a tabela
+   *  aplica os filtros locais sobre tudo e pagina só no final. */
   leads: Lead[];
-  page: number;
-  limit: number;
-  total: number;
   loading: boolean;
-  onPageChange: (page: number, limit?: number, range?: DateRange, search?: string) => void;
-  allLeadsForDropdowns: Lead[];
 }
 
-const MAX_ROWS = 200;
+const PAGE_SIZE = 50;
 
 function unique(values: (string | undefined | null)[]): string[] {
   return Array.from(new Set(values.filter((v): v is string => Boolean(v)))).sort();
@@ -45,24 +42,12 @@ function renderIdleBadge(days: number) {
 
 export default function LeadsTable({
   leads,
-  page,
-  limit,
-  total,
   loading,
-  onPageChange,
-  allLeadsForDropdowns,
 }: LeadsTableProps) {
+  // crmTotal = total real no CRM; allLeads pode estar limitado pelo cap do /api/data (5000)
+  const { allLeads, crmTotal } = useData();
   // Timestamp fixo do mount — "dias parado" não precisa de relógio vivo no render
   const [now] = useState(() => Date.now());
-  // ── Local date range (independent from global filter) ───────────────────
-  const [localStart, setLocalStart] = useState('');
-  const [localEnd, setLocalEnd]     = useState('');
-  const localRange = useMemo<DateRange>(() => ({ start: localStart, end: localEnd }), [localStart, localEnd]);
-
-  // ── Debounced name search → triggers server-side fetch ───────────────────
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const latestRange = useRef(localRange);
-  useEffect(() => { latestRange.current = localRange; }, [localRange]);
 
   // ── Filter states ────────────────────────────────────────────────────────
   const [filterNome, setFilterNome]                   = useState('');
@@ -94,68 +79,67 @@ export default function LeadsTable({
     return () => document.removeEventListener('mousedown', handler);
   }, [showBottomSheet]);
 
-  // Initial load with empty date range (independent from global filter)
-  // and re-fetch when local date range changes
-  useEffect(() => {
-    onPageChange(1, limit, latestRange.current, filterNome || undefined);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [localStart, localEnd]);
+  const handleNomeChange = (val: string) => setFilterNome(val);
 
-  // Debounced name search triggers server fetch
-  const handleNomeChange = (val: string) => {
-    setFilterNome(val);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      onPageChange(1, limit, latestRange.current, val || undefined);
-    }, 400);
-  };
+  // ── Filtering logic — roda sobre o conjunto COMPLETO, paginação vem depois ──
+  // `except` permite recalcular as opções de um dropdown ignorando o próprio filtro
+  // (cascata: cada dropdown só oferece valores que não zeram o resultado).
+  const applyLocalFilters = useMemo(() => {
+    return (source: Lead[], except?: string) => {
+      const nomeLower  = filterNome.toLowerCase();
+      const dateFilter = filterDate.replace(/\D/g, '');
 
-  // ── Dropdown options ──────────────────────────────────────────────────────
-  const options = useMemo(() => ({
-    origens:         unique(allLeadsForDropdowns.map((l) => getOrigin(l))),
-    corretores:      unique(allLeadsForDropdowns.map((l) => l.corretor?.nome)),
-    gestores:        unique(allLeadsForDropdowns.map((l) => l.gestor?.nome)),
-    imobiliarias:    unique(allLeadsForDropdowns.map((l) => l.imobiliaria?.nome)),
-    empreendimentos: unique(allLeadsForDropdowns.flatMap((l) => l.empreendimento?.map((e) => e.nome) ?? [])),
-    etapas:          unique(allLeadsForDropdowns.map((l) => l.situacao?.nome)),
-    tags:            unique(allLeadsForDropdowns.flatMap((l) => getLeadTags(l))),
-  }), [allLeadsForDropdowns]);
+      return source.filter((lead) => {
+        if (except !== 'nome' && nomeLower && !(lead.nome ?? '').toLowerCase().includes(nomeLower)) return false;
 
-  // ── Filtering logic ───────────────────────────────────────────────────────
-  const filtered = useMemo(() => {
-    const nomeLower  = filterNome.toLowerCase();
-    const dateFilter = filterDate.replace(/\D/g, '');
+        if (except !== 'date' && dateFilter) {
+          const iso = toISODate(lead.data_cad || lead.data_cadastro || lead.data_cadastramento);
+          if (!iso) return false;
+          const [yy, mm, dd] = iso.split('-');
+          if (!dd || !mm || !yy) return false;
+          if (!`${dd}/${mm}/${yy}`.includes(dateFilter)) return false;
+        }
 
-    return leads.filter((lead) => {
-      if (nomeLower && !(lead.nome ?? '').toLowerCase().includes(nomeLower)) return false;
+        if (except !== 'origem'         && filterOrigem        && getOrigin(lead) !== filterOrigem)                                          return false;
+        if (except !== 'corretor'       && filterCorretor      && lead.corretor?.nome !== filterCorretor)                                     return false;
+        if (except !== 'gestor'         && filterGestor        && lead.gestor?.nome !== filterGestor)                                         return false;
+        if (except !== 'imobiliaria'    && filterImobiliaria   && lead.imobiliaria?.nome !== filterImobiliaria)                              return false;
+        if (except !== 'empreendimento' && filterEmpreendimento && !(lead.empreendimento ?? []).some((e) => e.nome === filterEmpreendimento)) return false;
+        if (except !== 'etapa'          && filterEtapa         && lead.situacao?.nome !== filterEtapa)                                        return false;
+        if (except !== 'tag'            && filterTag           && !getLeadTags(lead).includes(filterTag))                                     return false;
+        if (except !== 'bolsao'         && filterBolsao) {
+          const isBolsao = isLeadBolsao(lead);
+          if (filterBolsao === 'sim' && !isBolsao) return false;
+          if (filterBolsao === 'nao' && isBolsao)  return false;
+        }
 
-      if (dateFilter) {
-        const iso = toISODate(lead.data_cad || lead.data_cadastro || lead.data_cadastramento);
-        if (!iso) return false;
-        const [yy, mm, dd] = iso.split('-');
-        if (!dd || !mm || !yy) return false;
-        if (!`${dd}/${mm}/${yy}`.includes(dateFilter)) return false;
-      }
-
-      if (filterOrigem        && getOrigin(lead) !== filterOrigem)                                          return false;
-      if (filterCorretor      && lead.corretor?.nome !== filterCorretor)                                     return false;
-      if (filterGestor        && lead.gestor?.nome !== filterGestor)                                         return false;
-      if (filterImobiliaria   && lead.imobiliaria?.nome !== filterImobiliaria)                              return false;
-      if (filterEmpreendimento && !(lead.empreendimento ?? []).some((e) => e.nome === filterEmpreendimento)) return false;
-      if (filterEtapa         && lead.situacao?.nome !== filterEtapa)                                        return false;
-      if (filterTag           && !getLeadTags(lead).includes(filterTag))                                     return false;
-      if (filterBolsao) {
-        const isBolsao = isLeadBolsao(lead);
-        if (filterBolsao === 'sim' && !isBolsao) return false;
-        if (filterBolsao === 'nao' && isBolsao)  return false;
-      }
-
-      return true;
-    });
-  }, [leads, filterNome, filterDate, filterOrigem, filterCorretor, filterGestor,
+        return true;
+      });
+    };
+  }, [filterNome, filterDate, filterOrigem, filterCorretor, filterGestor,
       filterImobiliaria, filterEmpreendimento, filterEtapa, filterTag, filterBolsao]);
 
-  const displayed = filtered.slice(0, MAX_ROWS);
+  const filtered = useMemo(() => applyLocalFilters(leads), [leads, applyLocalFilters]);
+
+  // ── Dropdown options em cascata ───────────────────────────────────────────
+  const options = useMemo(() => ({
+    origens:         unique(applyLocalFilters(leads, 'origem').map((l) => getOrigin(l))),
+    corretores:      unique(applyLocalFilters(leads, 'corretor').map((l) => l.corretor?.nome)),
+    gestores:        unique(applyLocalFilters(leads, 'gestor').map((l) => l.gestor?.nome)),
+    imobiliarias:    unique(applyLocalFilters(leads, 'imobiliaria').map((l) => l.imobiliaria?.nome)),
+    empreendimentos: unique(applyLocalFilters(leads, 'empreendimento').flatMap((l) => l.empreendimento?.map((e) => e.nome) ?? [])),
+    etapas:          unique(applyLocalFilters(leads, 'etapa').map((l) => l.situacao?.nome)),
+    tags:            unique(applyLocalFilters(leads, 'tag').flatMap((l) => getLeadTags(l))),
+  }), [leads, applyLocalFilters]);
+
+  // ── Paginação interna (depois do filtro, nunca antes) ─────────────────────
+  const [page, setPage] = useState(1);
+  useEffect(() => { setPage(1); }, [filtered.length]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const displayed = useMemo(
+    () => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [filtered, page],
+  );
 
   function clearFilters() {
     setFilterNome('');
@@ -168,11 +152,9 @@ export default function LeadsTable({
     setFilterEtapa('');
     setFilterTag('');
     setFilterBolsao('');
-    setLocalStart('');
-    setLocalEnd('');
     setShowAdvanced(false);
     setShowBottomSheet(false);
-    onPageChange(1, limit, { start: '', end: '' }, undefined);
+    setPage(1);
   }
 
   // ── Active filter counts ──────────────────────────────────────────────────
@@ -348,9 +330,14 @@ export default function LeadsTable({
         </div>
       )}
 
-      {/* ── Count ────────────────────────────────────────────────────────── */}
+      {/* ── Count — total real do filtro, não da página ─────────────────── */}
       <p className="text-[13px]" style={{ color: 'var(--text-secondary)' }}>
-        {filtered.length} leads{filtered.length > MAX_ROWS && ` (mostrando ${MAX_ROWS})`}
+        Mostrando {filtered.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} de {filtered.length.toLocaleString('pt-BR')} leads
+        {crmTotal > allLeads.length && (
+          <span className="ml-2 text-[11px] text-amber-400/80">
+            (base local com {allLeads.length.toLocaleString('pt-BR')} dos {crmTotal.toLocaleString('pt-BR')} leads do CRM — refine por data pra cobrir o restante)
+          </span>
+        )}
       </p>
 
       {/* ── MOBILE CARDS ─────────────────────────────────────────────────── */}
@@ -512,12 +499,12 @@ export default function LeadsTable({
       {/* ── PAGINAÇÃO ── */}
       <div className="flex flex-col sm:flex-row gap-4 items-center justify-between mt-2 p-4 rounded-xl border border-white/10 bg-white/5 backdrop-blur-md">
         <div className="text-xs text-zinc-400">
-          Mostrando <span className="text-white font-semibold">{total > 0 ? (page - 1) * limit + 1 : 0}</span> a <span className="text-white font-semibold">{Math.min(page * limit, total)}</span> de <span className="text-white font-semibold">{total}</span> leads
+          Mostrando <span className="text-white font-semibold">{filtered.length > 0 ? (page - 1) * PAGE_SIZE + 1 : 0}</span> a <span className="text-white font-semibold">{Math.min(page * PAGE_SIZE, filtered.length)}</span> de <span className="text-white font-semibold">{filtered.length.toLocaleString('pt-BR')}</span> leads
         </div>
 
         <div className="flex gap-2 items-center">
           <button
-            onClick={() => onPageChange(page - 1, limit, localRange, filterNome || undefined)}
+            onClick={() => setPage(p => Math.max(1, p - 1))}
             disabled={page === 1 || loading}
             className={`px-4 h-9 rounded-full text-xs font-semibold border border-white/12 transition-all ${
               page === 1 || loading
@@ -529,14 +516,14 @@ export default function LeadsTable({
           </button>
 
           <span className="text-xs text-zinc-400 px-2">
-            Página <span className="text-white font-semibold">{page}</span> de <span className="text-white font-semibold">{Math.ceil(total / limit) || 1}</span>
+            Página <span className="text-white font-semibold">{page}</span> de <span className="text-white font-semibold">{totalPages}</span>
           </span>
 
           <button
-            onClick={() => onPageChange(page + 1, limit, localRange, filterNome || undefined)}
-            disabled={page * limit >= total || loading}
+            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            disabled={page >= totalPages || loading}
             className={`px-4 h-9 rounded-full text-xs font-semibold border border-white/12 transition-all ${
-              page * limit >= total || loading
+              page >= totalPages || loading
                 ? 'opacity-40 cursor-not-allowed bg-transparent text-zinc-500'
                 : 'bg-white/[0.03] text-white hover:bg-white/10 active:scale-95'
             }`}

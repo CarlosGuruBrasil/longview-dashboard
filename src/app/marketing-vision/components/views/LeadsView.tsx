@@ -15,35 +15,16 @@ type SubTab = 'crm' | 'meta-validation' | 'score'
 type OrphanedLead = { id: string; name?: string; email?: string; phone?: string; formName?: string; createdTime: string }
 
 export default function LeadsView() {
-  const { 
+  const {
     allLeads,
-    filteredLeads, 
-    metaData, 
-    metaValidation, 
-    loading, 
+    filteredLeads,
+    metaData,
+    metaValidation,
+    loading,
     refresh,
-    detailedLeads,
-    detailedPage,
-    detailedLimit,
-    detailedTotal,
-    detailedLoading,
-    fetchDetailedLeads
   } = useData()
   const [activeTab, setActiveTab] = useState<SubTab>('crm')
   const [syncing, setSyncing] = useState(false)
-
-  // Paginação local do frontend para responder reativamente aos filtros globais/locais
-  const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 50
-
-  const paginatedLeads = useMemo(() => {
-    const startIdx = (currentPage - 1) * itemsPerPage
-    return filteredLeads.slice(startIdx, startIdx + itemsPerPage)
-  }, [filteredLeads, currentPage])
-
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [filteredLeads])
 
   // Filtros locais independentes para o Gráfico de Crescimento
   const [growthStart, setGrowthStart] = useState('')
@@ -292,16 +273,8 @@ export default function LeadsView() {
             </GlassCard>
           </div>
 
-          {/* Leads table */}
-          <LeadsTable 
-            leads={paginatedLeads} 
-            page={currentPage}
-            limit={itemsPerPage}
-            total={filteredLeads.length}
-            loading={loading}
-            onPageChange={(page) => setCurrentPage(page)}
-            allLeadsForDropdowns={allLeads}
-          />
+          {/* Leads table — recebe o conjunto filtrado COMPLETO; ela filtra e pagina internamente */}
+          <LeadsTable leads={filteredLeads} loading={loading} />
         </div>
       )}
 

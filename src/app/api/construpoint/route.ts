@@ -23,12 +23,31 @@ type MonthlySeriesPoint = {
   [key: string]: string | number;
 };
 
+type DisciplinaStats = { total: number; [key: string]: number };
+type VerificacaoPorObraStats = {
+  total: number;
+  aprovadas: number;
+  reprovadas: number;
+  naoAplica: number;
+};
+
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
 function isoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
+}
+
+function buildDisciplinaOrderKey(value: string): [number, string] {
+  const match = value.match(/^(\d+)\s*-\s*(.*)$/);
+  if (match) {
+    return [Number(match[1]), match[2].trim().toLowerCase()];
+  }
+  if (value === SEM_DISCIPLINA) {
+    return [9998, value.toLowerCase()];
+  }
+  return [9999, value.toLowerCase()];
 }
 
 export async function GET(req: Request) {
@@ -102,6 +121,32 @@ export async function GET(req: Request) {
     `;
     const vs = verifStatsQuery[0] || { total: 0, aprovadas: 0, reprovadas: 0, nao_aplica: 0 };
 
+    const verificacoesPorObraQuery = await sql`
+      SELECT
+        COALESCE(v.obra, 'Sem Obra') as obra,
+        COUNT(*)::int as total,
+        COUNT(*) FILTER (WHERE v.resultado = 'Aprovado')::int as aprovadas,
+        COUNT(*) FILTER (WHERE v.resultado = 'Reprovado')::int as reprovadas,
+        COUNT(*) FILTER (WHERE v.resultado = 'Não se aplica')::int as nao_aplica
+      FROM construpoint_verificacoes v
+      LEFT JOIN construpoint_disciplinas d ON d.modelo = v.modelo
+      WHERE v.data >= ${startDate}::date AND v.data < (${endDate}::date + 1)
+      ${verifFilters}
+      GROUP BY 1
+      ORDER BY 1
+    `;
+    const verificacoesPorObra: Record<string, VerificacaoPorObraStats> = Object.fromEntries(
+      verificacoesPorObraQuery.map((row) => [
+        row.obra as string,
+        {
+          total: row.total as number,
+          aprovadas: row.aprovadas as number,
+          reprovadas: row.reprovadas as number,
+          naoAplica: row.nao_aplica as number,
+        },
+      ])
+    );
+
     // 2. Inspecoes por Disciplina (0-TERRENO...9-IMPERMEABILIZAÇÕES) com detalhamento de Status
     const inspPorDisciplinaQuery = await sql`
       SELECT 
@@ -115,7 +160,7 @@ export async function GET(req: Request) {
       ${inspFilters}
       GROUP BY 1, 2
     `;
-    const inspecoesPorDisciplina: Record<string, { total: number, [status: string]: number }> = {};
+    const inspecoesPorDisciplina: Record<string, DisciplinaStats> = {};
     let totalInspections = 0;
     for (const row of inspPorDisciplinaQuery) {
       if (!inspecoesPorDisciplina[row.key]) {
@@ -125,6 +170,61 @@ export async function GET(req: Request) {
       inspecoesPorDisciplina[row.key].total += row.count;
       totalInspections += row.count;
     }
+
+    const inspPorDisciplinaObraQuery = await sql`
+      SELECT
+        COALESCE(i.obra, 'Sem Obra') as obra,
+        COALESCE(d.disciplina, ${SEM_DISCIPLINA}) as key,
+        COALESCE(i.status, 'Sem status') as status,
+        COUNT(*)::int as count
+      FROM construpoint_inspecoes i
+      LEFT JOIN construpoint_disciplinas d ON d.modelo = i.modelo
+      WHERE COALESCE(i.data_agendamento, i.data_criacao) >= ${startDate}::date
+        AND COALESCE(i.data_agendamento, i.data_criacao) < (${endDate}::date + 1)
+      ${status ? sql`AND i.status = ${status}` : sql``}
+      ${inspetor ? sql`AND i.inspetor = ${inspetor}` : sql``}
+      ${codeSearch ? sql`AND i.code ILIKE ${'%' + codeSearch + '%'}` : sql``}
+      ${disciplinaFiltro === SEM_DISCIPLINA
+        ? sql`AND d.disciplina IS NULL`
+        : disciplinaFiltro
+          ? sql`AND d.disciplina = ${disciplinaFiltro}`
+          : sql``}
+      GROUP BY 1, 2, 3
+    `;
+    const inspecoesPorDisciplinaPorObra: Record<string, Record<string, DisciplinaStats>> = {};
+    for (const row of inspPorDisciplinaObraQuery) {
+      if (!inspecoesPorDisciplinaPorObra[row.obra]) {
+        inspecoesPorDisciplinaPorObra[row.obra] = {};
+      }
+      if (!inspecoesPorDisciplinaPorObra[row.obra][row.key]) {
+        inspecoesPorDisciplinaPorObra[row.obra][row.key] = { total: 0 };
+      }
+      inspecoesPorDisciplinaPorObra[row.obra][row.key][row.status] = row.count;
+      inspecoesPorDisciplinaPorObra[row.obra][row.key].total += row.count;
+    }
+
+    const orderedInspecoesPorDisciplina = Object.fromEntries(
+      Object.entries(inspecoesPorDisciplina).sort(([a], [b]) => {
+        const [aNum, aText] = buildDisciplinaOrderKey(a);
+        const [bNum, bText] = buildDisciplinaOrderKey(b);
+        return aNum === bNum ? aText.localeCompare(bText, 'pt-BR') : aNum - bNum;
+      })
+    );
+
+    const orderedInspecoesPorDisciplinaPorObra = Object.fromEntries(
+      Object.entries(inspecoesPorDisciplinaPorObra)
+        .sort(([a], [b]) => a.localeCompare(b, 'pt-BR'))
+        .map(([obraKey, disciplinas]) => [
+          obraKey,
+          Object.fromEntries(
+            Object.entries(disciplinas).sort(([a], [b]) => {
+              const [aNum, aText] = buildDisciplinaOrderKey(a);
+              const [bNum, bText] = buildDisciplinaOrderKey(b);
+              return aNum === bNum ? aText.localeCompare(bText, 'pt-BR') : aNum - bNum;
+            })
+          ),
+        ])
+    );
 
     // 2.5. Inspeções por Local - n1
     const inspPorLocalN1Query = await sql`
@@ -289,9 +389,9 @@ export async function GET(req: Request) {
 
     const porInspetor = porInspetorQuery.map(row => {
       const counts = statusPorInspetorMap[row.inspetor as string] || {};
-      const totalInspecoes = Object.values(counts).reduce((a, b) => a + b, 0) || 1;
       const aceitas = counts['Aceito'] || 0;
-      const taxa = Math.round((aceitas / totalInspecoes) * 1000) / 10;
+      const totalEtapas = Object.values(counts).reduce((acc, count) => acc + count, 0);
+      const taxaEntrega = totalEtapas > 0 ? Math.round((aceitas / totalEtapas) * 1000) / 10 : 0;
       
       return {
         inspetor: row.inspetor as string,
@@ -300,7 +400,9 @@ export async function GET(req: Request) {
         reprovadas: row.reprovadas as number,
         taxaAprovacao: row.total > 0 ? Math.round((row.aprovadas / row.total) * 1000) / 10 : 0,
         statusCounts: counts,
-        taxa: taxa,
+        taxa: taxaEntrega,
+        totalAceitasInspecao: aceitas,
+        totalFinalizadasInspecao: totalEtapas,
         projetos: projetosMap[row.inspetor as string] || []
       };
     });
@@ -492,8 +594,10 @@ export async function GET(req: Request) {
         reprovadas: vs.reprovadas,
         naoAplica: vs.nao_aplica,
       },
+      verificacoesPorObra,
       inspecoesPorObra,
-      inspecoesPorDisciplina,
+      inspecoesPorDisciplina: orderedInspecoesPorDisciplina,
+      inspecoesPorDisciplinaPorObra: orderedInspecoesPorDisciplinaPorObra,
       inspecoesPorLocalN1,
       inspecoesPorLocalN2,
       statusBreakdown,

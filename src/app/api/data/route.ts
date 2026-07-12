@@ -456,7 +456,7 @@ async function readLeadsSummaryFromPg(
           GROUP BY temperatura ORDER BY total DESC LIMIT 5
         `,
         sql<{ avg: string | null }[]>`
-          SELECT AVG(score)::numeric(5,2) AS avg FROM leads ${dateWhere} WHERE score IS NOT NULL
+          SELECT AVG(score)::numeric(5,2) AS avg FROM leads ${dateWhere} AND score IS NOT NULL
         `,
         sql<{ pct: string }[]>`
           SELECT
@@ -986,8 +986,13 @@ export async function GET(request: NextRequest) {
   // Se o usuário selecionou datas específicas no dashboard, precisamos buscar
   // os dados do Meta ao vivo para esse período específico para os números baterem exato!
   const isFiltered = !!startDate || !!endDate;
-  const needMetaLive = forceRefresh || !metaData || cacheStale || isFiltered;
-  logger.warn({ err: metaData, ageMin: Math.round(cacheAgeMin) }, 'meta_cache stale — buscando ao vivo');
+  const needMetaLive = forceRefresh || !metaData || isFiltered;
+  
+  if (needMetaLive) {
+    logger.warn({ ageMin: Math.round(cacheAgeMin) }, 'meta_cache missing, filtered or forced — buscando ao vivo');
+  } else if (cacheStale) {
+    logger.warn({ ageMin: Math.round(cacheAgeMin) }, 'meta_cache stale — cron deveria atualizar, servindo cache antigo por enquanto');
+  }
 
   const CV_EMAIL = process.env.CV_CRM_EMAIL || '';
   const CV_TOKEN = process.env.CV_CRM_TOKEN || '';

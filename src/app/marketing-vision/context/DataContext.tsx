@@ -1,23 +1,10 @@
 'use client';
 import React, { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
-import type { Lead, MetaData, EstoqueData, MetaLeadForm, MetaPageInfo, DateRange, ActiveView, LeadSituacao, LeadSummary } from '../types';
-import { toISODate, getOrigin } from '../utils/leads';
-import { inFunnelStage, type FunnelStage } from '../utils/funnel';
+import type { Lead, MetaData, EstoqueData, MetaLeadForm, MetaPageInfo, DateRange, ActiveView, LeadSummary } from '../types';
+import { applyLeadFilters, type LeadFilters } from '../utils/leadFilters';
 import logger from '@/lib/logger'
 
-
-export interface LeadFilters {
-  origem?: string;
-  situacao?: string;
-  /** Etapa cumulativa do funil — usa o MESMO predicado da contagem (utils/funnel.ts) */
-  funnelStage?: FunnelStage;
-  empreendimento?: string;
-  corretor?: string;
-  imobiliaria?: string;
-  gestor?: string;
-  startDate?: string;
-  endDate?: string;
-}
+export type { LeadFilters };
 
 interface DataContextValue {
   // raw data
@@ -116,76 +103,10 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
   const [detailedTotal, setDetailedTotal] = useState(0);
   const [detailedLoading, setDetailedLoading] = useState(false);
 
-  const filteredLeads = useMemo(() => {
-    let result = allLeads;
-
-    // Date filter: local filters override global filters
-    const start = leadFilters.startDate || dateRange.start;
-    const end = leadFilters.endDate || dateRange.end;
-    if (start || end) {
-      result = result.filter(lead => {
-        const raw = lead.data_cad || lead.data_cadastro || lead.data_cadastramento;
-        if (!raw) return false;
-        const d = toISODate(raw);
-        if (!d) return false;
-        if (start && d < start) return false;
-        if (end && d > end) return false;
-        return true;
-      });
-    }
-
-    // Lead filters
-    if (leadFilters.origem) {
-      const filterVal = leadFilters.origem.toLowerCase();
-      result = result.filter(lead => {
-        const origin = getOrigin(lead);
-        return origin.toLowerCase().includes(filterVal);
-      });
-    }
-    if (leadFilters.situacao) {
-      const filterVal = leadFilters.situacao;
-      result = result.filter(lead => {
-        const sit = lead.situacao as LeadSituacao | undefined;
-        return sit?.nome?.toLowerCase() === filterVal.toLowerCase();
-      });
-    }
-    if (leadFilters.funnelStage) {
-      const stage = leadFilters.funnelStage;
-      result = result.filter(lead => inFunnelStage(lead, stage));
-    }
-    if (leadFilters.empreendimento) {
-      const filterVal = leadFilters.empreendimento.toLowerCase();
-      result = result.filter(lead => {
-        const emp = lead.empreendimento;
-        return Array.isArray(emp)
-          ? emp.some(e => (e.nome || '').toLowerCase().includes(filterVal))
-          : (emp as { nome?: string } | undefined)?.nome?.toLowerCase().includes(filterVal);
-      });
-    }
-    if (leadFilters.corretor) {
-      const filterVal = leadFilters.corretor.toLowerCase();
-      result = result.filter(lead => {
-        const name = String(lead.corretor?.nome || '').toLowerCase();
-        return name === filterVal;
-      });
-    }
-    if (leadFilters.imobiliaria) {
-      const filterVal = leadFilters.imobiliaria.toLowerCase();
-      result = result.filter(lead => {
-        const name = String(lead.imobiliaria?.nome || '').toLowerCase();
-        return name === filterVal;
-      });
-    }
-    if (leadFilters.gestor) {
-      const filterVal = leadFilters.gestor.toLowerCase();
-      result = result.filter(lead => {
-        const name = String(lead.gestor?.nome || (lead.raw as any)?.gestor?.nome || '').toLowerCase();
-        return name === filterVal;
-      });
-    }
-
-    return result;
-  }, [allLeads, dateRange, leadFilters]);
+  const filteredLeads = useMemo(
+    () => applyLeadFilters(allLeads, leadFilters, dateRange),
+    [allLeads, dateRange, leadFilters],
+  );
 
   const fetchDetailedLeads = useCallback(async (page: number, limit = 50, rangeOverride?: DateRange, search?: string) => {
     setDetailedLoading(true);
@@ -257,8 +178,8 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
         if (aggData.leadSummary) setLeadSummary(aggData.leadSummary);
       }
 
-      // Auto trigger detailed fetch on refresh to match dates
-      await fetchDetailedLeads(1, detailedLimit, r);
+      // detailedLeads NÃO é mais buscado automaticamente — nenhuma view consome hoje;
+      // quem precisar chama fetchDetailedLeads() explicitamente.
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Erro ao carregar dados';
       logger.error({ msg }, '[DataContext] refresh error:');
@@ -266,7 +187,7 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
     } finally {
       setLoading(false);
     }
-  }, [dateRange, detailedLimit, fetchDetailedLeads]);
+  }, [dateRange]);
 
   const clearFilters = useCallback(() => {
     setDateRange(DEFAULT_DATE);
@@ -316,10 +237,8 @@ export function DataProvider({ children, initialData }: DataProviderProps) {
   useEffect(() => {
     let active = true;
     const id = window.setTimeout(async () => {
-      if (allLeads.length === 0) {
-        await refresh(); // refresh já chama fetchAggregate em paralelo internamente
-      } else if (active) {
-        await fetchDetailedLeads(1, detailedLimit);
+      if (allLeads.length === 0 && active) {
+        await refresh(); // refresh já popula leadSummary em paralelo internamente
       }
     }, 0);
     return () => {

@@ -8,6 +8,8 @@ type Scope = { id: 'longview' | 'nautic' | 'hub-beira-mar'; nome: string; tipo: 
 type Item = {
   id: number; code: string | null; modelo: string | null; obra: string | null
   local: string | null; status: string | null; data: string | null
+  source_modelo: string | null; source_obra: string | null; source_local: string | null
+  override_modelo: string | null; override_obra: string | null; override_local: string | null
   scope_ids: string[]; manual: boolean
 }
 type ClassificationData = {
@@ -15,6 +17,7 @@ type ClassificationData = {
   items: Item[]
   scopes: Scope[]
 }
+type DraftFields = { modelo: string; obra: string; local: string }
 
 function formatDate(value: string | null) {
   return value ? new Date(value).toLocaleDateString('pt-BR') : '—'
@@ -23,6 +26,7 @@ function formatDate(value: string | null) {
 export default function ClassificacaoQualidadePage() {
   const [data, setData] = useState<ClassificationData | null>(null)
   const [selected, setSelected] = useState<Record<number, string[]>>({})
+  const [drafts, setDrafts] = useState<Record<number, DraftFields>>({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -33,7 +37,18 @@ export default function ClassificacaoQualidadePage() {
     try {
       const response = await fetch('/api/construpoint/classification')
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
-      setData(await response.json() as ClassificationData)
+      const nextData = await response.json() as ClassificationData
+      setData(nextData)
+      setDrafts(Object.fromEntries(
+        nextData.items.map((item) => [
+          item.id,
+          {
+            modelo: item.modelo ?? '',
+            obra: item.obra ?? '',
+            local: item.local ?? '',
+          },
+        ])
+      ))
     } catch (err) {
       logger.error({ err }, '[quality/classificacao] carregamento falhou')
       setError(err instanceof Error ? err.message : String(err))
@@ -59,16 +74,50 @@ export default function ClassificacaoQualidadePage() {
     })
   }
 
+  function updateDraft(inspectionId: number, field: keyof DraftFields, value: string) {
+    setDrafts(current => ({
+      ...current,
+      [inspectionId]: {
+        modelo: current[inspectionId]?.modelo ?? '',
+        obra: current[inspectionId]?.obra ?? '',
+        local: current[inspectionId]?.local ?? '',
+        [field]: value,
+      },
+    }))
+  }
+
   async function save(inspectionId: number) {
     const scopeIds = selected[inspectionId] ?? []
-    if (scopeIds.length === 0) return
+    const draft = drafts[inspectionId] ?? { modelo: '', obra: '', local: '' }
+    const item = data?.items.find(entry => entry.id === inspectionId)
+    if (!item) return
+    const normalizedDraft = {
+      modelo: draft.modelo.trim(),
+      obra: draft.obra.trim(),
+      local: draft.local.trim(),
+    }
+    const initialValues = {
+      modelo: item.modelo?.trim() ?? '',
+      obra: item.obra?.trim() ?? '',
+      local: item.local?.trim() ?? '',
+    }
+    const fieldsChanged = (
+      normalizedDraft.modelo !== initialValues.modelo
+      || normalizedDraft.obra !== initialValues.obra
+      || normalizedDraft.local !== initialValues.local
+    )
+    if (scopeIds.length === 0 && !fieldsChanged) return
     setSaving(inspectionId)
     setError(null)
     try {
       const response = await fetch('/api/construpoint/classification', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ inspectionId, scopeIds }),
+        body: JSON.stringify({
+          inspectionId,
+          scopeIds: scopeIds.length > 0 ? scopeIds : undefined,
+          fields: normalizedDraft,
+        }),
       })
       if (!response.ok) {
         const body = await response.json().catch(() => ({})) as { error?: string }
@@ -169,7 +218,7 @@ export default function ClassificacaoQualidadePage() {
             {data.items.map(item => {
               const itemSelection = selected[item.id] ?? []
               return (
-                <div key={item.id} className="p-4 lg:flex lg:items-center lg:justify-between gap-5">
+              <div key={item.id} className="p-4 lg:flex lg:items-center lg:justify-between gap-5">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-mono text-[11px] text-violet-300">{item.code ?? `#${item.id}`}</span>
@@ -180,6 +229,35 @@ export default function ClassificacaoQualidadePage() {
                     <p className="text-xs text-zinc-500 mt-1">
                       Origem: {item.obra ?? '—'} · Local: {item.local ?? '—'}
                     </p>
+                    <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2">
+                      {([
+                        { key: 'modelo', label: 'Modelo', original: item.source_modelo, override: item.override_modelo },
+                        { key: 'obra', label: 'Obra', original: item.source_obra, override: item.override_obra },
+                        { key: 'local', label: 'Local', original: item.source_local, override: item.override_local },
+                      ] as const).map((field) => {
+                        const value = drafts[item.id]?.[field.key] ?? ''
+                        const missing = value.trim().length === 0
+                        return (
+                          <label key={field.key} className="block">
+                            <span className="block text-[11px] text-zinc-400 mb-1">
+                              {field.label}
+                              {missing ? <span className="text-amber-400"> · faltando</span> : null}
+                              {field.override ? <span className="text-sky-400"> · ajustado manualmente</span> : null}
+                            </span>
+                            <input
+                              value={value}
+                              onChange={(event) => updateDraft(item.id, field.key, event.target.value)}
+                              placeholder={field.original ?? `Informe ${field.label.toLowerCase()}`}
+                              className={`w-full rounded-lg border bg-[#0F1013] px-3 py-2 text-xs text-zinc-100 outline-none transition ${
+                                missing
+                                  ? 'border-amber-500/40'
+                                  : 'border-[#2A2A2E] focus:border-violet-400/50'
+                              }`}
+                            />
+                          </label>
+                        )
+                      })}
+                    </div>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2 mt-4 lg:mt-0 lg:justify-end">
@@ -202,10 +280,10 @@ export default function ClassificacaoQualidadePage() {
                     })}
                     <button
                       onClick={() => void save(item.id)}
-                      disabled={itemSelection.length === 0 || saving === item.id}
+                      disabled={saving === item.id}
                       className="lv-btn-primary disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                      {saving === item.id ? 'Salvando…' : 'Confirmar'}
+                      {saving === item.id ? 'Salvando…' : 'Salvar ajustes'}
                     </button>
                   </div>
                 </div>

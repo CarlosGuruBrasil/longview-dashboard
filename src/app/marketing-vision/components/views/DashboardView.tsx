@@ -217,7 +217,7 @@ export default function DashboardView() {
 
         // Obtém o status da campanha dos detalhes
         const details = metaData?.campaignDetails?.find(d => String(d.id) === String(c.campaign_id));
-        const status = details?.status || 'ACTIVE';
+        const status = details?.status || 'UNKNOWN';
 
         return {
           id: c.campaign_id,

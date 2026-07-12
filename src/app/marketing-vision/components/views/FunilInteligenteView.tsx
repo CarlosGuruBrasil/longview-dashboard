@@ -79,7 +79,7 @@ function FunnelStep({ label, value, percentage, color, isLast }: {
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function FunilInteligenteView() {
-  const { setActiveView, loading: ctxLoading } = useData()
+  const { setActiveView, setLeadFilters, leadFilters, loading: ctxLoading } = useData()
   const [data, setData] = useState<FunilIntelligenceData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -316,7 +316,11 @@ export default function FunilInteligenteView() {
                       return (
                         <tr
                           key={row.origem}
-                          onClick={() => setActiveView('leads')}
+                          onClick={() => {
+                            // Drill-down real: leva o filtro de origem junto pra tela de Leads
+                            setLeadFilters({ ...leadFilters, origem: row.origem })
+                            setActiveView('leads')
+                          }}
                           className="border-b border-white/5 hover:bg-white/[0.04] cursor-pointer transition-colors"
                         >
                           <td className="py-3 px-3">
