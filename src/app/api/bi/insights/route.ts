@@ -1,24 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import jwt from 'jsonwebtoken';
 import { sql } from '@/lib/pg';
+import { verifyPermission } from '@/lib/auth';
 import logger from '@/lib/logger'
 
-const JWT_SECRET = process.env.JWT_SECRET ?? (() => { throw new Error('[LongView] JWT_SECRET nao configurado. Defina no .env.local') })();
-
-type AuthUser = { role?: string; email?: string };
-
-async function verifyAuth(): Promise<AuthUser | null> {
-  try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get('auth_token')?.value;
-    if (!token) return null;
-    return jwt.verify(token, JWT_SECRET) as AuthUser;
-  } catch { return null; }
-}
-
 export async function GET(_request: NextRequest) {
-  const authUser = await verifyAuth();
+  const authUser = await verifyPermission('viewMarketingDashboard');
   if (!authUser) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
 
   try {
@@ -89,17 +75,14 @@ export async function GET(_request: NextRequest) {
       // Monthly series — spend real do Meta Ads
       sql`
         SELECT
-          to_char(fl.data_cadastro, 'YYYY-MM')  AS month,
-          COUNT(DISTINCT fl.id_lead)::int        AS leads,
-          SUM(fa.leads_com_venda)::int           AS sales,
-          COALESCE(SUM(fa.valor_vendas), 0)      AS vgv,
-          COALESCE(SUM(fa.spend), 0)             AS spend
-        FROM fato_leads fl
-        LEFT JOIN fato_atribuicao_marketing fa
-          ON fa.id_campanha = COALESCE(NULLIF(fl.midia, ''), 'Sem origem')
-         AND fa.data = fl.data_cadastro
-        WHERE fl.data_cadastro >= CURRENT_DATE - INTERVAL '18 months'
-        GROUP BY month
+          to_char(data, 'YYYY-MM') AS month,
+          SUM(leads_gerados)::int AS leads,
+          SUM(leads_com_venda)::int AS sales,
+          COALESCE(SUM(valor_vendas), 0) AS vgv,
+          COALESCE(SUM(spend), 0) AS spend
+        FROM fato_atribuicao_marketing
+        WHERE data >= CURRENT_DATE - INTERVAL '18 months'
+        GROUP BY 1
         ORDER BY month
       `,
       // Summary — totais reais

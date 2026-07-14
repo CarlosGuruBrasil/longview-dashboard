@@ -61,19 +61,33 @@ async function upsertDimEmpreendimentos(): Promise<number> {
 }
 
 async function upsertDimCampanhasMeta(): Promise<number> {
-  const email = process.env.CV_CRM_EMAIL;
-  const token = process.env.CV_CRM_TOKEN;
-  if (!email || !token) return 0;
-
   try {
     const rows = await sql`
       INSERT INTO dim_campanhas_meta (id_campanha, nome)
       SELECT DISTINCT
-        COALESCE(NULLIF(raw->>'midia_principal', ''), 'unknown'),
-        COALESCE(NULLIF(raw->>'midia_principal', ''), 'Desconhecida')
-      FROM leads
-      WHERE raw->>'midia_principal' IS NOT NULL AND raw->>'midia_principal' != ''
-      ON CONFLICT (id_campanha) DO NOTHING
+        campaign_id,
+        campaign_name
+      FROM (
+        SELECT
+          COALESCE(
+            NULLIF(raw->'_meta'->>'campaign_id', ''),
+            NULLIF(raw->>'campaign_id', ''),
+            NULLIF(raw->>'utm_campaign', ''),
+            NULLIF(raw->>'midia_principal', ''),
+            'Sem origem'
+          ) AS campaign_id,
+          COALESCE(
+            NULLIF(raw->'_meta'->>'campaign_name', ''),
+            NULLIF(raw->>'campaign_name', ''),
+            NULLIF(raw->>'utm_campaign', ''),
+            NULLIF(raw->>'midia_principal', ''),
+            'Sem origem'
+          ) AS campaign_name
+        FROM leads
+      ) mapped
+      WHERE campaign_id IS NOT NULL
+        AND campaign_id != ''
+      ON CONFLICT (id_campanha) DO UPDATE SET nome = COALESCE(EXCLUDED.nome, dim_campanhas_meta.nome)
     `;
     return rows.count ?? 0;
   } catch (err: unknown) {
@@ -107,39 +121,89 @@ async function upsertFatoLeads(): Promise<number> {
   await sql`DELETE FROM fato_leads`;
 
   const result = await sql`
-    INSERT INTO fato_leads (
-      id_lead, id_empreendimento, data_cadastro, data_venda,
-      origem, midia, campanha, status, temperatura, score, valor_venda,
-      tempo_conversao_dias, raw
-    )
-    SELECT
-      l.id AS id_lead,
-      de.id_empreendimento,
-      l.data_cadastro::date AS data_cadastro,
-      v.data_venda::date AS data_venda,
-      l.origem,
-      l.raw->>'midia_principal' AS midia,
-      l.raw->>'midia_principal' AS campanha,
-      l.status,
-      l.temperatura,
-      l.score,
-      v.valor AS valor_venda,
-      CASE
-        WHEN v.data_venda IS NOT NULL AND l.data_cadastro IS NOT NULL
-        THEN (v.data_venda::date - l.data_cadastro::date)
-        ELSE NULL
-      END AS tempo_conversao_dias,
-      l.raw
-    FROM leads l
-    -- LATERAL agregado: 1 linha por lead mesmo quando o lead comprou N unidades
-    -- (JOIN direto em cv_vendas duplicava o lead — fan-out de 3832→3900 linhas)
-    LEFT JOIN LATERAL (
-      SELECT MIN(cv.data_venda)::date AS data_venda, SUM(cv.valor) AS valor
+    WITH lead_sales AS (
+      SELECT
+        cv.raw->>'idlead' AS id_lead,
+        MIN(cv.data_venda)::date AS data_venda,
+        COALESCE(SUM(cv.valor), 0) AS valor
       FROM cv_vendas cv
-      WHERE cv.raw->>'idlead' = l.id AND cv.data_venda IS NOT NULL
-    ) v ON true
-    LEFT JOIN dim_empreendimentos de ON lower(de.nome) = lower(l.empreendimento)
-    WHERE l.data_cadastro IS NOT NULL
+      WHERE cv.raw->>'idlead' IS NOT NULL
+        AND cv.raw->>'idlead' != ''
+        AND cv.data_venda IS NOT NULL
+      GROUP BY cv.raw->>'idlead'
+    ),
+    lead_base AS (
+      SELECT
+        l.id AS id_lead,
+        (
+          SELECT de.id_empreendimento
+          FROM dim_empreendimentos de
+          WHERE lower(btrim(de.nome)) = lower(btrim(l.empreendimento))
+          ORDER BY de.id_empreendimento
+          LIMIT 1
+        ) AS id_empreendimento,
+        l.data_cadastro::date AS data_cadastro,
+        l.data_atualizacao::date AS data_atualizacao,
+        ls.data_venda,
+        l.origem,
+        COALESCE(
+          NULLIF(l.raw->>'midia_principal', ''),
+          NULLIF(l.raw->>'midia_visita', ''),
+          NULLIF(l.raw->>'origem', ''),
+          NULLIF(l.origem, ''),
+          'Sem origem'
+        ) AS midia,
+        COALESCE(
+          NULLIF(l.raw->'_meta'->>'campaign_name', ''),
+          NULLIF(l.raw->>'campaign_name', ''),
+          NULLIF(l.raw->>'utm_campaign', ''),
+          NULLIF(l.raw->>'midia_principal', ''),
+          'Sem campanha'
+        ) AS campanha,
+        l.status,
+        COALESCE(NULLIF(l.raw->'situacao'->>'nome', ''), l.status) AS etapa,
+        l.temperatura,
+        l.score,
+        COALESCE(ls.valor, 0) AS valor_venda,
+        CASE
+          WHEN ls.data_venda IS NOT NULL AND l.data_cadastro IS NOT NULL
+          THEN (ls.data_venda::date - l.data_cadastro::date)
+          ELSE NULL
+        END AS tempo_conversao_dias,
+        NULLIF(l.raw->>'utm_campaign', '') AS utm_campaign,
+        NULLIF(l.raw->>'utm_source', '') AS utm_source,
+        NULLIF(l.raw->>'utm_content', '') AS utm_content,
+        l.raw
+      FROM leads l
+      LEFT JOIN lead_sales ls ON ls.id_lead = l.id
+      WHERE l.data_cadastro IS NOT NULL
+    )
+    INSERT INTO fato_leads (
+      id_lead, id_empreendimento, data_cadastro, data_atualizacao, data_venda,
+      origem, midia, campanha, status, etapa, temperatura, score, valor_venda,
+      tempo_conversao_dias, utm_campaign, utm_source, utm_content, raw
+    )
+    SELECT DISTINCT ON (id_lead)
+      id_lead,
+      id_empreendimento,
+      data_cadastro,
+      data_atualizacao,
+      data_venda,
+      origem,
+      midia,
+      campanha,
+      status,
+      etapa,
+      temperatura,
+      score,
+      valor_venda,
+      tempo_conversao_dias,
+      utm_campaign,
+      utm_source,
+      utm_content,
+      raw
+    FROM lead_base
+    ORDER BY id_lead
     ON CONFLICT DO NOTHING
   `;
   return result.count ?? 0;
@@ -221,11 +285,17 @@ async function upsertFatoMidiaPaga(): Promise<number> {
     if (rows.length === 0) return 0;
 
     // Garante que as campanhas existam na dim
-    const campaignNames = [...new Set(rows.map(r => ({ id: r.campaign_id, nome: r.campaign_name })))];
-    for (const c of campaignNames) {
+    const campaignMap = new Map<string, string>();
+    for (const row of rows) {
+      if (!campaignMap.has(row.campaign_id)) {
+        campaignMap.set(row.campaign_id, row.campaign_name);
+      }
+    }
+
+    for (const [id, nome] of campaignMap.entries()) {
       await sql`
         INSERT INTO dim_campanhas_meta (id_campanha, nome)
-        VALUES (${c.id}, ${c.nome})
+        VALUES (${id}, ${nome})
         ON CONFLICT (id_campanha) DO UPDATE SET nome = EXCLUDED.nome
       `;
     }
@@ -262,6 +332,65 @@ async function upsertFatoAtribuicao(): Promise<number> {
   await sql`DELETE FROM fato_atribuicao_marketing`;
 
   const result = await sql`
+    WITH lead_daily AS (
+      SELECT
+        COALESCE(
+          NULLIF(l.raw->'_meta'->>'campaign_id', ''),
+          NULLIF(l.raw->>'campaign_id', ''),
+          NULLIF(l.utm_campaign, ''),
+          'Sem origem'
+        ) AS id_campanha,
+        COALESCE(
+          MAX(NULLIF(l.raw->'_meta'->>'campaign_name', '')),
+          MAX(NULLIF(l.raw->>'campaign_name', '')),
+          MAX(NULLIF(l.campanha, '')),
+          'Sem origem'
+        ) AS nome_campanha,
+        l.data_cadastro AS data,
+        COUNT(DISTINCT l.id_lead)::bigint AS leads_gerados,
+        COUNT(DISTINCT l.id_lead) FILTER (
+          WHERE COALESCE(l.valor_venda, 0) > 0
+        )::bigint AS leads_com_venda,
+        COALESCE(SUM(l.valor_venda), 0) AS valor_vendas
+      FROM fato_leads l
+      WHERE l.data_cadastro IS NOT NULL
+      GROUP BY 1, 3
+    ),
+    media_daily AS (
+      SELECT
+        COALESCE(NULLIF(mp.id_campanha, ''), 'Sem origem') AS id_campanha,
+        COALESCE(MAX(NULLIF(dc.nome, '')), 'Sem origem') AS nome_campanha,
+        mp.data,
+        COALESCE(SUM(mp.spend), 0) AS spend,
+        COALESCE(SUM(mp.impressions), 0)::bigint AS impressions,
+        COALESCE(SUM(mp.clicks), 0)::bigint AS clicks
+      FROM fato_midia_paga mp
+      LEFT JOIN dim_campanhas_meta dc ON dc.id_campanha = mp.id_campanha
+      GROUP BY 1, 3
+    ),
+    merged AS (
+      SELECT
+        COALESCE(ld.id_campanha, md.id_campanha) AS id_campanha,
+        COALESCE(
+          NULLIF(ld.nome_campanha, ''),
+          NULLIF(md.nome_campanha, ''),
+          dc.nome,
+          'Sem origem'
+        ) AS nome_campanha,
+        COALESCE(ld.data, md.data) AS data,
+        COALESCE(md.spend, 0) AS spend,
+        COALESCE(md.impressions, 0)::bigint AS impressions,
+        COALESCE(md.clicks, 0)::bigint AS clicks,
+        COALESCE(ld.leads_gerados, 0)::bigint AS leads_gerados,
+        COALESCE(ld.leads_com_venda, 0)::bigint AS leads_com_venda,
+        COALESCE(ld.valor_vendas, 0) AS valor_vendas
+      FROM lead_daily ld
+      FULL OUTER JOIN media_daily md
+        ON md.id_campanha = ld.id_campanha
+       AND md.data = ld.data
+      LEFT JOIN dim_campanhas_meta dc
+        ON dc.id_campanha = COALESCE(ld.id_campanha, md.id_campanha)
+    )
     INSERT INTO fato_atribuicao_marketing (
       id_campanha, nome_campanha, data,
       spend, impressions, clicks,
@@ -269,54 +398,32 @@ async function upsertFatoAtribuicao(): Promise<number> {
       cpl, cac, roas
     )
     SELECT
-      COALESCE(l.raw->'_meta'->>'campaign_id', l.raw->>'campaign_id', 'Sem origem') AS id_campanha,
-      COALESCE(
-        dc.nome,
-        NULLIF(l.raw->'_meta'->>'campaign_name', ''),
-        NULLIF(l.raw->>'campaign_name', ''),
-        'Sem origem'
-      ) AS nome_campanha,
-      l.data_cadastro                               AS data,
-      COALESCE(SUM(mp.spend), 0)                    AS spend,
-      COALESCE(SUM(mp.impressions), 0)              AS impressions,
-      COALESCE(SUM(mp.clicks), 0)                   AS clicks,
-      COUNT(DISTINCT l.id_lead)::bigint             AS leads_gerados,
-      COUNT(DISTINCT l.id_lead) FILTER (
-        WHERE lower(l.status) LIKE '%venda%'
-           OR lower(l.status) LIKE '%negócio ganho%'
-      )::bigint                                     AS leads_com_venda,
-      COALESCE(SUM(fv.valor) FILTER (
-        WHERE fv.id_venda IS NOT NULL
-      ), 0)                                         AS valor_vendas,
-      CASE WHEN COUNT(DISTINCT l.id_lead) > 0 AND COALESCE(SUM(mp.spend), 0) > 0
-        THEN ROUND(SUM(mp.spend) / COUNT(DISTINCT l.id_lead), 2)
-        ELSE 0 END                                  AS cpl,
-      CASE WHEN COUNT(DISTINCT l.id_lead) FILTER (WHERE lower(l.status) LIKE '%venda%') > 0
-             AND COALESCE(SUM(mp.spend), 0) > 0
-        THEN ROUND(SUM(mp.spend) / COUNT(DISTINCT l.id_lead) FILTER (WHERE lower(l.status) LIKE '%venda%'), 2)
-        ELSE 0 END                                  AS cac,
-      CASE WHEN COALESCE(SUM(mp.spend), 0) > 0 AND COALESCE(SUM(fv.valor), 0) > 0
-        THEN ROUND(SUM(fv.valor) / SUM(mp.spend), 2)
-        ELSE 0 END                                  AS roas
-    FROM fato_leads l
-    LEFT JOIN fato_midia_paga mp
-           ON mp.id_campanha = COALESCE(l.raw->'_meta'->>'campaign_id', l.raw->>'campaign_id', 'Sem origem')
-          AND mp.data = l.data_cadastro
-    LEFT JOIN dim_campanhas_meta dc
-           ON dc.id_campanha = COALESCE(l.raw->'_meta'->>'campaign_id', l.raw->>'campaign_id', 'Sem origem')
-    LEFT JOIN fato_vendas fv
-           ON fv.data_venda = l.data_venda
-          AND l.data_venda IS NOT NULL
-    WHERE l.data_cadastro IS NOT NULL
-    GROUP BY
-      COALESCE(l.raw->'_meta'->>'campaign_id', l.raw->>'campaign_id', 'Sem origem'),
-      COALESCE(
-        dc.nome,
-        NULLIF(l.raw->'_meta'->>'campaign_name', ''),
-        NULLIF(l.raw->>'campaign_name', ''),
-        'Sem origem'
-      ),
-      l.data_cadastro
+      id_campanha,
+      nome_campanha,
+      data,
+      spend,
+      impressions,
+      clicks,
+      leads_gerados,
+      leads_com_venda,
+      valor_vendas,
+      CASE
+        WHEN leads_gerados > 0 AND spend > 0
+        THEN ROUND(spend / leads_gerados, 2)
+        ELSE 0
+      END AS cpl,
+      CASE
+        WHEN leads_com_venda > 0 AND spend > 0
+        THEN ROUND(spend / leads_com_venda, 2)
+        ELSE 0
+      END AS cac,
+      CASE
+        WHEN spend > 0 AND valor_vendas > 0
+        THEN ROUND(valor_vendas / spend, 2)
+        ELSE 0
+      END AS roas
+    FROM merged
+    WHERE data IS NOT NULL
     ON CONFLICT DO NOTHING
   `;
   return result.count ?? 0;
@@ -402,4 +509,8 @@ export async function POST(request: NextRequest) {
 
   const hasErrors = Object.values(results).some(v => typeof v === 'string' && v.startsWith('ERROR'));
   return NextResponse.json({ ok: !hasErrors, message: 'BI Star Schema sincronizado', results });
+}
+
+export async function GET(request: NextRequest) {
+  return POST(request);
 }
