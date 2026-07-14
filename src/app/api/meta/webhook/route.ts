@@ -369,7 +369,32 @@ export async function POST(request: NextRequest) {
           cidade:                 cidadeForm || undefined,
         };
 
-        // 3. Cria direto no CV CRM — o ID retornado vira a chave do Postgres
+        // 3a. Lead já cadastrado preenchendo o formulário de novo? Reativa em vez de duplicar.
+        let reengajado = false;
+        if (email || telefone) {
+          try {
+            const { reengajarLeadPorContato } = await import('@/lib/leadReativacao');
+            const reeng = await reengajarLeadPorContato({
+              email, telefone,
+              motivo: `Reengajamento via Meta Ads — preencheu o formulário novamente. Campanha: ${campanha || '?'} | Anúncio: ${ad_name ?? ad_id ?? '?'}`,
+            });
+            reengajado = reeng.ok;
+            logger.info(`[meta/webhook] checagem de reengajamento para ${leadgen_id}: ${reeng.reason}`);
+          } catch (e: unknown) {
+            // Nunca bloqueia o fluxo normal de criação por causa dessa checagem
+            logger.warn({ e }, '[meta/webhook] checagem de reengajamento falhou — segue fluxo normal');
+          }
+        }
+
+        if (reengajado) {
+          // Lead existente já foi reativado no CV CRM — o próprio CV CRM manda o
+          // webhook de volta e atualiza o Postgres. Não cria linha nova nem duplicata.
+          sendFCMPush(parsed.nome, empreendimento, campanha);
+          logger.info(`[meta/webhook] Lead ${leadgen_id} tratado como reengajamento — sem novo cadastro no CV CRM`);
+          continue;
+        }
+
+        // 3b. Lead novo — cria direto no CV CRM — o ID retornado vira a chave do Postgres
         const crmResult = await createCrmLead({
           nome:            parsed.nome,
           email:           email     || undefined,
