@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth, verifyAdminAuth } from '@/lib/auth';
 import { readUsers, writeUsers, UserProfileData } from '@/lib/db-kv';
 import { normalizePermissions, type UserPermissions } from '@/lib/permissions';
-import { canEditTargetUser, canManageAllPeople, canManageUserPermissions, canViewFullPeopleProfile, canViewAllPeopleReadOnly, sanitizeUserForDetail } from '@/lib/user-access';
+import { canEditTargetUser, canManageAllPeople, canManageUserPermissions, canViewFullPeopleProfile, canViewAllPeopleReadOnly, canSetManagerId, sanitizeUserForDetail } from '@/lib/user-access';
 
 /** GET /api/admin/users/[id] */
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -29,6 +29,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       canManageDocuments: canManageAllPeople(viewer),
       canManagePermissions: canManageUserPermissions(viewer, user),
       canChangeRole: admin?.userId === auth.userId,
+      canSetManagerId: canSetManagerId(viewer),
       canViewSensitive: canViewFullPeopleProfile(viewer, user),
       readOnly: canViewAllPeopleReadOnly(viewer) && !canManageAllPeople(viewer),
     },
@@ -76,6 +77,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   }
 
   if (body.profile) {
+    const allowManagerChange = canSetManagerId(viewer);
     user.profile = {
       ...(user.profile ?? {}),
       ...body.profile,
@@ -87,6 +89,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         : user.profile?.emergencyContact,
       // Notas apenas admin
       notes: admin ? (body.profile.notes ?? user.profile?.notes) : user.profile?.notes,
+      // managerId só pode ser definido por Desenvolvedor/Diretoria/isAdmin — senão um Gestor
+      // poderia se auto-atribuir liderados e burlar o escopo de canManageUserPermissions
+      managerId: allowManagerChange ? (body.profile.managerId ?? user.profile?.managerId) : user.profile?.managerId,
     };
   }
 

@@ -35,7 +35,9 @@ export function canManageAllPeople(viewer?: DbUser | null): boolean {
   }
   if (getUserCategory(viewer) === 'fornecedor') return false;
   if (isFinanceDepartment(viewer.profile)) return false;
-  return isManagerialPosition(viewer.profile?.position);
+  // role === 'Gestor' garante o acesso — o texto livre de position é só um fallback
+  // pra quem tem cargo de gestão mas não está com o role formal atribuído.
+  return viewer.role === 'Gestor' || isManagerialPosition(viewer.profile?.position);
 }
 
 function getManagementRank(user?: DbUser | null): number {
@@ -82,6 +84,11 @@ export function canEditTargetUser(viewer: DbUser, target: DbUser): boolean {
   return canManageAllPeople(viewer);
 }
 
+/** Verdadeiro se `target` reporta diretamente para `viewer` (managerId aponta pro viewer). */
+export function isDirectReport(viewer: DbUser, target: DbUser): boolean {
+  return !!target.profile?.managerId && target.profile.managerId === viewer.id;
+}
+
 export function canManageUserPermissions(viewer: DbUser, target: DbUser): boolean {
   if (viewer.id === target.id) return false;
   if (!canManageAllPeople(viewer)) return false;
@@ -90,15 +97,24 @@ export function canManageUserPermissions(viewer: DbUser, target: DbUser): boolea
   const viewerRank = getManagementRank(viewer);
   const targetRank = getManagementRank(target);
 
+  // Diretoria/admin gerenciam qualquer rank abaixo, empresa inteira — sem escopo de equipe.
   if (viewer.role === 'Diretoria') {
     return targetRank < viewerRank;
   }
 
+  // Gestor só gerencia quem reporta diretamente a ele (managerId), nunca a empresa inteira.
   if (viewer.role === 'Gestor' || isManagerialPosition(viewer.profile?.position)) {
-    return targetRank < viewerRank && target.role !== 'Diretoria' && !isManagerialPosition(target.profile?.position);
+    return isDirectReport(viewer, target) && targetRank < viewerRank && target.role !== 'Diretoria' && !isManagerialPosition(target.profile?.position);
   }
 
   return false;
+}
+
+/** Só admin de verdade (Desenvolvedor/Diretoria/isAdmin) define quem reporta pra quem —
+ *  senão um Gestor poderia se auto-atribuir liderados e burlar o escopo acima. */
+export function canSetManagerId(viewer?: DbUser | null): boolean {
+  if (!viewer) return false;
+  return viewer.role === 'Desenvolvedor' || viewer.role === 'Diretoria' || viewer.permissions?.isAdmin === true;
 }
 
 export function canAccessHrMetrics(user?: Pick<DbUser, 'role' | 'profile'> | null): boolean {

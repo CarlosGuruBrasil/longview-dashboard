@@ -91,7 +91,7 @@ interface UserData {
   profile?: {
     category?: 'colaborador' | 'fornecedor';
     phone?: string; whatsapp?: string; position?: string; department?: string;
-    company?: string; activatedAt?: string; birthDate?: string; linkedIn?: string;
+    company?: string; managerId?: string; activatedAt?: string; birthDate?: string; linkedIn?: string;
     avatarUrl?: string; status?: string; notes?: string;
     cpf?: string; rg?: string; rgOrgao?: string; rgEstado?: string;
     professionalId?: string; professionalIdType?: string;
@@ -106,6 +106,7 @@ interface PageMeta {
   canManageDocuments: boolean;
   canManagePermissions?: boolean;
   canChangeRole?: boolean;
+  canSetManagerId?: boolean;
   canViewSensitive: boolean;
   readOnly?: boolean;
 }
@@ -219,6 +220,8 @@ export default function ColaboradorPage() {
   const [position, setPosition]     = useState('');
   const [department, setDepartment] = useState('');
   const [company, setCompany]       = useState('');
+  const [managerId, setManagerId]   = useState('');
+  const [managers, setManagers]     = useState<{ id: string; name: string; role: string }[]>([]);
   const [activatedAt, setActivatedAt] = useState('');
   const [birthDate, setBirthDate]   = useState('');
   const [linkedIn, setLinkedIn]     = useState('');
@@ -306,6 +309,7 @@ export default function ColaboradorPage() {
       setPosition(u.profile?.position ?? '');
       setDepartment(u.profile?.department ?? '');
       setCompany(u.profile?.company ?? '');
+      setManagerId(u.profile?.managerId ?? '');
       setActivatedAt(u.profile?.activatedAt?.slice(0, 10) ?? '');
       setBirthDate(u.profile?.birthDate?.slice(0, 10) ?? '');
       setLinkedIn(u.profile?.linkedIn ?? '');
@@ -342,6 +346,14 @@ export default function ColaboradorPage() {
     return () => window.clearTimeout(timer);
   }, [canManageDocs, id]);
 
+  // ── Load candidatos a gestor responsável (lista já respeita visibilidade do viewer) ──
+  useEffect(() => {
+    fetch('/api/admin/users').then(r => r.json()).then(d => {
+      const list = (d.users ?? []) as { id: string; name: string; role: string }[];
+      setManagers(list.filter(u => u.id !== id && (u.role === 'Diretoria' || u.role === 'Gestor')));
+    }).catch(() => logger.warn('[colaborador] lista de gestores falhou'));
+  }, [id]);
+
   // ── Save profile ───────────────────────────────────────────────────────────
   const handleSave = async () => {
     // CPF validation
@@ -356,6 +368,7 @@ export default function ColaboradorPage() {
         name,
         profile: {
           phone, whatsapp, position, department, company,
+          managerId: pageMeta.canSetManagerId ? (managerId || undefined) : undefined,
           activatedAt: activatedAt || undefined,
           birthDate:   birthDate   || undefined,
           linkedIn, avatarUrl, status,
@@ -524,6 +537,14 @@ export default function ColaboradorPage() {
           </Field>
           <Field label="Empresa">
             <Input value={company} onChange={canEdit ? setCompany : undefined} placeholder="Ex: Longview" readOnly={!canEdit} />
+          </Field>
+          <Field label="Gestor Responsável">
+            {pageMeta.canSetManagerId ? (
+              <Select value={managerId} onChange={setManagerId}
+                options={[{ value: '', label: 'Nenhum' }, ...managers.map(m => ({ value: m.id, label: `${m.name} (${m.role})` }))]} />
+            ) : (
+              <Input value={managers.find(m => m.id === managerId)?.name ?? (managerId ? managerId : '—')} readOnly />
+            )}
           </Field>
           {pageMeta.canChangeRole ? (
             <Field label="Perfil (role)">

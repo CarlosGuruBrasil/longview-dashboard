@@ -33,6 +33,7 @@ export interface UserProfileData {
   position?: string;         // cargo
   department?: string;       // departamento
   company?: string;          // empresa
+  managerId?: string;        // id do colaborador a quem este reporta — escopa quem um Gestor pode gerenciar
   activatedAt?: string;      // data de entrada na empresa (ISO date)
   birthDate?: string;        // data de nascimento
   address?: UserAddress;
