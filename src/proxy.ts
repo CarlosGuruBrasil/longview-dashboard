@@ -39,6 +39,7 @@ export function proxy(request: NextRequest) {
     pathname === '/api/webhooks/cvcrm'     || // webhooks do CV CRM (grava leads) — acesso externo
     pathname === '/api/meta/webhook'       || // webhooks do Meta Lead Ads — acesso externo
     pathname === '/api/webhooks/construpoint' || // webhooks do Construpoint — acesso externo
+    pathname === '/api/webhooks/rdstation-reengagement' || // webhook RD Station (reengajamento e-mail) — acesso externo
     pathname === '/api/notifications/send'  || // envio interno de push — auth via CRON_SECRET
     pathname.startsWith('/api/cron/')              || // cron jobs — autenticados pelo CRON_SECRET
     pathname === '/api/meta/create-lead-ad'        || // lead ad creation — auth via CRON_SECRET
