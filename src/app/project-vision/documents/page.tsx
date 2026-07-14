@@ -6,6 +6,7 @@ import {
   Paperclip, Filter, X, Loader2, Plus, Upload,
 } from 'lucide-react';
 import type { DocumentWithContext } from '@/app/api/documents/route';
+import type { Project } from '@/lib/db-kv';
 import { useUser } from '@/context/UserContext';
 import logger from '@/lib/logger'
 
@@ -44,13 +45,13 @@ export default function DocumentsPage() {
 
   const [docs,     setDocs]     = useState<DocumentWithContext[]>([]);
   const [tasks,    setTasks]    = useState<{ id: string; subject: string; project: string }[]>([]);
-  const [projects, setProjects] = useState<string[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [loading,  setLoading]  = useState(true);
 
   // Filtros
   const [q,          setQ]          = useState('');
   const [filterCat,  setFilterCat]  = useState('Todos');
-  const [filterProj, setFilterProj] = useState('Todos');
+  const [filterProj, setFilterProj] = useState('Todos'); // guarda o id do empreendimento
 
   // Modal upload
   const [uploadOpen,    setUploadOpen]    = useState(false);
@@ -65,7 +66,7 @@ export default function DocumentsPage() {
       const params = new URLSearchParams();
       if (q && q.trim())              params.set('q', q.trim());
       if (filterCat !== 'Todos')      params.set('category', filterCat);
-      if (filterProj !== 'Todos')     params.set('project', filterProj);
+      if (filterProj !== 'Todos')     params.set('projectId', filterProj);
 
       const res = await fetch(`/api/documents?${params}`);
       const data = await res.json();
@@ -77,6 +78,15 @@ export default function DocumentsPage() {
     }
   }, [q, filterCat, filterProj]);
 
+  // Carrega empreendimentos reais (filtro + rótulo de contexto)
+  const fetchProjects = useCallback(async () => {
+    try {
+      const res  = await fetch('/api/projects');
+      const data = await res.json();
+      setProjects(data.projects ?? []);
+    } catch { /* ignora */ }
+  }, []);
+
   // Carrega tarefas para o modal de upload
   const fetchTasks = useCallback(async () => {
     try {
@@ -84,8 +94,6 @@ export default function DocumentsPage() {
       const data = await res.json();
       const list = (data.tasks ?? []) as { id: string; subject: string; project: string }[];
       setTasks(list);
-      const projs = [...new Set(list.map(t => t.project).filter(Boolean))].sort();
-      setProjects(projs);
       if (!uploadTask && list.length > 0) setUploadTask(list[0].id);
     } catch { /* ignora */ }
   }, [uploadTask]);
@@ -94,6 +102,10 @@ export default function DocumentsPage() {
     const id = window.setTimeout(() => { void fetchDocs(); }, 0);
     return () => window.clearTimeout(id);
   }, [fetchDocs]);
+  useEffect(() => {
+    const id = window.setTimeout(() => { void fetchProjects(); }, 0);
+    return () => window.clearTimeout(id);
+  }, [fetchProjects]);
   useEffect(() => {
     if (!uploadOpen) return;
     const id = window.setTimeout(() => { void fetchTasks(); }, 0);
@@ -184,7 +196,7 @@ export default function DocumentsPage() {
           <select value={filterProj} onChange={e => setFilterProj(e.target.value)}
             className="bg-[#0A0A0B] border border-[#1E1E22] rounded-lg px-3 py-2 text-xs text-white focus:outline-none">
             <option value="Todos">Todos os empreendimentos</option>
-            {projects.map(p => <option key={p} value={p}>{p}</option>)}
+            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </div>
       </section>

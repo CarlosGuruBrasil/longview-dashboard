@@ -110,9 +110,9 @@ export default function Home() {
 
 
   // Filtrar tarefas baseadas no filtro de projetos
-  const filteredTasks = selectedProjectFilter === 'Todos' 
-    ? tasks 
-    : tasks.filter(t => t.project.toLowerCase() === selectedProjectFilter.toLowerCase());
+  const filteredTasks = selectedProjectFilter === 'Todos'
+    ? tasks
+    : tasks.filter(t => t.projectId === selectedProjectFilter);
 
   // KPIs
   const totalTasks = filteredTasks.length;
@@ -166,7 +166,7 @@ export default function Home() {
 
   // Gráfico 2: Andamento por Empreendimento
   const projectStats = projects.map(p => {
-    const projTasks = tasks.filter(t => t.project.toLowerCase() === p.name.toLowerCase());
+    const projTasks = tasks.filter(t => t.projectId === p.id);
     const total = projTasks.length;
     const completed = projTasks.filter(t => t.statusAndamento === 'Finalizado').length;
     const inProgress = projTasks.filter(t => t.statusAndamento === 'Em andamento').length;
@@ -245,7 +245,7 @@ export default function Home() {
             >
               <option value="Todos" className="bg-[#121214] text-white">Todos</option>
               {projects.map(p => (
-                <option key={p.id} value={p.name} className="bg-[#121214] text-white">{p.name}</option>
+                <option key={p.id} value={p.id} className="bg-[#121214] text-white">{p.name}</option>
               ))}
             </select>
           </div>
@@ -528,7 +528,7 @@ export default function Home() {
           </div>
           <div className="space-y-4.5">
             {projects.slice(0, 4).map((proj) => {
-              const projTasks = tasks.filter(t => t.project.toLowerCase() === proj.name.toLowerCase());
+              const projTasks = tasks.filter(t => t.projectId === proj.id);
               const delayed = projTasks.filter(t => {
                 if (t.statusAndamento === 'Finalizado' || !t.previsaoEntrega) return false;
                 const parts = t.previsaoEntrega.split('/');

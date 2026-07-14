@@ -1,89 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 import logger from '@/lib/logger'
+import type { Subtask, Comment, Document, ChangeLog, Task, Project, Responsible } from '@/lib/db-kv';
 
-export interface Subtask {
-  id: string;
-  title: string;
-  completed: boolean;
-}
-
-export interface Comment {
-  id: string;
-  userId: string;
-  userName: string;
-  role: 'Diretoria' | 'Equipe Interna' | 'Parceiro';
-  content: string;
-  createdAt: string;
-}
-
-export interface Document {
-  id: string;
-  name: string;
-  category: string;
-  uploadDate: string;
-  uploader: string;
-  size?: string;
-  version: number;
-  url: string;
-}
-
-export interface ChangeLog {
-  id: string;
-  field: string;
-  oldValue: string;
-  newValue: string;
-  userName: string;
-  date: string;
-}
-
-export interface Task {
-  id: string;
-  project: string;
-  sector: string;
-  subject: string;
-  description: string;
-  responsible: string;
-  secondaryResponsibles: string[];
-  statusContratacao: string;
-  statusAndamento: 'Não iniciado' | 'Em andamento' | 'Aguardando' | 'Em análise' | 'Finalizado';
-  urgencia: 'Baixa' | 'Média' | 'Alta' | 'Crítica' | 'Emergencial';
-  inicio: string;
-  previsaoEntrega: string;
-  entregaEfetiva: string;
-  situacao: string;
-  observacoesRotinas: string;
-  progress: number;
-  subtasks: Subtask[];
-  comments: Comment[];
-  documents: Document[];
-  logs: ChangeLog[];
-  dependencies: string[];
-  tags: string[];
-}
-
-export interface Project {
-  id: string;
-  name: string;
-  description: string;
-  status: string;
-  progress: number;
-  banner: string;
-}
-
-export interface Responsible {
-  id: string;
-  name: string;
-  phone: string;
-  email: string;
-  company: string;
-  photo?: string;
-  photoPosition?: {
-    x: number;
-    y: number;
-    zoom: number;
-  };
-}
+export type { Subtask, Comment, Document, ChangeLog, Task, Project, Responsible };
 
 export interface DatabaseState {
   tasks: Task[];

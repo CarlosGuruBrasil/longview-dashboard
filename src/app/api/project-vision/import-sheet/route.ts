@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminAuth } from '@/lib/auth';
-import { readProjectData, writeKv, writeProjectData } from '@/lib/db-kv';
+import { readTasks, readProjects, readResponsibles, writeKv, reconcileProjectVisionImport } from '@/lib/db-kv';
 import { buildProjectDataFromCsv, buildProjectDataFromXlsx, readProjectDataFromDefaultSheet } from '@/lib/project-sheet-import';
 import logger from '@/lib/logger'
 
@@ -91,7 +91,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ dryRun: true, report });
     }
 
-    const previousState = await readProjectData();
+    const [prevTasks, prevProjects, prevResponsibles] = await Promise.all([readTasks(), readProjects(), readResponsibles()]);
+    const previousState = { tasks: prevTasks, projects: prevProjects, responsibles: prevResponsibles };
     await writeKv('project_sheet_import_backup', {
       backedUpAt: new Date().toISOString(),
       tasks: previousState.tasks.length,
@@ -100,7 +101,7 @@ export async function POST(request: NextRequest) {
       state: previousState,
     });
 
-    await writeProjectData(state);
+    await reconcileProjectVisionImport(state);
     await writeKv('project_sheet_import_last', {
       ...report,
       importedBy: {

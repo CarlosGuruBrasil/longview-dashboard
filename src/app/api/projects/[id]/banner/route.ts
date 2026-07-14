@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
 import { sql, ensureSchema } from '@/lib/pg';
-import { mutateProjectData } from '@/lib/db-kv';
+import { setProjectBanner } from '@/lib/db-kv';
 import logger from '@/lib/logger'
 
 type Params = { params: Promise<{ id: string }> };
@@ -49,12 +49,9 @@ export async function POST(req: NextRequest, { params }: Params) {
         updated_at   = NOW()
     `;
 
-    // Atualiza o campo banner no project_state com a URL da rota
+    // Atualiza o campo banner do empreendimento com a URL da rota
     const bannerUrl = `/api/projects/${id}/banner`;
-    await mutateProjectData(db => {
-      const proj = db.projects.find(p => p.id === id);
-      if (proj) proj.banner = bannerUrl;
-    });
+    await setProjectBanner(id, bannerUrl);
 
     return NextResponse.json({ url: bannerUrl });
   } catch (e: unknown) {

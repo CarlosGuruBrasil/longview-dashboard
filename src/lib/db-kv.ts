@@ -103,7 +103,7 @@ export interface Document { id: string; name: string; category: string; uploadDa
 export interface ChangeLog { id: string; field: string; oldValue: string; newValue: string; userName: string; date: string; }
 
 export interface Task {
-  id: string; project: string; sector: string; subject: string; description: string;
+  id: string; project: string; projectId?: string; sector: string; subject: string; description: string;
   responsible: string; secondaryResponsibles: string[]; statusContratacao: string;
   statusAndamento: 'Não iniciado' | 'Em andamento' | 'Aguardando' | 'Em análise' | 'Finalizado';
   urgencia: 'Baixa' | 'Média' | 'Alta' | 'Crítica' | 'Emergencial';
@@ -113,8 +113,9 @@ export interface Task {
   logs: ChangeLog[]; dependencies: string[]; tags: string[];
 }
 
+export interface PhotoPosition { x: number; y: number; zoom: number; }
 export interface Project { id: string; name: string; description: string; status: string; progress: number; banner: string; }
-export interface Responsible { id: string; name: string; phone: string; email: string; company: string; photo?: string; }
+export interface Responsible { id: string; name: string; phone: string; email: string; company: string; photo?: string; photoPosition?: PhotoPosition; }
 export interface ProjectDatabaseState { tasks: Task[]; projects: Project[]; responsibles: Responsible[]; }
 
 export interface ShortLink { slug: string; url: string; title: string; active: boolean; createdAt: string; createdBy: string; }
@@ -263,7 +264,8 @@ export async function readProjectData(): Promise<ProjectDatabaseState> {
       const rows = await db<{ data: ProjectDatabaseState }[]>`
         SELECT data FROM project_state WHERE key = 'state'
       `;
-      const pgState = normalizeProjectState(rows[0]?.data);
+      const raw = rows[0]?.data;
+      const pgState = normalizeProjectState(typeof raw === 'string' ? JSON.parse(raw) : raw);
       if (hasProjectVisionData(pgState)) return pgState;
 
       const seededState = readLocalProjectData();
@@ -306,7 +308,8 @@ export async function mutateProjectData(
       const rows = await tx<{ data: ProjectDatabaseState }[]>`
         SELECT data FROM project_state WHERE key = 'state' FOR UPDATE
       `;
-      let state: ProjectDatabaseState = normalizeProjectState(rows[0]?.data);
+      const rawState = rows[0]?.data;
+      let state: ProjectDatabaseState = normalizeProjectState(typeof rawState === 'string' ? JSON.parse(rawState) : rawState);
       if (!hasProjectVisionData(state)) {
         state = readLocalProjectData();
       }
@@ -626,7 +629,7 @@ async function migrateTasksIfNeeded(db: Awaited<ReturnType<typeof getPg>>): Prom
 
 /** Lê tarefas com filtros opcionais. Fallback para JSONB se tabela vazia. */
 export async function readTasks(filters: {
-  project?: string; sector?: string; status?: string;
+  project?: string; projectId?: string; sector?: string; status?: string;
   urgencia?: string; responsible?: string; statusContratacao?: string; q?: string;
 } = {}): Promise<Task[]> {
   if (isPg()) {
@@ -637,10 +640,12 @@ export async function readTasks(filters: {
       // Tenta migrar se necessário (retorna tasks legadas se migração recém-rodou)
       const migrated = await migrateTasksIfNeeded(db);
 
-      const rows = await db<{ data: unknown }[]>`SELECT data FROM tasks ORDER BY updated_at DESC`;
+      const rows = await db<{ data: unknown; project_id: string | null }[]>`SELECT data, project_id FROM tasks ORDER BY updated_at DESC`;
       tasks = rows.map(r => {
         const raw = r.data;
-        return (typeof raw === 'string' ? JSON.parse(raw) : raw) as Task;
+        const t = (typeof raw === 'string' ? JSON.parse(raw) : raw) as Task;
+        // project_id (coluna) é a fonte de verdade — pode não estar no JSONB pra tarefas antigas
+        return { ...t, projectId: r.project_id ?? t.projectId };
       });
 
       // Fallback: migração acabou de rodar mas INSERT pode ter falhado → usa dados originais
@@ -659,6 +664,7 @@ export async function readTasks(filters: {
       tasks = await readTasksFromJsonb(db);
     }
 
+    if (filters.projectId)         tasks = tasks.filter(t => t.projectId === filters.projectId);
     if (filters.project)           tasks = tasks.filter(t => t.project?.toLowerCase() === filters.project!.toLowerCase());
     if (filters.sector)            tasks = tasks.filter(t => t.sector?.toLowerCase() === filters.sector!.toLowerCase());
     if (filters.status)            tasks = tasks.filter(t => t.statusAndamento?.toLowerCase() === filters.status!.toLowerCase());
@@ -679,9 +685,11 @@ export async function readTaskById(id: string): Promise<Task | null> {
   if (isPg()) {
     const db = await getPg();
     await migrateTasksIfNeeded(db);
-    const rows = await db<{ data: Task }[]>`SELECT data FROM tasks WHERE id = ${id} LIMIT 1`;
+    const rows = await db<{ data: unknown; project_id: string | null }[]>`SELECT data, project_id FROM tasks WHERE id = ${id} LIMIT 1`;
     if (!rows[0]) return null;
-    return typeof rows[0].data === 'object' ? rows[0].data as Task : JSON.parse(rows[0].data as unknown as string) as Task;
+    const raw = rows[0].data;
+    const t = (typeof raw === 'object' ? raw : JSON.parse(raw as unknown as string)) as Task;
+    return { ...t, projectId: rows[0].project_id ?? t.projectId };
   }
   const state = readLocalProjectData();
   return state.tasks.find(t => t.id === id) ?? null;
@@ -703,20 +711,30 @@ export async function nextTaskId(): Promise<string> {
   return `LVM-${String(max + 1).padStart(4, '0')}`;
 }
 
-/** Insere ou atualiza tarefa. */
+/** Insere ou atualiza tarefa. Resolve project_id/project (nome) a partir de um ou outro. */
 export async function upsertTask(task: Task): Promise<void> {
   if (isPg()) {
     const db = await getPg();
+    let projectId = task.projectId ?? null;
+    let projectName = task.project ?? '';
+    if (projectId) {
+      const proj = await readProjectById(projectId);
+      if (proj) projectName = proj.name;
+    } else if (projectName) {
+      const rows = await db<{ id: string }[]>`SELECT id FROM projects WHERE LOWER(name) = LOWER(${projectName}) LIMIT 1`;
+      projectId = rows[0]?.id ?? null;
+    }
+    const taskToStore: Task = { ...task, project: projectName, projectId: projectId ?? undefined };
     await db`
-      INSERT INTO tasks (id, project, data, created_at, updated_at)
-      VALUES (${task.id}, ${task.project ?? ''}, ${JSON.stringify(task)}, NOW(), NOW())
+      INSERT INTO tasks (id, project, project_id, data, created_at, updated_at)
+      VALUES (${task.id}, ${projectName}, ${projectId}, ${JSON.stringify(taskToStore)}, NOW(), NOW())
       ON CONFLICT (id) DO UPDATE SET
         project    = EXCLUDED.project,
+        project_id = EXCLUDED.project_id,
         data       = EXCLUDED.data,
         updated_at = NOW()
     `;
-    // Atualiza progresso do projeto no project_state
-    await _syncProjectProgress(db, task.project);
+    if (projectId) await _syncProjectProgress(db, projectId);
     return;
   }
   // Dev local
@@ -730,10 +748,9 @@ export async function upsertTask(task: Task): Promise<void> {
 export async function deleteTask(id: string): Promise<boolean> {
   if (isPg()) {
     const db = await getPg();
-    const task = await readTaskById(id);
-    await db`DELETE FROM tasks WHERE id = ${id}`;
-    if (task) await _syncProjectProgress(db, task.project);
-    return !!task;
+    const rows = await db<{ project_id: string | null }[]>`DELETE FROM tasks WHERE id = ${id} RETURNING project_id`;
+    if (rows[0]?.project_id) await _syncProjectProgress(db, rows[0].project_id);
+    return rows.length > 0;
   }
   let found = false;
   await mutateProjectData(db => {
@@ -743,30 +760,291 @@ export async function deleteTask(id: string): Promise<boolean> {
   return found;
 }
 
-/** Recalcula progresso do projeto e atualiza project_state. */
-async function _syncProjectProgress(db: Awaited<ReturnType<typeof getPg>>, projectName: string): Promise<void> {
+/** Recalcula progresso do projeto a partir das tarefas vinculadas por project_id. */
+async function _syncProjectProgress(db: Awaited<ReturnType<typeof getPg>>, projectId: string): Promise<void> {
   try {
-    const rows = await db<{ data: Task }[]>`SELECT data FROM tasks WHERE project = ${projectName}`;
+    const rows = await db<{ data: unknown }[]>`SELECT data FROM tasks WHERE project_id = ${projectId}`;
     const tasks = rows.map(r => (typeof r.data === 'object' ? r.data : JSON.parse(r.data as unknown as string)) as Task);
     const finished = tasks.filter(t => t.statusAndamento === 'Finalizado').length;
     const progress = tasks.length > 0 ? Math.round((finished / tasks.length) * 100) : 0;
     const status   = progress === 100 ? 'Finalizado' : progress > 0 ? 'Em andamento' : 'Não iniciado';
-
-    const stateRows = await db<{ data: { projects: Project[]; responsibles: Responsible[] } }[]>`
-      SELECT data FROM project_state WHERE key = 'state' LIMIT 1
-    `;
-    if (!stateRows[0]) return;
-    const state = stateRows[0].data;
-    state.projects = state.projects.map(p =>
-      p.name.toLowerCase() === projectName.toLowerCase() ? { ...p, progress, status } : p
-    );
-    await db`
-      UPDATE project_state SET data = ${JSON.stringify(state)} WHERE key = 'state'
-    `;
+    await db`UPDATE projects SET progress = ${progress}, status = ${status}, updated_at = NOW() WHERE id = ${projectId}`;
   } catch (e) { logger.warn({ err: e }, '[db-kv] _syncProjectProgress error'); }
 }
 
-// ─── 8. TASK DOCUMENTS — binário no Postgres ─────────────────────────────────
+// ─── 9. PROJECTS — tabela dedicada ───────────────────────────────────────────
+// Migração transparente: na primeira leitura, se a tabela projects estiver vazia,
+// copia automaticamente do JSONB legado (project_state). JSONB original preservado.
+
+export function slugify(name: string): string {
+  return name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+}
+
+async function readProjectsFromJsonb(db: Awaited<ReturnType<typeof getPg>>): Promise<Project[]> {
+  try {
+    const rows = await db<{ data: unknown }[]>`SELECT data FROM project_state WHERE key = 'state' LIMIT 1`;
+    const raw = rows[0]?.data;
+    const state = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    const projects = (state as { projects?: Project[] })?.projects;
+    return Array.isArray(projects) ? projects : [];
+  } catch { return []; }
+}
+
+async function migrateProjectsIfNeeded(db: Awaited<ReturnType<typeof getPg>>): Promise<Project[]> {
+  const [{ count }] = await db<{ count: string }[]>`SELECT COUNT(*) AS count FROM projects`;
+  if (Number(count) > 0) return [];
+
+  const projects = await readProjectsFromJsonb(db);
+  if (projects.length === 0) return [];
+
+  for (const p of projects) {
+    try {
+      await db`
+        INSERT INTO projects (id, name, description, status, progress, banner)
+        VALUES (${p.id}, ${p.name}, ${p.description ?? ''}, ${p.status ?? 'Não iniciado'}, ${p.progress ?? 0}, ${p.banner ?? ''})
+        ON CONFLICT (id) DO NOTHING
+      `;
+    } catch (e) { logger.warn({ e }, '[db-kv] migrate project $ falhou:'); }
+  }
+  return projects;
+}
+
+/** Lê todos os empreendimentos. Fallback para JSONB se tabela vazia. */
+export async function readProjects(): Promise<Project[]> {
+  if (isPg()) {
+    const db = await getPg();
+    await migrateProjectsIfNeeded(db);
+    const rows = await db<Project[]>`SELECT id, name, description, status, progress, banner FROM projects ORDER BY name`;
+    if (rows.length === 0) return readProjectsFromJsonb(db);
+    return rows;
+  }
+  return (readLocalProjectData()).projects;
+}
+
+/** Lê um empreendimento por ID. */
+export async function readProjectById(id: string): Promise<Project | null> {
+  if (isPg()) {
+    const db = await getPg();
+    const rows = await db<Project[]>`SELECT id, name, description, status, progress, banner FROM projects WHERE id = ${id} LIMIT 1`;
+    return rows[0] ?? null;
+  }
+  const state = readLocalProjectData();
+  return state.projects.find(p => p.id === id) ?? null;
+}
+
+/** Insere ou atualiza empreendimento. */
+export async function upsertProject(project: Project): Promise<void> {
+  if (isPg()) {
+    const db = await getPg();
+    await db`
+      INSERT INTO projects (id, name, description, status, progress, banner)
+      VALUES (${project.id}, ${project.name}, ${project.description ?? ''}, ${project.status ?? 'Não iniciado'}, ${project.progress ?? 0}, ${project.banner ?? ''})
+      ON CONFLICT (id) DO UPDATE SET
+        name        = EXCLUDED.name,
+        description = EXCLUDED.description,
+        status      = EXCLUDED.status,
+        progress    = EXCLUDED.progress,
+        banner      = EXCLUDED.banner,
+        updated_at  = NOW()
+    `;
+    return;
+  }
+  await mutateProjectData(db => {
+    const idx = db.projects.findIndex(p => p.id === project.id);
+    if (idx >= 0) db.projects[idx] = project; else db.projects.push(project);
+  });
+}
+
+/** Atualiza só o banner de um empreendimento (usado pelo upload de imagem). */
+export async function setProjectBanner(id: string, bannerUrl: string): Promise<void> {
+  if (isPg()) {
+    const db = await getPg();
+    await db`UPDATE projects SET banner = ${bannerUrl}, updated_at = NOW() WHERE id = ${id}`;
+    return;
+  }
+  await mutateProjectData(db => {
+    const proj = db.projects.find(p => p.id === id);
+    if (proj) proj.banner = bannerUrl;
+  });
+}
+
+// ─── 10. RESPONSIBLES — tabela dedicada ──────────────────────────────────────
+// Migração transparente: na primeira leitura, se a tabela responsibles estiver vazia,
+// copia automaticamente do JSONB legado (project_state). JSONB original preservado.
+
+async function readResponsiblesFromJsonb(db: Awaited<ReturnType<typeof getPg>>): Promise<Responsible[]> {
+  try {
+    const rows = await db<{ data: unknown }[]>`SELECT data FROM project_state WHERE key = 'state' LIMIT 1`;
+    const raw = rows[0]?.data;
+    const state = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    const responsibles = (state as { responsibles?: Responsible[] })?.responsibles;
+    return Array.isArray(responsibles) ? responsibles : [];
+  } catch { return []; }
+}
+
+async function migrateResponsiblesIfNeeded(db: Awaited<ReturnType<typeof getPg>>): Promise<Responsible[]> {
+  const [{ count }] = await db<{ count: string }[]>`SELECT COUNT(*) AS count FROM responsibles`;
+  if (Number(count) > 0) return [];
+
+  const responsibles = await readResponsiblesFromJsonb(db);
+  if (responsibles.length === 0) return [];
+
+  for (const r of responsibles) {
+    try {
+      await db`
+        INSERT INTO responsibles (id, name, phone, email, company, photo, photo_position)
+        VALUES (${r.id}, ${r.name}, ${r.phone ?? ''}, ${r.email ?? ''}, ${r.company ?? ''}, ${r.photo ?? null}, ${(r.photoPosition ?? null) as never})
+        ON CONFLICT (id) DO NOTHING
+      `;
+    } catch (e) { logger.warn({ e }, '[db-kv] migrate responsible $ falhou:'); }
+  }
+  return responsibles;
+}
+
+/** Lê todos os responsáveis. Fallback para JSONB se tabela vazia. */
+export async function readResponsibles(): Promise<Responsible[]> {
+  if (isPg()) {
+    const db = await getPg();
+    await migrateResponsiblesIfNeeded(db);
+    const rows = await db<{ id: string; name: string; phone: string; email: string; company: string; photo: string | null; photo_position: PhotoPosition | null }[]>`
+      SELECT id, name, phone, email, company, photo, photo_position FROM responsibles ORDER BY name
+    `;
+    if (rows.length === 0) return readResponsiblesFromJsonb(db);
+    return rows.map(r => ({ id: r.id, name: r.name, phone: r.phone, email: r.email, company: r.company, photo: r.photo ?? undefined, photoPosition: r.photo_position ?? undefined }));
+  }
+  return (readLocalProjectData()).responsibles;
+}
+
+/** Gera próximo ID de responsável (resp-N). Race-safe com MAX no banco. */
+export async function nextResponsibleId(): Promise<string> {
+  if (isPg()) {
+    const db = await getPg();
+    await migrateResponsiblesIfNeeded(db);
+    const rows = await db<{ max_id: string | null }[]>`
+      SELECT MAX(CAST(REGEXP_REPLACE(id, '[^0-9]', '', 'g') AS INTEGER)) AS max_id FROM responsibles
+    `;
+    const max = Number(rows[0]?.max_id ?? 0);
+    return `resp-${max + 1}`;
+  }
+  const state = readLocalProjectData();
+  const max = state.responsibles.length > 0 ? Math.max(...state.responsibles.map(r => parseInt(r.id.replace('resp-', '')) || 0)) : 0;
+  return `resp-${max + 1}`;
+}
+
+/** Insere ou atualiza responsável. */
+export async function upsertResponsible(responsible: Responsible): Promise<void> {
+  if (isPg()) {
+    const db = await getPg();
+    await db`
+      INSERT INTO responsibles (id, name, phone, email, company, photo, photo_position)
+      VALUES (${responsible.id}, ${responsible.name}, ${responsible.phone ?? ''}, ${responsible.email ?? ''}, ${responsible.company ?? ''}, ${responsible.photo ?? null}, ${(responsible.photoPosition ?? null) as never})
+      ON CONFLICT (id) DO UPDATE SET
+        name           = EXCLUDED.name,
+        phone          = EXCLUDED.phone,
+        email          = EXCLUDED.email,
+        company        = EXCLUDED.company,
+        photo          = EXCLUDED.photo,
+        photo_position = EXCLUDED.photo_position,
+        updated_at     = NOW()
+    `;
+    return;
+  }
+  await mutateProjectData(db => {
+    const idx = db.responsibles.findIndex(r => r.id === responsible.id);
+    if (idx >= 0) db.responsibles[idx] = responsible; else db.responsibles.push(responsible);
+  });
+}
+
+/** Remove responsável. */
+export async function deleteResponsible(id: string): Promise<boolean> {
+  if (isPg()) {
+    const db = await getPg();
+    const rows = await db`DELETE FROM responsibles WHERE id = ${id} RETURNING id`;
+    return rows.length > 0;
+  }
+  let found = false;
+  await mutateProjectData(db => {
+    const idx = db.responsibles.findIndex(r => r.id === id);
+    if (idx >= 0) { found = true; db.responsibles.splice(idx, 1); }
+  });
+  return found;
+}
+
+// ─── 11. IMPORT DE PLANILHA — reconciliação relacional ───────────────────────
+
+/**
+ * Substitui projects/responsibles/tasks pelo conteúdo de uma importação de planilha
+ * (mesma semântica de "a planilha é a nova verdade" que existia com o blob), mas via
+ * upsert-and-reconcile relacional em vez de sobrescrever project_state.data inteiro.
+ * Preserva banner/photo/photo_position que a planilha não carrega (não entram no
+ * ON CONFLICT DO UPDATE). Ordem importa: tasks são limpas antes de remover projetos
+ * órfãos, senão a FK tasks.project_id bloqueia o DELETE.
+ */
+export async function reconcileProjectVisionImport(state: ProjectDatabaseState): Promise<void> {
+  if (!isPg()) {
+    await writeProjectData(state);
+    return;
+  }
+  const db = await getPg();
+
+  await db.begin(async (tx) => {
+    await tx`DELETE FROM tasks`;
+
+    for (const p of state.projects) {
+      await tx`
+        INSERT INTO projects (id, name, description, status, progress, banner)
+        VALUES (${p.id}, ${p.name}, ${p.description ?? ''}, ${p.status ?? 'Não iniciado'}, ${p.progress ?? 0}, ${p.banner ?? ''})
+        ON CONFLICT (id) DO UPDATE SET
+          name        = EXCLUDED.name,
+          description = EXCLUDED.description,
+          status      = EXCLUDED.status,
+          progress    = EXCLUDED.progress,
+          updated_at  = NOW()
+      `;
+    }
+    const newProjectIds = state.projects.map(p => p.id);
+    await (newProjectIds.length > 0
+      ? tx`DELETE FROM projects WHERE id <> ALL(${newProjectIds})`
+      : tx`DELETE FROM projects`);
+
+    for (const r of state.responsibles) {
+      await tx`
+        INSERT INTO responsibles (id, name, phone, email, company)
+        VALUES (${r.id}, ${r.name}, ${r.phone ?? ''}, ${r.email ?? ''}, ${r.company ?? ''})
+        ON CONFLICT (id) DO UPDATE SET
+          name       = EXCLUDED.name,
+          phone      = EXCLUDED.phone,
+          email      = EXCLUDED.email,
+          company    = EXCLUDED.company,
+          updated_at = NOW()
+      `;
+    }
+    const newRespIds = state.responsibles.map(r => r.id);
+    await (newRespIds.length > 0
+      ? tx`DELETE FROM responsibles WHERE id <> ALL(${newRespIds})`
+      : tx`DELETE FROM responsibles`);
+
+    for (const t of state.tasks) {
+      let projectId: string | null = null;
+      if (t.project) {
+        const rows = await tx<{ id: string }[]>`SELECT id FROM projects WHERE LOWER(name) = LOWER(${t.project}) LIMIT 1`;
+        projectId = rows[0]?.id ?? null;
+      }
+      const taskToStore: Task = { ...t, projectId: projectId ?? undefined };
+      await tx`
+        INSERT INTO tasks (id, project, project_id, data, created_at, updated_at)
+        VALUES (${t.id}, ${t.project ?? ''}, ${projectId}, ${JSON.stringify(taskToStore)}, NOW(), NOW())
+        ON CONFLICT (id) DO UPDATE SET
+          project    = EXCLUDED.project,
+          project_id = EXCLUDED.project_id,
+          data       = EXCLUDED.data,
+          updated_at = NOW()
+      `;
+    }
+  });
+}
+
+// ─── 12. TASK DOCUMENTS — binário no Postgres ────────────────────────────────
 
 /** Lista metadados dos anexos de uma tarefa (sem o conteúdo binário). */
 export async function listTaskDocuments(taskId: string): Promise<TaskDocumentMeta[]> {

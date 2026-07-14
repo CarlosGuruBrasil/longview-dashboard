@@ -316,6 +316,37 @@ export async function ensureSchema(): Promise<void> {
     await optionalSchemaStep('user_documents.content_b64 column', () => sql`ALTER TABLE user_documents ADD COLUMN IF NOT EXISTS content_b64 TEXT`);
     await optionalSchemaStep('user_docs_user_id index', () => sql`CREATE INDEX IF NOT EXISTS user_docs_user_id ON user_documents (user_id)`);
 
+    // Empreendimentos — tabela dedicada, substitui project_state.data.projects
+    await sql`
+      CREATE TABLE IF NOT EXISTS projects (
+        id          TEXT PRIMARY KEY,
+        name        TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        status      TEXT NOT NULL DEFAULT 'Não iniciado',
+        progress    INTEGER NOT NULL DEFAULT 0,
+        banner      TEXT NOT NULL DEFAULT '',
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `;
+    await optionalSchemaStep('projects name index', () => sql`CREATE UNIQUE INDEX IF NOT EXISTS projects_name_lower_uidx ON projects (LOWER(name))`);
+
+    // Responsáveis — tabela dedicada, substitui project_state.data.responsibles
+    await sql`
+      CREATE TABLE IF NOT EXISTS responsibles (
+        id             TEXT PRIMARY KEY,
+        name           TEXT NOT NULL,
+        phone          TEXT NOT NULL DEFAULT '',
+        email          TEXT NOT NULL DEFAULT '',
+        company        TEXT NOT NULL DEFAULT '',
+        photo          TEXT,
+        photo_position JSONB,
+        created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `;
+    await optionalSchemaStep('responsibles name index', () => sql`CREATE INDEX IF NOT EXISTS responsibles_name_lower_idx ON responsibles (LOWER(name))`);
+
     await sql`
       CREATE TABLE IF NOT EXISTS project_banners (
         project_id   TEXT PRIMARY KEY,
@@ -349,6 +380,9 @@ export async function ensureSchema(): Promise<void> {
     await optionalSchemaStep('tasks project index',     () => sql`CREATE INDEX IF NOT EXISTS tasks_project_idx     ON tasks (project)`);
     await optionalSchemaStep('tasks status index',      () => sql`CREATE INDEX IF NOT EXISTS tasks_status_idx      ON tasks ((data->>'statusAndamento'))`);
     await optionalSchemaStep('tasks responsible index', () => sql`CREATE INDEX IF NOT EXISTS tasks_responsible_idx ON tasks ((data->>'responsible'))`);
+    // project_id — FK real; `project` (texto) fica como cache desnormalizado até uma migração futura remover
+    await optionalSchemaStep('tasks project_id column', () => sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS project_id TEXT REFERENCES projects(id)`);
+    await optionalSchemaStep('tasks project_id index',  () => sql`CREATE INDEX IF NOT EXISTS tasks_project_id_idx ON tasks (project_id)`);
 
     // Anexos de tarefas em binário (BYTEA) — sem base64
     await sql`

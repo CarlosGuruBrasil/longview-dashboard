@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
-import { readProjectData, mutateProjectData, Project } from '@/lib/db-kv';
+import { readProjects, readProjectById, upsertProject, slugify, type Project } from '@/lib/db-kv';
 import logger from '@/lib/logger'
 
 export async function GET(_request: NextRequest) {
@@ -8,8 +8,8 @@ export async function GET(_request: NextRequest) {
     const user = await verifyAuth();
     if (!user) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
 
-    const db = await readProjectData();
-    return NextResponse.json({ projects: db.projects || [] });
+    const projects = await readProjects();
+    return NextResponse.json({ projects });
   } catch (error) {
     logger.error({ error }, 'Erro na API de empreendimentos:');
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
@@ -25,15 +25,12 @@ export async function PATCH(request: NextRequest) {
     const { id, banner } = body;
     if (!id) return NextResponse.json({ error: 'ID obrigatório' }, { status: 400 });
 
-    let updated: Project | undefined;
-    await mutateProjectData((db) => {
-      const idx = db.projects.findIndex(p => p.id === id);
-      if (idx === -1) return;
-      if (banner !== undefined) db.projects[idx].banner = banner;
-      updated = db.projects[idx];
-    });
+    const existing = await readProjectById(id);
+    if (!existing) return NextResponse.json({ error: 'Empreendimento não encontrado' }, { status: 404 });
 
-    if (!updated) return NextResponse.json({ error: 'Empreendimento não encontrado' }, { status: 404 });
+    const updated: Project = { ...existing, banner: banner !== undefined ? banner : existing.banner };
+    await upsertProject(updated);
+
     return NextResponse.json({ project: updated });
   } catch (error) {
     logger.error({ error }, 'Erro ao atualizar empreendimento:');
@@ -50,17 +47,13 @@ export async function POST(request: NextRequest) {
     const name = body.name?.trim();
     if (!name) return NextResponse.json({ error: 'Nome é obrigatório' }, { status: 400 });
 
-    const id = name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
-    let newProject: Project | undefined;
-    let conflict = false;
-
-    await mutateProjectData((db) => {
-      if (db.projects.some(p => p.id === id)) { conflict = true; return; }
-      newProject = { id, name, description: body.description?.trim() || 'Empreendimento cadastrado no LongView Manager.', status: 'Não iniciado', progress: 0, banner: body.banner || '' };
-      db.projects.push(newProject!);
-    });
-
+    const id = slugify(name);
+    const conflict = await readProjectById(id);
     if (conflict) return NextResponse.json({ error: 'Já existe um empreendimento com este nome' }, { status: 400 });
+
+    const newProject: Project = { id, name, description: body.description?.trim() || 'Empreendimento cadastrado no LongView Manager.', status: 'Não iniciado', progress: 0, banner: body.banner || '' };
+    await upsertProject(newProject);
+
     return NextResponse.json({ project: newProject }, { status: 201 });
   } catch (error) {
     logger.error({ error }, 'Erro ao cadastrar empreendimento:');

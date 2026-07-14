@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
-import { readProjectData, mutateProjectData, Responsible } from '@/lib/db-kv';
+import { readResponsibles, nextResponsibleId, upsertResponsible, type Responsible } from '@/lib/db-kv';
 import axios from 'axios';
 import logger from '@/lib/logger'
 
@@ -29,6 +29,7 @@ type CvCorretor = {
 
 type ResponsibleBody = Pick<Responsible, 'name' | 'phone' | 'email' | 'company'> & {
   photo?: string;
+  photoPosition?: Responsible['photoPosition'];
 };
 
 async function readCache(): Promise<Responsible[] | null> {
@@ -122,8 +123,7 @@ export async function GET() {
     const user = await verifyAuth();
     if (!user) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
 
-    const db = await readProjectData();
-    const localResponsibles = db.responsibles || [];
+    const localResponsibles = await readResponsibles();
 
     let cvResponsibles: Responsible[] = [];
     if (process.env.CV_CRM_EMAIL && process.env.CV_CRM_TOKEN) {
@@ -165,23 +165,17 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
 
     const body = await request.json() as ResponsibleBody;
-    let newResponsible: Responsible | undefined;
 
-    await mutateProjectData((db) => {
-      if (!db.responsibles) db.responsibles = [];
-      const lastId = db.responsibles.length > 0
-        ? Math.max(...db.responsibles.map(r => parseInt(r.id.replace('resp-', '')) || 0))
-        : 0;
-      newResponsible = {
-        id: `resp-${lastId + 1}`,
-        name: body.name.trim(),
-        phone: body.phone.trim() || '',
-        email: body.email.trim() || '',
-        company: body.company.trim() || 'LongView',
-        photo: body.photo || undefined,
-      };
-      db.responsibles.push(newResponsible!);
-    });
+    const newResponsible: Responsible = {
+      id: await nextResponsibleId(),
+      name: body.name.trim(),
+      phone: body.phone.trim() || '',
+      email: body.email.trim() || '',
+      company: body.company.trim() || 'LongView',
+      photo: body.photo || undefined,
+      photoPosition: body.photoPosition || undefined,
+    };
+    await upsertResponsible(newResponsible);
 
     return NextResponse.json({ responsible: newResponsible }, { status: 201 });
   } catch (error) {

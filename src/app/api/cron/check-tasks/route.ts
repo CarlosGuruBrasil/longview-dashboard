@@ -18,7 +18,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql, ensureSchema } from '@/lib/pg';
 import { sendFCMMulticast } from '@/lib/firebase-admin';
-import { readProjectData } from '@/lib/db-kv';
+import { readTasks, readProjects, readResponsibles } from '@/lib/db-kv';
 import type { Task } from '@/lib/db-kv';
 import logger from '@/lib/logger'
 
@@ -108,15 +108,13 @@ export async function GET(req: NextRequest) {
   }
 
   // ── Carrega dados ──────────────────────────────────────────────────────────
-  let db: Awaited<ReturnType<typeof readProjectData>>;
+  let tasks: Task[], projects: Awaited<ReturnType<typeof readProjects>>, responsibles: Awaited<ReturnType<typeof readResponsibles>>;
   try {
-    db = await readProjectData();
+    [tasks, projects, responsibles] = await Promise.all([readTasks(), readProjects(), readResponsibles()]);
   } catch (e) {
     logger.error({ e }, '[check-tasks] erro ao ler DB:');
     return NextResponse.json({ error: 'Falha ao ler dados' }, { status: 500 });
   }
-
-  const { tasks, projects, responsibles } = db;
 
   // ── FCM tokens do Postgres ─────────────────────────────────────────────────
   const fcmRows = await sql`
@@ -296,7 +294,7 @@ export async function GET(req: NextRequest) {
   }
 
   for (const project of projects) {
-    const projectTasks = tasks.filter(t => t.project === project.name);
+    const projectTasks = tasks.filter(t => t.projectId === project.id);
     const activeTasks  = projectTasks.filter(t => t.statusAndamento !== 'Finalizado');
     if (!activeTasks.length) continue;
 

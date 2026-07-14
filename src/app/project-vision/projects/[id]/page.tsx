@@ -39,7 +39,7 @@ export default function ProjectDetailPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          project: project.name,
+          projectId: project.id,
           sector: newSector,
           subject: newSubject.trim(),
           description: newDesc.trim(),
@@ -75,7 +75,7 @@ export default function ProjectDetailPage() {
       const found = projects.find(p => p.id === id);
       setProject(found || null);
       if (found) {
-        const resT = await fetch(`/api/tasks?project=${encodeURIComponent(found.name)}`);
+        const resT = await fetch(`/api/tasks?projectId=${encodeURIComponent(found.id)}`);
         setTasks((await resT.json()).tasks || []);
       }
     } catch (e) {

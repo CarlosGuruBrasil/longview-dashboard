@@ -65,7 +65,7 @@ export default function KanbanPage() {
 
   // RBAC: Equipe e Parceiros veem apenas as tarefas autorizadas
   const filteredTasks = tasks.filter(task => {
-    const matchesProject = selectedProject === 'Todos' || task.project.toLowerCase() === selectedProject.toLowerCase();
+    const matchesProject = selectedProject === 'Todos' || task.projectId === selectedProject;
     const matchesUrgencia = selectedUrgencia === 'Todos' || task.urgencia.toLowerCase() === selectedUrgencia.toLowerCase();
     const matchesResp = selectedResp === 'Todos' || task.responsible.toLowerCase() === selectedResp.toLowerCase();
 
@@ -179,7 +179,7 @@ export default function KanbanPage() {
               >
                 <option value="Todos">Todos</option>
                 {projects.map(p => (
-                  <option key={p.id} value={p.name}>{p.name}</option>
+                  <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
               </select>
             </div>

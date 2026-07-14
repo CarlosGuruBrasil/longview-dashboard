@@ -149,7 +149,7 @@ export default function TimelinePage() {
 
   // Filtros
   const filteredTasks = tasks.filter(task => {
-    const matchesProject = selectedProject === 'Todos' || task.project.toLowerCase() === selectedProject.toLowerCase();
+    const matchesProject = selectedProject === 'Todos' || task.projectId === selectedProject;
     
     // Regra RBAC para parceiro
     let isAuthorized = true;
@@ -193,7 +193,7 @@ export default function TimelinePage() {
             >
               <option value="Todos">Todos os Empreendimentos</option>
               {projects.map(p => (
-                <option key={p.id} value={p.name}>{p.name}</option>
+                <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
           </div>

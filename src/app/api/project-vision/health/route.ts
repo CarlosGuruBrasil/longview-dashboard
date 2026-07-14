@@ -18,10 +18,10 @@ export async function GET() {
     const tables = await sql<{ tablename: string }[]>`
       SELECT tablename FROM pg_tables
       WHERE schemaname = 'public'
-        AND tablename IN ('tasks','task_documents','project_state','project_banners')
+        AND tablename IN ('tasks','task_documents','project_state','project_banners','projects','responsibles')
     `;
     const found = tables.map(r => r.tablename);
-    for (const t of ['tasks', 'task_documents', 'project_state']) {
+    for (const t of ['tasks', 'task_documents', 'project_state', 'projects', 'responsibles']) {
       checks.push({ name: `table:${t}`, ok: found.includes(t), detail: found.includes(t) ? 'existe' : 'NAO ENCONTRADA' });
     }
   } catch (e: unknown) {
@@ -43,23 +43,26 @@ export async function GET() {
   }
 
   try {
-    const rows = await sql<{ data: { projects?: unknown[] } }[]>`
-      SELECT data FROM project_state WHERE key = 'state' LIMIT 1
-    `;
-    const projects = rows[0]?.data?.projects;
-    const count = Array.isArray(projects) ? projects.length : 0;
-    checks.push({ name: 'project_state:projects', ok: count > 0, detail: `${count} empreendimentos` });
+    const [row] = await sql<{ count: string }[]>`SELECT COUNT(*)::text AS count FROM projects`;
+    checks.push({ name: 'projects:count', ok: Number(row.count) > 0, detail: `${row.count} empreendimentos` });
   } catch (e: unknown) {
-    checks.push({ name: 'project_state:projects', ok: false, detail: e instanceof Error ? e.message : String(e) });
+    checks.push({ name: 'projects:count', ok: false, detail: e instanceof Error ? e.message : String(e) });
+  }
+
+  try {
+    const [row] = await sql<{ count: string }[]>`SELECT COUNT(*)::text AS count FROM tasks WHERE project_id IS NULL AND project <> ''`;
+    checks.push({ name: 'tasks:orphan_project_id', ok: Number(row.count) === 0, detail: `${row.count} tarefas sem project_id` });
+  } catch (e: unknown) {
+    checks.push({ name: 'tasks:orphan_project_id', ok: false, detail: e instanceof Error ? e.message : String(e) });
   }
 
   try {
     const indexes = await sql<{ indexname: string }[]>`
       SELECT indexname FROM pg_indexes
       WHERE tablename = 'tasks'
-        AND indexname IN ('tasks_project_idx','tasks_status_idx','tasks_responsible_idx')
+        AND indexname IN ('tasks_project_idx','tasks_status_idx','tasks_responsible_idx','tasks_project_id_idx')
     `;
-    checks.push({ name: 'tasks:indexes', ok: indexes.length === 3, detail: `${indexes.length}/3 indices` });
+    checks.push({ name: 'tasks:indexes', ok: indexes.length === 4, detail: `${indexes.length}/4 indices` });
   } catch (e: unknown) {
     checks.push({ name: 'tasks:indexes', ok: false, detail: e instanceof Error ? e.message : String(e) });
   }

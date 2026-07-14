@@ -52,9 +52,12 @@ export default function ReportsPage() {
     )
   ).sort();
 
+  // Nome de exibição do empreendimento selecionado (selectedProject guarda o id)
+  const selectedProjectName = selectedProject === 'Todos' ? 'Todos' : (projects.find(p => p.id === selectedProject)?.name ?? selectedProject);
+
   // Filtro duplo: empreendimento + responsável
   const filteredTasks = tasks.filter(t => {
-    const matchProject = selectedProject === 'Todos' || t.project.toLowerCase() === selectedProject.toLowerCase();
+    const matchProject = selectedProject === 'Todos' || t.projectId === selectedProject;
     const matchResp = selectedResponsible === 'Todos' || t.responsible === selectedResponsible ||
       t.secondaryResponsibles?.includes(selectedResponsible);
     return matchProject && matchResp;
@@ -97,7 +100,7 @@ export default function ReportsPage() {
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = `Relatorio_LongView_${reportType}_${selectedProject.replace(/ /g, '_')}.csv`;
+    a.href = url; a.download = `Relatorio_LongView_${reportType}_${selectedProjectName.replace(/ /g, '_')}.csv`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
   };
 
@@ -105,7 +108,7 @@ export default function ReportsPage() {
 
   const reportTitle =
     reportType === 'executivo' ? 'Relatório Executivo Geral' :
-    reportType === 'empreendimento' ? `Relatório de Empreendimento — ${selectedProject}` :
+    reportType === 'empreendimento' ? `Relatório de Empreendimento — ${selectedProjectName}` :
     reportType === 'produtividade' ? 'Análise de Produtividade' :
     'Relatório de Riscos, Pendências e Atrasos';
 
@@ -161,7 +164,7 @@ export default function ReportsPage() {
               <select value={selectedProject} onChange={e => setSelectedProject(e.target.value)}
                 className="bg-[#0A0A0B] border border-[#1E1E22] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none">
                 <option value="Todos">Todos os Empreendimentos</option>
-                {projects.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
             {/* Responsável */}
@@ -211,7 +214,7 @@ export default function ReportsPage() {
                 <span className="block text-[9px] uppercase font-black text-zinc-500 tracking-wider">Documento Oficial de Auditoria</span>
                 <h3 className="text-lg font-bold text-white print:text-black mt-0.5">{reportTitle}</h3>
                 <p className="text-xs text-zinc-400 print:text-zinc-600 mt-0.5">
-                  {selectedProject !== 'Todos' ? selectedProject : 'Todos os Empreendimentos'}
+                  {selectedProject !== 'Todos' ? selectedProjectName : 'Todos os Empreendimentos'}
                   {selectedResponsible !== 'Todos' ? ` · ${selectedResponsible}` : ''}
                 </p>
               </div>

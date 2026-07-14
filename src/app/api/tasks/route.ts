@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
-import { readTasks, nextTaskId, upsertTask, Task } from '@/lib/db-kv';
+import { readTasks, nextTaskId, upsertTask, readProjectById, type Task } from '@/lib/db-kv';
 import logger from '@/lib/logger'
 
 export async function GET(request: NextRequest) {
@@ -11,6 +11,7 @@ export async function GET(request: NextRequest) {
     const p = request.nextUrl.searchParams;
     const tasks = await readTasks({
       project:           p.get('project')           ?? undefined,
+      projectId:         p.get('projectId')          ?? undefined,
       sector:            p.get('sector')             ?? undefined,
       status:            p.get('status')             ?? undefined,
       urgencia:          p.get('urgencia')           ?? undefined,
@@ -35,11 +36,17 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
 
     const body = await request.json();
-    const id   = await nextTaskId();
+    const projectId = body.projectId as string | undefined;
+    if (!projectId) return NextResponse.json({ error: 'projectId é obrigatório' }, { status: 400 });
+    const project = await readProjectById(projectId);
+    if (!project) return NextResponse.json({ error: 'Empreendimento não encontrado' }, { status: 400 });
+
+    const id = await nextTaskId();
 
     const task: Task = {
       id,
-      project:              body.project              || 'Geral',
+      project:              project.name,
+      projectId:            project.id,
       sector:               body.sector               || 'Gestão',
       subject:              body.subject              || 'Sem Assunto',
       description:          body.description          || '',

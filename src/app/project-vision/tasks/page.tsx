@@ -36,7 +36,7 @@ export default function TasksPage() {
   const [selectedRespName, setSelectedRespName] = useState<string | null>(null);
 
   // Formulário de Nova Tarefa
-  const [newProject, setNewProject] = useState('Villa Alta');
+  const [newProject, setNewProject] = useState('');
   const [newSector, setNewSector] = useState('Projetos');
   const [newSubject, setNewSubject] = useState('');
   const [newDesc, setNewDesc] = useState('');
@@ -70,6 +70,11 @@ export default function TasksPage() {
     });
   }, []);
 
+  // Pré-seleciona o primeiro empreendimento no formulário de nova tarefa assim que carrega
+  useEffect(() => {
+    if (!newProject && projects.length > 0) setNewProject(projects[0].id);
+  }, [projects, newProject]);
+
   // Extrair opções únicas para os filtros
   const sectors = ['Todos', ...Array.from(new Set(tasks.map(t => t.sector).filter(Boolean)))];
   const responsibles = ['Todos', ...Array.from(new Set(tasks.map(t => t.responsible).filter(Boolean)))];
@@ -88,7 +93,7 @@ export default function TasksPage() {
       task.project.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    const matchesProject = selectedProject === 'Todos' || task.project.toLowerCase() === selectedProject.toLowerCase();
+    const matchesProject = selectedProject === 'Todos' || task.projectId === selectedProject;
     const matchesSector = selectedSector === 'Todos' || task.sector.toLowerCase() === selectedSector.toLowerCase();
     const matchesStatus = selectedStatus === 'Todos' || task.statusAndamento.toLowerCase() === selectedStatus.toLowerCase();
     const matchesUrgencia = selectedUrgencia === 'Todos' || task.urgencia.toLowerCase() === selectedUrgencia.toLowerCase();
@@ -123,7 +128,7 @@ export default function TasksPage() {
     if (!newSubject.trim()) return;
 
     const payload = {
-      project: newProject,
+      projectId: newProject,
       sector: newSector,
       subject: newSubject.trim(),
       description: newDesc.trim(),
@@ -236,7 +241,7 @@ export default function TasksPage() {
             >
               <option value="Todos">Todos</option>
               {projects.map(p => (
-                <option key={p.id} value={p.name}>{p.name}</option>
+                <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
           </div>
@@ -459,7 +464,7 @@ export default function TasksPage() {
                       className="bg-[#121214] border border-[#1E1E22] rounded-lg px-3 py-2 text-xs text-white focus:outline-none"
                     >
                       {projects.map(p => (
-                        <option key={p.id} value={p.name}>{p.name}</option>
+                        <option key={p.id} value={p.id}>{p.name}</option>
                       ))}
                     </select>
                   </div>
