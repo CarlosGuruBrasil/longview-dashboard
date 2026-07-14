@@ -2,32 +2,9 @@
 
 import React from 'react';
 import Image from 'next/image';
-import {
-  LayoutDashboard,
-  Users,
-  DollarSign,
-  Megaphone,
-  BarChart3,
-  Lightbulb,
-} from 'lucide-react';
 import { useData } from '../context/DataContext';
-import type { ActiveView } from '../types';
 import SidebarFooter from '@/components/app/SidebarFooter';
-
-interface NavItem {
-  icon: React.ElementType;
-  label: string;
-  view: ActiveView;
-}
-
-const NAV_ITEMS: NavItem[] = [
-  { icon: LayoutDashboard, label: 'Smart Dashboard',  view: 'dashboard'    },
-  { icon: Users,           label: 'Leads & Pipeline',  view: 'leads'        },
-  { icon: DollarSign,      label: 'Vendas & Projetos', view: 'vendas'       },
-  { icon: BarChart3,       label: 'Métricas',         view: 'metrics'      },
-  { icon: Lightbulb,       label: 'Inteligência',     view: 'intelligence' },
-  { icon: Megaphone,       label: 'Marketing',        view: 'marketing'    },
-];
+import { MARKETING_NAV_ITEMS } from './navigation';
 
 export default function Sidebar() {
   const { activeView, setActiveView } = useData();
@@ -52,7 +29,7 @@ export default function Sidebar() {
 
       {/* Nav items */}
       <nav className="flex-1 px-2 py-4 space-y-0.5">
-        {NAV_ITEMS.map(({ icon: Icon, label, view }) => {
+        {MARKETING_NAV_ITEMS.map(({ icon: Icon, label, view }) => {
           const isActive = activeView === view;
           return (
             <button

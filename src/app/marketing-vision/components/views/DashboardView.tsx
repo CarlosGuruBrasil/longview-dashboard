@@ -673,7 +673,7 @@ export default function DashboardView() {
 
       {/* ── Seção C: Origem dos Leads (Círculos) ── */}
       <GlassCard title="Origem dos Leads (Top 10 do Mês)">
-        <div className="flex flex-wrap items-center justify-center gap-4 py-8 px-4">
+        <div className="flex flex-nowrap overflow-x-auto items-center gap-4 py-6 px-4 custom-scrollbar pb-8">
           {origensData.length === 0 ? (
             <p className="text-zinc-500 text-center text-xs py-8">Nenhum lead encontrado no mês atual.</p>
           ) : (

@@ -1,11 +1,11 @@
 import type { ActiveView } from '../types';
 import {
   LayoutDashboard, Radio, MapPin, Megaphone, GitMerge, Cpu, Globe, Zap,
-  Users, BarChart3, DollarSign, Lightbulb, Building2, Antenna,
+  Users, BarChart3, DollarSign, Lightbulb, Antenna,
 } from 'lucide-react';
 
 export interface NavItem {
-  icon: React.ComponentType<{ size?: number; className?: string }>;
+  icon: React.ComponentType<{ size?: number; className?: string; strokeWidth?: number }>;
   label: string;
   view: ActiveView;
 }

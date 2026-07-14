@@ -238,7 +238,7 @@ export default function LeadsView() {
 
             {/* Tabela de Investimento por Fonte */}
             <GlassCard title="Investimento & leads por Fonte (Período Crescimento)">
-              <div className="overflow-x-auto">
+              <div className="max-h-[300px] overflow-y-auto overflow-x-auto custom-scrollbar">
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b border-white/10 text-zinc-400 font-semibold">

@@ -2,18 +2,15 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
-import {
-  LayoutDashboard, Users, DollarSign, BarChart3, Megaphone, Lightbulb, X,
-  ChevronRight, RefreshCw, GitMerge, Radio, MapPin, Cpu, Globe, Zap,
-} from 'lucide-react';
+import { X, ChevronRight, RefreshCw } from 'lucide-react';
 import { useData } from '../context/DataContext';
-import type { ActiveView } from '../types';
 import Sidebar from './Sidebar';
 import NotificationBanner from '@/components/NotificationBanner';
 import AppHeader from '@/components/app/AppHeader';
 import logger from '@/lib/logger'
 import SidebarFooter from '@/components/app/SidebarFooter';
 import PWAInstallBanner from '@/components/app/PWAInstallBanner';
+import { MARKETING_NAV_ITEMS, MARKETING_PRIMARY_NAV, MARKETING_VIEW_TITLES } from './navigation';
 
 function usePullToRefresh(onRefresh: () => Promise<void>) {
   const scrollRef = useRef<HTMLElement>(null);
@@ -59,60 +56,6 @@ function usePullToRefresh(onRefresh: () => Promise<void>) {
   return { scrollRef, pullY, refreshing, THRESHOLD };
 }
 
-const VIEW_TITLES: Record<ActiveView, string> = {
-  // ── Novas views refatoradas
-  comando:         'Central de Comando',
-  jornada:         'Jornada do Lead',
-  ads:             'Gestão de Ads',
-  assistente:      'Assistente de IA',
-  social:          'Central Social',
-  integracoes:     'Hub de Integrações',
-  // ── Funil e Vendas
-  funil:           'Funil Inteligente',
-  vendas:          'Vendas & Projetos',
-  // ── Legacy (mantidas)
-  dashboard:       'Smart Dashboard',
-  leads:           'Leads & Pipeline',
-  oportunidades:   'Oportunidades',
-  empreendimentos: 'Empreendimentos',
-  insights:        'BI Insights',
-  metrics:         'Métricas',
-  trafego:         'Tráfego',
-  marketing:       'Marketing',
-  intelligence:    'Inteligência',
-  publicar:        'Publicar',
-  audiences:       'Audiências CRM',
-  links:           'Links & QR',
-  score:           'Score',
-  fontes:          'Fontes de Leads',
-};
-
-// Nav móvel (5 botões principais da barra inferior)
-const PRIMARY_NAV = [
-  { icon: Radio,         label: 'Comando',  view: 'comando'    as ActiveView },
-  { icon: MapPin,        label: 'Jornada',  view: 'jornada'    as ActiveView },
-  { icon: Megaphone,     label: 'Ads',      view: 'ads'        as ActiveView },
-  { icon: GitMerge,      label: 'Funil',    view: 'funil'      as ActiveView },
-  { icon: Cpu,           label: 'IA',       view: 'assistente' as ActiveView },
-] as const;
-
-// Nav completo do drawer lateral
-const DRAWER_NAV = [
-  { icon: LayoutDashboard, label: 'Dashboard',           view: 'dashboard'    as ActiveView },
-  { icon: Radio,         label: 'Central de Comando',    view: 'comando'      as ActiveView },
-  { icon: MapPin,        label: 'Jornada do Lead',       view: 'jornada'      as ActiveView },
-  { icon: Megaphone,     label: 'Gestão de Ads',         view: 'ads'          as ActiveView },
-  { icon: BarChart3,     label: 'Marketing Ads (Gastos)', view: 'marketing'   as ActiveView },
-  { icon: Cpu,           label: 'Assistente de IA',      view: 'assistente'   as ActiveView },
-  { icon: Globe,         label: 'Central Social',        view: 'social'       as ActiveView },
-  { icon: GitMerge,      label: 'Funil Inteligente',     view: 'funil'        as ActiveView },
-  { icon: DollarSign,    label: 'Vendas & Projetos',     view: 'vendas'       as ActiveView },
-  { icon: Users,         label: 'Leads (Legacy)',        view: 'leads'        as ActiveView },
-  { icon: BarChart3,     label: 'Métricas',              view: 'metrics'      as ActiveView },
-  { icon: Lightbulb,     label: 'Inteligência',          view: 'intelligence' as ActiveView },
-  { icon: Zap,           label: 'Hub de Integrações',    view: 'integracoes'  as ActiveView },
-] as const;
-
 function useCurrentUser() {
   const [user, setUser] = useState<{ name?: string; role?: string } | null>(null);
   useEffect(() => {
@@ -140,7 +83,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const user = useCurrentUser();
 
-  const title = VIEW_TITLES[activeView] ?? 'Dashboard';
+  const title = MARKETING_VIEW_TITLES[activeView] ?? 'Dashboard';
 
   const { scrollRef, pullY, refreshing, THRESHOLD } = usePullToRefresh(
     useCallback(() => refresh(true), [refresh])
@@ -186,7 +129,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-0.5">
-          {DRAWER_NAV.map(({ icon: Icon, label, view }) => {
+          {MARKETING_NAV_ITEMS.map(({ icon: Icon, label, view }) => {
             const active = activeView === view;
             return (
               <button
@@ -289,7 +232,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         }}
       >
         <div className="flex items-end h-[60px] px-1">
-          {PRIMARY_NAV.map(({ icon: Icon, label, view }) => {
+          {MARKETING_PRIMARY_NAV.map(({ icon: Icon, label, view }) => {
             const active = activeView === view;
             return (
               <button
