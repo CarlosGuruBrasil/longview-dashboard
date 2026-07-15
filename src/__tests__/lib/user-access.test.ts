@@ -10,6 +10,7 @@ function makeUser(overrides: Partial<DbUser>): DbUser {
   };
 }
 
+const dev = makeUser({ id: 'usr-dev', role: 'Desenvolvedor' });
 const diretor = makeUser({ id: 'usr-dir', role: 'Diretoria' });
 const gestor = makeUser({ id: 'usr-gestor', role: 'Gestor' });
 const outroGestor = makeUser({ id: 'usr-gestor-2', role: 'Gestor' });
@@ -42,6 +43,14 @@ describe('canManageUserPermissions — escopo de equipe do Gestor', () => {
   it('Diretoria pode gerenciar qualquer colaborador de rank menor, sem escopo de equipe', () => {
     expect(canManageUserPermissions(diretor, naoReport)).toBe(true);
     expect(canManageUserPermissions(diretor, semManager)).toBe(true);
+  });
+  it('Desenvolvedor pode gerenciar qualquer colaborador, sem escopo de equipe (regressão: faltava esse branch)', () => {
+    expect(canManageUserPermissions(dev, naoReport)).toBe(true);
+    expect(canManageUserPermissions(dev, semManager)).toBe(true);
+    expect(canManageUserPermissions(dev, gestor)).toBe(true);
+  });
+  it('Desenvolvedor NÃO pode gerenciar permissões de outro Desenvolvedor', () => {
+    expect(canManageUserPermissions(dev, makeUser({ id: 'usr-dev-2', role: 'Desenvolvedor' }))).toBe(false);
   });
 });
 

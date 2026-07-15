@@ -94,10 +94,14 @@ export function canManageUserPermissions(viewer: DbUser, target: DbUser): boolea
   if (!canManageAllPeople(viewer)) return false;
   if (target.role === 'Desenvolvedor') return false;
 
+  // Desenvolvedor/isAdmin gerenciam qualquer colaborador (exceto outro Desenvolvedor, já barrado acima) —
+  // sem essa checagem explícita, caem no `return false` do final por não serem 'Diretoria' nem 'Gestor'.
+  if (viewer.role === 'Desenvolvedor' || viewer.permissions?.isAdmin === true) return true;
+
   const viewerRank = getManagementRank(viewer);
   const targetRank = getManagementRank(target);
 
-  // Diretoria/admin gerenciam qualquer rank abaixo, empresa inteira — sem escopo de equipe.
+  // Diretoria gerencia qualquer rank abaixo, empresa inteira — sem escopo de equipe.
   if (viewer.role === 'Diretoria') {
     return targetRank < viewerRank;
   }
