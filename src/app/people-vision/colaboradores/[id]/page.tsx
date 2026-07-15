@@ -41,6 +41,35 @@ const PROF_ID_BY_ROLE: Record<string, { type: string; label: string; placeholder
 const STATES_BR = ['AC','AL','AM','AP','BA','CE','DF','ES','GO','MA','MG','MS','MT',
   'PA','PB','PE','PI','PR','RJ','RN','RO','RR','RS','SC','SE','SP','TO'];
 
+// Cargos e departamentos já em uso na base — lista viva, cresce via "Outro" quando falta opção
+const DEPARTMENTS = [
+  'Comercial', 'Direção', 'Engenharia', 'Engenharia HUB', 'Engenharia Nautic',
+  'Financeiro', 'Fornecedores', 'Marketing', 'Relacionamento Cliente', 'Suprimentos',
+];
+
+const POSITIONS = [
+  'Almoxarife', 'Ambiental', 'Analista Administrativo', 'Analista Financeiro', 'Ancoragem',
+  'Análise Acústica', 'Análise térmica e lumínica', 'Arquitetura', 'Arquitetura - Legal e Executivo',
+  'Assistente Administrativo', 'Assistente Comercial', 'Assistente Engenharia civil',
+  'Assistente Financeiro', 'Assistente Relac. Cliente', 'Assistente Suprimentos',
+  'Assistente de Projetos', 'Automação', 'Auxiliar Engenharia Civil II', 'Auxiliar de Engenharia Civil',
+  'CFTV (segurança)', 'Consultoria de Paisagismo', 'Consultoria de marketing',
+  'Coordenador Assist.Técnica', 'Coordenadora de Incorporação', 'Coordenadora de Projetos',
+  'Coordenadora de Projetos e Licenças', 'Coordenadora de Suprimentos', 'Coordenação e Compatibilização',
+  'Coordendora Relac. Cliente', 'Diretor', 'Drenagem', 'ETE', 'Estagiário Marketing',
+  'Estagiário de Engenharia Civil', 'Estrutura', 'Estrutura de concreto', 'Exaustão',
+  'Gerente', 'Gerente Comercial', 'Gerente Financeiro', 'Gerente Geral de Obras',
+  'Gerente de Incorporação', 'Gerente de Obras', 'Gerente de Vendas', 'Imagens comerciais',
+  'Impermeabilização', 'Interiores', 'Interiores Comercial', 'Interiores áreas comerciais',
+  'Interiores áreas comuns', 'Luminotécnico', 'Líder de Projetos', 'Marketing', 'Orçamento',
+  'PPCI / Gás', 'Paisagismo', 'Piscina', 'Piscinas', 'Planejamento', 'Porteiro',
+  'Preventivo contra incêndio', 'Projeto de sistema de exaustão', 'Recepcionista e Relac. Cliente',
+  'Relatório de desempenho térmico', 'Sondagem', 'Supervisor Assist.Técnica', 'Supervisor de Obra',
+  'Supervisor de Qualidade e Engenharia', 'Terraplanagem', 'Topografia', 'Técnica Segurança do Trabalho',
+];
+
+const CUSTOM_OPT = '__outro__';
+
 const DOC_CATEGORIES = [
   { value: 'contrato_clt', label: 'Contrato CLT' },
   { value: 'contrato_pj',  label: 'Contrato PJ / Prestação de Serviços' },
@@ -218,7 +247,9 @@ export default function ColaboradorPage() {
   const [phone, setPhone]           = useState('');
   const [whatsapp, setWhatsapp]     = useState('');
   const [position, setPosition]     = useState('');
+  const [positionCustom, setPositionCustom] = useState(false);
   const [department, setDepartment] = useState('');
+  const [departmentCustom, setDepartmentCustom] = useState(false);
   const [company, setCompany]       = useState('');
   const [managerId, setManagerId]   = useState('');
   const [managers, setManagers]     = useState<{ id: string; name: string; role: string }[]>([]);
@@ -306,8 +337,12 @@ export default function ColaboradorPage() {
       setStatus(u.profile?.status ?? 'ativo');
       setPhone(u.profile?.phone ?? '');
       setWhatsapp(u.profile?.whatsapp ?? '');
-      setPosition(u.profile?.position ?? '');
-      setDepartment(u.profile?.department ?? '');
+      const loadedPosition = u.profile?.position ?? '';
+      setPosition(loadedPosition);
+      setPositionCustom(loadedPosition !== '' && !POSITIONS.includes(loadedPosition));
+      const loadedDepartment = u.profile?.department ?? '';
+      setDepartment(loadedDepartment);
+      setDepartmentCustom(loadedDepartment !== '' && !DEPARTMENTS.includes(loadedDepartment));
       setCompany(u.profile?.company ?? '');
       setManagerId(u.profile?.managerId ?? '');
       setActivatedAt(u.profile?.activatedAt?.slice(0, 10) ?? '');
@@ -530,10 +565,30 @@ export default function ColaboradorPage() {
             <Input value={user.email} readOnly />
           </Field>
           <Field label="Cargo / Posição">
-            <Input value={position} onChange={canEdit ? setPosition : undefined} placeholder="Ex: Corretor Senior" readOnly={!canEdit} />
+            <Select value={positionCustom ? CUSTOM_OPT : position}
+              onChange={v => {
+                if (!canEdit) return;
+                if (v === CUSTOM_OPT) { setPositionCustom(true); setPosition(''); }
+                else { setPositionCustom(false); setPosition(v); }
+              }}
+              options={[{ value: '', label: 'Selecione...' }, ...POSITIONS.map(p => ({ value: p, label: p })), { value: CUSTOM_OPT, label: 'Outro (digitar)' }]}
+              disabled={!canEdit} />
+            {positionCustom && (
+              <Input value={position} onChange={canEdit ? setPosition : undefined} placeholder="Digite o cargo" readOnly={!canEdit} />
+            )}
           </Field>
           <Field label="Departamento">
-            <Input value={department} onChange={canEdit ? setDepartment : undefined} placeholder="Ex: Comercial" readOnly={!canEdit} />
+            <Select value={departmentCustom ? CUSTOM_OPT : department}
+              onChange={v => {
+                if (!canEdit) return;
+                if (v === CUSTOM_OPT) { setDepartmentCustom(true); setDepartment(''); }
+                else { setDepartmentCustom(false); setDepartment(v); }
+              }}
+              options={[{ value: '', label: 'Selecione...' }, ...DEPARTMENTS.map(d => ({ value: d, label: d })), { value: CUSTOM_OPT, label: 'Outro (digitar)' }]}
+              disabled={!canEdit} />
+            {departmentCustom && (
+              <Input value={department} onChange={canEdit ? setDepartment : undefined} placeholder="Digite o departamento" readOnly={!canEdit} />
+            )}
           </Field>
           <Field label="Empresa">
             <Input value={company} onChange={canEdit ? setCompany : undefined} placeholder="Ex: Longview" readOnly={!canEdit} />
