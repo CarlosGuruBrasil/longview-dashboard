@@ -10,7 +10,7 @@ import SidebarFooter from './SidebarFooter';
 import PWAInstallBanner from './PWAInstallBanner';
 import type { ModuleKey } from './moduleNavigation';
 
-type Accent = 'blue' | 'emerald' | 'violet';
+type Accent = 'blue' | 'emerald' | 'violet' | 'teal';
 
 export interface SidebarItem {
   name: string;
@@ -40,6 +40,12 @@ const ACCENT: Record<Accent, { text: string; bg: string; border: string; avatar:
     bg: 'bg-emerald-500/15',
     border: 'border-emerald-500/30',
     avatar: 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400',
+  },
+  teal: {
+    text: 'text-teal-400',
+    bg: 'bg-teal-500/15',
+    border: 'border-teal-500/30',
+    avatar: 'bg-teal-500/20 border-teal-500/30 text-teal-400',
   },
   violet: {
     text: 'text-violet-400',

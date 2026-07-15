@@ -368,7 +368,7 @@ export async function seedDatabaseIfEmpty(): Promise<void> {
   const allPerms = createDefaultPermissions({
     viewMarketingDashboard: true, viewMarketingLeads: true, viewMarketingOportunidades: true,
     viewMarketingEstoque: true, viewMarketingAds: true, viewMarketingVendas: true,
-    viewProjectVision: true, manageProjects: true, manageCommentsDocs: true,
+    viewProjectVision: true, viewSiteVision: true, manageProjects: true, manageCommentsDocs: true,
     deleteTasks: true, viewPeopleVision: true, viewQualityVision: true, isAdmin: true,
   });
 

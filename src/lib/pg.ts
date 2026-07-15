@@ -230,6 +230,107 @@ export async function ensureSchema(): Promise<void> {
     await optionalSchemaStep('quality scope reverse index', () => sql`CREATE INDEX IF NOT EXISTS quality_inspection_scopes_scope_idx ON quality_inspection_scopes (scope_id, inspection_id)`);
 
     await sql`
+      CREATE TABLE IF NOT EXISTS site_public_settings (
+        key          TEXT PRIMARY KEY,
+        value        JSONB NOT NULL DEFAULT '{}'::jsonb,
+        description  TEXT NOT NULL DEFAULT '',
+        updated_by   TEXT NOT NULL DEFAULT 'Sistema',
+        updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS site_public_empreendimentos (
+        id                   TEXT PRIMARY KEY,
+        slug                 TEXT NOT NULL UNIQUE,
+        nome                 TEXT NOT NULL,
+        status_publicacao    TEXT NOT NULL DEFAULT 'draft' CHECK (status_publicacao IN ('draft', 'published', 'archived')),
+        destaque             BOOLEAN NOT NULL DEFAULT false,
+        exibir_na_home       BOOLEAN NOT NULL DEFAULT true,
+        crm_empreendimento_id BIGINT,
+        cidade               TEXT NOT NULL DEFAULT '',
+        bairro               TEXT NOT NULL DEFAULT '',
+        headline             TEXT NOT NULL DEFAULT '',
+        resumo               TEXT NOT NULL DEFAULT '',
+        descricao            TEXT NOT NULL DEFAULT '',
+        hero_image_url       TEXT NOT NULL DEFAULT '',
+        cta_label            TEXT NOT NULL DEFAULT 'Quero saber mais',
+        cta_target           TEXT NOT NULL DEFAULT '',
+        tags                 JSONB NOT NULL DEFAULT '[]'::jsonb,
+        highlights           JSONB NOT NULL DEFAULT '[]'::jsonb,
+        metadata             JSONB NOT NULL DEFAULT '{}'::jsonb,
+        published_at         TIMESTAMPTZ,
+        created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `;
+    await optionalSchemaStep('site_public empreendimentos slug index', () => sql`CREATE UNIQUE INDEX IF NOT EXISTS site_public_empreendimentos_slug_uidx ON site_public_empreendimentos (LOWER(slug))`);
+    await optionalSchemaStep('site_public empreendimentos status index', () => sql`CREATE INDEX IF NOT EXISTS site_public_empreendimentos_status_idx ON site_public_empreendimentos (status_publicacao, destaque, updated_at DESC)`);
+    await optionalSchemaStep('site_public empreendimentos crm index', () => sql`CREATE INDEX IF NOT EXISTS site_public_empreendimentos_crm_idx ON site_public_empreendimentos (crm_empreendimento_id)`);
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS site_public_media_assets (
+        id                 TEXT PRIMARY KEY,
+        empreendimento_id  TEXT NOT NULL REFERENCES site_public_empreendimentos(id) ON DELETE CASCADE,
+        kind               TEXT NOT NULL DEFAULT 'image' CHECK (kind IN ('image', 'video', 'brochure', 'floorplan', 'document', 'logo')),
+        origin             TEXT NOT NULL DEFAULT 'upload' CHECK (origin IN ('upload', 'cvcrm', 'external', 'legacy')),
+        title              TEXT NOT NULL DEFAULT '',
+        alt_text           TEXT NOT NULL DEFAULT '',
+        storage_key        TEXT NOT NULL DEFAULT '',
+        public_url         TEXT NOT NULL DEFAULT '',
+        thumbnail_url      TEXT NOT NULL DEFAULT '',
+        mime_type          TEXT NOT NULL DEFAULT '',
+        size_bytes         BIGINT,
+        width              INTEGER,
+        height             INTEGER,
+        is_primary         BOOLEAN NOT NULL DEFAULT false,
+        sort_order         INTEGER NOT NULL DEFAULT 0,
+        metadata           JSONB NOT NULL DEFAULT '{}'::jsonb,
+        created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `;
+    await optionalSchemaStep('site_public media empreendimento index', () => sql`CREATE INDEX IF NOT EXISTS site_public_media_assets_emp_idx ON site_public_media_assets (empreendimento_id, sort_order, created_at DESC)`);
+    await optionalSchemaStep('site_public media primary index', () => sql`CREATE INDEX IF NOT EXISTS site_public_media_assets_primary_idx ON site_public_media_assets (is_primary, empreendimento_id)`);
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS site_public_lead_submissions (
+        id                   TEXT PRIMARY KEY,
+        empreendimento_id    TEXT REFERENCES site_public_empreendimentos(id) ON DELETE SET NULL,
+        lead_nome            TEXT NOT NULL DEFAULT '',
+        lead_email           TEXT NOT NULL DEFAULT '',
+        lead_phone           TEXT NOT NULL DEFAULT '',
+        source               TEXT NOT NULL DEFAULT 'site',
+        status               TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'qualified', 'discarded', 'error')),
+        cvcrm_lead_id        BIGINT,
+        assigned_to          TEXT NOT NULL DEFAULT '',
+        message              TEXT NOT NULL DEFAULT '',
+        utm                  JSONB NOT NULL DEFAULT '{}'::jsonb,
+        payload              JSONB NOT NULL DEFAULT '{}'::jsonb,
+        error_message        TEXT NOT NULL DEFAULT '',
+        sent_to_cvcrm_at     TIMESTAMPTZ,
+        created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `;
+    await optionalSchemaStep('site_public leads status index', () => sql`CREATE INDEX IF NOT EXISTS site_public_lead_submissions_status_idx ON site_public_lead_submissions (status, created_at DESC)`);
+    await optionalSchemaStep('site_public leads empreendimento index', () => sql`CREATE INDEX IF NOT EXISTS site_public_lead_submissions_emp_idx ON site_public_lead_submissions (empreendimento_id, created_at DESC)`);
+    await optionalSchemaStep('site_public leads cvcrm index', () => sql`CREATE INDEX IF NOT EXISTS site_public_lead_submissions_cvcrm_idx ON site_public_lead_submissions (cvcrm_lead_id)`);
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS site_public_sync_runs (
+        id           BIGSERIAL PRIMARY KEY,
+        integration  TEXT NOT NULL CHECK (integration IN ('cvcrm', 'site-api', 'media-import', 'legacy-sync')),
+        status       TEXT NOT NULL CHECK (status IN ('success', 'warning', 'error', 'running')),
+        scope        TEXT NOT NULL DEFAULT '',
+        summary      TEXT NOT NULL DEFAULT '',
+        details      JSONB NOT NULL DEFAULT '{}'::jsonb,
+        created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `;
+    await optionalSchemaStep('site_public sync integration index', () => sql`CREATE INDEX IF NOT EXISTS site_public_sync_runs_integration_idx ON site_public_sync_runs (integration, created_at DESC)`);
+
+    await sql`
       CREATE TABLE IF NOT EXISTS cv_empreendimentos (
         id               BIGINT PRIMARY KEY,
         nome             TEXT,

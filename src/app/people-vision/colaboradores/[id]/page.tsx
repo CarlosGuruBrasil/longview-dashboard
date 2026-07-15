@@ -94,7 +94,7 @@ interface UserPerms {
   viewMarketingDashboard: boolean; viewMarketingLeads: boolean;
   viewMarketingOportunidades: boolean; viewMarketingEstoque: boolean;
   viewMarketingAds: boolean; viewMarketingVendas: boolean;
-  viewProjectVision: boolean; manageProjects: boolean;
+  viewProjectVision: boolean; viewSiteVision: boolean; manageProjects: boolean;
   manageCommentsDocs: boolean; deleteTasks: boolean;
   viewPeopleVision: boolean; viewQualityVision: boolean; viewSalesVision: boolean;
   isAdmin: boolean;
@@ -104,7 +104,7 @@ const DEFAULT_PERMS: UserPerms = {
   viewMarketingDashboard: false, viewMarketingLeads: false,
   viewMarketingOportunidades: false, viewMarketingEstoque: false,
   viewMarketingAds: false, viewMarketingVendas: false,
-  viewProjectVision: false, manageProjects: false,
+  viewProjectVision: false, viewSiteVision: false, manageProjects: false,
   manageCommentsDocs: false, deleteTasks: false,
   viewPeopleVision: false, viewQualityVision: false, viewSalesVision: false,
   isAdmin: false,
@@ -915,6 +915,7 @@ export default function ColaboradorPage() {
                 {([
                   ['viewPeopleVision',  'People Vision'],
                   ['viewQualityVision', 'Quality Vision'],
+                  ['viewSiteVision',    'Site Vision'],
                   ['viewSalesVision',   'Sales Vision'],
                   ['isAdmin',           'Administrador (acesso total)'],
                 ] as [keyof UserPerms, string][]).map(([key, label]) => (

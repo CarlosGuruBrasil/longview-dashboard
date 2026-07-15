@@ -8,6 +8,7 @@ import {
   TrendingUp,
   Users,
   ClipboardCheck,
+  MonitorSmartphone,
   ShoppingBag,
   ArrowRight,
   LogOut
@@ -21,6 +22,7 @@ interface SelectAppJwtPayload {
   role: string;
   permissions?: {
     viewProjectVision?: boolean;
+    viewSiteVision?: boolean;
     viewMarketingDashboard?: boolean;
     viewPeopleVision?: boolean;
     viewQualityVision?: boolean;
@@ -59,6 +61,21 @@ const APPS = [
     tagColor: 'text-orange-300/80',
     btnClass: 'bg-orange-500/90 hover:bg-orange-400 shadow-[0_12px_28px_rgba(249,115,22,0.18)]',
     permKey: 'hasMarketingAccess',
+  },
+  {
+    key: 'site',
+    href: '/site-vision',
+    label: 'Site Vision',
+    tag: 'Site & Operação',
+    description: 'Admin do site, portfólio publicado, integrações com CV CRM, saúde da base e gestão operacional da presença digital.',
+    icon: MonitorSmartphone,
+    color: 'teal',
+    accent: 'bg-teal-500/12 border-teal-400/20 text-teal-300',
+    cardHover: 'hover:border-teal-300/30 hover:bg-teal-500/[0.045]',
+    cardBorder: 'border-teal-400/15',
+    tagColor: 'text-teal-300/80',
+    btnClass: 'bg-teal-500/90 hover:bg-teal-400 shadow-[0_12px_28px_rgba(20,184,166,0.18)]',
+    permKey: 'hasSiteAccess',
   },
   {
     key: 'people',
@@ -124,6 +141,7 @@ export default async function SelectAppPage() {
 
   const access: Record<string, boolean> = {
     hasProjectAccess:   isDeveloper || permissions?.viewProjectVision === true,
+    hasSiteAccess:      isDeveloper || permissions?.viewSiteVision === true,
     hasMarketingAccess: isDeveloper || permissions?.viewMarketingDashboard === true,
     hasPeopleAccess:    isDeveloper || permissions?.viewPeopleVision === true,
     hasQualityAccess:   isDeveloper || permissions?.viewQualityVision === true,

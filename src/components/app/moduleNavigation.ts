@@ -4,12 +4,13 @@ import {
   Building2,
   ClipboardCheck,
   Grid3X3,
+  MonitorSmartphone,
   UsersRound,
   type LucideIcon,
 } from 'lucide-react';
 import type { User } from '@/context/UserContext';
 
-export type ModuleKey = 'project' | 'marketing' | 'people' | 'quality';
+export type ModuleKey = 'project' | 'site' | 'marketing' | 'people' | 'quality';
 
 export interface ModuleNavItem {
   key: ModuleKey;
@@ -40,6 +41,20 @@ export const MODULES: ModuleNavItem[] = [
     iconBgClass: 'bg-blue-500/12 border-blue-400/20 text-blue-300',
     buttonClass: 'bg-blue-500/90 hover:bg-blue-400 text-white',
     permission: 'viewProjectVision',
+  },
+  {
+    key: 'site',
+    name: 'Site Vision',
+    shortName: 'Site',
+    href: '/site-vision',
+    icon: MonitorSmartphone,
+    colorClass: 'text-teal-400',
+    bgClass: 'bg-teal-500/10 hover:bg-teal-500/16',
+    activeBgClass: 'bg-teal-500/10',
+    borderClass: 'border-teal-400/20',
+    iconBgClass: 'bg-teal-500/12 border-teal-400/20 text-teal-300',
+    buttonClass: 'bg-teal-500/90 hover:bg-teal-400 text-white',
+    permission: 'viewSiteVision',
   },
   {
     key: 'marketing',

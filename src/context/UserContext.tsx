@@ -11,6 +11,7 @@ export interface UserPermissions {
   viewMarketingAds: boolean;
   viewMarketingVendas: boolean;
   viewProjectVision: boolean;
+  viewSiteVision: boolean;
   manageProjects: boolean;
   manageCommentsDocs: boolean;
   deleteTasks: boolean;
@@ -54,6 +55,7 @@ const defaultUser: User = {
     viewMarketingAds: false,
     viewMarketingVendas: false,
     viewProjectVision: false,
+    viewSiteVision: false,
     manageProjects: false,
     manageCommentsDocs: false,
     deleteTasks: false,
