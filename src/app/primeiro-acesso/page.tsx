@@ -89,14 +89,19 @@ export default function PrimeiroAcessoPage() {
             <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider block">
               Confirmar nova senha
             </label>
-            <PasswordInput
-              autoComplete="new-password"
-              value={confirmPassword}
-              onChange={(event) => setConfirmPassword(event.target.value)}
-              required
-              inputClassName="w-full bg-[#1b1b1f] border border-[#2e2e34] rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition-all duration-200"
-              placeholder="Repita a senha"
-            />
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-zinc-500">
+                <KeyRound size={16} />
+              </div>
+              <PasswordInput
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                required
+                inputClassName="w-full bg-[#1b1b1f] border border-[#2e2e34] rounded-xl pl-10 pr-10 py-3 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition-all duration-200"
+                placeholder="Repita a senha"
+              />
+            </div>
           </div>
 
           <button
