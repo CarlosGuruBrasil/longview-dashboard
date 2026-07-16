@@ -18,6 +18,7 @@ import { kv } from '@/lib/kv';
 import axios from 'axios';
 import { sendCAPIEvents, type CAPIEvent } from '@/app/api/meta/capi/route';
 import { createCrmLead } from '@/lib/cvcrm';
+import { reengajarLeadPorContato } from '@/lib/leadReativacao';
 import logger from '@/lib/logger';
 import { sql, ensureSchema } from '@/lib/pg';
 
@@ -46,6 +47,7 @@ type ProcessStats = {
   sentToRD: number;
   sentToCV: number;
   capiSent: number;
+  reengaged: number;
   errors: number;
   ok: boolean;
 };
@@ -272,10 +274,21 @@ async function sendToRD(lead: MetaLead, score: number, midia: string, empreendim
   }
 }
 
+function isCron(request: NextRequest): boolean {
+  const secret = process.env.CRON_SECRET;
+  const auth   = request.headers.get('Authorization') || '';
+  if (!secret) return false; // fail-safe: exige CRON_SECRET em produção
+  return auth === `Bearer ${secret}`;
+}
+
 export async function GET(request: NextRequest) {
+  if (!isCron(request)) {
+    return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+  }
+
   const startedAt = new Date().toISOString();
   const log: string[]  = [];
-  const stats: ProcessStats = { startedAt, newLeads: 0, sentToRD: 0, sentToCV: 0, capiSent: 0, errors: 0, ok: false };
+  const stats: ProcessStats = { startedAt, newLeads: 0, sentToRD: 0, sentToCV: 0, capiSent: 0, reengaged: 0, errors: 0, ok: false };
 
   try {
     // Timestamp da última execução (padrão: 2h atrás)
@@ -345,6 +358,32 @@ export async function GET(request: NextRequest) {
           origem,
           mensagem: customFieldsMessage || undefined,
         };
+
+        // Lead já cadastrado preenchendo o formulário de novo? Reativa em vez de duplicar
+        // no CV CRM (mesma checagem do /api/meta/webhook — evita duplicata quando o
+        // contato já existe, seja de uma captura anterior via webhook ou via CV CRM).
+        let reengajado = false;
+        if (email || phone) {
+          try {
+            const reeng = await reengajarLeadPorContato({
+              email, telefone: phone,
+              motivo: `Reengajamento via Meta Ads (cron process-leads) — preencheu o formulário novamente. Campanha: ${campanha || '?'}`,
+            });
+            reengajado = reeng.ok;
+            log.push(`[reengajamento] lead ${lead.id}: ${reeng.reason}`);
+          } catch (e: unknown) {
+            // Nunca bloqueia o fluxo normal de criação por causa dessa checagem
+            log.push(`[WARN] checagem de reengajamento falhou para ${lead.id} — segue fluxo normal`);
+          }
+        }
+
+        if (reengajado) {
+          stats.reengaged++;
+          sendFCMPush(nome, empreendimento, campanha);
+          processedSet.add(lead.id);
+          log.push(`[OK] Lead ${lead.id} tratado como reengajamento — sem novo cadastro no CV CRM`);
+          continue;
+        }
 
         // Envia para o CV CRM
         const cvRes = await createCrmLead(parsed);
