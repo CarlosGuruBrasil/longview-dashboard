@@ -420,11 +420,14 @@ export default function ColaboradorPage() {
           emergencyContact: { name: ecName, phone: ecPhone, relationship: ecRel },
         },
       };
-      if (isSelf && currentPwd && newPwd) {
+      if (newPwd) {
         if (newPwd !== confirmPwd) { setError('Senhas não conferem'); return; }
         if (newPwd.length < 8)    { setError('Nova senha: mínimo 8 caracteres'); return; }
-        body.currentPassword = currentPwd;
-        body.newPassword     = newPwd;
+        if (isSelf) {
+          if (!currentPwd) { setError('Senha atual é obrigatória para alterar sua própria senha'); return; }
+          body.currentPassword = currentPwd;
+        }
+        body.newPassword = newPwd;
       }
       if (pageMeta.canChangeRole && !isSelf) body.role = role;
 
@@ -864,8 +867,8 @@ export default function ColaboradorPage() {
         </Section>
       )}
 
-      {/* ── Permissões do sistema (somente admin, não é o próprio) ── */}
-      {pageMeta.canManagePermissions && !isSelf && (
+      {/* ── Permissões do sistema (somente gestores/admins com permissão) ── */}
+      {pageMeta.canManagePermissions && (
         <Section title="Permissões do Sistema" icon={ShieldCheck} accent="text-amber-400">
           <div className="space-y-4">
             {/* Marketing Vision */}
@@ -940,14 +943,18 @@ export default function ColaboradorPage() {
       )}
 
       {/* ── Segurança ── */}
-      {(isSelf || id === currentUser?.id) && (
+      {(isSelf || isAdmin) && (
         <Section title="Segurança" icon={Lock}>
-          <p className="text-xs text-zinc-500 mb-3">Deixe em branco para não alterar a senha.</p>
+          <p className="text-xs text-zinc-500 mb-3">
+            {isSelf ? 'Deixe em branco para não alterar a senha.' : 'Como administrador, você pode forçar uma nova senha para este usuário.'}
+          </p>
           <div className="space-y-3">
-            <Field label="Senha atual">
-              <Input type="password" value={currentPwd} onChange={setCurrentPwd} placeholder="••••••••" />
-            </Field>
-            <Field label="Nova senha">
+            {isSelf && (
+              <Field label="Senha atual">
+                <Input type="password" value={currentPwd} onChange={setCurrentPwd} placeholder="••••••••" />
+              </Field>
+            )}
+            <Field label={isSelf ? "Nova senha" : "Nova senha (Admin Reset)"}>
               <Input type="password" value={newPwd} onChange={setNewPwd} placeholder="Mínimo 8 caracteres" />
             </Field>
             <Field label="Confirmar nova senha">

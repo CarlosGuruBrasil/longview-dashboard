@@ -3,6 +3,7 @@ import { verifyAuth, verifyAdminAuth } from '@/lib/auth';
 import { readUsers, writeUsers, UserProfileData } from '@/lib/db-kv';
 import { normalizePermissions, type UserPermissions } from '@/lib/permissions';
 import { canEditTargetUser, canManageAllPeople, canManageUserPermissions, canViewFullPeopleProfile, canViewAllPeopleReadOnly, canSetManagerId, sanitizeUserForDetail } from '@/lib/user-access';
+import bcrypt from 'bcryptjs';
 
 /** GET /api/admin/users/[id] */
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -50,6 +51,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     role?:        string;
     profile?:     Partial<UserProfileData>;
     permissions?: Partial<UserPermissions>;
+    newPassword?: string;
   };
 
   const users = await readUsers();
@@ -93,6 +95,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       // poderia se auto-atribuir liderados e burlar o escopo de canManageUserPermissions
       managerId: allowManagerChange ? (body.profile.managerId ?? user.profile?.managerId) : user.profile?.managerId,
     };
+  }
+
+  // Admin forçando troca de senha
+  if (admin && body.newPassword) {
+    user.passwordHash = await bcrypt.hash(body.newPassword, 10);
   }
 
   users[idx] = user;
