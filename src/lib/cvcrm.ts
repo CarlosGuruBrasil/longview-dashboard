@@ -41,6 +41,101 @@ export interface CrmLeadResult {
   id?:     string | number;
   raw?:    unknown;
   error?:  string;
+  action?: 'created' | 'reactivated' | 'annotated_existing';
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return typeof value === 'object' && value !== null ? value as Record<string, unknown> : {};
+}
+
+function toOptionalString(value: unknown): string | undefined {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed || undefined;
+  }
+  if (typeof value === 'number') return String(value);
+  return undefined;
+}
+
+function pickLeadId(lead: Record<string, unknown>): string | number | undefined {
+  return toOptionalString(lead.idlead) ?? toOptionalString(lead.id) ?? toOptionalString(asRecord(lead.lead).id) ?? toOptionalString(asRecord(lead.lead).idlead);
+}
+
+function pickSituacaoId(lead: Record<string, unknown>): number | null {
+  const situacao = asRecord(lead.situacao);
+  const raw = situacao.id ?? lead.idsituacao;
+  const parsed = raw != null ? Number(raw) : NaN;
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function pickCorretorId(lead: Record<string, unknown>): number | null {
+  const corretor = asRecord(lead.corretor);
+  const raw = corretor.id ?? lead.idcorretor;
+  const parsed = raw != null ? Number(raw) : NaN;
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function isLikelyDuplicateError(detail: string): boolean {
+  const normalized = detail.toLowerCase();
+  return [
+    'duplic',
+    'ja existe',
+    'já existe',
+    'existente',
+    'erro_ao_alterar_lead',
+    'lead existente',
+    'lead ja cadastrado',
+    'lead já cadastrado',
+  ].some((token) => normalized.includes(token));
+}
+
+function buildDuplicateMotivo(lead: CrmLeadInput): string {
+  const origem = lead.origem ?? 'Origem não informada';
+  const parts = [
+    `Lead recorrente identificado.`,
+    `Origem: ${origem}.`,
+    lead.midia ? `Mídia/Campanha: ${lead.midia}.` : '',
+    lead.empreendimento ? `Empreendimento: ${lead.empreendimento}.` : '',
+    lead.mensagem ? `Observação capturada: ${lead.mensagem}.` : '',
+  ].filter(Boolean);
+  return parts.join(' ').slice(0, 32000);
+}
+
+async function anotarLeadExistente(input: {
+  idlead: string | number;
+  email?: string;
+  telefone?: string;
+  motivo: string;
+}): Promise<ReativarLeadResult> {
+  try {
+    const payload: Record<string, unknown> = {
+      idlead: input.idlead,
+      permitir_alteracao: true,
+      ...(input.email ? { email: input.email } : {}),
+      ...(input.telefone ? { telefone: input.telefone } : {}),
+      interacoes: [{
+        tipo: 'A',
+        descricao: input.motivo.slice(0, 32000),
+      }],
+    };
+
+    const res = await axios.post(
+      `${CRM_BASE}/comercial/leads`,
+      payload,
+      { headers: crmHeaders(), timeout: CRM_TIMEOUT }
+    );
+
+    logger.info({ idlead: input.idlead }, '[cvcrm] lead existente anotado');
+    return { ok: true, raw: res.data };
+  } catch (err: unknown) {
+    const data = axios.isAxiosError(err) ? err.response?.data as { message?: string; error?: string } | undefined : undefined;
+    const detail =
+      data?.message ??
+      data?.error   ??
+      (err instanceof Error ? err.message : String(err));
+    logger.warn({ idlead: input.idlead, detail }, '[cvcrm] anotar lead existente falhou');
+    return { ok: false, error: detail };
+  }
 }
 
 /**
@@ -73,7 +168,7 @@ export async function createCrmLead(lead: CrmLeadInput): Promise<CrmLeadResult> 
     const id   = data.idlead ?? data.id ?? data.lead?.id ?? data.lead?.idlead;
 
     logger.info({ id, nome: lead.nome }, '[cvcrm] lead criado');
-    return { ok: true, id, raw: data };
+    return { ok: true, id, raw: data, action: 'created' };
 
   } catch (err: unknown) {
     const data = axios.isAxiosError(err) ? err.response?.data as { message?: string; error?: string } | undefined : undefined;
@@ -81,6 +176,58 @@ export async function createCrmLead(lead: CrmLeadInput): Promise<CrmLeadResult> 
       data?.message ??
       data?.error   ??
       (err instanceof Error ? err.message : String(err));
+
+    if ((lead.email || lead.telefone) && isLikelyDuplicateError(detail)) {
+      const existing = await findCrmLeadByContact(lead.email, lead.telefone);
+      const existingLead = asRecord(existing);
+      const existingId = pickLeadId(existingLead);
+
+      if (existingId) {
+        const motivo = buildDuplicateMotivo(lead);
+        const idsituacaoAtual = pickSituacaoId(existingLead);
+        const idcorretor = pickCorretorId(existingLead);
+        const email = toOptionalString(existingLead.email) ?? lead.email;
+        const telefone = toOptionalString(existingLead.telefone) ?? toOptionalString(existingLead.celular) ?? lead.telefone;
+
+        if (idsituacaoAtual != null && !idsituacaoExcluidaDeReativacao(idsituacaoAtual)) {
+          const reactivation = await reativarLead({
+            idlead: existingId,
+            email,
+            telefone,
+            idcorretor,
+            motivo,
+          });
+
+          if (reactivation.ok) {
+            logger.info({ id: existingId, nome: lead.nome }, '[cvcrm] lead duplicado reativado');
+            return {
+              ok: true,
+              id: existingId,
+              raw: { existing: existingLead, reactivation: reactivation.raw },
+              action: 'reactivated',
+            };
+          }
+        }
+
+        const annotation = await anotarLeadExistente({
+          idlead: existingId,
+          email,
+          telefone,
+          motivo,
+        });
+
+        if (annotation.ok) {
+          logger.info({ id: existingId, nome: lead.nome }, '[cvcrm] lead duplicado anotado');
+          return {
+            ok: true,
+            id: existingId,
+            raw: { existing: existingLead, annotation: annotation.raw },
+            action: 'annotated_existing',
+          };
+        }
+      }
+    }
+
     logger.warn({ detail, nome: lead.nome, email: lead.email, telefone: lead.telefone }, '[cvcrm] createLead falhou');
     return { ok: false, error: detail };
   }
