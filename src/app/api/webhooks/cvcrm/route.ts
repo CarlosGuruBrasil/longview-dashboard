@@ -216,7 +216,7 @@ export async function POST(request: NextRequest) {
         await sql`
           INSERT INTO lead_stage_history (lead_id, lead_nome, de, para, autor, raw)
           VALUES (${id}, ${full.nome ?? null}, ${prev?.status ?? null}, ${statusNomeV},
-                  ${autor ? String(autor) : null}, ${JSON.stringify(full)})
+                  ${autor ? String(autor) : null}, ${sql.json(full as never)})
         `;
       }
     }
@@ -238,7 +238,7 @@ export async function POST(request: NextRequest) {
         ${sqlScalar(full.temperatura)},
         ${parseCrmDate(full.data_cad ?? full.data_cadastro)},
         ${parseCrmDate(full.data_atualizacao)},
-        ${full as never},
+        ${sql.json(full as never)},
         NOW()
       )
       ON CONFLICT (id) DO UPDATE SET

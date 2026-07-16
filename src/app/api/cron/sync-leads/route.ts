@@ -142,7 +142,7 @@ export async function GET(request: NextRequest) {
           VALUES
             (${id}, ${nome}, ${email_lead}, ${telefone}, ${origem}, ${status},
              ${empreend}, ${score}, ${temperatura}, ${dataCad}, ${dataAtual},
-             ${lead as never}, NOW())
+             ${sql.json(lead as never)}, NOW())
           ON CONFLICT (id) DO UPDATE SET
             nome             = EXCLUDED.nome,
             email            = EXCLUDED.email,

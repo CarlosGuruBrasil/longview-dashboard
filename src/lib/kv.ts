@@ -14,7 +14,7 @@ async function optionalKvSchemaStep(label: string, step: () => Promise<unknown>)
   } catch (error) {
     const pgError = error as { code?: string; message?: string };
     if (pgError.code === '42501') {
-      logger.warn(`[kv] optional schema step skipped ($): $`);
+      logger.warn({ label, message: pgError.message }, '[kv] optional schema step skipped');
       return;
     }
     throw error;

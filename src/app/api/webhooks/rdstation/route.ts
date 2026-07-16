@@ -56,7 +56,7 @@ async function saveToPostgres(
         ${null}, ${null},
         ${new Date().toISOString()},
         ${new Date().toISOString()},
-        ${rawVal as never},
+        ${sql.json(rawVal as never)},
         NOW()
       )
       ON CONFLICT (id) DO UPDATE SET
@@ -66,7 +66,7 @@ async function saveToPostgres(
         origem           = COALESCE(leads.origem, EXCLUDED.origem),
         empreendimento   = COALESCE(leads.empreendimento, EXCLUDED.empreendimento),
         data_atualizacao = EXCLUDED.data_atualizacao,
-        raw              = leads.raw || jsonb_build_object('_rd', ${rdRaw as never}),
+        raw              = leads.raw || ${sql.json({ _rd: rdRaw } as never)},
         synced_at        = NOW()
     `;
   } catch (e: unknown) {
