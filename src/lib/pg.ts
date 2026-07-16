@@ -29,7 +29,7 @@ async function optionalSchemaStep(label: string, step: () => Promise<unknown>): 
   } catch (error) {
     const pgError = error as { code?: string; message?: string };
     if (pgError.code === '42501') {
-      logger.warn(`[pg] optional schema step skipped ($): $`);
+      logger.warn({ label, message: pgError.message }, '[pg] optional schema step skipped');
       return;
     }
     throw error;
@@ -329,6 +329,168 @@ export async function ensureSchema(): Promise<void> {
       )
     `;
     await optionalSchemaStep('site_public sync integration index', () => sql`CREATE INDEX IF NOT EXISTS site_public_sync_runs_integration_idx ON site_public_sync_runs (integration, created_at DESC)`);
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS integration_events (
+        id            BIGSERIAL PRIMARY KEY,
+        system_source TEXT NOT NULL,
+        system_target TEXT NOT NULL DEFAULT '',
+        entity_type   TEXT NOT NULL DEFAULT 'lead',
+        entity_id     TEXT NOT NULL DEFAULT '',
+        external_id   TEXT NOT NULL DEFAULT '',
+        status        TEXT NOT NULL CHECK (status IN ('received', 'processed', 'sent', 'warning', 'error', 'skipped')),
+        summary       TEXT NOT NULL DEFAULT '',
+        detail        TEXT NOT NULL DEFAULT '',
+        payload       JSONB NOT NULL DEFAULT '{}'::jsonb,
+        created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `;
+    await optionalSchemaStep('integration_events source target index', () => sql`CREATE INDEX IF NOT EXISTS integration_events_source_target_idx ON integration_events (system_source, system_target, created_at DESC)`);
+    await optionalSchemaStep('integration_events status index', () => sql`CREATE INDEX IF NOT EXISTS integration_events_status_idx ON integration_events (status, created_at DESC)`);
+    await optionalSchemaStep('integration_events entity index', () => sql`CREATE INDEX IF NOT EXISTS integration_events_entity_idx ON integration_events (entity_type, entity_id, created_at DESC)`);
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS site_public_resales (
+        id                  TEXT PRIMARY KEY,
+        cv_unidade_id       BIGINT NOT NULL,
+        cv_empreendimento_id BIGINT NOT NULL,
+        slug                TEXT NOT NULL UNIQUE,
+        status_publicacao   TEXT NOT NULL DEFAULT 'draft' CHECK (status_publicacao IN ('draft', 'published', 'archived', 'sold')),
+        destaque            BOOLEAN NOT NULL DEFAULT false,
+        titulo_publico      TEXT NOT NULL DEFAULT '',
+        descricao_publica   TEXT NOT NULL DEFAULT '',
+        preco_revenda       NUMERIC,
+        valor_condominio    NUMERIC,
+        valor_iptu          NUMERIC,
+        aceita_financiamento BOOLEAN NOT NULL DEFAULT false,
+        permuta             BOOLEAN NOT NULL DEFAULT false,
+        corretor_nome       TEXT NOT NULL DEFAULT '',
+        corretor_telefone   TEXT NOT NULL DEFAULT '',
+        corretor_email      TEXT NOT NULL DEFAULT '',
+        origem_revenda      TEXT NOT NULL DEFAULT 'proprietario' CHECK (origem_revenda IN ('proprietario', 'imobiliaria', 'interna')),
+        hero_image_url      TEXT NOT NULL DEFAULT '',
+        metadata            JSONB NOT NULL DEFAULT '{}'::jsonb,
+        created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `;
+    await optionalSchemaStep('site_public resales slug index', () => sql`CREATE UNIQUE INDEX IF NOT EXISTS site_public_resales_slug_uidx ON site_public_resales (LOWER(slug))`);
+    await optionalSchemaStep('site_public resales status index', () => sql`CREATE INDEX IF NOT EXISTS site_public_resales_status_idx ON site_public_resales (status_publicacao, destaque, updated_at DESC)`);
+    await optionalSchemaStep('site_public resales unidade index', () => sql`CREATE INDEX IF NOT EXISTS site_public_resales_unit_idx ON site_public_resales (cv_unidade_id)`);
+    await optionalSchemaStep('site_public resales owner_name column', () => sql`ALTER TABLE site_public_resales ADD COLUMN IF NOT EXISTS owner_name TEXT NOT NULL DEFAULT ''`);
+    await optionalSchemaStep('site_public resales owner_phone column', () => sql`ALTER TABLE site_public_resales ADD COLUMN IF NOT EXISTS owner_phone TEXT NOT NULL DEFAULT ''`);
+    await optionalSchemaStep('site_public resales owner_email column', () => sql`ALTER TABLE site_public_resales ADD COLUMN IF NOT EXISTS owner_email TEXT NOT NULL DEFAULT ''`);
+    await optionalSchemaStep('site_public resales owner_document column', () => sql`ALTER TABLE site_public_resales ADD COLUMN IF NOT EXISTS owner_document TEXT NOT NULL DEFAULT ''`);
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS site_public_unit_visibility (
+        cv_unidade_id        BIGINT PRIMARY KEY,
+        cv_empreendimento_id BIGINT NOT NULL,
+        visible_on_site      BOOLEAN NOT NULL DEFAULT true,
+        updated_by           TEXT NOT NULL DEFAULT 'Sistema',
+        updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `;
+    await optionalSchemaStep('site_public unit visibility empreendimento index', () => sql`CREATE INDEX IF NOT EXISTS site_public_unit_visibility_emp_idx ON site_public_unit_visibility (cv_empreendimento_id, visible_on_site, updated_at DESC)`);
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS site_public_internal_tables (
+        id                   TEXT PRIMARY KEY,
+        site_empreendimento_id TEXT REFERENCES site_public_empreendimentos(id) ON DELETE CASCADE,
+        cv_empreendimento_id  BIGINT,
+        title                TEXT NOT NULL,
+        version_label        TEXT NOT NULL DEFAULT '',
+        mime_type            TEXT,
+        size_bytes           BIGINT,
+        storage_key          TEXT NOT NULL DEFAULT '',
+        public_url           TEXT NOT NULL DEFAULT '',
+        data                 BYTEA,
+        metadata             JSONB NOT NULL DEFAULT '{}'::jsonb,
+        created_by           TEXT NOT NULL DEFAULT '',
+        created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `;
+    await optionalSchemaStep('site_public internal tables project index', () => sql`CREATE INDEX IF NOT EXISTS site_public_internal_tables_project_idx ON site_public_internal_tables (site_empreendimento_id, updated_at DESC)`);
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS site_public_gated_assets (
+        id                   TEXT PRIMARY KEY,
+        site_empreendimento_id TEXT REFERENCES site_public_empreendimentos(id) ON DELETE CASCADE,
+        title                TEXT NOT NULL,
+        slug                 TEXT NOT NULL UNIQUE,
+        asset_type           TEXT NOT NULL CHECK (asset_type IN ('ebook', 'brochure', 'document')),
+        storage_key          TEXT NOT NULL DEFAULT '',
+        public_url           TEXT NOT NULL DEFAULT '',
+        thumbnail_url        TEXT NOT NULL DEFAULT '',
+        mime_type            TEXT NOT NULL DEFAULT '',
+        size_bytes           BIGINT,
+        active               BOOLEAN NOT NULL DEFAULT true,
+        lead_tag             TEXT NOT NULL DEFAULT 'ebook',
+        metadata             JSONB NOT NULL DEFAULT '{}'::jsonb,
+        created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `;
+    await optionalSchemaStep('site_public gated assets project index', () => sql`CREATE INDEX IF NOT EXISTS site_public_gated_assets_project_idx ON site_public_gated_assets (site_empreendimento_id, active, updated_at DESC)`);
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS site_public_analytics_events (
+        id                   BIGSERIAL PRIMARY KEY,
+        session_id           TEXT NOT NULL,
+        anonymous_id         TEXT NOT NULL DEFAULT '',
+        event_name           TEXT NOT NULL,
+        page_url             TEXT NOT NULL DEFAULT '',
+        page_path            TEXT NOT NULL DEFAULT '',
+        referrer             TEXT NOT NULL DEFAULT '',
+        site_empreendimento_id TEXT REFERENCES site_public_empreendimentos(id) ON DELETE SET NULL,
+        site_resale_id       TEXT REFERENCES site_public_resales(id) ON DELETE SET NULL,
+        cv_empreendimento_id BIGINT,
+        cv_unidade_id        BIGINT,
+        button_name          TEXT NOT NULL DEFAULT '',
+        source               TEXT NOT NULL DEFAULT '',
+        utm                  JSONB NOT NULL DEFAULT '{}'::jsonb,
+        properties           JSONB NOT NULL DEFAULT '{}'::jsonb,
+        consent_scope        JSONB NOT NULL DEFAULT '{}'::jsonb,
+        created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `;
+    await optionalSchemaStep('site_public analytics page index', () => sql`CREATE INDEX IF NOT EXISTS site_public_analytics_events_page_idx ON site_public_analytics_events (page_path, created_at DESC)`);
+    await optionalSchemaStep('site_public analytics event index', () => sql`CREATE INDEX IF NOT EXISTS site_public_analytics_events_name_idx ON site_public_analytics_events (event_name, created_at DESC)`);
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS site_public_cookie_consents (
+        id                   BIGSERIAL PRIMARY KEY,
+        session_id           TEXT NOT NULL,
+        anonymous_id         TEXT NOT NULL DEFAULT '',
+        consent_version      TEXT NOT NULL,
+        necessary            BOOLEAN NOT NULL DEFAULT true,
+        analytics            BOOLEAN NOT NULL DEFAULT false,
+        marketing            BOOLEAN NOT NULL DEFAULT false,
+        source               TEXT NOT NULL DEFAULT 'banner',
+        locale               TEXT NOT NULL DEFAULT 'pt-BR',
+        user_agent_hash      TEXT NOT NULL DEFAULT '',
+        ip_hash              TEXT NOT NULL DEFAULT '',
+        created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `;
+    await optionalSchemaStep('site_public cookie consents session index', () => sql`CREATE INDEX IF NOT EXISTS site_public_cookie_consents_session_idx ON site_public_cookie_consents (session_id, created_at DESC)`);
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS site_public_page_snapshots (
+        id                   BIGSERIAL PRIMARY KEY,
+        page_type            TEXT NOT NULL,
+        page_key             TEXT NOT NULL,
+        page_path            TEXT NOT NULL,
+        views                INTEGER NOT NULL DEFAULT 0,
+        unique_sessions      INTEGER NOT NULL DEFAULT 0,
+        lead_submissions     INTEGER NOT NULL DEFAULT 0,
+        cta_clicks           INTEGER NOT NULL DEFAULT 0,
+        whatsapp_clicks      INTEGER NOT NULL DEFAULT 0,
+        updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `;
+    await optionalSchemaStep('site_public page snapshots path index', () => sql`CREATE INDEX IF NOT EXISTS site_public_page_snapshots_path_idx ON site_public_page_snapshots (page_path, updated_at DESC)`);
 
     await sql`
       CREATE TABLE IF NOT EXISTS cv_empreendimentos (

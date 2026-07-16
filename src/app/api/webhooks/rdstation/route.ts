@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createCrmLead } from '@/lib/cvcrm';
+import { recordIntegrationEvent } from '@/lib/integration-events';
 import logger from '@/lib/logger';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -150,6 +151,18 @@ export async function POST(req: NextRequest) {
         mensagem
       };
 
+      await recordIntegrationEvent({
+        systemSource: 'rdstation',
+        systemTarget: 'longview',
+        entityType: 'lead',
+        entityId: lead.id || lead.uuid || email || telefone || nome,
+        externalId: email || telefone || '',
+        status: 'received',
+        summary: 'Webhook de lead recebido do RD Station',
+        detail: midia,
+        payload: { email, telefone, empreendimento, midia },
+      });
+
       // Tenta criar no CV CRM
       let cvId: string | number | undefined;
       try {
@@ -165,13 +178,46 @@ export async function POST(req: NextRequest) {
         const cvRes = await createCrmLead(createParams);
         cvId = cvRes?.id;
         if (cvId) processedCount.cv++;
+        await recordIntegrationEvent({
+          systemSource: 'longview',
+          systemTarget: 'cvcrm',
+          entityType: 'lead',
+          entityId: cvId ?? email ?? telefone ?? nome,
+          externalId: email || telefone || '',
+          status: cvId ? 'sent' : 'warning',
+          summary: cvId ? 'Lead do RD Station enviado ao CV CRM' : 'RD Station processado sem ID retornado pelo CV CRM',
+          detail: midia,
+          payload: { empreendimento, origem, midia },
+        });
       } catch (cvErr: unknown) {
-        logger.warn({ cvErr: cvErr instanceof Error ? cvErr.message : String(cvErr) }, '[rdstation/webhook] CV CRM failed');
+        const detail = cvErr instanceof Error ? cvErr.message : String(cvErr);
+        logger.warn({ cvErr: detail }, '[rdstation/webhook] CV CRM failed');
+        await recordIntegrationEvent({
+          systemSource: 'longview',
+          systemTarget: 'cvcrm',
+          entityType: 'lead',
+          entityId: email || telefone || nome,
+          externalId: email || telefone || '',
+          status: 'error',
+          summary: 'Falha ao encaminhar lead do RD Station para o CV CRM',
+          detail,
+          payload: { empreendimento, origem, midia },
+        });
       }
 
       // Salva no Postgres
       await saveToPostgres(lead, parsed, cvId);
       processedCount.db++;
+      await recordIntegrationEvent({
+        systemSource: 'rdstation',
+        systemTarget: 'longview',
+        entityType: 'lead',
+        entityId: cvId ?? email ?? telefone ?? nome,
+        externalId: email || telefone || '',
+        status: 'processed',
+        summary: 'Lead do RD Station persistido no LongView',
+        detail: cvId ? `CV CRM ${cvId}` : 'Persistido sem ID do CV CRM',
+      });
 
       // Envia notificação Push
       sendFCMPush(nome, empreendimento, midia);
@@ -181,6 +227,14 @@ export async function POST(req: NextRequest) {
 
   } catch (error) {
     logger.error({ error }, '[rdstation/webhook] Erro no processamento do webhook');
+    await recordIntegrationEvent({
+      systemSource: 'rdstation',
+      systemTarget: 'longview',
+      entityType: 'lead',
+      status: 'error',
+      summary: 'Erro geral no processamento do webhook do RD Station',
+      detail: error instanceof Error ? error.message : String(error),
+    });
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
   }
 }

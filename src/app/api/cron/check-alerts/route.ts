@@ -127,7 +127,7 @@ export async function GET(req: NextRequest) {
         pushSent++;
       }
     } catch (e) {
-      logger.error({ e }, '[check-alerts] falha ao enviar push para $:');
+      logger.error({ error: e, alertId: alert.id }, '[check-alerts] falha ao enviar push');
     }
   }
 
@@ -146,7 +146,7 @@ export async function GET(req: NextRequest) {
     warning: alerts.filter(a => a.severity === 'warning').length,
   };
 
-  logger.info(`[check-alerts] $ críticos, $ avisos → $ push enviados`);
+  logger.info({ critical: counts.critical, warning: counts.warning, pushSent }, '[check-alerts] resumo');
 
   return NextResponse.json({
     ok: true,

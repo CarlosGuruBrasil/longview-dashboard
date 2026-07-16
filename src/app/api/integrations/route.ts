@@ -53,8 +53,8 @@ export async function GET() {
   }[]>`SELECT id, platform, name, status, account_id, account_name, last_sync, error_message FROM integrations ORDER BY created_at ASC`;
 
   // Integração da Meta via variáveis de ambiente (sempre presente se configurada)
-  const metaToken = process.env.META_ACCESS_TOKEN;
-  const metaAccountId = process.env.META_AD_ACCOUNT_ID;
+  const metaToken = process.env.META_TOKEN || process.env.META_ACCESS_TOKEN;
+  const metaAccountId = process.env.META_ACT_ID || process.env.META_AD_ACCOUNT_ID;
   const cvEmail = process.env.CV_CRM_EMAIL;
   const cvToken = process.env.CV_CRM_TOKEN;
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parseCrmDate } from '@/lib/dateUtils';
+import { recordIntegrationEvent } from '@/lib/integration-events';
 import logger from '@/lib/logger'
 import type { CAPIEvent } from '@/app/api/meta/capi/route';
 
@@ -123,6 +124,16 @@ export async function POST(request: NextRequest) {
           id_empreendimento = EXCLUDED.id_empreendimento, id_unidade = EXCLUDED.id_unidade, valor = EXCLUDED.valor,
           data_venda = EXCLUDED.data_venda, status = EXCLUDED.status, raw = EXCLUDED.raw, synced_at = EXCLUDED.synced_at
       `;
+      await recordIntegrationEvent({
+        systemSource: 'cvcrm',
+        systemTarget: 'longview',
+        entityType: 'venda',
+        entityId: vendaId,
+        externalId: vendaId,
+        status: 'processed',
+        summary: 'Webhook de venda processado do CV CRM',
+        detail: String(v.idempreendimento ?? ''),
+      });
       logger.info(`[webhook/cvcrm] Venda ${vendaId} upserted`);
       return NextResponse.json({ ok: true });
     }
@@ -150,6 +161,16 @@ export async function POST(request: NextRequest) {
         ON CONFLICT (id) DO UPDATE SET
           status = EXCLUDED.status, status_venda = EXCLUDED.status_venda, valor = EXCLUDED.valor, raw = EXCLUDED.raw, synced_at = EXCLUDED.synced_at
       `;
+      await recordIntegrationEvent({
+        systemSource: 'cvcrm',
+        systemTarget: 'longview',
+        entityType: 'unidade',
+        entityId: unidadeId,
+        externalId: unidadeId,
+        status: 'processed',
+        summary: 'Webhook de unidade processado do CV CRM',
+        detail: statusText,
+      });
       logger.info(`[webhook/cvcrm] Unidade ${unidadeId} upserted`);
       return NextResponse.json({ ok: true });
     }
@@ -165,6 +186,16 @@ export async function POST(request: NextRequest) {
     if (!/^\d{1,15}$/.test(String(leadId))) {
       return NextResponse.json({ ok: false, error: 'id inválido' }, { status: 400 });
     }
+
+    await recordIntegrationEvent({
+      systemSource: 'cvcrm',
+      systemTarget: 'longview',
+      entityType: 'lead',
+      entityId: leadId,
+      externalId: leadId,
+      status: 'received',
+      summary: 'Webhook de lead recebido do CV CRM',
+    });
 
     // Se veio sem os campos (só id), busca o lead completo na API do CV.
     let full = lead;
@@ -223,12 +254,28 @@ export async function POST(request: NextRequest) {
         data_atualizacao = EXCLUDED.data_atualizacao,
         raw              = CASE
           WHEN leads.raw ? '_meta'
-          THEN EXCLUDED.raw || jsonb_build_object('_meta', leads.raw->'_meta')
+          THEN EXCLUDED.raw
+            || jsonb_build_object('_meta', leads.raw->'_meta')
+            || CASE
+              WHEN leads.raw ? '_meta_lead_id'
+              THEN jsonb_build_object('_meta_lead_id', leads.raw->'_meta_lead_id')
+              ELSE '{}'::jsonb
+            END
           ELSE EXCLUDED.raw
         END,
         synced_at        = NOW()
     `;
 
+    await recordIntegrationEvent({
+      systemSource: 'cvcrm',
+      systemTarget: 'longview',
+      entityType: 'lead',
+      entityId: id,
+      externalId: id,
+      status: 'processed',
+      summary: 'Lead do CV CRM persistido no LongView',
+      detail: statusNomeV ?? '',
+    });
     logger.info(`[webhook/cvcrm] lead ${id} upserted (${statusNomeV ?? '?'})`);
 
     // ── CAPI: envia evento de etapa ao pixel da Meta ─────────────────────
@@ -308,6 +355,14 @@ export async function POST(request: NextRequest) {
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     logger.error({ msg }, '[webhook/cvcrm]');
+    await recordIntegrationEvent({
+      systemSource: 'cvcrm',
+      systemTarget: 'longview',
+      entityType: 'lead',
+      status: 'error',
+      summary: 'Erro ao processar webhook do CV CRM',
+      detail: msg,
+    });
     // Grava falha para retry manual — não retorna 500 para o CV não parar de reenviar
     try {
       const { sql } = await import('@/lib/pg');

@@ -25,6 +25,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
 import { createCrmLead } from '@/lib/cvcrm';
+import { recordIntegrationEvent } from '@/lib/integration-events';
 import logger from '@/lib/logger'
 
 const META_BASE    = 'https://graph.facebook.com/v21.0';
@@ -181,7 +182,7 @@ async function saveToPostgres(
         ${null}, ${null},
         ${lead.created_time ? new Date(lead.created_time).toISOString() : null},
         ${new Date().toISOString()},
-        ${rawVal as never},
+        ${sql.json(rawVal as never)},
         NOW()
       )
       ON CONFLICT (id) DO UPDATE SET
@@ -191,7 +192,11 @@ async function saveToPostgres(
         origem           = COALESCE(leads.origem, EXCLUDED.origem),
         empreendimento   = COALESCE(leads.empreendimento, EXCLUDED.empreendimento),
         data_atualizacao = EXCLUDED.data_atualizacao,
-        raw              = leads.raw || jsonb_build_object('_meta', ${metaRaw as never}),
+        raw              = CASE
+          WHEN EXCLUDED.raw ? '_meta'
+          THEN leads.raw || EXCLUDED.raw
+          ELSE EXCLUDED.raw
+        END,
         synced_at        = NOW()
     `;
   } catch (e: unknown) {
@@ -205,7 +210,7 @@ function forwardToRDStation(parsed: {
   nome: string; email: string; telefone: string;
   empreendimento: string; midia: string;
   conhece_empreendimento?: string; procura_imovel_para?: string; cidade?: string;
-}): void {
+}, metaLeadId?: string): void {
   const apiKey = process.env.RD_TOKEN_PUBLIC;
   if (!apiKey || !parsed.email) return;
 
@@ -230,9 +235,35 @@ function forwardToRDStation(parsed: {
       },
     },
     { params: { api_key: apiKey }, timeout: 12_000 }
-  ).catch(err => {
-    logger.warn({ err: err?.response?.data?.error_description || err?.message || err }, '[meta/webhook] RD Station forward falhou');
-  });
+  )
+    .then(() =>
+      recordIntegrationEvent({
+        systemSource: 'longview',
+        systemTarget: 'rdstation',
+        entityType: 'lead',
+        entityId: metaLeadId ?? parsed.email,
+        externalId: metaLeadId ?? parsed.email,
+        status: 'sent',
+        summary: 'Lead encaminhado para o RD Station',
+        detail: parsed.midia || parsed.empreendimento || '',
+        payload: { email: parsed.email, midia: parsed.midia, empreendimento: parsed.empreendimento },
+      })
+    )
+    .catch(err => {
+      const detail = err?.response?.data?.error_description || err?.message || String(err);
+      logger.warn({ err: detail }, '[meta/webhook] RD Station forward falhou');
+      void recordIntegrationEvent({
+        systemSource: 'longview',
+        systemTarget: 'rdstation',
+        entityType: 'lead',
+        entityId: metaLeadId ?? parsed.email,
+        externalId: metaLeadId ?? parsed.email,
+        status: 'error',
+        summary: 'Falha ao encaminhar lead para o RD Station',
+        detail,
+        payload: { email: parsed.email, midia: parsed.midia, empreendimento: parsed.empreendimento },
+      });
+    });
 }
 
 /** Envia push FCM para equipe comercial */
@@ -324,12 +355,33 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
+        await recordIntegrationEvent({
+          systemSource: 'meta',
+          systemTarget: 'longview',
+          entityType: 'lead',
+          entityId: leadgen_id,
+          externalId: leadgen_id,
+          status: 'received',
+          summary: 'Webhook de lead recebido da Meta',
+          detail: campaign_name ?? ad_name ?? '',
+          payload: { form_id, ad_id, ad_name, campaign_name },
+        });
+
         logger.info(`[meta/webhook] Processando lead ${leadgen_id} (campanha: ${campaign_name ?? '?'})`);
 
         // 1. Busca dados completos na Meta API
         const metaLead = await fetchMetaLead(leadgen_id);
         if (!metaLead) {
           logger.warn(`[meta/webhook] Não foi possível buscar lead ${leadgen_id}`);
+          await recordIntegrationEvent({
+            systemSource: 'meta',
+            systemTarget: 'longview',
+            entityType: 'lead',
+            entityId: leadgen_id,
+            externalId: leadgen_id,
+            status: 'error',
+            summary: 'Falha ao buscar payload completo do lead na Meta',
+          });
           continue;
         }
 
@@ -358,6 +410,15 @@ export async function POST(request: NextRequest) {
         if (!nomeCompleto && !email && !telefone) {
           logger.warn(`[meta/webhook] Lead ${leadgen_id} sem dados de contato — ignorado`);
           await logWebhookError('meta_webhook', 'Lead descartado por falta de dados de contato básicos (nome, email ou telefone)', { leadgen_id, fields });
+          await recordIntegrationEvent({
+            systemSource: 'meta',
+            systemTarget: 'longview',
+            entityType: 'lead',
+            entityId: leadgen_id,
+            externalId: leadgen_id,
+            status: 'skipped',
+            summary: 'Lead ignorado por falta de contato basico',
+          });
           continue;
         }
 
@@ -380,9 +441,30 @@ export async function POST(request: NextRequest) {
             });
             reengajado = reeng.ok;
             logger.info(`[meta/webhook] checagem de reengajamento para ${leadgen_id}: ${reeng.reason}`);
+            await recordIntegrationEvent({
+              systemSource: 'longview',
+              systemTarget: 'cvcrm',
+              entityType: 'lead',
+              entityId: leadgen_id,
+              externalId: email || telefone || leadgen_id,
+              status: reeng.ok ? 'processed' : 'warning',
+              summary: reeng.ok ? 'Lead reengajado no CV CRM' : 'Tentativa de reengajamento sem efeito',
+              detail: reeng.reason,
+              payload: { email, telefone, campanha, ad_id, ad_name },
+            });
           } catch (e: unknown) {
             // Nunca bloqueia o fluxo normal de criação por causa dessa checagem
             logger.warn({ e }, '[meta/webhook] checagem de reengajamento falhou — segue fluxo normal');
+            await recordIntegrationEvent({
+              systemSource: 'longview',
+              systemTarget: 'cvcrm',
+              entityType: 'lead',
+              entityId: leadgen_id,
+              externalId: email || telefone || leadgen_id,
+              status: 'warning',
+              summary: 'Falha na checagem de reengajamento antes do envio ao CV CRM',
+              detail: e instanceof Error ? e.message : String(e),
+            });
           }
         }
 
@@ -413,12 +495,23 @@ export async function POST(request: NextRequest) {
           logger.warn(`[meta/webhook] CV CRM falhou para ${leadgen_id}: ${crmResult.error}`);
           await logWebhookError('meta_webhook', `CV CRM falhou: ${crmResult.error}`, { leadgen_id, parsed });
         }
+        await recordIntegrationEvent({
+          systemSource: 'longview',
+          systemTarget: 'cvcrm',
+          entityType: 'lead',
+          entityId: crmResult.ok ? crmResult.id ?? leadgen_id : leadgen_id,
+          externalId: leadgen_id,
+          status: crmResult.ok ? 'sent' : 'error',
+          summary: crmResult.ok ? 'Lead enviado ao CV CRM' : 'Falha ao enviar lead ao CV CRM',
+          detail: crmResult.ok ? campaign_name ?? '' : crmResult.error ?? '',
+          payload: { email, telefone, empreendimento, midia },
+        });
 
         // 4. Salva no Postgres com ID do CV CRM (sem duplicata); fallback meta_xxx se CV falhou
         await saveToPostgres(metaLead, parsed, crmResult.ok ? crmResult.id : undefined);
 
         // 5. RD Station em background (para e-mail e nutrição)
-        forwardToRDStation(parsed);
+        forwardToRDStation(parsed, leadgen_id);
 
         // 6. Push FCM para equipe comercial
         sendFCMPush(parsed.nome, empreendimento, campanha);
@@ -427,6 +520,17 @@ export async function POST(request: NextRequest) {
           `[meta/webhook] Lead ${leadgen_id} processado — ` +
           `CRM: ${crmResult.ok ? `OK (id=${crmResult.id})` : 'FALHOU'}`
         );
+        await recordIntegrationEvent({
+          systemSource: 'meta',
+          systemTarget: 'longview',
+          entityType: 'lead',
+          entityId: crmResult.ok ? crmResult.id ?? leadgen_id : leadgen_id,
+          externalId: leadgen_id,
+          status: 'processed',
+          summary: 'Lead da Meta processado no LongView',
+          detail: crmResult.ok ? 'Persistido e encaminhado para integrações seguintes' : 'Persistido com fallback local',
+          payload: { empreendimento, midia, origem },
+        });
       }
     }
   };

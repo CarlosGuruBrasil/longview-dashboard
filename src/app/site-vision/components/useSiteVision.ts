@@ -21,6 +21,13 @@ export interface SiteVisionPayload {
     soldUnits: number;
     materials: number;
     mediaAssets: number;
+    resales: number;
+    publishedResales: number;
+    internalTables: number;
+    gatedAssets: number;
+    analyticsEvents: number;
+    cookieConsents: number;
+    pageSnapshots: number;
   };
   leadStatus: Array<{ status: string; total: number }>;
   siteLeadStatus: Array<{ status: string; total: number }>;
@@ -38,6 +45,73 @@ export interface SiteVisionPayload {
     heroImageUrl: string;
     mediaCount: number;
     updatedAt: string;
+  }>;
+  inventory: Array<{
+    id: number;
+    nome: string;
+    totalUnits: number;
+    availableUnits: number;
+    reservedUnits: number;
+    soldUnits: number;
+    linkedPages: number;
+  }>;
+  resales: Array<{
+    id: string;
+    slug: string;
+    title: string;
+    status: 'draft' | 'published' | 'archived' | 'sold';
+    destaque: boolean;
+    projectName: string | null;
+    cvUnitId: number;
+    heroImageUrl: string;
+    brokerName: string;
+    price: number | null;
+    unitLabel: string;
+    updatedAt: string;
+  }>;
+  internalTables: Array<{
+    id: string;
+    title: string;
+    projectName: string | null;
+    versionLabel: string;
+    sizeBytes: number | null;
+    createdAt: string;
+  }>;
+  gatedAssets: Array<{
+    id: string;
+    title: string;
+    slug: string;
+    type: 'ebook' | 'brochure' | 'document';
+    active: boolean;
+    projectName: string | null;
+    sizeBytes: number | null;
+    leads: number;
+    updatedAt: string;
+  }>;
+  analytics: {
+    sessions: number;
+    pageViews: number;
+    ctaClicks: number;
+    whatsappClicks: number;
+    ebookDownloads: number;
+    analyticsConsents: number;
+    marketingConsents: number;
+  };
+  topPages: Array<{
+    pageType: string;
+    pageKey: string;
+    path: string;
+    views: number;
+    uniqueSessions: number;
+    leads: number;
+    ctaClicks: number;
+    whatsappClicks: number;
+    updatedAt: string;
+  }>;
+  topCtas: Array<{
+    name: string;
+    total: number;
+    latestAt: string | null;
   }>;
   timestamps: {
     leadsSyncAt: string | null;
@@ -80,6 +154,15 @@ export interface SiteVisionPayload {
     scope: string;
     summary: string;
     createdAt: string;
+  }>;
+  integrationHealth: Array<{
+    key: string;
+    latestStatus: string | null;
+    latestSummary: string | null;
+    latestAt: string | null;
+    events24h: number;
+    issues24h: number;
+    ok24h: number;
   }>;
   schema: {
     siteTables: number;

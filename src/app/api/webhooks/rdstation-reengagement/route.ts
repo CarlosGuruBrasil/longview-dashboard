@@ -22,6 +22,7 @@
  * no plano Pro/Advanced — confirmar isso na conta antes de configurar.
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { recordIntegrationEvent } from '@/lib/integration-events';
 import logger from '@/lib/logger';
 
 type RdLeadPayload = Record<string, unknown> & {
@@ -59,15 +60,45 @@ export async function POST(request: NextRequest) {
   }
 
   const motivo = MOTIVO_POR_EVENTO[evento] ?? `Reengajamento: interação RD Station (${evento})`;
+  await recordIntegrationEvent({
+    systemSource: 'rdstation',
+    systemTarget: 'longview',
+    entityType: 'lead',
+    entityId: email,
+    externalId: email,
+    status: 'received',
+    summary: 'Webhook de reengajamento recebido do RD Station',
+    detail: evento,
+  });
 
   try {
     const { reengajarLeadPorContato } = await import('@/lib/leadReativacao');
     const result = await reengajarLeadPorContato({ email, motivo });
     logger.info(`[webhook/rdstation-reengagement] ${email} (${evento}) -> ${result.reason}`);
+    await recordIntegrationEvent({
+      systemSource: 'longview',
+      systemTarget: 'cvcrm',
+      entityType: 'lead',
+      entityId: email,
+      externalId: email,
+      status: result.ok ? 'processed' : 'warning',
+      summary: result.ok ? 'Lead reengajado no CV CRM a partir do RD Station' : 'Reengajamento sem efeito no CV CRM',
+      detail: result.reason,
+    });
     return NextResponse.json({ ok: result.ok, reason: result.reason });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     logger.error({ msg }, '[webhook/rdstation-reengagement]');
+    await recordIntegrationEvent({
+      systemSource: 'longview',
+      systemTarget: 'cvcrm',
+      entityType: 'lead',
+      entityId: email,
+      externalId: email,
+      status: 'error',
+      summary: 'Erro ao reengajar lead do RD Station no CV CRM',
+      detail: msg,
+    });
     // Não retorna 500 pra RD Station não entrar em loop de retry
     return NextResponse.json({ ok: true, warning: 'processed with errors' });
   }

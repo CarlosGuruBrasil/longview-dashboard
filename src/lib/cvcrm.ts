@@ -72,7 +72,7 @@ export async function createCrmLead(lead: CrmLeadInput): Promise<CrmLeadResult> 
     const data = res.data as { idlead?: string | number; id?: string | number; lead?: { id?: string | number; idlead?: string | number } };
     const id   = data.idlead ?? data.id ?? data.lead?.id ?? data.lead?.idlead;
 
-    logger.info(`[cvcrm] lead criado: id=$ nome="$"`);
+    logger.info({ id, nome: lead.nome }, '[cvcrm] lead criado');
     return { ok: true, id, raw: data };
 
   } catch (err: unknown) {
@@ -81,7 +81,7 @@ export async function createCrmLead(lead: CrmLeadInput): Promise<CrmLeadResult> 
       data?.message ??
       data?.error   ??
       (err instanceof Error ? err.message : String(err));
-    logger.warn(`[cvcrm] createLead falhou: $`);
+    logger.warn({ detail, nome: lead.nome, email: lead.email, telefone: lead.telefone }, '[cvcrm] createLead falhou');
     return { ok: false, error: detail };
   }
 }

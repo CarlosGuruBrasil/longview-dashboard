@@ -196,7 +196,7 @@ async function saveToPostgres(lead: MetaLead, parsed: any, cvId?: string | numbe
         ${null}, ${null},
         ${lead.created_time ? new Date(lead.created_time).toISOString() : null},
         ${new Date().toISOString()},
-        ${rawVal as never},
+        ${sql.json(rawVal as never)},
         NOW()
       )
       ON CONFLICT (id) DO UPDATE SET
@@ -206,7 +206,11 @@ async function saveToPostgres(lead: MetaLead, parsed: any, cvId?: string | numbe
         origem           = COALESCE(leads.origem, EXCLUDED.origem),
         empreendimento   = COALESCE(leads.empreendimento, EXCLUDED.empreendimento),
         data_atualizacao = EXCLUDED.data_atualizacao,
-        raw              = leads.raw || jsonb_build_object('_meta', ${metaRaw as never}),
+        raw              = CASE
+          WHEN EXCLUDED.raw ? '_meta'
+          THEN leads.raw || EXCLUDED.raw
+          ELSE EXCLUDED.raw
+        END,
         synced_at        = NOW()
     `;
   } catch (e: unknown) {

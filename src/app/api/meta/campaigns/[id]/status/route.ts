@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import logger from '@/lib/logger'
 
 const JWT_SECRET = process.env.JWT_SECRET ?? (() => { throw new Error('[LongView] JWT_SECRET nao configurado. Defina no .env.local') })();
-const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN || '';
+const META_ACCESS_TOKEN = process.env.META_TOKEN || process.env.META_ACCESS_TOKEN || '';
 const META_API_VERSION = 'v19.0';
 
 type AuthUser = { role?: string; email?: string };
