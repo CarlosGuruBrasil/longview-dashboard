@@ -35,7 +35,10 @@ export function proxy(request: NextRequest) {
   // 1. Permitir livre acesso a assets, imagens, favicon e à própria tela de login
   if (
     pathname.startsWith('/_next') ||
+    pathname === '/site' ||
+    pathname.startsWith('/site/') ||
     pathname.startsWith('/api/auth') || // rotas de api de auth (/api/auth/login)
+    pathname.startsWith('/api/public/site/') ||
     pathname === '/api/webhooks/cvcrm'     || // webhooks do CV CRM (grava leads) — acesso externo
     pathname === '/api/meta/webhook'       || // webhooks do Meta Lead Ads — acesso externo
     pathname === '/api/webhooks/construpoint' || // webhooks do Construpoint — acesso externo
