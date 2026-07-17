@@ -30,7 +30,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     // Verificar se já tem site_public_empreendimentos
     const [siteRows] = await Promise.all([
       sql<{ id: string }[]>`
-        SELECT id FROM site_public_empreendimentos 
+        SELECT id FROM site_public_empreendimentos
         WHERE crm_empreendimento_id = ${empId}
         LIMIT 1
       `,
@@ -46,22 +46,24 @@ export async function POST(request: NextRequest, { params }: Params) {
     const siteProjectId = siteRows[0].id;
     const mediaId = randomUUID();
 
+    const altText = (formData.get('altText') as string) || file.name;
+
     // Salvar em site_public_media_assets
     await sql`
       INSERT INTO site_public_media_assets (
-        id, empreendimento_id, kind, title, alt_text, 
+        id, empreendimento_id, kind, title, alt_text,
         public_url, thumbnail_url, is_primary, sort_order,
         created_at, updated_at
       ) VALUES (
-        ${mediaId},
-        ${siteProjectId},
-        'image',
-        ${file.name},
-        ${formData.get('altText') || file.name},
-        ${`/api/site-vision/empreendimentos/${empId}/media/${mediaId}`},
-        ${`/api/site-vision/empreendimentos/${empId}/media/${mediaId}/thumb`},
-        false,
-        (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM site_public_media_assets WHERE empreendimento_id = ${siteProjectId})
+        ${mediaId}::uuid,
+        ${siteProjectId}::uuid,
+        'image'::text,
+        ${file.name}::text,
+        ${altText}::text,
+        ${`/api/site-vision/empreendimentos/${empId}/media/${mediaId}`}::text,
+        ${`/api/site-vision/empreendimentos/${empId}/media/${mediaId}/thumb`}::text,
+        false::boolean,
+        (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM site_public_media_assets WHERE empreendimento_id = ${siteProjectId}::uuid)::integer
       )
     `;
 
