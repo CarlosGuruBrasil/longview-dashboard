@@ -29,10 +29,10 @@ export function useOverview() {
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    const fetch = async () => {
+    const doFetch = async () => {
       try {
         setLoading(true);
-        const res = await fetch('/api/site-vision/overview');
+        const res = await doFetch('/api/site-vision/overview');
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = await res.json();
         setData(json);
@@ -78,10 +78,10 @@ export function useProjects() {
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    const fetch = async () => {
+    const doFetch = async () => {
       try {
         setLoading(true);
-        const res = await fetch('/api/site-vision/projects');
+        const res = await doFetch('/api/site-vision/projects');
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = await res.json();
         setData(json);
@@ -135,10 +135,10 @@ export function useInventory() {
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    const fetch = async () => {
+    const doFetch = async () => {
       try {
         setLoading(true);
-        const res = await fetch('/api/site-vision/inventory');
+        const res = await doFetch('/api/site-vision/inventory');
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = await res.json();
         setData(json);
@@ -208,10 +208,10 @@ export function useAnalytics() {
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    const fetch = async () => {
+    const doFetch = async () => {
       try {
         setLoading(true);
-        const res = await fetch('/api/site-vision/analytics');
+        const res = await doFetch('/api/site-vision/analytics');
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = await res.json();
         setData(json);

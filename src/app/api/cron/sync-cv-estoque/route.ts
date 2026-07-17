@@ -3,6 +3,7 @@ import axios from 'axios';
 import { sql, ensureSchema } from '@/lib/pg';
 import { isCronAuthorized, unauthorizedJson } from '@/lib/internal-auth';
 import logger from '@/lib/logger'
+import { isRealEmpreendimento } from '@/lib/cvcrm-projects';
 
 export const maxDuration = 300;
 export const runtime = 'nodejs';
@@ -67,11 +68,15 @@ export async function POST(request: NextRequest) {
     const projRes = await axios.get<CvProject[]>('https://longviewempreendimentos.cvcrm.com.br/api/v1/cadastros/empreendimentos', { headers, timeout: 20000 });
     const projects = Array.isArray(projRes.data) ? projRes.data : [];
     
-    // Filtra projetos válidos
-    const validProjects = projects.filter((p) =>
-      p.tipo_empreendimento?.[0]?.nome !== null && 
-      p.situacao_comercial?.[0]?.nome !== null
-    );
+    const validProjects = projects.filter((p) => isRealEmpreendimento(p));
+    const validProjectIds = validProjects
+      .map((p) => Number(p.idempreendimento ?? 0))
+      .filter((id) => Number.isFinite(id) && id > 0);
+
+    if (validProjectIds.length > 0) {
+      await sql`DELETE FROM cv_unidades WHERE id_empreendimento NOT IN ${sql(validProjectIds)}`;
+      await sql`DELETE FROM cv_empreendimentos WHERE id NOT IN ${sql(validProjectIds)}`;
+    }
 
     let upsertedEmp = 0;
     let upsertedUnidades = 0;
@@ -86,7 +91,7 @@ export async function POST(request: NextRequest) {
 
       await sql`
         INSERT INTO cv_empreendimentos (id, nome, situacao, tipo, raw, synced_at)
-        VALUES (${idEmp}, ${nome}, ${situacao}, ${tipo}, ${JSON.stringify(p)}, NOW())
+        VALUES (${idEmp}, ${nome}, ${situacao}, ${tipo}, ${p as never}, NOW())
         ON CONFLICT (id) DO UPDATE SET
           nome = EXCLUDED.nome,
           situacao = EXCLUDED.situacao,
@@ -144,18 +149,24 @@ export async function POST(request: NextRequest) {
           const blocoNome = uni._bloco_nome || null;
           const num = uni.nome || null;
 
-          const andar     = uni.andar  ? parseInt(String(uni.andar),  10) : null;
-          const coluna    = uni.coluna ? parseInt(String(uni.coluna), 10) : null;
-          const tipologia = uni.tipologia ?? uni.tipo ?? null;
-
           await sql`
             INSERT INTO cv_unidades (
               id, id_empreendimento, bloco, numero, status, status_venda,
-              valor, metragem, andar, coluna, tipologia, raw, synced_at
+              valor, metragem, raw, synced_at
             ) VALUES (
               ${idUni}, ${idEmp}, ${blocoNome}, ${num}, ${statusText}, ${statusVenda},
-              ${valor}, ${metragem}, ${andar}, ${coluna}, ${tipologia}, ${JSON.stringify(uni)}, NOW()
+              ${valor}, ${metragem}, ${uni as never}, NOW()
             )
+            ON CONFLICT (id) DO UPDATE SET
+              id_empreendimento = EXCLUDED.id_empreendimento,
+              bloco = EXCLUDED.bloco,
+              numero = EXCLUDED.numero,
+              status = EXCLUDED.status,
+              status_venda = EXCLUDED.status_venda,
+              valor = EXCLUDED.valor,
+              metragem = EXCLUDED.metragem,
+              raw = EXCLUDED.raw,
+              synced_at = EXCLUDED.synced_at
           `;
           upsertedUnidades++;
         }

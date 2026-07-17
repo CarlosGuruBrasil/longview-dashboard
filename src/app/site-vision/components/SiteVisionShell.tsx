@@ -4,14 +4,18 @@ import Link from 'next/link';
 import {
   ArrowRight,
   Building2,
+  ChartColumnBig,
   Database,
+  GalleryVerticalEnd,
   Image as ImageIcon,
   LayoutTemplate,
   Link2,
+  MapPinned,
   RadioTower,
   RefreshCw,
   ShieldCheck,
   Siren,
+  Table2,
   Users2,
   Workflow,
 } from 'lucide-react';
@@ -20,6 +24,18 @@ import { useSiteVision, type SiteVisionPayload } from './useSiteVision';
 function formatSync(value: string | null) {
   if (!value) return 'Sem registro';
   return new Date(value).toLocaleString('pt-BR');
+}
+
+function formatMoney(value: number | null) {
+  if (value == null) return 'Nao definido';
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(value);
+}
+
+function formatBytes(value: number | null) {
+  if (value == null || Number.isNaN(value)) return 'Sem tamanho';
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function publicationTone(status: 'draft' | 'published' | 'archived') {
@@ -684,6 +700,409 @@ export function SiteVisionAccess() {
                     </div>
                   </Link>
                 ))}
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
+    </SiteVisionFrame>
+  );
+}
+
+function InventoryCards({ items }: { items: SiteVisionPayload['inventory'] }) {
+  if (items.length === 0) {
+    return <EmptyPanel text="Nenhum espelho de estoque foi carregado ainda a partir do CV CRM." />;
+  }
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      {items.map((item) => (
+        <div key={item.id} className="rounded-[26px] border border-white/8 bg-white/[0.035] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_18px_48px_rgba(0,0,0,0.22)]">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-base font-semibold text-white">{item.nome}</p>
+              <p className="mt-1 text-xs text-zinc-500">{item.linkedPages} paginas do site vinculadas</p>
+            </div>
+            <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-300">
+              {item.totalUnits} unidades
+            </span>
+          </div>
+          <div className="mt-5 grid gap-3 md:grid-cols-3">
+            <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-200/80">Disponiveis</p>
+              <p className="mt-2 text-xl font-semibold text-white">{item.availableUnits}</p>
+            </div>
+            <div className="rounded-2xl border border-amber-400/20 bg-amber-500/10 px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-200/80">Reservadas</p>
+              <p className="mt-2 text-xl font-semibold text-white">{item.reservedUnits}</p>
+            </div>
+            <div className="rounded-2xl border border-sky-400/20 bg-sky-500/10 px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-200/80">Vendidas</p>
+              <p className="mt-2 text-xl font-semibold text-white">{item.soldUnits}</p>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ResaleCards({ items }: { items: SiteVisionPayload['resales'] }) {
+  if (items.length === 0) {
+    return <EmptyPanel text="Nenhuma revenda foi criada ainda. Aqui vamos cadastrar revendas reaproveitando unidades do espelho CV CRM." />;
+  }
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      {items.map((item) => (
+        <div key={item.id} className="rounded-[26px] border border-white/8 bg-white/[0.035] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_18px_48px_rgba(0,0,0,0.22)]">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-base font-semibold text-white">{item.title}</p>
+                {item.destaque ? (
+                  <span className="rounded-full border border-teal-400/15 bg-teal-500/10 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-teal-300">
+                    Destaque
+                  </span>
+                ) : null}
+              </div>
+              <p className="mt-1 text-sm text-zinc-400">{item.projectName || 'Empreendimento nao identificado'}</p>
+              <p className="mt-1 text-xs text-zinc-500">{item.unitLabel || `Unidade CV ${item.cvUnitId}`}</p>
+            </div>
+            <span className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] ${publicationTone(item.status === 'sold' ? 'archived' : item.status as 'draft' | 'published' | 'archived')}`}>
+              {item.status === 'sold' ? 'Vendida' : publicationLabel(item.status as 'draft' | 'published' | 'archived')}
+            </span>
+          </div>
+
+          <div className="mt-5 grid gap-3 md:grid-cols-2">
+            <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Preco</p>
+              <p className="mt-2 text-lg font-semibold text-white">{formatMoney(item.price)}</p>
+            </div>
+            <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Corretor</p>
+              <p className="mt-2 text-sm font-semibold text-white">{item.brokerName || 'Nao definido'}</p>
+            </div>
+          </div>
+
+          <div className="mt-4 flex items-center justify-between gap-3 text-xs text-zinc-500">
+            <span>{item.heroImageUrl ? 'Hero definida' : 'Sem hero image'}</span>
+            <span>Atualizado em {formatSync(item.updatedAt)}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MaterialCards({
+  internalTables,
+  gatedAssets,
+}: {
+  internalTables: SiteVisionPayload['internalTables'];
+  gatedAssets: SiteVisionPayload['gatedAssets'];
+}) {
+  return (
+    <div className="grid gap-6 xl:grid-cols-2">
+      <div className="rounded-[30px] border border-white/8 bg-white/[0.035] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_18px_48px_rgba(0,0,0,0.22)]">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-white">Tabelas internas</p>
+            <p className="text-xs text-zinc-500">Uso exclusivo do Site Vision. Nao vai para o site publico.</p>
+          </div>
+          <GalleryVerticalEnd size={16} className="text-teal-300" />
+        </div>
+        <div className="mt-5 space-y-3">
+          {internalTables.length === 0 ? (
+            <EmptyPanel text="Nenhuma tabela comercial interna cadastrada ainda." />
+          ) : (
+            internalTables.map((item) => (
+              <div key={item.id} className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-4">
+                <p className="text-sm font-semibold text-white">{item.title}</p>
+                <p className="mt-1 text-xs text-zinc-500">{item.projectName || 'Sem empreendimento'}{item.versionLabel ? ` • ${item.versionLabel}` : ''}</p>
+                <div className="mt-3 flex items-center justify-between gap-3 text-xs text-zinc-400">
+                  <span>{formatBytes(item.sizeBytes)}</span>
+                  <span>{formatSync(item.createdAt)}</span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      <div className="rounded-[30px] border border-white/8 bg-white/[0.035] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_18px_48px_rgba(0,0,0,0.22)]">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-white">Materiais gated</p>
+            <p className="text-xs text-zinc-500">E-books e assets liberados somente apos formulario.</p>
+          </div>
+          <RadioTower size={16} className="text-teal-300" />
+        </div>
+        <div className="mt-5 space-y-3">
+          {gatedAssets.length === 0 ? (
+            <EmptyPanel text="Nenhum asset gated foi configurado ainda." />
+          ) : (
+            gatedAssets.map((item) => (
+              <div key={item.id} className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-white">{item.title}</p>
+                    <p className="mt-1 text-xs text-zinc-500">{item.projectName || 'Sem empreendimento'} • /{item.slug}</p>
+                  </div>
+                  <span className={`rounded-full border px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${item.active ? 'border-emerald-400/20 bg-emerald-500/10 text-emerald-300' : 'border-zinc-400/20 bg-zinc-500/10 text-zinc-300'}`}>
+                    {item.active ? 'Ativo' : 'Inativo'}
+                  </span>
+                </div>
+                <div className="mt-3 flex items-center justify-between gap-3 text-xs text-zinc-400">
+                  <span>{item.type.toUpperCase()} • {formatBytes(item.sizeBytes)}</span>
+                  <span>{item.leads} leads</span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TopPagesPanel({ items }: { items: SiteVisionPayload['topPages'] }) {
+  if (items.length === 0) {
+    return <EmptyPanel text="Sem snapshots de paginas ainda. Assim que o tracking entrar, esta area mostrara paginas mais vistas, sessoes e conversao." />;
+  }
+
+  return (
+    <div className="space-y-3">
+      {items.map((item) => (
+        <div key={`${item.pageType}:${item.pageKey}`} className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold text-white">{item.path}</p>
+              <p className="mt-1 text-xs text-zinc-500">{item.pageType} • {item.pageKey}</p>
+            </div>
+            <span className="text-xs text-zinc-500">{formatSync(item.updatedAt)}</span>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-4">
+            {[
+              ['Views', item.views],
+              ['Sessoes', item.uniqueSessions],
+              ['Leads', item.leads],
+              ['CTAs', item.ctaClicks],
+            ].map(([label, value]) => (
+              <div key={label} className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500">{label}</p>
+                <p className="mt-2 text-lg font-semibold text-white">{value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function TopCtasPanel({ items }: { items: SiteVisionPayload['topCtas'] }) {
+  if (items.length === 0) {
+    return <EmptyPanel text="Sem cliques rastreados ainda. Aqui vamos enxergar os botoes que mais convertem no portal." />;
+  }
+
+  return (
+    <div className="space-y-3">
+      {items.map((item) => (
+        <div key={item.name} className="flex items-center justify-between gap-4 rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3">
+          <div>
+            <p className="text-sm font-semibold text-white">{item.name}</p>
+            <p className="mt-1 text-xs text-zinc-500">{formatSync(item.latestAt)}</p>
+          </div>
+          <span className="text-lg font-semibold text-white">{item.total}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function SiteVisionUnidades() {
+  const { data, loading, error, reload } = useSiteVision();
+
+  return (
+    <SiteVisionFrame loading={loading} error={error} reload={reload} data={data}>
+      {(site) => (
+        <div className="flex-1 space-y-6 p-4 md:p-6 lg:px-6 lg:py-4">
+          <section className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
+            <MetricCard label="Unidades espelhadas" value={site.overview.units} helper="Base sincronizada do CV CRM" icon={Table2} />
+            <MetricCard label="Vendidas" value={site.overview.soldUnits} helper="Base potencial para revendas" icon={Building2} />
+            <MetricCard label="Empreendimentos CRM" value={site.overview.crmProjects} helper="Portfolio sincronizado" icon={Database} />
+            <MetricCard label="Paginas vinculadas" value={site.overview.linkedCrmProjects} helper="Empreendimentos ja conectados ao site" icon={Link2} />
+          </section>
+
+          <section className="rounded-[30px] border border-white/8 bg-white/[0.035] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_18px_48px_rgba(0,0,0,0.22)]">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-white">Mapa de estoque por empreendimento</p>
+                <p className="text-xs text-zinc-500">Aqui vamos decidir o que entra como oferta primaria e o que pode virar revenda.</p>
+              </div>
+              <span className="rounded-full border border-teal-400/15 bg-teal-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-teal-300">
+                CV CRM + Site Vision
+              </span>
+            </div>
+            <div className="mt-5">
+              <InventoryCards items={site.inventory} />
+            </div>
+          </section>
+        </div>
+      )}
+    </SiteVisionFrame>
+  );
+}
+
+export function SiteVisionRevendas() {
+  const { data, loading, error, reload } = useSiteVision();
+
+  return (
+    <SiteVisionFrame loading={loading} error={error} reload={reload} data={data}>
+      {(site) => (
+        <div className="flex-1 space-y-6 p-4 md:p-6 lg:px-6 lg:py-4">
+          <section className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
+            <MetricCard label="Revendas" value={site.overview.resales} helper="Ofertas derivadas de unidades do CRM" icon={MapPinned} />
+            <MetricCard label="Revendas publicadas" value={site.overview.publishedResales} helper="Ja elegiveis para a vitrine secundaria" icon={LayoutTemplate} />
+            <MetricCard label="Unidades vendidas" value={site.overview.soldUnits} helper="Base que pode gerar oportunidades de revenda" icon={Building2} />
+            <MetricCard label="Alertas de capa" value={site.contentWarnings.find((item) => item.key === 'resales-sem-hero')?.total ?? 0} helper="Revendas sem hero image definida" icon={Siren} />
+          </section>
+
+          <section className="rounded-[30px] border border-white/8 bg-white/[0.035] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_18px_48px_rgba(0,0,0,0.22)]">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-white">Cockpit de revendas</p>
+                <p className="text-xs text-zinc-500">Revenda nasce a partir da unidade do CRM, mas vive com ciclo proprio de publicacao.</p>
+              </div>
+              <span className="rounded-full border border-teal-400/15 bg-teal-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-teal-300">
+                Nova camada
+              </span>
+            </div>
+            <div className="mt-5">
+              <ResaleCards items={site.resales} />
+            </div>
+          </section>
+        </div>
+      )}
+    </SiteVisionFrame>
+  );
+}
+
+export function SiteVisionMateriais() {
+  const { data, loading, error, reload } = useSiteVision();
+
+  return (
+    <SiteVisionFrame loading={loading} error={error} reload={reload} data={data}>
+      {(site) => (
+        <div className="flex-1 space-y-6 p-4 md:p-6 lg:px-6 lg:py-4">
+          <section className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
+            <MetricCard label="Midias publicas" value={site.overview.mediaAssets} helper="Galerias e assets de vitrine" icon={ImageIcon} />
+            <MetricCard label="Tabelas internas" value={site.overview.internalTables} helper="Conteudo privado do time comercial" icon={Database} />
+            <MetricCard label="Assets gated" value={site.overview.gatedAssets} helper="E-books e downloads mediante formulario" icon={GalleryVerticalEnd} />
+            <MetricCard label="Leads de gated" value={site.gatedAssets.reduce((acc, item) => acc + item.leads, 0)} helper="Captação relacionada aos materiais" icon={RadioTower} />
+          </section>
+
+          <MaterialCards internalTables={site.internalTables} gatedAssets={site.gatedAssets} />
+        </div>
+      )}
+    </SiteVisionFrame>
+  );
+}
+
+export function SiteVisionAnalytics() {
+  const { data, loading, error, reload } = useSiteVision();
+
+  return (
+    <SiteVisionFrame loading={loading} error={error} reload={reload} data={data}>
+      {(site) => (
+        <div className="flex-1 space-y-6 p-4 md:p-6 lg:px-6 lg:py-4">
+          <section className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
+            <MetricCard label="Sessoes" value={site.analytics.sessions} helper="Visitantes monitorados na camada propria" icon={ChartColumnBig} />
+            <MetricCard label="Page views" value={site.analytics.pageViews} helper="Navegacao medida apos consentimento" icon={LayoutTemplate} />
+            <MetricCard label="CTAs clicados" value={site.analytics.ctaClicks} helper="Cliques em botoes estrategicos" icon={Workflow} />
+            <MetricCard label="Downloads de e-book" value={site.analytics.ebookDownloads} helper="Conversoes diretas dos gated assets" icon={GalleryVerticalEnd} />
+          </section>
+
+          <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+            <div className="rounded-[30px] border border-white/8 bg-white/[0.035] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_18px_48px_rgba(0,0,0,0.22)]">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-white">Paginas mais vistas</p>
+                  <p className="text-xs text-zinc-500">Snapshot consolidado para leitura rapida do site.</p>
+                </div>
+                <ChartColumnBig size={16} className="text-teal-300" />
+              </div>
+              <div className="mt-5">
+                <TopPagesPanel items={site.topPages} />
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <div className="rounded-[30px] border border-white/8 bg-white/[0.035] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_18px_48px_rgba(0,0,0,0.22)]">
+                <p className="text-sm font-semibold text-white">Botoes mais clicados</p>
+                <p className="mt-1 text-xs text-zinc-500">CTA, WhatsApp e pontos de conversao acompanhados pelo modulo.</p>
+                <div className="mt-5">
+                  <TopCtasPanel items={site.topCtas} />
+                </div>
+              </div>
+
+              <div className="rounded-[30px] border border-white/8 bg-white/[0.035] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_18px_48px_rgba(0,0,0,0.22)]">
+                <p className="text-sm font-semibold text-white">Sinais de consentimento</p>
+                <div className="mt-5 grid gap-3 md:grid-cols-2">
+                  <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Consentimento analytics</p>
+                    <p className="mt-2 text-2xl font-semibold text-white">{site.analytics.analyticsConsents}</p>
+                  </div>
+                  <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Consentimento marketing</p>
+                    <p className="mt-2 text-2xl font-semibold text-white">{site.analytics.marketingConsents}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
+    </SiteVisionFrame>
+  );
+}
+
+export function SiteVisionGovernanca() {
+  const { data, loading, error, reload } = useSiteVision();
+
+  return (
+    <SiteVisionFrame loading={loading} error={error} reload={reload} data={data}>
+      {(site) => (
+        <div className="flex-1 space-y-6 p-4 md:p-6 lg:px-6 lg:py-4">
+          <section className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
+            <MetricCard label="Tabelas do modulo" value={site.schema.siteTables} helper={site.schema.siteReady ? 'Camada completa pronta no Postgres' : 'Estrutura ainda em maturacao'} icon={Database} />
+            <MetricCard label="Aceites de cookie" value={site.overview.cookieConsents} helper="Base legal para analytics e marketing" icon={ShieldCheck} />
+            <MetricCard label="Snapshots de pagina" value={site.overview.pageSnapshots} helper="Leitura agregada de performance" icon={ChartColumnBig} />
+            <MetricCard label="Admins com acesso" value={site.userBreakdown.admins} helper="Usuarios aptos a operar o modulo" icon={Users2} />
+          </section>
+
+          <section className="grid gap-6 xl:grid-cols-[1fr_1fr]">
+            <div className="rounded-[30px] border border-white/8 bg-white/[0.035] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_18px_48px_rgba(0,0,0,0.22)]">
+              <p className="text-sm font-semibold text-white">Controles estruturais</p>
+              <div className="mt-5 space-y-3">
+                {[
+                  'Separacao entre camada publica, espelho CRM e operacao interna do site.',
+                  'Revendas tratadas como entidade propria, sem corromper a unidade original do CRM.',
+                  'Tabelas comerciais restritas ao Site Vision e fora do frontend publico.',
+                  'Analytics dependente de consentimento e com trilha propria no banco.',
+                ].map((text) => (
+                  <div key={text} className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3 text-sm leading-relaxed text-zinc-300">
+                    {text}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-[30px] border border-white/8 bg-white/[0.035] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_18px_48px_rgba(0,0,0,0.22)]">
+              <p className="text-sm font-semibold text-white">Pendencias atuais</p>
+              <div className="mt-5">
+                <WarningGrid items={site.contentWarnings} />
               </div>
             </div>
           </section>

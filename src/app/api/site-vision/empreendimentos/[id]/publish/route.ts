@@ -19,7 +19,6 @@ interface PublishPayload {
   metadata?: Record<string, unknown>;
 }
 
-type Params = { params: Promise<{ id: string }> };
 
 export async function POST(request: NextRequest, { params }: Params) {
   const user = await verifyPermission('viewSiteVision');

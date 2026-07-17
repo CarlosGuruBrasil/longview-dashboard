@@ -5,9 +5,7 @@ import { verifyPermission } from '@/lib/auth';
 
 const TITLE_MAP = {
   '/site-vision/empreendimentos': 'Empreendimentos',
-  '/site-vision/leads': 'Leads & Captação',
-  '/site-vision/integracoes': 'Integrações',
-  '/site-vision/acesso': 'Acesso & Operação',
+  '/site-vision/equipe': 'Equipe do Site',
   '/site-vision': 'Dashboard',
 };
 
@@ -30,7 +28,7 @@ export default async function SiteVisionLayout({ children }: { children: React.R
           module="site"
           titleMap={TITLE_MAP}
           fallbackTitle="Site Vision"
-          subtitle="Admin do site, integrações e operação comercial publicada"
+          subtitle="Controle do site, empreendimentos publicados e equipe visível"
           accent="teal"
         />
         {children}

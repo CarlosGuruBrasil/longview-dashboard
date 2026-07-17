@@ -5,11 +5,18 @@ export type PublicProjectSummary = {
   id: string;
   slug: string;
   nome: string;
+  displayName: string;
   cidade: string;
   bairro: string;
+  locationLabel: string;
   headline: string;
   resumo: string;
+  shortDescription: string;
   heroImageUrl: string;
+  cardHeroImageUrl: string;
+  logoUrl: string;
+  stageLabel: string;
+  deliveryLabel: string;
   ctaLabel: string;
   ctaTarget: string;
   destaque: boolean;
@@ -50,11 +57,31 @@ export type PublicResale = {
 
 export type PublicProjectDetail = PublicProjectSummary & {
   descricao: string;
+  addressLine: string;
+  detailHeroImageUrl: string;
+  heroVideoUrl: string;
+  cardVideoUrl: string;
+  whatsappNumber: string;
+  clientPortalUrl: string;
+  technicalAssistUrl: string;
   tags: string[];
   highlights: string[];
+  specs: Array<{ label: string; value: string }>;
   mediaAssets: PublicMediaAsset[];
   gatedAssets: PublicGatedAsset[];
   resales: PublicResale[];
+  visibleUnits: Array<{
+    id: number;
+    bloco: string;
+    numero: string;
+    tipologia: string;
+    areaPrivativa: string;
+    bedrooms: string;
+    suites: string;
+    parkingSpaces: string;
+    priceLabel: string;
+    statusLabel: string;
+  }>;
   stats: {
     totalUnits: number;
     availableUnits: number;
@@ -80,9 +107,48 @@ type SiteTeamSettings = {
   visibleUserIds: string[];
 };
 
+type PublicProjectMetadata = {
+  displayName?: string;
+  shortDescription?: string;
+  locationLabel?: string;
+  addressLine?: string;
+  stageLabel?: string;
+  deliveryLabel?: string;
+  areaLabel?: string;
+  bedroomsLabel?: string;
+  suitesLabel?: string;
+  parkingLabel?: string;
+  floorsLabel?: string;
+  unitsLabel?: string;
+  cardHeroImageUrl?: string;
+  detailHeroImageUrl?: string;
+  logoUrl?: string;
+  heroVideoUrl?: string;
+  cardVideoUrl?: string;
+  whatsappNumber?: string;
+  clientPortalUrl?: string;
+  technicalAssistUrl?: string;
+};
+
 function asStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+}
+
+function asProjectMetadata(value: unknown): PublicProjectMetadata {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return value as PublicProjectMetadata;
+}
+
+function safeMetadataString(value: unknown) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function formatMoneyLabel(value: string | number | null | undefined) {
+  if (value == null || value === '') return 'Sob consulta';
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return 'Sob consulta';
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(parsed);
 }
 
 function isBrokerCandidate(user: Awaited<ReturnType<typeof readUsers>>[number]) {
@@ -107,6 +173,7 @@ export async function listPublishedProjects(): Promise<PublicProjectSummary[]> {
     headline: string;
     resumo: string;
     hero_image_url: string;
+    metadata: unknown;
     cta_label: string;
     cta_target: string;
     destaque: boolean;
@@ -123,6 +190,7 @@ export async function listPublishedProjects(): Promise<PublicProjectSummary[]> {
       e.headline,
       e.resumo,
       e.hero_image_url,
+      e.metadata,
       e.cta_label,
       e.cta_target,
       e.destaque,
@@ -137,6 +205,22 @@ export async function listPublishedProjects(): Promise<PublicProjectSummary[]> {
   `;
 
   return rows.map((row) => ({
+    ...(function () {
+      const metadata = asProjectMetadata(row.metadata);
+      const displayName = safeMetadataString(metadata.displayName) || row.nome;
+      const locationLabel = safeMetadataString(metadata.locationLabel) || [row.bairro, row.cidade].filter(Boolean).join(' • ');
+      const shortDescription = safeMetadataString(metadata.shortDescription) || row.headline || row.resumo;
+      const cardHeroImageUrl = safeMetadataString(metadata.cardHeroImageUrl) || row.hero_image_url;
+      return {
+        displayName,
+        locationLabel,
+        shortDescription,
+        cardHeroImageUrl,
+        logoUrl: safeMetadataString(metadata.logoUrl),
+        stageLabel: safeMetadataString(metadata.stageLabel),
+        deliveryLabel: safeMetadataString(metadata.deliveryLabel),
+      };
+    })(),
     id: row.id,
     slug: row.slug,
     nome: row.nome,
@@ -167,6 +251,7 @@ export async function getPublishedProjectBySlug(slug: string): Promise<PublicPro
     resumo: string;
     descricao: string;
     hero_image_url: string;
+    metadata: unknown;
     cta_label: string;
     cta_target: string;
     destaque: boolean;
@@ -186,6 +271,7 @@ export async function getPublishedProjectBySlug(slug: string): Promise<PublicPro
       resumo,
       descricao,
       hero_image_url,
+      metadata,
       cta_label,
       cta_target,
       destaque,
@@ -201,7 +287,7 @@ export async function getPublishedProjectBySlug(slug: string): Promise<PublicPro
 
   if (!project) return null;
 
-  const [mediaAssets, gatedAssets, resales, statsRows] = await Promise.all([
+  const [mediaAssets, gatedAssets, resales, statsRows, visibleUnitsRows] = await Promise.all([
     sql<{
       id: string;
       kind: string;
@@ -261,20 +347,73 @@ export async function getPublishedProjectBySlug(slug: string): Promise<PublicPro
       WHERE u.id_empreendimento = ${project.crm_empreendimento_id ?? -1}
         AND COALESCE(v.visible_on_site, true) = true
     `,
+    sql<{
+      id: number;
+      bloco: string | null;
+      numero: string | null;
+      status: string | null;
+      valor: string | number | null;
+      metragem: string | number | null;
+      tipologia: string | null;
+      raw: Record<string, unknown>;
+    }[]>`
+      SELECT u.id, u.bloco, u.numero, u.status, u.valor, u.metragem, u.tipologia, u.raw
+      FROM cv_unidades u
+      LEFT JOIN site_public_unit_visibility v ON v.cv_unidade_id = u.id
+      WHERE u.id_empreendimento = ${project.crm_empreendimento_id ?? -1}
+        AND COALESCE(v.visible_on_site, true) = true
+      ORDER BY
+        CASE
+          WHEN LOWER(COALESCE(u.status, '')) LIKE '%disp%' THEN 0
+          WHEN LOWER(COALESCE(u.status, '')) LIKE '%res%' THEN 1
+          ELSE 2
+        END,
+        COALESCE(u.valor, 0) ASC,
+        u.id ASC
+      LIMIT 6
+    `,
   ]);
 
   const stats = statsRows[0] ?? { total_units: 0, available_units: 0, reserved_units: 0, sold_units: 0 };
+  const metadata = asProjectMetadata(project.metadata);
+  const displayName = safeMetadataString(metadata.displayName) || project.nome;
+  const locationLabel = safeMetadataString(metadata.locationLabel) || [project.bairro, project.cidade].filter(Boolean).join(' • ');
+  const shortDescription = safeMetadataString(metadata.shortDescription) || project.headline || project.resumo;
+  const cardHeroImageUrl = safeMetadataString(metadata.cardHeroImageUrl) || project.hero_image_url;
+  const detailHeroImageUrl = safeMetadataString(metadata.detailHeroImageUrl) || project.hero_image_url;
+  const unitSpecs = [
+    { label: 'Área privativa', value: safeMetadataString(metadata.areaLabel) },
+    { label: 'Dormitórios', value: safeMetadataString(metadata.bedroomsLabel) },
+    { label: 'Suítes', value: safeMetadataString(metadata.suitesLabel) },
+    { label: 'Vagas', value: safeMetadataString(metadata.parkingLabel) },
+    { label: 'Andares', value: safeMetadataString(metadata.floorsLabel) },
+    { label: 'Unidades', value: safeMetadataString(metadata.unitsLabel) },
+  ].filter((item) => item.value);
 
   return {
     id: project.id,
     slug: project.slug,
     nome: project.nome,
+    displayName,
     cidade: project.cidade,
     bairro: project.bairro,
+    locationLabel,
     headline: project.headline,
     resumo: project.resumo,
+    shortDescription,
     descricao: project.descricao,
+    addressLine: safeMetadataString(metadata.addressLine),
     heroImageUrl: project.hero_image_url,
+    cardHeroImageUrl,
+    detailHeroImageUrl,
+    logoUrl: safeMetadataString(metadata.logoUrl),
+    stageLabel: safeMetadataString(metadata.stageLabel),
+    deliveryLabel: safeMetadataString(metadata.deliveryLabel),
+    heroVideoUrl: safeMetadataString(metadata.heroVideoUrl),
+    cardVideoUrl: safeMetadataString(metadata.cardVideoUrl),
+    whatsappNumber: safeMetadataString(metadata.whatsappNumber),
+    clientPortalUrl: safeMetadataString(metadata.clientPortalUrl),
+    technicalAssistUrl: safeMetadataString(metadata.technicalAssistUrl),
     ctaLabel: project.cta_label,
     ctaTarget: project.cta_target,
     destaque: project.destaque,
@@ -283,6 +422,7 @@ export async function getPublishedProjectBySlug(slug: string): Promise<PublicPro
     publishedAt: project.published_at,
     tags: asStringArray(project.tags),
     highlights: asStringArray(project.highlights),
+    specs: unitSpecs,
     mediaAssets: mediaAssets.map((row) => ({
       id: row.id,
       kind: row.kind,
@@ -309,6 +449,18 @@ export async function getPublishedProjectBySlug(slug: string): Promise<PublicPro
       price: row.preco_revenda == null ? null : Number(row.preco_revenda),
       heroImageUrl: row.hero_image_url,
       brokerName: row.corretor_nome,
+    })),
+    visibleUnits: visibleUnitsRows.map((row) => ({
+      id: row.id,
+      bloco: row.bloco ?? '',
+      numero: row.numero ?? '',
+      tipologia: row.tipologia ?? '',
+      areaPrivativa: safeMetadataString(row.raw?.area_privativa) || safeMetadataString(row.raw?.areaprivativa) || (row.metragem == null ? '' : String(row.metragem)),
+      bedrooms: safeMetadataString(row.raw?.dormitorios) || safeMetadataString(row.raw?.quartos),
+      suites: safeMetadataString(row.raw?.suites),
+      parkingSpaces: safeMetadataString(row.raw?.vagas) || safeMetadataString(row.raw?.vaga_garagem) || safeMetadataString(row.raw?.numero_vagas),
+      priceLabel: formatMoneyLabel(row.valor),
+      statusLabel: row.status || 'Disponibilidade em atualização',
     })),
     stats: {
       totalUnits: Number(stats.total_units ?? 0),

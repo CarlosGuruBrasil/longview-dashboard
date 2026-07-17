@@ -1,5 +1,5 @@
-import { SiteVisionIntegracoes } from '../components/SiteVisionShell';
+import { redirect } from 'next/navigation';
 
 export default function SiteVisionIntegracoesPage() {
-  return <SiteVisionIntegracoes />;
+  redirect('/site-vision');
 }

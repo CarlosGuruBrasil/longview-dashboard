@@ -55,8 +55,8 @@ export default async function PublicSiteHomePage() {
           {visibleProjects.map((project) => (
             <article key={project.id} className="overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.03]">
               <div className="relative h-56 bg-zinc-900">
-                {project.heroImageUrl ? (
-                  <Image src={project.heroImageUrl} alt={project.nome} fill className="object-cover" unoptimized />
+                {project.cardHeroImageUrl ? (
+                  <Image src={project.cardHeroImageUrl} alt={project.displayName} fill className="object-cover" unoptimized />
                 ) : (
                   <div className="flex h-full items-center justify-center text-sm text-zinc-500">Sem imagem principal</div>
                 )}
@@ -64,8 +64,15 @@ export default async function PublicSiteHomePage() {
               <div className="space-y-4 p-6">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <h3 className="text-xl font-semibold text-white">{project.nome}</h3>
-                    <p className="mt-1 text-sm text-zinc-400">{[project.bairro, project.cidade].filter(Boolean).join(' • ') || 'Localização em definição'}</p>
+                    <div className="flex items-center gap-3">
+                      {project.logoUrl ? (
+                        <div className="relative h-10 w-20">
+                          <Image src={project.logoUrl} alt={project.displayName} fill className="object-contain object-left" unoptimized />
+                        </div>
+                      ) : null}
+                      <h3 className="text-xl font-semibold text-white">{project.displayName}</h3>
+                    </div>
+                    <p className="mt-1 text-sm text-zinc-400">{project.locationLabel || 'Localização em definição'}</p>
                   </div>
                   {project.destaque ? (
                     <span className="rounded-full border border-teal-400/20 bg-teal-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-teal-300">
@@ -73,7 +80,11 @@ export default async function PublicSiteHomePage() {
                     </span>
                   ) : null}
                 </div>
-                <p className="text-sm leading-relaxed text-zinc-300">{project.headline || project.resumo || 'Conteúdo em preparação.'}</p>
+                <div className="flex flex-wrap gap-2 text-xs text-zinc-500">
+                  {project.stageLabel ? <span>{project.stageLabel}</span> : null}
+                  {project.deliveryLabel ? <span>{project.deliveryLabel}</span> : null}
+                </div>
+                <p className="text-sm leading-relaxed text-zinc-300">{project.shortDescription || project.headline || project.resumo || 'Conteúdo em preparação.'}</p>
                 <div className="flex items-center justify-between text-xs text-zinc-500">
                   <span>{project.mediaCount} mídia(s)</span>
                   <span>{project.publishedAt ? new Date(project.publishedAt).toLocaleDateString('pt-BR') : 'Publicado'}</span>

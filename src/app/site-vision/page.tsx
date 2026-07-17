@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import jwt from 'jsonwebtoken';
-import { SiteVisionOverview } from './components/SiteVisionShell';
+import { SiteVisionDashboard } from './components/SiteVisionDashboard';
 
 export const metadata: Metadata = {
   title: 'Site Vision — LongView',
@@ -26,5 +26,5 @@ export default async function SiteVisionPage() {
   const user = await verifyAuth();
   if (!user) redirect('/login');
 
-  return <SiteVisionOverview />;
+  return <SiteVisionDashboard />;
 }

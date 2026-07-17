@@ -24,7 +24,7 @@ export async function GET() {
         spe.status_publicacao,
         MAX(spe.updated_at)::text AS ultima_atualizacao
       FROM cv_empreendimentos ce
-      LEFT JOIN cv_unidades cu ON cu.empreendimento_id = ce.id
+      LEFT JOIN cv_unidades cu ON cu.id_empreendimento = ce.id
       LEFT JOIN cv_materiais cm ON cm.id_empreendimento = ce.id
       LEFT JOIN site_public_empreendimentos spe ON spe.crm_empreendimento_id = ce.id
       GROUP BY ce.id, ce.nome, ce.situacao, ce.tipo, spe.id, spe.status_publicacao, spe.updated_at
@@ -41,7 +41,7 @@ export async function GET() {
             SELECT COUNT(*) AS total FROM site_public_resales WHERE cv_empreendimento_id = ${emp.id}
           `,
           sql<{ total: number }[]>`
-            SELECT COUNT(*) AS total FROM site_public_unit_visibility 
+            SELECT COUNT(*) AS total FROM site_public_unit_visibility
             WHERE cv_empreendimento_id = ${emp.id} AND visible_on_site = true
           `,
         ]);

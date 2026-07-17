@@ -1,5 +1,5 @@
-import { SiteVisionAccess } from '../components/SiteVisionShell';
+import { redirect } from 'next/navigation';
 
 export default function SiteVisionAccessPage() {
-  return <SiteVisionAccess />;
+  redirect('/site-vision/equipe');
 }

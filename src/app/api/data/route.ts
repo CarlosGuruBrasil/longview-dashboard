@@ -8,6 +8,7 @@ import jwt from 'jsonwebtoken';
 import { rateLimit, getClientIp } from '@/lib/rateLimit';
 import type { MetaData, MetaLeadForm, MetaPageInfo } from '@/app/marketing-vision/types';
 import logger from '@/lib/logger'
+import { isRealEmpreendimento } from '@/lib/cvcrm-projects';
 
 const JWT_SECRET   = process.env.JWT_SECRET ?? (() => { throw new Error('[LongView] JWT_SECRET nao configurado. Defina no .env.local') })();
 const META_PAGE_ID = '259079394232614';
@@ -587,11 +588,7 @@ async function fetchCRMEmpreendimentos(): Promise<{ empreendimentos: unknown[]; 
     const projRes = await axios.get('https://longviewempreendimentos.cvcrm.com.br/api/v1/cadastros/empreendimentos', { headers, timeout: 20000 });
     const projects = Array.isArray(projRes.data) ? projRes.data : [];
     logger.info(`[fetchCRMEmpreendimentos] $ projetos recebidos do CRM`);
-    const validProjects = projects.filter((p: Record<string, unknown>) => {
-      const te = (p.tipo_empreendimento as { nome?: string }[] | undefined);
-      const sc = (p.situacao_comercial as { nome?: string }[] | undefined);
-      return te?.[0]?.nome !== null && sc?.[0]?.nome !== null;
-    });
+    const validProjects = projects.filter((p: Record<string, unknown>) => isRealEmpreendimento(p));
 
     const empreendimentos: { id: number; nome: string; situacao: string; tipo: string }[] = [];
     const unidades: { id: number; id_empreendimento: number; bloco: string; numero: string; status: string; valor: number; metragem: number; andar: number | null; coluna: number | null; tipologia: string; situacao_mapa_disponibilidade: number | null }[] = [];
