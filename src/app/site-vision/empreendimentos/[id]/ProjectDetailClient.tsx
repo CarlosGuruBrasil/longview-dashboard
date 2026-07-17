@@ -1,55 +1,43 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AlertCircle, ChevronLeft, Plus, Trash2, Star, Loader2 } from 'lucide-react';
+import { AlertCircle, ChevronLeft, Plus, Star, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import logger from '@/lib/logger';
 
 interface ProjectDetail {
-  crm: {
+  empreendimento: {
     id: number;
     nome: string;
-    situacao: string;
-    tipo: string;
+    situacao: string | null;
+    tipo: string | null;
   };
-  materiais: Array<{
+  siteConfig: {
     id: string;
-    nome: string;
-    tipo: string;
-    uploadedBy: string;
-  }>;
-  unidades: Array<{
+    status: 'draft' | 'published' | 'archived';
+    enabled: boolean;
+  } | null;
+  units: Array<{
     id: number;
     bloco: string | null;
     numero: string | null;
     status: string | null;
     valor: number | null;
     metragem: number | null;
+    siteVisible: boolean;
   }>;
-  resales: Array<{
+  mediaAssets: Array<{
     id: string;
-    titulo_publico: string;
-    status_publicacao: string;
+    title: string;
+    kind: string;
+    isPrimary: boolean;
+    sortOrder: number;
+    publicUrl: string;
   }>;
-  site: {
-    publicado: boolean;
-    siteProjectId: string | null;
-    status_publicacao: string | null;
-  };
-}
-
-interface MediaAsset {
-  id: string;
-  title: string;
-  kind: string;
-  is_primary: boolean;
-  sort_order: number;
-  public_url: string;
 }
 
 export function ProjectDetailClient({ projectId }: { projectId: number }) {
   const [data, setData] = useState<ProjectDetail | null>(null);
-  const [imagens, setImagens] = useState<MediaAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -63,22 +51,11 @@ export function ProjectDetailClient({ projectId }: { projectId: number }) {
         setLoading(true);
         const res = await fetch(`/api/site-vision/empreendimentos/${projectId}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const json = await res.json();
+        const json = (await res.json()) as ProjectDetail;
         setData(json);
-
-        // Se já publicado, carregar imagens
-        if (json.site.publicado && json.site.siteProjectId) {
-          const mediaRes = await fetch(
-            `/api/site-vision/empreendimentos/${projectId}/media`
-          );
-          if (mediaRes.ok) {
-            const mediaJson = await mediaRes.json();
-            setImagens(mediaJson.mediaAssets || []);
-            const primary = mediaJson.mediaAssets?.find((m: MediaAsset) => m.is_primary);
-            if (primary) setHeroImageId(primary.id);
-          }
-        }
-
+        setUnidadesSelecionadas(new Set(json.units.filter((u) => u.siteVisible).map((u) => u.id)));
+        const primary = json.mediaAssets.find((m) => m.isPrimary);
+        if (primary) setHeroImageId(primary.id);
         setError(null);
       } catch (err) {
         logger.error({ error: err }, '[ProjectDetailClient] fetch failed');
@@ -92,7 +69,7 @@ export function ProjectDetailClient({ projectId }: { projectId: number }) {
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !data) return;
 
     try {
       setUploading(true);
@@ -105,23 +82,29 @@ export function ProjectDetailClient({ projectId }: { projectId: number }) {
         { method: 'POST', body: form }
       );
 
-      if (!res.ok) throw new Error('Erro no upload');
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || 'Erro no upload');
+      }
       const json = await res.json();
 
-      setImagens((prev) => [
-        ...prev,
-        {
-          id: json.id,
-          title: json.nome,
-          kind: 'image',
-          is_primary: false,
-          sort_order: (prev.length || 0) + 1,
-          public_url: json.url,
-        },
-      ]);
+      setData({
+        ...data,
+        mediaAssets: [
+          ...data.mediaAssets,
+          {
+            id: json.id,
+            title: json.nome,
+            kind: 'image',
+            isPrimary: false,
+            sortOrder: data.mediaAssets.length + 1,
+            publicUrl: json.url,
+          },
+        ],
+      });
     } catch (err) {
       logger.error({ error: err }, 'upload failed');
-      alert('Erro ao fazer upload');
+      alert(err instanceof Error ? err.message : 'Erro ao fazer upload');
     } finally {
       setUploading(false);
     }
@@ -143,19 +126,19 @@ export function ProjectDetailClient({ projectId }: { projectId: number }) {
             destaque: false,
             heroImageId,
             unidadesVisiveis: Array.from(unidadesSelecionadas),
-            headlinePublico: data.crm.nome,
-            descricaoCurta: data.crm.nome,
+            headlinePublico: data.empreendimento.nome,
+            descricaoCurta: data.empreendimento.nome,
           }),
         }
       );
 
-      if (!res.ok) throw new Error('Erro ao publicar');
       const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Erro ao publicar');
       alert(json.message);
       window.location.reload();
     } catch (err) {
       logger.error({ error: err }, 'publish failed');
-      alert('Erro ao publicar');
+      alert(err instanceof Error ? err.message : 'Erro ao publicar');
     } finally {
       setPublishing(false);
     }
@@ -189,6 +172,8 @@ export function ProjectDetailClient({ projectId }: { projectId: number }) {
     );
   }
 
+  const publicado = data.siteConfig?.enabled === true;
+
   return (
     <div className="space-y-6">
       <div>
@@ -199,9 +184,9 @@ export function ProjectDetailClient({ projectId }: { projectId: number }) {
           <ChevronLeft size={16} />
           Voltar
         </Link>
-        <h2 className="text-3xl font-semibold text-white">{data.crm.nome}</h2>
+        <h2 className="text-3xl font-semibold text-white">{data.empreendimento.nome}</h2>
         <p className="mt-2 text-sm text-zinc-400">
-          {data.crm.situacao} • {data.crm.tipo} • ID {data.crm.id}
+          {data.empreendimento.situacao} • {data.empreendimento.tipo} • ID {data.empreendimento.id}
         </p>
       </div>
 
@@ -211,12 +196,12 @@ export function ProjectDetailClient({ projectId }: { projectId: number }) {
           <div>
             <p className="text-sm font-semibold text-white">Status</p>
             <p className="mt-1 text-xs text-zinc-400">
-              {data.site.publicado
+              {publicado
                 ? 'Visível no site público'
                 : 'Não está publicado ainda. Clique em Publicar para começar.'}
             </p>
           </div>
-          {data.site.publicado ? (
+          {publicado ? (
             <span className="rounded-full bg-emerald-500/20 px-4 py-2 text-sm font-semibold text-emerald-300">
               Publicado
             </span>
@@ -238,39 +223,44 @@ export function ProjectDetailClient({ projectId }: { projectId: number }) {
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-semibold text-white">Imagens</h3>
           <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-zinc-300">
-            {imagens.length}
+            {data.mediaAssets.length}
           </span>
         </div>
 
-        {imagens.length > 0 && (
+        {data.mediaAssets.length > 0 && (
           <div className="space-y-2 mb-4 max-h-96 overflow-y-auto">
-            {imagens
-              .sort((a, b) => a.sort_order - b.sort_order)
+            {[...data.mediaAssets]
+              .sort((a, b) => a.sortOrder - b.sortOrder)
               .map((img) => (
                 <div
                   key={img.id}
                   className={`flex items-center justify-between rounded-lg p-3 ${
-                    img.is_primary ? 'bg-teal-500/20 border border-teal-400/30' : 'bg-white/5'
+                    img.id === heroImageId ? 'bg-teal-500/20 border border-teal-400/30' : 'bg-white/5'
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="h-12 w-12 rounded-lg bg-zinc-700 flex items-center justify-center text-xs text-zinc-400">
-                      IMG
+                    <div className="h-12 w-12 rounded-lg bg-zinc-700 flex items-center justify-center text-xs text-zinc-400 overflow-hidden">
+                      {img.publicUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={img.publicUrl} alt={img.title} className="h-full w-full object-cover" />
+                      ) : (
+                        'IMG'
+                      )}
                     </div>
                     <div>
                       <p className="text-sm font-medium text-white">{img.title}</p>
                       <p className="text-xs text-zinc-500">
-                        {img.is_primary ? '⭐ Destaque' : `Posição ${img.sort_order}`}
+                        {img.id === heroImageId ? '⭐ Destaque' : `Posição ${img.sortOrder}`}
                       </p>
                     </div>
                   </div>
                   <button
                     onClick={() => setHeroImageId(img.id)}
                     className={`p-2 rounded transition-colors ${
-                      img.is_primary ? 'text-teal-300' : 'text-zinc-600 hover:text-teal-300'
+                      img.id === heroImageId ? 'text-teal-300' : 'text-zinc-600 hover:text-teal-300'
                     }`}
                   >
-                    <Star size={16} fill={img.is_primary ? 'currentColor' : 'none'} />
+                    <Star size={16} fill={img.id === heroImageId ? 'currentColor' : 'none'} />
                   </button>
                 </div>
               ))}
@@ -297,15 +287,15 @@ export function ProjectDetailClient({ projectId }: { projectId: number }) {
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-semibold text-white">Unidades a publicar</h3>
           <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-zinc-300">
-            {unidadesSelecionadas.size} / {data.unidades.length}
+            {unidadesSelecionadas.size} / {data.units.length}
           </span>
         </div>
 
-        {data.unidades.length === 0 ? (
+        {data.units.length === 0 ? (
           <p className="text-sm text-zinc-400">Nenhuma unidade cadastrada.</p>
         ) : (
           <div className="space-y-2 max-h-96 overflow-y-auto">
-            {data.unidades.slice(0, 20).map((unit) => (
+            {data.units.slice(0, 20).map((unit) => (
               <label key={unit.id} className="flex items-center gap-3 rounded-lg bg-white/5 p-3 cursor-pointer hover:bg-white/10">
                 <input
                   type="checkbox"
@@ -342,7 +332,7 @@ export function ProjectDetailClient({ projectId }: { projectId: number }) {
           disabled={publishing}
           className="flex-1 rounded-lg bg-teal-600 px-6 py-3 text-center font-semibold text-white hover:bg-teal-700 disabled:opacity-50 transition-colors"
         >
-          {publishing ? 'Publicando...' : data.site.publicado ? 'Salvar alterações' : 'Publicar agora'}
+          {publishing ? 'Publicando...' : publicado ? 'Salvar alterações' : 'Publicar agora'}
         </button>
         <Link href="/site-vision/empreendimentos" className="rounded-lg border border-white/20 px-6 py-3 font-semibold text-white hover:bg-white/10 transition-colors">
           Cancelar
