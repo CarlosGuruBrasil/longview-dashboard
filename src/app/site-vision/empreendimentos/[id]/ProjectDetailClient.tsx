@@ -61,14 +61,14 @@ export function ProjectDetailClient({ projectId }: { projectId: number }) {
     const doFetch = async () => {
       try {
         setLoading(true);
-        const res = await doFetch(`/api/site-vision/empreendimentos/${projectId}`);
+        const res = await fetch(`/api/site-vision/empreendimentos/${projectId}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = await res.json();
         setData(json);
 
         // Se já publicado, carregar imagens
         if (json.site.publicado && json.site.siteProjectId) {
-          const mediaRes = await doFetch(
+          const mediaRes = await fetch(
             `/api/site-vision/empreendimentos/${projectId}/media`
           );
           if (mediaRes.ok) {
@@ -87,7 +87,7 @@ export function ProjectDetailClient({ projectId }: { projectId: number }) {
         setLoading(false);
       }
     };
-    fetch();
+    doFetch();
   }, [projectId]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -100,7 +100,7 @@ export function ProjectDetailClient({ projectId }: { projectId: number }) {
       form.append('file', file);
       form.append('altText', file.name);
 
-      const res = await doFetch(
+      const res = await fetch(
         `/api/site-vision/empreendimentos/${projectId}/media/upload`,
         { method: 'POST', body: form }
       );
@@ -132,7 +132,7 @@ export function ProjectDetailClient({ projectId }: { projectId: number }) {
 
     try {
       setPublishing(true);
-      const res = await doFetch(
+      const res = await fetch(
         `/api/site-vision/empreendimentos/${projectId}/publish`,
         {
           method: 'POST',

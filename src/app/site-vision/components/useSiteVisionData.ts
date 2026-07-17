@@ -32,7 +32,7 @@ export function useOverview() {
     const doFetch = async () => {
       try {
         setLoading(true);
-        const res = await doFetch('/api/site-vision/overview');
+        const res = await fetch('/api/site-vision/overview');
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = await res.json();
         setData(json);
@@ -44,7 +44,7 @@ export function useOverview() {
         setLoading(false);
       }
     };
-    fetch();
+    doFetch();
   }, []);
 
   return { data, loading, error };
@@ -81,7 +81,7 @@ export function useProjects() {
     const doFetch = async () => {
       try {
         setLoading(true);
-        const res = await doFetch('/api/site-vision/projects');
+        const res = await fetch('/api/site-vision/projects');
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = await res.json();
         setData(json);
@@ -93,7 +93,7 @@ export function useProjects() {
         setLoading(false);
       }
     };
-    fetch();
+    doFetch();
   }, []);
 
   return { data, loading, error };
@@ -138,7 +138,7 @@ export function useInventory() {
     const doFetch = async () => {
       try {
         setLoading(true);
-        const res = await doFetch('/api/site-vision/inventory');
+        const res = await fetch('/api/site-vision/inventory');
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = await res.json();
         setData(json);
@@ -150,7 +150,7 @@ export function useInventory() {
         setLoading(false);
       }
     };
-    fetch();
+    doFetch();
   }, []);
 
   return { data, loading, error };
@@ -211,7 +211,7 @@ export function useAnalytics() {
     const doFetch = async () => {
       try {
         setLoading(true);
-        const res = await doFetch('/api/site-vision/analytics');
+        const res = await fetch('/api/site-vision/analytics');
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = await res.json();
         setData(json);
@@ -223,7 +223,7 @@ export function useAnalytics() {
         setLoading(false);
       }
     };
-    fetch();
+    doFetch();
   }, []);
 
   return { data, loading, error };

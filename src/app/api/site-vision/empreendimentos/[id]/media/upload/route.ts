@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyPermission } from '@/lib/auth';
 import { sql } from '@/lib/pg';
+import { pushMidia } from '@/lib/site-longview-client';
 import logger from '@/lib/logger';
 import { randomUUID } from 'crypto';
 
 type Params = { params: Promise<{ id: string }> };
+
+const MAX_SIZE_BYTES = 5 * 1024 * 1024;
 
 export async function POST(request: NextRequest, { params }: Params) {
   const user = await verifyPermission('viewSiteVision');
@@ -22,12 +25,20 @@ export async function POST(request: NextRequest, { params }: Params) {
     if (!file) {
       return NextResponse.json({ error: 'Nenhum arquivo enviado.' }, { status: 400 });
     }
-
     if (!file.type.startsWith('image/')) {
       return NextResponse.json({ error: 'Apenas imagens são permitidas.' }, { status: 400 });
     }
+    if (file.size > MAX_SIZE_BYTES) {
+      return NextResponse.json({ error: 'Arquivo muito grande (máx. 5MB).' }, { status: 413 });
+    }
 
-    // Verificar se já tem site_public_empreendimentos
+    // empId aqui é o cv_crm_id (usado pra localizar o empreendimento no site real)
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const dataUrl = `data:${file.type};base64,${buffer.toString('base64')}`;
+    const altText = (formData.get('altText') as string) || file.name;
+
+    const pushed = await pushMidia(empId, { tipo: 'foto', dataUrl, descricao: altText });
+
     const [siteRows] = await Promise.all([
       sql<{ id: string }[]>`
         SELECT id FROM site_public_empreendimentos
@@ -36,46 +47,33 @@ export async function POST(request: NextRequest, { params }: Params) {
       `,
     ]);
 
-    if (!siteRows[0]) {
-      return NextResponse.json(
-        { error: 'Este empreendimento ainda não foi publicado. Publique antes de adicionar imagens.' },
-        { status: 400 }
-      );
+    const mediaId = randomUUID();
+    if (siteRows[0]) {
+      const siteProjectId = siteRows[0].id;
+      await sql`
+        INSERT INTO site_public_media_assets (
+          id, empreendimento_id, kind, origin, title, alt_text,
+          public_url, thumbnail_url, mime_type, is_primary, sort_order,
+          metadata, created_at, updated_at
+        ) VALUES (
+          ${mediaId}, ${siteProjectId}, 'image', 'upload', ${file.name}, ${altText},
+          ${pushed.midia.url_storage}, ${pushed.midia.url_storage}, ${file.type}, false,
+          (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM site_public_media_assets WHERE empreendimento_id = ${siteProjectId}),
+          ${sql.json({ siteLongviewMidiaId: pushed.midia.id })}, NOW(), NOW()
+        )
+      `;
     }
 
-    const siteProjectId = siteRows[0].id;
-    const mediaId = randomUUID();
-
-    const altText = (formData.get('altText') as string) || file.name;
-
-    // Salvar em site_public_media_assets
-    await sql`
-      INSERT INTO site_public_media_assets (
-        id, empreendimento_id, kind, title, alt_text,
-        public_url, thumbnail_url, is_primary, sort_order,
-        created_at, updated_at
-      ) VALUES (
-        ${mediaId}::uuid,
-        ${siteProjectId}::uuid,
-        'image'::text,
-        ${file.name}::text,
-        ${altText}::text,
-        ${`/api/site-vision/empreendimentos/${empId}/media/${mediaId}`}::text,
-        ${`/api/site-vision/empreendimentos/${empId}/media/${mediaId}/thumb`}::text,
-        false::boolean,
-        (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM site_public_media_assets WHERE empreendimento_id = ${siteProjectId}::uuid)::integer
-      )
-    `;
-
-    logger.info({ empId, mediaId, fileName: file.name }, '[site-vision/media/upload] success');
+    logger.info({ empId, siteLongviewMidiaId: pushed.midia.id, fileName: file.name }, '[site-vision/media/upload] pushed to site real');
 
     return NextResponse.json({
       id: mediaId,
       nome: file.name,
+      url: pushed.midia.url_storage,
       tipo: file.type,
     });
   } catch (error) {
     logger.error({ error }, '[site-vision/media/upload] error');
-    return NextResponse.json({ error: 'Erro ao fazer upload.' }, { status: 500 });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Erro ao fazer upload.' }, { status: 500 });
   }
 }
