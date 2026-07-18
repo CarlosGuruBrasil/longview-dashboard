@@ -46,6 +46,12 @@ interface ProjectDetail {
     valor: number | null;
     metragem: number | null;
     siteVisible: boolean;
+    resale: {
+      id: string;
+      status_publicacao: string;
+      titulo_publico: string;
+      preco_revenda: number | null;
+    } | null;
   }>;
   materials: Array<{
     id: string;
@@ -95,6 +101,7 @@ export function ProjectDetailClient({ projectId }: { projectId: number }) {
   const [publishing, setPublishing] = useState(false);
   const [unidadesSelecionadas, setUnidadesSelecionadas] = useState<Set<number>>(new Set());
   const [heroImageId, setHeroImageId] = useState<string | null>(null);
+  const [revendaBusy, setRevendaBusy] = useState<number | string | null>(null);
   const [contentForm, setContentForm] = useState({
     shortDescription: '',
     descricao: '',
@@ -206,6 +213,75 @@ export function ProjectDetailClient({ projectId }: { projectId: number }) {
       setError(err instanceof Error ? err.message : 'Erro ao enviar material.');
     } finally {
       setMateriaisBusy('');
+    }
+  };
+
+  const transformarEmRevenda = async (unit: ProjectDetail['units'][number]) => {
+    if (!data) return;
+    const precoStr = window.prompt(`Valor pedido pela revenda da unidade ${unit.numero ?? unit.id} (R$):`, unit.valor ? String(unit.valor) : '');
+    if (precoStr === null) return;
+    const preco = precoStr.trim() ? Number(precoStr.replace(/[^\d.,]/g, '').replace(',', '.')) : null;
+
+    setRevendaBusy(unit.id);
+    setError(null);
+    try {
+      const res = await fetch('/api/site-vision/revendas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cvUnidadeId: unit.id,
+          cvEmpreendimentoId: data.empreendimento.id,
+          title: `Revenda ${data.empreendimento.nome} - Unidade ${unit.numero ?? unit.id}`,
+          price: preco,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || 'Erro ao criar revenda.');
+      await loadDetail();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao criar revenda.');
+    } finally {
+      setRevendaBusy(null);
+    }
+  };
+
+  const disponibilizarRevenda = async (resaleId: string) => {
+    if (!data) return;
+    setRevendaBusy(resaleId);
+    setError(null);
+    try {
+      const res = await fetch(`/api/site-vision/empreendimentos/${projectId}/revendas`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resaleId }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || 'Erro ao disponibilizar revenda.');
+      await loadDetail();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao disponibilizar revenda.');
+    } finally {
+      setRevendaBusy(null);
+    }
+  };
+
+  const removerRevendaDoSite = async (resaleId: string) => {
+    if (!data) return;
+    setRevendaBusy(resaleId);
+    setError(null);
+    try {
+      const res = await fetch(`/api/site-vision/empreendimentos/${projectId}/revendas`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resaleId }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || 'Erro ao remover revenda do site.');
+      await loadDetail();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao remover revenda do site.');
+    } finally {
+      setRevendaBusy(null);
     }
   };
 
@@ -646,32 +722,74 @@ export function ProjectDetailClient({ projectId }: { projectId: number }) {
           <p className="text-sm text-zinc-400">Nenhuma unidade cadastrada.</p>
         ) : (
           <div className="space-y-2 max-h-96 overflow-y-auto">
-            {data.units.slice(0, 20).map((unit) => (
-              <label key={unit.id} className="flex items-center gap-3 rounded-lg bg-white/5 p-3 cursor-pointer hover:bg-white/10">
-                <input
-                  type="checkbox"
-                  checked={unidadesSelecionadas.has(unit.id)}
-                  onChange={(e) => {
-                    const newSet = new Set(unidadesSelecionadas);
-                    if (e.target.checked) {
-                      newSet.add(unit.id);
-                    } else {
-                      newSet.delete(unit.id);
-                    }
-                    setUnidadesSelecionadas(newSet);
-                  }}
-                  className="h-4 w-4 rounded"
-                />
-                <div>
-                  <p className="text-sm font-medium text-white">
-                    {unit.bloco && `Bloco ${unit.bloco}`} {unit.numero && `Apto ${unit.numero}`}
-                  </p>
-                  <p className="text-xs text-zinc-500">
-                    {unit.status} • {unit.metragem}m²
-                  </p>
+            {data.units.map((unit) => {
+              const vendida = (unit.status ?? '').toLowerCase().includes('vend');
+              return (
+                <div key={unit.id} className="flex items-center gap-3 rounded-lg bg-white/5 p-3 hover:bg-white/10">
+                  <label className="flex flex-1 items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={unidadesSelecionadas.has(unit.id)}
+                      onChange={(e) => {
+                        const newSet = new Set(unidadesSelecionadas);
+                        if (e.target.checked) {
+                          newSet.add(unit.id);
+                        } else {
+                          newSet.delete(unit.id);
+                        }
+                        setUnidadesSelecionadas(newSet);
+                      }}
+                      className="h-4 w-4 rounded"
+                    />
+                    <div>
+                      <p className="text-sm font-medium text-white">
+                        {unit.bloco && `Bloco ${unit.bloco}`} {unit.numero && `Apto ${unit.numero}`}
+                      </p>
+                      <p className="text-xs text-zinc-500">
+                        {unit.status} • {unit.metragem}m²
+                      </p>
+                    </div>
+                  </label>
+
+                  {vendida && !unit.resale && (
+                    <button
+                      onClick={() => transformarEmRevenda(unit)}
+                      disabled={revendaBusy === unit.id}
+                      className="shrink-0 rounded-lg bg-amber-500/15 px-3 py-2 text-xs font-semibold text-amber-300 hover:bg-amber-500/25 disabled:opacity-60"
+                    >
+                      {revendaBusy === unit.id ? <Loader2 className="animate-spin inline mr-1" size={12} /> : ''}
+                      Transformar em revenda
+                    </button>
+                  )}
+
+                  {unit.resale && unit.resale.status_publicacao !== 'published' && (
+                    <button
+                      onClick={() => disponibilizarRevenda(unit.resale!.id)}
+                      disabled={revendaBusy === unit.resale.id}
+                      className="shrink-0 rounded-lg bg-teal-600 px-3 py-2 text-xs font-semibold text-white hover:bg-teal-700 disabled:opacity-60"
+                    >
+                      {revendaBusy === unit.resale.id ? <Loader2 className="animate-spin inline mr-1" size={12} /> : ''}
+                      Disponibilizar no site
+                    </button>
+                  )}
+
+                  {unit.resale && unit.resale.status_publicacao === 'published' && (
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className="rounded-full bg-emerald-500/15 px-3 py-1.5 text-xs font-semibold text-emerald-300">
+                        Revenda no site
+                      </span>
+                      <button
+                        onClick={() => removerRevendaDoSite(unit.resale!.id)}
+                        disabled={revendaBusy === unit.resale.id}
+                        className="rounded-lg px-3 py-2 text-xs font-semibold text-red-300 hover:bg-red-500/10 disabled:opacity-60"
+                      >
+                        Remover
+                      </button>
+                    </div>
+                  )}
                 </div>
-              </label>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

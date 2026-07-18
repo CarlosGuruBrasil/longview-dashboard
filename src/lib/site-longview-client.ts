@@ -139,3 +139,24 @@ export function pushMaterial(cvCrmId: number, params: MaterialPush) {
 export function deleteMaterial(materialId: number) {
   return call<{ success: boolean }>(`/api/admin/materiais/${materialId}`, { method: 'DELETE' });
 }
+
+export type RevendaPush = {
+  unidadeNumero?: string;
+  titulo: string;
+  preco?: number | null;
+  descricao?: string;
+  corretorNome?: string;
+  corretorTelefone?: string;
+  corretorEmail?: string;
+};
+
+export function pushRevenda(cvCrmId: number, params: RevendaPush) {
+  return call<{ success: boolean; revenda: { id: number; titulo: string; preco: number | null; status: string } }>(
+    `/api/admin/empreendimentos/${cvCrmId}/revendas`,
+    { method: 'POST', body: JSON.stringify(params) }
+  );
+}
+
+export function deleteRevendaRemota(revendaId: number) {
+  return call<{ success: boolean }>(`/api/admin/revendas/${revendaId}`, { method: 'DELETE' });
+}
