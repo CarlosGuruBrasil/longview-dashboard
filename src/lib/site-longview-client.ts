@@ -116,7 +116,8 @@ export type EmpreendimentoPublicState = {
 export async function fetchEmpreendimentoPublicState(cvCrmId: number): Promise<EmpreendimentoPublicState | null> {
   if (!BASE_URL) return null;
   try {
-    const res = await fetch(`${BASE_URL}/api/empreendimentos/${cvCrmId}`, { cache: 'no-store' });
+    // by=cv_crm_id desambigua: id (PK) e cv_crm_id sao numeracoes independentes que podem colidir.
+    const res = await fetch(`${BASE_URL}/api/empreendimentos/${cvCrmId}?by=cv_crm_id`, { cache: 'no-store' });
     if (!res.ok) return null;
     return (await res.json()) as EmpreendimentoPublicState;
   } catch {
