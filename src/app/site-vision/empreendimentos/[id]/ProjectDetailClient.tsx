@@ -72,6 +72,14 @@ interface ProjectDetail {
   }>;
 }
 
+function formatDataEntrega(value: string | null) {
+  if (!value) return 'Não informado';
+  // CV CRM manda DD/MM/YYYY — já está no formato certo, só normaliza se vier ISO.
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(value)) return value;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString('pt-BR');
+}
+
 function formatSpecRange(min: number | null, max: number | null) {
   if (min == null && max == null) return 'Sem unidades cadastradas';
   const lo = min ?? max;
@@ -368,7 +376,7 @@ export function ProjectDetailClient({ projectId }: { projectId: number }) {
           <div>
             <p className="text-xs text-zinc-500">Data de entrega</p>
             <p className="mt-1 text-sm text-zinc-200">
-              {data.empreendimento.dataEntrega ? new Date(data.empreendimento.dataEntrega).toLocaleDateString('pt-BR') : 'Não informado'}
+              {formatDataEntrega(data.empreendimento.dataEntrega)}
             </p>
           </div>
           <div>

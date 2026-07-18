@@ -272,8 +272,15 @@ export async function GET(_request: NextRequest, { params }: Params) {
     // Specs calculados a partir das unidades — mesmo dado que o site real computa
     // a partir do que foi empurrado por pushUnidades. Só informativo aqui.
     const areas = units.map((u) => u.metragem).filter((v): v is number => v != null && v > 0);
+    // O CV CRM não manda um campo numérico de dormitórios — vem embutido no texto de
+    // tipologia (ex: "2 Dorm / 2 Suítes"), então extrai por regex.
     const dormitorios = units
-      .map((u) => (u.raw.dormitorios != null ? Number(u.raw.dormitorios) : null))
+      .map((u) => {
+        if (u.raw.dormitorios != null) return Number(u.raw.dormitorios);
+        const tipologia = String(u.raw.tipologia ?? '');
+        const match = /(\d+)\s*dorm/i.exec(tipologia);
+        return match ? Number(match[1]) : null;
+      })
       .filter((v): v is number => v != null && Number.isFinite(v));
     const andares = units
       .map((u) => (u.andar != null ? Number(u.andar) : null))
