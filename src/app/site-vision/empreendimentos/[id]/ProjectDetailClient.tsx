@@ -16,7 +16,21 @@ interface ProjectDetail {
     id: string;
     status: 'draft' | 'published' | 'archived';
     enabled: boolean;
+    resumo: string;
+    descricao: string;
+    metadata: {
+      logoUrl?: string;
+      videoUrl?: string;
+      vagasLabel?: string;
+    };
   } | null;
+  specs: {
+    areaMin: number | null;
+    areaMax: number | null;
+    dormitoriosMin: number | null;
+    dormitoriosMax: number | null;
+    andares: number | null;
+  };
   units: Array<{
     id: number;
     bloco: string | null;
@@ -36,6 +50,13 @@ interface ProjectDetail {
   }>;
 }
 
+function formatSpecRange(min: number | null, max: number | null) {
+  if (min == null && max == null) return 'Sem unidades cadastradas';
+  const lo = min ?? max;
+  const hi = max ?? min;
+  return lo === hi ? String(lo) : `${lo}-${hi}`;
+}
+
 export function ProjectDetailClient({ projectId }: { projectId: number }) {
   const [data, setData] = useState<ProjectDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -44,6 +65,15 @@ export function ProjectDetailClient({ projectId }: { projectId: number }) {
   const [publishing, setPublishing] = useState(false);
   const [unidadesSelecionadas, setUnidadesSelecionadas] = useState<Set<number>>(new Set());
   const [heroImageId, setHeroImageId] = useState<string | null>(null);
+  const [contentForm, setContentForm] = useState({
+    shortDescription: '',
+    descricao: '',
+    logoUrl: '',
+    videoUrl: '',
+    vagasLabel: '',
+  });
+  const [savingContent, setSavingContent] = useState(false);
+  const [contentSaved, setContentSaved] = useState(false);
 
   useEffect(() => {
     const doFetch = async () => {
@@ -56,6 +86,13 @@ export function ProjectDetailClient({ projectId }: { projectId: number }) {
         setUnidadesSelecionadas(new Set(json.units.filter((u) => u.siteVisible).map((u) => u.id)));
         const primary = json.mediaAssets.find((m) => m.isPrimary);
         if (primary) setHeroImageId(primary.id);
+        setContentForm({
+          shortDescription: json.siteConfig?.resumo ?? '',
+          descricao: json.siteConfig?.descricao ?? '',
+          logoUrl: json.siteConfig?.metadata?.logoUrl ?? '',
+          videoUrl: json.siteConfig?.metadata?.videoUrl ?? '',
+          vagasLabel: json.siteConfig?.metadata?.vagasLabel ?? '',
+        });
         setError(null);
       } catch (err) {
         logger.error({ error: err }, '[ProjectDetailClient] fetch failed');
@@ -66,6 +103,33 @@ export function ProjectDetailClient({ projectId }: { projectId: number }) {
     };
     doFetch();
   }, [projectId]);
+
+  const saveContent = async () => {
+    setSavingContent(true);
+    setContentSaved(false);
+    setError(null);
+    try {
+      const res = await fetch(`/api/site-vision/empreendimentos/${projectId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          shortDescription: contentForm.shortDescription,
+          descricao: contentForm.descricao,
+          logoUrl: contentForm.logoUrl,
+          videoUrl: contentForm.videoUrl,
+          vagasLabel: contentForm.vagasLabel,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || 'Erro ao salvar conteúdo.');
+      setContentSaved(true);
+    } catch (err) {
+      logger.error({ error: err }, '[ProjectDetailClient] save content failed');
+      setError(err instanceof Error ? err.message : 'Erro ao salvar conteúdo.');
+    } finally {
+      setSavingContent(false);
+    }
+  };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -216,6 +280,83 @@ export function ProjectDetailClient({ projectId }: { projectId: number }) {
             </button>
           )}
         </div>
+      </div>
+
+      {/* Conteúdo do site */}
+      <div className="rounded-[24px] border border-white/8 bg-white/[0.03] p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-semibold text-white">Conteúdo do site</h3>
+          {contentSaved ? <span className="text-xs font-semibold text-emerald-300">Salvo no site real ✓</span> : null}
+        </div>
+
+        <label className="block space-y-1.5">
+          <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Descrição curta (card)</span>
+          <textarea
+            rows={2}
+            value={contentForm.shortDescription}
+            onChange={(e) => { setContentForm((f) => ({ ...f, shortDescription: e.target.value })); setContentSaved(false); }}
+            placeholder="Texto que aparece no card do empreendimento na home"
+            className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-zinc-100 outline-none"
+          />
+        </label>
+
+        <label className="block space-y-1.5">
+          <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Descrição completa (página de detalhe)</span>
+          <textarea
+            rows={5}
+            value={contentForm.descricao}
+            onChange={(e) => { setContentForm((f) => ({ ...f, descricao: e.target.value })); setContentSaved(false); }}
+            placeholder="Texto completo exibido na página do empreendimento"
+            className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-zinc-100 outline-none"
+          />
+        </label>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="block space-y-1.5">
+            <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">URL do logo</span>
+            <input
+              value={contentForm.logoUrl}
+              onChange={(e) => { setContentForm((f) => ({ ...f, logoUrl: e.target.value })); setContentSaved(false); }}
+              placeholder="https://..."
+              className="h-10 w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 text-sm text-zinc-100 outline-none"
+            />
+          </label>
+          <label className="block space-y-1.5">
+            <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">URL do vídeo (embed)</span>
+            <input
+              value={contentForm.videoUrl}
+              onChange={(e) => { setContentForm((f) => ({ ...f, videoUrl: e.target.value })); setContentSaved(false); }}
+              placeholder="https://www.youtube.com/embed/..."
+              className="h-10 w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 text-sm text-zinc-100 outline-none"
+            />
+          </label>
+        </div>
+
+        <label className="block space-y-1.5 sm:max-w-xs">
+          <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Vagas de garagem</span>
+          <input
+            value={contentForm.vagasLabel}
+            onChange={(e) => { setContentForm((f) => ({ ...f, vagasLabel: e.target.value })); setContentSaved(false); }}
+            placeholder="Ex: 1-3"
+            className="h-10 w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 text-sm text-zinc-100 outline-none"
+          />
+        </label>
+
+        <div className="rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3 text-xs text-zinc-400">
+          <p className="font-semibold text-zinc-300 mb-1">Especificações (calculadas automaticamente pelas unidades)</p>
+          <p>Área privativa: {formatSpecRange(data.specs.areaMin, data.specs.areaMax)}{data.specs.areaMin != null ? ' m²' : ''}</p>
+          <p>Dormitórios: {formatSpecRange(data.specs.dormitoriosMin, data.specs.dormitoriosMax)}</p>
+          <p>Andares: {data.specs.andares ?? 'Sem unidades cadastradas'}</p>
+        </div>
+
+        <button
+          onClick={saveContent}
+          disabled={savingContent}
+          className="rounded-lg bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 disabled:opacity-50"
+        >
+          {savingContent ? <Loader2 className="animate-spin inline mr-2" size={16} /> : ''}
+          Salvar conteúdo
+        </button>
       </div>
 
       {/* Imagens */}

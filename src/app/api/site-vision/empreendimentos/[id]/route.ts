@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyPermission } from '@/lib/auth';
 import { ensureSchema, sql } from '@/lib/pg';
+import { pushEmpreendimentoConfig } from '@/lib/site-longview-client';
 import logger from '@/lib/logger';
 
 type Params = { params: Promise<{ id: string }> };
@@ -27,6 +28,7 @@ type SiteProjectMetadata = {
   clientPortalUrl?: string;
   technicalAssistUrl?: string;
   videoUrl?: string;
+  vagasLabel?: string;
 };
 
 function parseJsonValue(value: unknown): unknown {
@@ -267,6 +269,23 @@ export async function GET(_request: NextRequest, { params }: Params) {
       { total: 0, available: 0, reserved: 0, sold: 0 }
     );
 
+    // Specs calculados a partir das unidades — mesmo dado que o site real computa
+    // a partir do que foi empurrado por pushUnidades. Só informativo aqui.
+    const areas = units.map((u) => u.metragem).filter((v): v is number => v != null && v > 0);
+    const dormitorios = units
+      .map((u) => (u.raw.dormitorios != null ? Number(u.raw.dormitorios) : null))
+      .filter((v): v is number => v != null && Number.isFinite(v));
+    const andares = units
+      .map((u) => (u.andar != null ? Number(u.andar) : null))
+      .filter((v): v is number => v != null && Number.isFinite(v));
+    const specs = {
+      areaMin: areas.length ? Math.min(...areas) : null,
+      areaMax: areas.length ? Math.max(...areas) : null,
+      dormitoriosMin: dormitorios.length ? Math.min(...dormitorios) : null,
+      dormitoriosMax: dormitorios.length ? Math.max(...dormitorios) : null,
+      andares: andares.length ? Math.max(...andares) : null,
+    };
+
     const crmMedia = [
       raw.foto
         ? {
@@ -393,6 +412,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
         andamento: raw.andamento ?? null,
       },
       crmMedia,
+      specs,
       siteConfig: site
         ? {
             id: site.id,
@@ -486,6 +506,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       tags?: unknown;
       highlights?: unknown;
       videoUrl?: unknown;
+      vagasLabel?: unknown;
       displayName?: unknown;
       shortDescription?: unknown;
       locationLabel?: unknown;
@@ -565,6 +586,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const metadata: SiteProjectMetadata = {
       ...currentMetadata,
       ...(typeof body.videoUrl === 'string' ? { videoUrl: body.videoUrl.trim() } : {}),
+      ...(typeof body.vagasLabel === 'string' ? { vagasLabel: body.vagasLabel.trim() } : {}),
       ...(typeof body.displayName === 'string' ? { displayName: body.displayName.trim() } : {}),
       ...(typeof body.shortDescription === 'string' ? { shortDescription: body.shortDescription.trim() } : {}),
       ...(typeof body.locationLabel === 'string' ? { locationLabel: body.locationLabel.trim() } : {}),
@@ -628,6 +650,22 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         metadata = EXCLUDED.metadata,
         updated_at = EXCLUDED.updated_at
     `;
+
+    try {
+      await pushEmpreendimentoConfig(empreendimentoId, {
+        ...(typeof body.shortDescription === 'string' ? { descricaoCurta: body.shortDescription.trim() } : {}),
+        ...(typeof body.descricao === 'string' ? { descricao: descricao } : {}),
+        ...(typeof body.logoUrl === 'string' ? { logoUrl: body.logoUrl.trim() } : {}),
+        ...(typeof body.videoUrl === 'string' ? { videoUrl: body.videoUrl.trim() } : {}),
+        ...(typeof body.vagasLabel === 'string' ? { vagasLabel: body.vagasLabel.trim() } : {}),
+      });
+    } catch (pushError) {
+      logger.error({ pushError, empreendimentoId }, '[site-vision/project-detail] falha ao sincronizar conteudo com o site real');
+      return NextResponse.json(
+        { error: `Salvo localmente, mas não foi possível sincronizar com o site real: ${pushError instanceof Error ? pushError.message : pushError}` },
+        { status: 502 }
+      );
+    }
 
     return NextResponse.json({ ok: true });
   } catch (error) {

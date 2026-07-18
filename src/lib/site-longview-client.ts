@@ -79,3 +79,19 @@ export function pushUsuarios(usuarios: UsuarioPush[]) {
     body: JSON.stringify({ usuarios }),
   });
 }
+
+export type EmpreendimentoConfigPush = Partial<{
+  descricaoCurta: string;
+  descricao: string;
+  logoUrl: string;
+  videoUrl: string;
+  vagasLabel: string;
+  ativo: boolean;
+}>;
+
+export function pushEmpreendimentoConfig(cvCrmId: number, params: EmpreendimentoConfigPush) {
+  return call<{ success: boolean }>(`/api/admin/empreendimentos/${cvCrmId}`, {
+    method: 'PUT',
+    body: JSON.stringify(params),
+  });
+}

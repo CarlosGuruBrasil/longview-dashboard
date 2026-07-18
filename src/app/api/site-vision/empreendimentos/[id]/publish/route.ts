@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyPermission } from '@/lib/auth';
 import { sql } from '@/lib/pg';
-import { triggerCvCrmSync, pushUnidades, type UnidadePush } from '@/lib/site-longview-client';
+import { triggerCvCrmSync, pushEmpreendimentoConfig, pushUnidades, type UnidadePush } from '@/lib/site-longview-client';
 import logger from '@/lib/logger';
 import { randomUUID } from 'crypto';
 
@@ -67,6 +67,19 @@ export async function POST(request: NextRequest, { params }: Params) {
           { status: 502 }
         );
       }
+    }
+
+    // Aplicado depois do sync pra ser a última escrita — o sync não conhece a coluna `ativo`
+    // do jeito que o dashboard controla (draft/published/archived), então essa chamada é quem
+    // decide a visibilidade real no site.
+    try {
+      await pushEmpreendimentoConfig(empId, { ativo: body.status === 'published' });
+    } catch (statusError) {
+      logger.error({ statusError, empId }, '[site-vision/publish] falha ao atualizar status no site real');
+      return NextResponse.json(
+        { error: `Não foi possível atualizar o status no site real: ${statusError instanceof Error ? statusError.message : statusError}` },
+        { status: 502 }
+      );
     }
 
     // Slug: converter nome pra slug seguro

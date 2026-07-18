@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyPermission } from '@/lib/auth';
 import { readUsers } from '@/lib/db-kv';
 import { ensureSchema, sql } from '@/lib/pg';
+import { pushUsuarios } from '@/lib/site-longview-client';
 import logger from '@/lib/logger';
 
 type TeamSettings = {
@@ -89,6 +90,33 @@ export async function PUT(request: NextRequest) {
         updated_by = EXCLUDED.updated_by,
         updated_at = EXCLUDED.updated_at
     `;
+
+    // Empurra pro site real: quem não está em visibleUserIds vira ativo=false lá
+    // (lista vazia = todos os candidatos ficam visíveis, mesma regra usada no GET).
+    const visibleSet = new Set(visibleUserIds);
+    const candidates = (await readUsers()).filter(isBrokerCandidate);
+    const usuariosPush = candidates
+      .filter((entry) => entry.email)
+      .map((entry) => ({
+        nome: entry.name,
+        email: entry.email,
+        telefone: entry.profile?.whatsapp || entry.profile?.phone || null,
+        creci: entry.profile?.professionalIdType === 'creci' ? entry.profile?.professionalId ?? null : null,
+        cargo: entry.profile?.position || entry.role,
+        ativo: visibleSet.size === 0 ? true : visibleSet.has(entry.id),
+      }));
+
+    if (usuariosPush.length > 0) {
+      try {
+        await pushUsuarios(usuariosPush);
+      } catch (pushError) {
+        logger.error({ pushError }, '[site-vision/team] falha ao sincronizar equipe com o site real');
+        return NextResponse.json(
+          { error: `Salvo localmente, mas não foi possível sincronizar com o site real: ${pushError instanceof Error ? pushError.message : pushError}` },
+          { status: 502 }
+        );
+      }
+    }
 
     return NextResponse.json({ ok: true, visibleUserIds });
   } catch (error) {
