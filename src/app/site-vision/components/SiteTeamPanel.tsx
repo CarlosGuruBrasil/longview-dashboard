@@ -69,7 +69,7 @@ export function SiteTeamPanel() {
       const response = await fetch('/api/site-vision/team', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ visibleUserIds: nextTeam.filter((member) => member.visibleOnSite).map((member) => member.id) }),
+        body: JSON.stringify({ hiddenUserIds: nextTeam.filter((member) => !member.visibleOnSite).map((member) => member.id) }),
       });
       const json = await response.json();
       if (!response.ok) throw new Error(json?.error || 'Erro ao salvar equipe.');
@@ -90,13 +90,13 @@ export function SiteTeamPanel() {
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <span className="inline-flex rounded-full border border-teal-400/15 bg-teal-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-teal-300">Equipe no site</span>
-            <h2 className="mt-4 text-3xl font-semibold tracking-tight text-white">Quem pode aparecer no site</h2>
+            <h2 className="mt-4 text-3xl font-semibold tracking-tight text-white">Time comercial no site</h2>
             <p className="mt-3 max-w-3xl text-sm leading-relaxed text-zinc-400">
-              Lista completa do People Vision — colaboradores e fornecedores. Marcados com <Sparkles size={12} className="inline -mt-0.5 text-amber-300" /> são sugestões automáticas (cargo/CRECI de corretor), mas você decide manualmente quem liga ou desliga.
+              Automático: todo mundo do People Vision com departamento <strong className="text-zinc-200">Comercial</strong> ou perfil <strong className="text-zinc-200">Corretor</strong> <Sparkles size={12} className="inline -mt-0.5 text-amber-300" /> entra aqui sozinho — colaborador novo com esse perfil já aparece na próxima vez que abrir essa tela. O botão é só pra exceção pontual, não pra decidir quem é elegível.
             </p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-zinc-300">
-            {visibleIds.length} visíveis no site · {team.length} no total
+            {visibleIds.length} visíveis no site · {team.length} elegíveis
           </div>
         </div>
 
