@@ -30,7 +30,8 @@ type CvUnit = Record<string, unknown> & {
     situacao_mapa_disponibilidade?: string | number;
   };
   valor?: string | number;
-  metragem_real?: string | number;
+  area_privativa?: string | number;
+  vagas_garagem?: string | null;
   _bloco_nome?: string;
   nome?: string;
   andar?: string | number;
@@ -110,6 +111,14 @@ export async function POST(request: NextRequest) {
         });
         
         const rawData = detRes.data;
+
+        // O endpoint de lista (usado no INSERT acima) não traz materiais_campanha/plantas/
+        // documentos do empreendimento — só o endpoint de detalhe tem isso. Sobrescreve o raw
+        // com a versão completa depois que o detalhe chega.
+        await sql`
+          UPDATE cv_empreendimentos SET raw = ${rawData as never}, synced_at = NOW() WHERE id = ${idEmp}
+        `;
+
         const unidadesList: CvUnit[] = [];
 
         // Parsing similar to EmpreendimentosView logic
@@ -145,7 +154,9 @@ export async function POST(request: NextRequest) {
           else if (statusVenda === 3 || sitObj.vendida != null || sitObj.vendida_idsituacao === 3) statusText = 'Vendido';
 
           const valor = parseFloat(String(uni.valor)) || null;
-          const metragem = parseFloat(String(uni.metragem_real)) || null;
+          // area_privativa é o campo real do CV CRM — "metragem_real" nunca existiu no payload,
+          // por isso metragem sempre vinha null (confirmado inspecionando o raw de produção).
+          const metragem = parseFloat(String(uni.area_privativa)) || null;
           const blocoNome = uni._bloco_nome || null;
           const num = uni.nome || null;
 
