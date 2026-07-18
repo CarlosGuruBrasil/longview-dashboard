@@ -159,10 +159,9 @@ export async function POST(request: NextRequest, { params }: Params) {
         status: string | null;
         valor: string | number | null;
         metragem: string | number | null;
-        tipologia: string | null;
         raw: Record<string, unknown>;
       }[]>`
-        SELECT id, bloco, numero, status, valor, metragem, tipologia, raw
+        SELECT id, bloco, numero, status, valor, metragem, raw
         FROM cv_unidades
         WHERE id_empreendimento = ${empId} AND id = ANY(${body.unidadesVisiveis})
       `;
@@ -171,7 +170,7 @@ export async function POST(request: NextRequest, { params }: Params) {
         .filter((u) => u.numero)
         .map((u) => ({
           numero: String(u.numero),
-          tipo: u.tipologia || 'apartamento',
+          tipo: String(u.raw?.tipologia ?? u.raw?.tipo ?? 'apartamento'),
           dormitorios: u.raw?.dormitorios != null ? Number(u.raw.dormitorios) : null,
           area_privativa: u.metragem != null ? Number(u.metragem) : null,
           preco: u.valor != null ? Number(u.valor) : null,
