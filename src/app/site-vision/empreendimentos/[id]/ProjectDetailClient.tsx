@@ -11,6 +11,13 @@ interface ProjectDetail {
     nome: string;
     situacao: string | null;
     tipo: string | null;
+    segmento: string | null;
+    cidade: string | null;
+    bairro: string | null;
+    estado: string | null;
+    endereco: string | null;
+    dataEntrega: string | null;
+    andamento: number | null;
   };
   siteConfig: {
     id: string;
@@ -39,6 +46,21 @@ interface ProjectDetail {
     valor: number | null;
     metragem: number | null;
     siteVisible: boolean;
+  }>;
+  materials: Array<{
+    id: string;
+    nome: string;
+    tipo: string;
+    sizeBytes?: number | null;
+    downloadUrl: string;
+    fonte: 'cvcrm' | 'manual';
+  }>;
+  publishedMateriais: Array<{
+    id: number;
+    tipo: string;
+    origem: string;
+    titulo: string;
+    url_storage: string;
   }>;
   mediaAssets: Array<{
     id: string;
@@ -74,35 +96,110 @@ export function ProjectDetailClient({ projectId }: { projectId: number }) {
   });
   const [savingContent, setSavingContent] = useState(false);
   const [contentSaved, setContentSaved] = useState(false);
+  const [materiaisBusy, setMateriaisBusy] = useState('');
+
+  const loadDetail = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch(`/api/site-vision/empreendimentos/${projectId}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = (await res.json()) as ProjectDetail;
+      setData(json);
+      setUnidadesSelecionadas(new Set(json.units.filter((u) => u.siteVisible).map((u) => u.id)));
+      const primary = json.mediaAssets.find((m) => m.isPrimary);
+      if (primary) setHeroImageId(primary.id);
+      setContentForm({
+        shortDescription: json.siteConfig?.resumo ?? '',
+        descricao: json.siteConfig?.descricao ?? '',
+        logoUrl: json.siteConfig?.metadata?.logoUrl ?? '',
+        videoUrl: json.siteConfig?.metadata?.videoUrl ?? '',
+        vagasLabel: json.siteConfig?.metadata?.vagasLabel ?? '',
+      });
+      setError(null);
+    } catch (err) {
+      logger.error({ error: err }, '[ProjectDetailClient] fetch failed');
+      setError(String(err));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const doFetch = async () => {
-      try {
-        setLoading(true);
-        const res = await fetch(`/api/site-vision/empreendimentos/${projectId}`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const json = (await res.json()) as ProjectDetail;
-        setData(json);
-        setUnidadesSelecionadas(new Set(json.units.filter((u) => u.siteVisible).map((u) => u.id)));
-        const primary = json.mediaAssets.find((m) => m.isPrimary);
-        if (primary) setHeroImageId(primary.id);
-        setContentForm({
-          shortDescription: json.siteConfig?.resumo ?? '',
-          descricao: json.siteConfig?.descricao ?? '',
-          logoUrl: json.siteConfig?.metadata?.logoUrl ?? '',
-          videoUrl: json.siteConfig?.metadata?.videoUrl ?? '',
-          vagasLabel: json.siteConfig?.metadata?.vagasLabel ?? '',
-        });
-        setError(null);
-      } catch (err) {
-        logger.error({ error: err }, '[ProjectDetailClient] fetch failed');
-        setError(String(err));
-      } finally {
-        setLoading(false);
-      }
-    };
-    doFetch();
+    loadDetail();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
+
+  const publishedTitles = new Set((data?.publishedMateriais ?? []).map((m) => m.titulo));
+
+  const publishMaterial = async (material: ProjectDetail['materials'][number]) => {
+    if (!data) return;
+    setMateriaisBusy(material.id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/site-vision/empreendimentos/${projectId}/materiais`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tipo: material.tipo === 'planta' ? 'planta' : 'material',
+          titulo: material.nome,
+          url: material.downloadUrl,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || 'Erro ao publicar material.');
+      await loadDetail();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao publicar material.');
+    } finally {
+      setMateriaisBusy('');
+    }
+  };
+
+  const removeMaterial = async (materialId: number) => {
+    if (!data) return;
+    setMateriaisBusy(`remove-${materialId}`);
+    setError(null);
+    try {
+      const res = await fetch(`/api/site-vision/empreendimentos/${projectId}/materiais`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ materialId }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || 'Erro ao remover material.');
+      await loadDetail();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao remover material.');
+    } finally {
+      setMateriaisBusy('');
+    }
+  };
+
+  const uploadManualMaterial = async (file: File, tipo: 'material' | 'planta' | 'ebook') => {
+    if (!data) return;
+    setMateriaisBusy('uploading');
+    setError(null);
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const res = await fetch(`/api/site-vision/empreendimentos/${projectId}/materiais`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tipo, titulo: file.name, dataUrl }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || 'Erro ao enviar material.');
+      await loadDetail();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao enviar material.');
+    } finally {
+      setMateriaisBusy('');
+    }
+  };
 
   const saveContent = async () => {
     setSavingContent(true);
@@ -254,6 +351,33 @@ export function ProjectDetailClient({ projectId }: { projectId: number }) {
         </p>
       </div>
 
+      {/* Dados do CRM */}
+      <div className="rounded-[24px] border border-white/8 bg-white/[0.03] p-6">
+        <h3 className="text-base font-semibold text-white mb-4">Dados do CRM</h3>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div>
+            <p className="text-xs text-zinc-500">Endereço</p>
+            <p className="mt-1 text-sm text-zinc-200">
+              {[data.empreendimento.endereco, data.empreendimento.bairro, data.empreendimento.cidade, data.empreendimento.estado].filter(Boolean).join(', ') || 'Não informado'}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-zinc-500">Segmento</p>
+            <p className="mt-1 text-sm text-zinc-200">{data.empreendimento.segmento || 'Não informado'}</p>
+          </div>
+          <div>
+            <p className="text-xs text-zinc-500">Data de entrega</p>
+            <p className="mt-1 text-sm text-zinc-200">
+              {data.empreendimento.dataEntrega ? new Date(data.empreendimento.dataEntrega).toLocaleDateString('pt-BR') : 'Não informado'}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-zinc-500">Andamento da obra</p>
+            <p className="mt-1 text-sm text-zinc-200">{data.empreendimento.andamento != null ? `${data.empreendimento.andamento}%` : 'Não informado'}</p>
+          </div>
+        </div>
+      </div>
+
       {/* Status */}
       <div className="rounded-[24px] border border-white/8 bg-white/[0.03] p-6">
         <div className="flex items-center justify-between">
@@ -357,6 +481,84 @@ export function ProjectDetailClient({ projectId }: { projectId: number }) {
           {savingContent ? <Loader2 className="animate-spin inline mr-2" size={16} /> : ''}
           Salvar conteúdo
         </button>
+      </div>
+
+      {/* Materiais */}
+      <div className="rounded-[24px] border border-white/8 bg-white/[0.03] p-6 space-y-5">
+        <div>
+          <h3 className="text-base font-semibold text-white">Materiais e plantas</h3>
+          <p className="mt-1 text-xs text-zinc-400">
+            O que já vem pronto do CV CRM aparece abaixo — só clicar em publicar. Também dá pra enviar um PDF/imagem manualmente.
+          </p>
+        </div>
+
+        {data.materials.length === 0 ? (
+          <p className="text-sm text-zinc-500">Nenhum material do CRM encontrado pra este empreendimento.</p>
+        ) : (
+          <div className="space-y-2">
+            {data.materials.map((material) => {
+              const isPublished = publishedTitles.has(material.nome);
+              return (
+                <div key={material.id} className="flex items-center justify-between gap-3 rounded-xl bg-white/5 p-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-white">{material.nome}</p>
+                    <p className="text-xs text-zinc-500">
+                      {material.tipo} • {material.fonte === 'cvcrm' ? 'CV CRM' : 'Manual'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => publishMaterial(material)}
+                    disabled={isPublished || materiaisBusy === material.id}
+                    className={`shrink-0 rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
+                      isPublished ? 'bg-emerald-500/15 text-emerald-300' : 'bg-white/10 text-white hover:bg-white/15'
+                    } disabled:opacity-60`}
+                  >
+                    {materiaisBusy === material.id ? <Loader2 className="animate-spin inline mr-1" size={13} /> : ''}
+                    {isPublished ? 'Publicado' : 'Publicar no site'}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {(data.publishedMateriais ?? []).length > 0 && (
+          <div className="border-t border-white/8 pt-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">Publicados no site</p>
+            <div className="space-y-2">
+              {data.publishedMateriais.map((item) => (
+                <div key={item.id} className="flex items-center justify-between gap-3 rounded-xl bg-white/5 p-3">
+                  <p className="truncate text-sm text-zinc-200">{item.titulo}</p>
+                  <button
+                    onClick={() => removeMaterial(item.id)}
+                    disabled={materiaisBusy === `remove-${item.id}`}
+                    className="shrink-0 rounded-lg px-3 py-2 text-xs font-semibold text-red-300 hover:bg-red-500/10 disabled:opacity-60"
+                  >
+                    Remover
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <label className="block">
+          <span className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-4 py-2.5 text-sm font-semibold text-white hover:bg-white/15 transition-colors cursor-pointer">
+            <Plus size={16} />
+            {materiaisBusy === 'uploading' ? 'Enviando...' : 'Enviar material manual (PDF/imagem)'}
+          </span>
+          <input
+            type="file"
+            accept="application/pdf,image/*"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) uploadManualMaterial(file, 'material');
+              e.target.value = '';
+            }}
+            disabled={materiaisBusy === 'uploading'}
+            className="hidden"
+          />
+        </label>
       </div>
 
       {/* Imagens */}

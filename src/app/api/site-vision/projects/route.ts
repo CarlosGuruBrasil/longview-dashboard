@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { verifyPermission } from '@/lib/auth';
-import { sql } from '@/lib/pg';
+import { ensureSchema, sql } from '@/lib/pg';
 import logger from '@/lib/logger';
 
 type CrmProjectRow = { id: number; nome: string; situacao: string | null; tipo: string | null };
@@ -26,6 +26,7 @@ export async function GET() {
   }
 
   try {
+    await ensureSchema();
     const [crmProjectsRows, siteProjectsRows] = await Promise.all([
       sql<CrmProjectRow[]>`
         SELECT id, nome, situacao, tipo

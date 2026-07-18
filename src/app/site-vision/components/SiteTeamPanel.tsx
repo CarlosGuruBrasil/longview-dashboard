@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
-import { Loader2, Mail, Phone, ShieldCheck } from 'lucide-react';
+import { Loader2, Mail, Phone, Search, ShieldCheck, Sparkles } from 'lucide-react';
 
 type TeamMember = {
   id: string;
@@ -14,10 +14,12 @@ type TeamMember = {
   position: string;
   department: string;
   company: string;
+  category: string;
   avatarUrl: string;
   status: string;
   professionalId: string;
   professionalIdType: string;
+  suggested: boolean;
   visibleOnSite: boolean;
 };
 
@@ -30,8 +32,23 @@ export function SiteTeamPanel() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
 
   const visibleIds = useMemo(() => team.filter((member) => member.visibleOnSite).map((member) => member.id), [team]);
+
+  const filteredTeam = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return team;
+    return team.filter((member) => {
+      return (
+        member.name.toLowerCase().includes(query) ||
+        member.email.toLowerCase().includes(query) ||
+        member.position.toLowerCase().includes(query) ||
+        member.company.toLowerCase().includes(query) ||
+        member.department.toLowerCase().includes(query)
+      );
+    });
+  }, [team, search]);
 
   useEffect(() => {
     fetch('/api/site-vision/team', { cache: 'no-store' })
@@ -73,21 +90,37 @@ export function SiteTeamPanel() {
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <span className="inline-flex rounded-full border border-teal-400/15 bg-teal-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-teal-300">Equipe no site</span>
-            <h2 className="mt-4 text-3xl font-semibold tracking-tight text-white">Corretores e consultores que podem aparecer no site</h2>
+            <h2 className="mt-4 text-3xl font-semibold tracking-tight text-white">Quem pode aparecer no site</h2>
             <p className="mt-3 max-w-3xl text-sm leading-relaxed text-zinc-400">
-              Esses dados são reaproveitados do People Vision. Aqui você decide quem vai ou não para o site com um botão de ligar e desligar.
+              Lista completa do People Vision — colaboradores e fornecedores. Marcados com <Sparkles size={12} className="inline -mt-0.5 text-amber-300" /> são sugestões automáticas (cargo/CRECI de corretor), mas você decide manualmente quem liga ou desliga.
             </p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-zinc-300">
-            {visibleIds.length} visíveis no site
+            {visibleIds.length} visíveis no site · {team.length} no total
           </div>
+        </div>
+
+        <div className="relative mt-5 max-w-md">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Buscar por nome, email, cargo, empresa..."
+            className="h-10 w-full rounded-2xl border border-white/10 bg-white/[0.04] pl-9 pr-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-600"
+          />
         </div>
       </section>
 
       {error ? <div className="rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</div> : null}
 
+      {filteredTeam.length === 0 ? (
+        <div className="rounded-[26px] border border-dashed border-white/10 bg-white/[0.02] p-8 text-center text-sm text-zinc-500">
+          Nenhum resultado pra &quot;{search}&quot;.
+        </div>
+      ) : null}
+
       <div className="grid gap-4 lg:grid-cols-2">
-        {team.map((member) => (
+        {filteredTeam.map((member) => (
           <div key={member.id} className="rounded-[26px] border border-white/8 bg-white/[0.035] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_18px_48px_rgba(0,0,0,0.22)]">
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-center gap-4 min-w-0">
@@ -99,7 +132,13 @@ export function SiteTeamPanel() {
                   </div>
                 )}
                 <div className="min-w-0">
-                  <p className="truncate text-base font-semibold text-white">{member.name}</p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="truncate text-base font-semibold text-white">{member.name}</p>
+                    {member.suggested ? <Sparkles size={13} className="shrink-0 text-amber-300" /> : null}
+                    {member.category === 'fornecedor' ? (
+                      <span className="shrink-0 rounded-full border border-amber-400/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-amber-300">Fornecedor</span>
+                    ) : null}
+                  </div>
                   <p className="mt-1 text-sm text-zinc-400">{member.position || member.role}{member.department ? ` • ${member.department}` : ''}</p>
                   <p className="mt-1 text-xs text-zinc-500">{member.professionalIdType || 'Perfil interno'}{member.professionalId ? ` • ${member.professionalId}` : ''}</p>
                 </div>

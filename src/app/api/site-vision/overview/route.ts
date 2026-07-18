@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyPermission } from '@/lib/auth';
 import { readProjects, readUsers } from '@/lib/db-kv';
-import { sql } from '@/lib/pg';
+import { ensureSchema, sql } from '@/lib/pg';
 import logger from '@/lib/logger';
 
 type CountRow = { total: string | number };
@@ -19,6 +19,7 @@ export async function GET() {
   }
 
   try {
+    await ensureSchema();
     const [projects, users] = await Promise.all([readProjects(), readUsers()]);
 
     const [

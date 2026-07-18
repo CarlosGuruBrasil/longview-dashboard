@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyPermission } from '@/lib/auth';
-import { sql } from '@/lib/pg';
+import { ensureSchema, sql } from '@/lib/pg';
 import { pushMidia } from '@/lib/site-longview-client';
 import logger from '@/lib/logger';
 import { randomUUID } from 'crypto';
@@ -14,6 +14,7 @@ export async function POST(request: NextRequest, { params }: Params) {
   if (!user) return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 });
 
   try {
+    await ensureSchema();
     const { id } = await params;
     const empId = Number(id);
     if (!Number.isFinite(empId)) {

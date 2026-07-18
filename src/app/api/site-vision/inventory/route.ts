@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { verifyPermission } from '@/lib/auth';
-import { sql } from '@/lib/pg';
+import { ensureSchema, sql } from '@/lib/pg';
 import logger from '@/lib/logger';
 
 type InventoryRow = {
@@ -41,6 +41,7 @@ export async function GET() {
   }
 
   try {
+    await ensureSchema();
     const [inventoryRows, resaleRows] = await Promise.all([
       sql<InventoryRow[]>`
         SELECT
@@ -52,9 +53,9 @@ export async function GET() {
           COUNT(cu.id) FILTER (WHERE cu.status_venda = 3 OR LOWER(COALESCE(cu.status, '')) LIKE '%vend%')::int AS sold_units,
           (SELECT COUNT(*) FROM site_public_empreendimentos WHERE crm_empreendimento_id = ce.id)::int AS linked_pages
         FROM cv_empreendimentos ce
-        LEFT JOIN cv_unidades cu ON cu.empreendimento_id = ce.id
+        LEFT JOIN cv_unidades cu ON cu.id_empreendimento = ce.id
         GROUP BY ce.id
-        ORDER BY ce.updated_at DESC
+        ORDER BY ce.synced_at DESC
         LIMIT 16
       `,
       sql<ResaleRow[]>`

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyPermission } from '@/lib/auth';
 import { ensureSchema, sql } from '@/lib/pg';
-import { pushEmpreendimentoConfig } from '@/lib/site-longview-client';
+import { fetchEmpreendimentoPublicState, pushEmpreendimentoConfig } from '@/lib/site-longview-client';
 import logger from '@/lib/logger';
 
 type Params = { params: Promise<{ id: string }> };
@@ -286,6 +286,9 @@ export async function GET(_request: NextRequest, { params }: Params) {
       andares: andares.length ? Math.max(...andares) : null,
     };
 
+    const publicState = await fetchEmpreendimentoPublicState(empreendimentoId);
+    const publishedMateriais = publicState?.materiais ?? [];
+
     const crmMedia = [
       raw.foto
         ? {
@@ -413,6 +416,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
       },
       crmMedia,
       specs,
+      publishedMateriais,
       siteConfig: site
         ? {
             id: site.id,

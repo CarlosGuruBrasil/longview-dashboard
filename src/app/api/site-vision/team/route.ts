@@ -37,25 +37,29 @@ export async function GET() {
 
   try {
     const [users, settings] = await Promise.all([readUsers(), readTeamSettings()]);
+    const hasSavedSelection = (settings.visibleUserIds ?? []).length > 0;
     const visibleIds = new Set(settings.visibleUserIds ?? []);
-    const team = users
-      .filter((entry) => isBrokerCandidate(entry))
-      .map((entry) => ({
-        id: entry.id,
-        name: entry.name,
-        email: entry.email,
-        role: entry.role,
-        phone: entry.profile?.phone ?? '',
-        whatsapp: entry.profile?.whatsapp ?? '',
-        position: entry.profile?.position ?? '',
-        department: entry.profile?.department ?? '',
-        company: entry.profile?.company ?? '',
-        avatarUrl: entry.profile?.avatarUrl ?? '',
-        status: entry.profile?.status ?? 'ativo',
-        professionalId: entry.profile?.professionalId ?? '',
-        professionalIdType: entry.profile?.professionalIdType ?? '',
-        visibleOnSite: visibleIds.size === 0 ? isBrokerCandidate(entry) : visibleIds.has(entry.id),
-      }));
+    // Lista completa do People Vision — nada fica escondido atrás de heurística.
+    // Quem bate no heurístico de corretor vem pré-marcado como sugestão até o usuário salvar
+    // uma seleção manual pela primeira vez.
+    const team = users.map((entry) => ({
+      id: entry.id,
+      name: entry.name,
+      email: entry.email,
+      role: entry.role,
+      phone: entry.profile?.phone ?? '',
+      whatsapp: entry.profile?.whatsapp ?? '',
+      position: entry.profile?.position ?? '',
+      department: entry.profile?.department ?? '',
+      company: entry.profile?.company ?? '',
+      category: entry.profile?.category ?? '',
+      avatarUrl: entry.profile?.avatarUrl ?? '',
+      status: entry.profile?.status ?? 'ativo',
+      professionalId: entry.profile?.professionalId ?? '',
+      professionalIdType: entry.profile?.professionalIdType ?? '',
+      suggested: isBrokerCandidate(entry),
+      visibleOnSite: hasSavedSelection ? visibleIds.has(entry.id) : isBrokerCandidate(entry),
+    }));
 
     return NextResponse.json({ team, settings });
   } catch (error) {
@@ -75,6 +79,8 @@ export async function PUT(request: NextRequest) {
       : [];
 
     await ensureSchema();
+    const previousSettings = await readTeamSettings();
+    const previousVisibleIds = new Set(previousSettings.visibleUserIds ?? []);
     await sql`
       INSERT INTO site_public_settings (key, value, description, updated_by, updated_at)
       VALUES (
@@ -91,19 +97,21 @@ export async function PUT(request: NextRequest) {
         updated_at = EXCLUDED.updated_at
     `;
 
-    // Empurra pro site real: quem não está em visibleUserIds vira ativo=false lá
-    // (lista vazia = todos os candidatos ficam visíveis, mesma regra usada no GET).
+    // Empurra pro site real quem está selecionado agora, mais quem estava selecionado antes e
+    // saiu da seleção (pra desativar de verdade lá, não só parar de mandar). Não manda a base
+    // inteira de usuários — só quem é relevante pra essa mudança, pra não poluir a tabela do site.
     const visibleSet = new Set(visibleUserIds);
-    const candidates = (await readUsers()).filter(isBrokerCandidate);
-    const usuariosPush = candidates
-      .filter((entry) => entry.email)
+    const affectedIds = new Set([...visibleSet, ...previousVisibleIds]);
+    const allUsers = await readUsers();
+    const usuariosPush = allUsers
+      .filter((entry) => affectedIds.has(entry.id) && entry.email)
       .map((entry) => ({
         nome: entry.name,
         email: entry.email,
         telefone: entry.profile?.whatsapp || entry.profile?.phone || null,
-        creci: entry.profile?.professionalIdType === 'creci' ? entry.profile?.professionalId ?? null : null,
+        creci: (entry.profile?.professionalIdType ?? '').toLowerCase() === 'creci' ? entry.profile?.professionalId ?? null : null,
         cargo: entry.profile?.position || entry.role,
-        ativo: visibleSet.size === 0 ? true : visibleSet.has(entry.id),
+        ativo: visibleSet.has(entry.id),
       }));
 
     if (usuariosPush.length > 0) {

@@ -95,3 +95,46 @@ export function pushEmpreendimentoConfig(cvCrmId: number, params: Empreendimento
     body: JSON.stringify(params),
   });
 }
+
+export type EmpreendimentoPublicState = {
+  id: number;
+  cv_crm_id: number;
+  nome: string;
+  descricao: string | null;
+  descricao_curta: string | null;
+  logo_url: string | null;
+  video_url: string | null;
+  vagas_label: string | null;
+  ativo: boolean;
+  midias: Array<{ id: number; tipo: 'foto' | 'video'; url_storage: string; url_thumb: string | null; descricao: string | null; ordem: number }>;
+  unidades: Array<{ id: number; numero: string; status: string }>;
+  materiais?: Array<{ id: number; tipo: string; titulo: string; url_storage: string; origem: string }>;
+};
+
+// GET público (sem auth) do site real — a "verdade" do que está de fato ao vivo, pra não
+// depender de tabelas locais do dashboard que podem ficar desatualizadas/vazias.
+export async function fetchEmpreendimentoPublicState(cvCrmId: number): Promise<EmpreendimentoPublicState | null> {
+  if (!BASE_URL) return null;
+  try {
+    const res = await fetch(`${BASE_URL}/api/empreendimentos/${cvCrmId}`, { cache: 'no-store' });
+    if (!res.ok) return null;
+    return (await res.json()) as EmpreendimentoPublicState;
+  } catch {
+    return null;
+  }
+}
+
+export type MaterialPush =
+  | { tipo: 'material' | 'planta' | 'ebook'; titulo: string; descricao?: string; url: string }
+  | { tipo: 'material' | 'planta' | 'ebook'; titulo: string; descricao?: string; dataUrl: string };
+
+export function pushMaterial(cvCrmId: number, params: MaterialPush) {
+  return call<{ success: boolean; material: { id: number; titulo: string; url_storage: string } }>(
+    `/api/admin/empreendimentos/${cvCrmId}/materiais`,
+    { method: 'POST', body: JSON.stringify(params) }
+  );
+}
+
+export function deleteMaterial(materialId: number) {
+  return call<{ success: boolean }>(`/api/admin/materiais/${materialId}`, { method: 'DELETE' });
+}
