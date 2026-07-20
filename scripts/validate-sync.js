@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const { sql } = require('../src/lib/pg');
 
 async function validateSync() {
