@@ -32,8 +32,10 @@ export async function POST(request: NextRequest, { params }: Params) {
       corretor_nome: string;
       corretor_telefone: string;
       corretor_email: string;
+      posicao: string;
+      vagas: number | null;
     }[]>`
-      SELECT cv_unidade_id, titulo_publico, preco_revenda, descricao_publica, corretor_nome, corretor_telefone, corretor_email
+      SELECT cv_unidade_id, titulo_publico, preco_revenda, descricao_publica, corretor_nome, corretor_telefone, corretor_email, posicao, vagas
       FROM site_public_resales
       WHERE id = ${resaleId} AND cv_empreendimento_id = ${empId}
       LIMIT 1
@@ -57,6 +59,8 @@ export async function POST(request: NextRequest, { params }: Params) {
         corretorNome: resale.corretor_nome,
         corretorTelefone: resale.corretor_telefone,
         corretorEmail: resale.corretor_email,
+        posicao: resale.posicao,
+        vagas: resale.vagas,
       });
 
       await sql`

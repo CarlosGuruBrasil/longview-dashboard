@@ -150,6 +150,8 @@ export type RevendaPush = {
   corretorNome?: string;
   corretorTelefone?: string;
   corretorEmail?: string;
+  posicao?: string;
+  vagas?: number | null;
 };
 
 export function pushRevenda(cvCrmId: number, params: RevendaPush) {

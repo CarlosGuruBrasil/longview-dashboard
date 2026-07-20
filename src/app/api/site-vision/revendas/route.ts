@@ -32,6 +32,8 @@ export async function POST(request: NextRequest) {
       brokerEmail?: unknown;
       brokerPhone?: unknown;
       description?: unknown;
+      posicao?: unknown;
+      vagas?: unknown;
     };
 
     const cvUnidadeId = Number(body.cvUnidadeId);
@@ -62,13 +64,15 @@ export async function POST(request: NextRequest) {
     const description = typeof body.description === 'string' && body.description.trim()
       ? body.description.trim()
       : (ownerMode === 'update' ? 'Revenda com dados do proprietário atualizados manualmente.' : 'Revenda criada a partir de unidade vendida no CRM.');
+    const posicao = String(body.posicao ?? '');
+    const vagas = body.vagas == null || body.vagas === '' ? null : Number(body.vagas);
     const id = `resale-${cvUnidadeId}-${Date.now()}`;
 
     await sql`
       INSERT INTO site_public_resales (
         id, cv_unidade_id, cv_empreendimento_id, slug, status_publicacao, titulo_publico,
         descricao_publica, preco_revenda, corretor_nome, corretor_telefone, corretor_email, owner_name, owner_email,
-        owner_phone, owner_document, metadata, created_at, updated_at
+        owner_phone, owner_document, posicao, vagas, metadata, created_at, updated_at
       ) VALUES (
         ${id},
         ${cvUnidadeId},
@@ -85,6 +89,8 @@ export async function POST(request: NextRequest) {
         ${ownerEmail},
         ${ownerPhone},
         ${ownerDocument},
+        ${posicao},
+        ${Number.isFinite(vagas ?? NaN) ? vagas : null},
         ${JSON.stringify({ ownerMode, createdFrom: 'site-vision-unit-action' })},
         NOW(),
         NOW()

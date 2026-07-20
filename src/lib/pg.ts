@@ -381,6 +381,8 @@ export async function ensureSchema(): Promise<void> {
     await optionalSchemaStep('site_public resales owner_phone column', () => sql`ALTER TABLE site_public_resales ADD COLUMN IF NOT EXISTS owner_phone TEXT NOT NULL DEFAULT ''`);
     await optionalSchemaStep('site_public resales owner_email column', () => sql`ALTER TABLE site_public_resales ADD COLUMN IF NOT EXISTS owner_email TEXT NOT NULL DEFAULT ''`);
     await optionalSchemaStep('site_public resales owner_document column', () => sql`ALTER TABLE site_public_resales ADD COLUMN IF NOT EXISTS owner_document TEXT NOT NULL DEFAULT ''`);
+    await optionalSchemaStep('site_public resales posicao column', () => sql`ALTER TABLE site_public_resales ADD COLUMN IF NOT EXISTS posicao TEXT NOT NULL DEFAULT ''`);
+    await optionalSchemaStep('site_public resales vagas column', () => sql`ALTER TABLE site_public_resales ADD COLUMN IF NOT EXISTS vagas INT`);
 
     await sql`
       CREATE TABLE IF NOT EXISTS site_public_unit_visibility (
