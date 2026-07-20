@@ -20,9 +20,13 @@ export async function rateLimit(
   limit = 60,
   windowSecs = 60
 ): Promise<RateLimitResult> {
-  // Se KV não estiver configurado, libera sem bloquear (ambiente local)
-  if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
-    return { success: true, remaining: limit, reset: Date.now() + windowSecs * 1000 };
+  // Em produção usamos o KV em Postgres; sem DATABASE_URL, libera no ambiente local.
+  if (!process.env.DATABASE_URL) {
+    return {
+      success: true,
+      remaining: limit,
+      reset: Math.floor(Date.now() / 1000) + windowSecs,
+    };
   }
 
   const key = `rl:${identifier}`;
@@ -45,9 +49,13 @@ export async function rateLimit(
       reset,
     };
   } catch (err) {
-    // Se Redis falhar, libera a request (fail open) — não bloqueia usuários por erro de infra
+    // Se o KV falhar, libera a request (fail open) para não derrubar o app por erro de infra.
     logger.warn({ err }, '[rateLimit] Erro ao consultar KV, liberando request:');
-    return { success: true, remaining: limit, reset: Date.now() + windowSecs * 1000 };
+    return {
+      success: true,
+      remaining: limit,
+      reset: Math.floor(Date.now() / 1000) + windowSecs,
+    };
   }
 }
 
