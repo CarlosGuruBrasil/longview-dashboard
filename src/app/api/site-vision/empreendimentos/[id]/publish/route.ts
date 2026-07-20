@@ -5,6 +5,41 @@ import { triggerCvCrmSync, pushEmpreendimentoConfig, pushUnidades, type UnidadeP
 import logger from '@/lib/logger';
 import { randomUUID } from 'crypto';
 
+// CV CRM não manda um campo numérico de dormitórios — vem embutido no texto de
+// tipologia (ex: "2 Dorm / 2 Suítes"), mesma extração usada no GET de detalhe.
+function extractDormitorios(raw: Record<string, unknown> | undefined): number | null {
+  if (raw?.dormitorios != null) return Number(raw.dormitorios);
+  const tipologia = String(raw?.tipologia ?? raw?.tipo ?? '');
+  const match = /(\d+)\s*dorm/i.exec(tipologia);
+  return match ? Number(match[1]) : null;
+}
+
+// vagas_garagem vem como código de identificação da vaga (ex: "VG 44 / HB 44"), não
+// como quantidade — HB é hobby box, não vaga. Conta só os tokens "VG" pra achar a
+// quantidade real de vagas de garagem atreladas à unidade.
+function extractVagas(raw: Record<string, unknown> | undefined): number | null {
+  const vagasGaragem = raw?.vagas_garagem;
+  if (typeof vagasGaragem !== 'string' || !vagasGaragem.trim()) return null;
+  const count = vagasGaragem.split('/').filter((token) => token.trim().toUpperCase().startsWith('VG')).length;
+  return count > 0 ? count : null;
+}
+
+// Cada unidade lista suas próprias plantas em raw.plantas (nome + idplanta), mas só o
+// nível de empreendimento (crmRaw.plantas) tem a URL da imagem. Casa pelo idplanta e
+// prioriza a planta cujo nome cita o número da unidade (mais específica).
+function extractPlantaUrl(
+  raw: Record<string, unknown> | undefined,
+  numero: string,
+  plantaUrlById: Map<string, string>
+): string | null {
+  const plantas = Array.isArray(raw?.plantas) ? (raw!.plantas as Array<Record<string, unknown>>) : [];
+  if (plantas.length === 0) return null;
+  const especifica = plantas.find((p) => String(p.nome ?? '').includes(numero));
+  const escolhida = especifica ?? plantas[0];
+  const url = plantaUrlById.get(String(escolhida.idplanta ?? ''));
+  return url || null;
+}
+
 function mapUnidadeStatus(status: string | null): UnidadePush['status'] {
   const s = (status || '').toLowerCase();
   if (s.includes('vend')) return 'vendido';
@@ -166,12 +201,21 @@ export async function POST(request: NextRequest, { params }: Params) {
         WHERE id_empreendimento = ${empId} AND id = ANY(${body.unidadesVisiveis})
       `;
 
+      const crmPlantas = Array.isArray(crmRaw?.plantas) ? (crmRaw.plantas as Array<Record<string, unknown>>) : [];
+      const plantaUrlById = new Map<string, string>(
+        crmPlantas
+          .filter((p) => p.idplanta != null && p.img_planta_servidor)
+          .map((p) => [String(p.idplanta), String(p.img_planta_servidor)])
+      );
+
       const unidadesPush: UnidadePush[] = unidadeRows
         .filter((u) => u.numero)
         .map((u) => ({
           numero: String(u.numero),
           tipo: String(u.raw?.tipologia ?? u.raw?.tipo ?? 'apartamento'),
-          dormitorios: u.raw?.dormitorios != null ? Number(u.raw.dormitorios) : null,
+          dormitorios: extractDormitorios(u.raw),
+          vagas: extractVagas(u.raw),
+          planta_url: extractPlantaUrl(u.raw, String(u.numero), plantaUrlById),
           area_privativa: u.metragem != null ? Number(u.metragem) : null,
           preco: u.valor != null ? Number(u.valor) : null,
           status: mapUnidadeStatus(u.status),

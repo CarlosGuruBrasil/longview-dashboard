@@ -47,6 +47,8 @@ export type UnidadePush = {
   tipo?: string;
   dormitorios?: number | null;
   banheiros?: number | null;
+  vagas?: number | null;
+  planta_url?: string | null;
   area_privativa?: number | null;
   area_comum?: number | null;
   area_total?: number | null;
