@@ -264,6 +264,7 @@ export type EmpreendimentoListItem = {
   cidade: string;
   estado: string;
   origem: 'cvcrm' | 'manual';
+  ordem: number;
 };
 
 export async function fetchEmpreendimentosPublicos(): Promise<EmpreendimentoListItem[]> {
@@ -292,4 +293,26 @@ export async function fetchEmpreendimentoDetailById(id: number): Promise<Empreen
   } catch {
     return null;
   }
+}
+
+export type EmpreendimentoManualUpdate = Partial<EmpreendimentoManualPush> & { ordem?: number; ativo?: boolean };
+
+export function updateEmpreendimentoManual(id: number, params: EmpreendimentoManualUpdate) {
+  return call<{ success: boolean; empreendimento: { id: number; nome: string; slug: string } }>(
+    `/api/admin/empreendimentos/${id}`,
+    { method: 'PATCH', body: JSON.stringify(params) }
+  );
+}
+
+export type RevendaUpdate = Partial<Omit<RevendaByEmpIdPush, 'empreendimentoId'>> & { status?: 'disponivel' | 'vendida' };
+
+export function updateRevenda(id: number, params: RevendaUpdate) {
+  return call<{ success: boolean }>(`/api/admin/revendas/${id}`, { method: 'PATCH', body: JSON.stringify(params) });
+}
+
+export function reorderRevendaMidias(revendaId: number, ordem: Array<{ id: number; ordem: number }>) {
+  return call<{ success: boolean }>(
+    `/api/admin/revendas/${revendaId}/midias/ordem`,
+    { method: 'PUT', body: JSON.stringify({ ordem }) }
+  );
 }

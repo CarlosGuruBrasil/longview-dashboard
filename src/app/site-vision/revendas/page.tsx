@@ -1,10 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Loader2, Plus, Trash2, Upload, ExternalLink, Building2, Home } from 'lucide-react';
+import { Loader2, Plus, Trash2, Upload, ExternalLink, Building2, Home, Pencil, X, GripVertical } from 'lucide-react';
 
-type EmpItem = { id: number; nome: string; slug: string; cidade: string; estado: string; origem: 'cvcrm' | 'manual' };
+type EmpItem = { id: number; nome: string; slug: string; cidade: string; estado: string; origem: 'cvcrm' | 'manual'; ordem: number };
 type RevendaItem = { id: number; slug: string; titulo: string; preco: number | null; status: string };
+type Midia = { id: number; tipo: 'foto' | 'planta' | 'documento'; url_storage: string; ordem: number };
+
+const SITE_BASE_URL = 'https://longview.guru.dev.br';
 
 const inputClass = 'h-10 w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 text-sm text-zinc-100 outline-none';
 const labelClass = 'block space-y-1.5';
@@ -13,22 +16,37 @@ const cardClass = 'rounded-[24px] border border-white/8 bg-white/[0.03] p-5 shad
 const btnPrimary = 'inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-teal-500 hover:bg-teal-400 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-wait';
 const btnGhost = 'inline-flex items-center gap-2 h-9 px-3 rounded-xl bg-white/[0.05] text-zinc-300 hover:bg-white/[0.09] text-xs font-medium transition-colors';
 
+const emptyRevForm = {
+  empreendimentoId: '', titulo: '', descricao: '', preco: '', areaPrivativa: '', areaTotal: '',
+  dormitorios: '', suites: '', vagas: '', andar: '', bloco: '', posicao: '',
+  corretorNome: '', corretorTelefone: '', corretorEmail: '',
+};
+
+const fileToDataUrl = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
 export default function RevendasPage() {
   const [empreendimentos, setEmpreendimentos] = useState<EmpItem[]>([]);
   const [loadingEmps, setLoadingEmps] = useState(true);
+  const [reordering, setReordering] = useState(false);
+  const [dragEmpId, setDragEmpId] = useState<number | null>(null);
 
   const [empForm, setEmpForm] = useState({ nome: '', endereco: '', cidade: '', estado: '', descricaoCurta: '' });
   const [empSaving, setEmpSaving] = useState(false);
   const [empMsg, setEmpMsg] = useState('');
 
-  const [revForm, setRevForm] = useState({
-    empreendimentoId: '', titulo: '', descricao: '', preco: '', areaPrivativa: '', areaTotal: '',
-    dormitorios: '', suites: '', vagas: '', andar: '', bloco: '', posicao: '',
-    corretorNome: '', corretorTelefone: '', corretorEmail: '',
-  });
+  const [editingRevendaId, setEditingRevendaId] = useState<number | null>(null);
+  const [revForm, setRevForm] = useState(emptyRevForm);
   const [revSaving, setRevSaving] = useState(false);
   const [revMsg, setRevMsg] = useState('');
   const [activeRevenda, setActiveRevenda] = useState<{ id: number; slug: string; empSlug: string } | null>(null);
+  const [midias, setMidias] = useState<Midia[]>([]);
+  const [dragMidiaId, setDragMidiaId] = useState<number | null>(null);
 
   const [uploadBusy, setUploadBusy] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
@@ -72,12 +90,84 @@ export default function RevendasPage() {
     }
   };
 
-  const criarRevenda = async () => {
+  // Arrastar os cards de empreendimento reordena a lista local; solta = persiste
+  // a nova ordem (0,1,2...) pra cada um que mudou de posicao.
+  const onDropEmp = async (targetId: number) => {
+    if (dragEmpId === null || dragEmpId === targetId) return;
+    const list = [...empreendimentos];
+    const fromIdx = list.findIndex((e) => e.id === dragEmpId);
+    const toIdx = list.findIndex((e) => e.id === targetId);
+    if (fromIdx === -1 || toIdx === -1) return;
+    const [moved] = list.splice(fromIdx, 1);
+    list.splice(toIdx, 0, moved);
+    setEmpreendimentos(list);
+    setDragEmpId(null);
+    setReordering(true);
+    try {
+      await Promise.all(
+        list.map((e, idx) =>
+          e.ordem === idx
+            ? Promise.resolve()
+            : fetch(`/api/site-vision/site-empreendimentos/${e.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ordem: idx }),
+              })
+        )
+      );
+      await loadEmpreendimentos();
+    } finally {
+      setReordering(false);
+    }
+  };
+
+  const carregarRevendaParaEdicao = async (r: RevendaItem, empId: string) => {
+    setRevMsg('');
+    try {
+      const res = await fetch(`/api/site-vision/site-revendas/by-slug/${r.slug}`);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Erro ao carregar revenda.');
+      const rev = json.revenda;
+      setEditingRevendaId(rev.id);
+      setRevForm({
+        empreendimentoId: empId,
+        titulo: rev.titulo || '',
+        descricao: rev.descricao || '',
+        preco: '',
+        areaPrivativa: rev.area_privativa ?? '',
+        areaTotal: rev.area_total ?? '',
+        dormitorios: rev.dormitorios ?? '',
+        suites: rev.suites ?? '',
+        vagas: rev.vagas ?? '',
+        andar: rev.andar ?? '',
+        bloco: rev.bloco || '',
+        posicao: rev.posicao || '',
+        corretorNome: rev.corretor_nome || '',
+        corretorTelefone: rev.corretor_telefone || '',
+        corretorEmail: rev.corretor_email || '',
+      });
+      const emp = empreendimentos.find((e) => String(e.id) === empId);
+      setActiveRevenda({ id: rev.id, slug: rev.slug, empSlug: emp?.slug ?? rev.empreendimento?.slug ?? '' });
+      setMidias(rev.midias ?? []);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (error) {
+      setRevMsg(error instanceof Error ? error.message : 'Erro ao carregar revenda.');
+    }
+  };
+
+  const cancelarEdicao = () => {
+    setEditingRevendaId(null);
+    setRevForm(emptyRevForm);
+    setActiveRevenda(null);
+    setMidias([]);
+    setRevMsg('');
+  };
+
+  const salvarRevenda = async () => {
     setRevSaving(true);
     setRevMsg('');
     try {
-      const payload = {
-        empreendimentoId: Number(revForm.empreendimentoId),
+      const payloadBase = {
         titulo: revForm.titulo,
         descricao: revForm.descricao || undefined,
         preco: revForm.preco ? Number(revForm.preco) : null,
@@ -93,36 +183,45 @@ export default function RevendasPage() {
         corretorTelefone: revForm.corretorTelefone || undefined,
         corretorEmail: revForm.corretorEmail || undefined,
       };
-      const res = await fetch('/api/site-vision/site-revendas', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Erro ao criar revenda.');
 
-      const emp = empreendimentos.find((e) => e.id === payload.empreendimentoId);
-      setActiveRevenda({ id: json.revenda.id, slug: json.revenda.slug, empSlug: emp?.slug ?? '' });
-      setRevMsg(`Revenda "${json.revenda.titulo}" criada. Agora envie as fotos abaixo.`);
+      if (editingRevendaId) {
+        const res = await fetch(`/api/site-vision/site-revendas/${editingRevendaId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payloadBase),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || 'Erro ao salvar revenda.');
+        setRevMsg('Alterações salvas.');
+        if (browseEmpId) await carregarRevendasDoEmpreendimento(browseEmpId);
+      } else {
+        const payload = { ...payloadBase, empreendimentoId: Number(revForm.empreendimentoId) };
+        const res = await fetch('/api/site-vision/site-revendas', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || 'Erro ao criar revenda.');
+        const emp = empreendimentos.find((e) => e.id === payload.empreendimentoId);
+        setActiveRevenda({ id: json.revenda.id, slug: json.revenda.slug, empSlug: emp?.slug ?? '' });
+        setEditingRevendaId(json.revenda.id);
+        setMidias([]);
+        setRevMsg(`Revenda "${json.revenda.titulo}" criada. Agora envie as fotos abaixo.`);
+      }
     } catch (error) {
-      setRevMsg(error instanceof Error ? error.message : 'Erro ao criar revenda.');
+      setRevMsg(error instanceof Error ? error.message : 'Erro ao salvar revenda.');
     } finally {
       setRevSaving(false);
     }
   };
 
-  const fileToDataUrl = (file: File): Promise<string> =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result));
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-
   const uploadMidias = async (files: FileList | null, tipo: 'foto' | 'planta' | 'documento') => {
     if (!files || !files.length || !activeRevenda) return;
     setUploadBusy(true);
     let ok = 0;
+    const ordemBase = midias.filter((m) => m.tipo === tipo).length;
+    const novas: Midia[] = [];
     for (let i = 0; i < files.length; i++) {
       setUploadProgress(`Enviando ${i + 1}/${files.length}...`);
       try {
@@ -130,15 +229,47 @@ export default function RevendasPage() {
         const res = await fetch(`/api/site-vision/site-revendas/${activeRevenda.id}/midias`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tipo, dataUrl, ordem: i }),
+          body: JSON.stringify({ tipo, dataUrl, ordem: ordemBase + i }),
         });
-        if (res.ok) ok += 1;
+        const json = await res.json();
+        if (res.ok) {
+          ok += 1;
+          novas.push({ id: json.midia.id, tipo, url_storage: json.midia.url_storage, ordem: ordemBase + i });
+        }
       } catch {
         // segue pro proximo arquivo mesmo se um falhar
       }
     }
+    setMidias((prev) => [...prev, ...novas]);
     setUploadProgress(`${ok}/${files.length} enviados com sucesso.`);
     setUploadBusy(false);
+  };
+
+  const removerMidia = async (midiaId: number) => {
+    if (!confirm('Remover essa foto?')) return;
+    await fetch(`/api/site-vision/site-revendas/midias/${midiaId}`, { method: 'DELETE' });
+    setMidias((prev) => prev.filter((m) => m.id !== midiaId));
+  };
+
+  // Arrastar as fotos reordena localmente; solta = persiste a nova ordem em lote.
+  const onDropMidia = async (targetId: number, tipo: Midia['tipo']) => {
+    if (dragMidiaId === null || dragMidiaId === targetId || !activeRevenda) return;
+    const grupo = midias.filter((m) => m.tipo === tipo);
+    const resto = midias.filter((m) => m.tipo !== tipo);
+    const fromIdx = grupo.findIndex((m) => m.id === dragMidiaId);
+    const toIdx = grupo.findIndex((m) => m.id === targetId);
+    if (fromIdx === -1 || toIdx === -1) return;
+    const [moved] = grupo.splice(fromIdx, 1);
+    grupo.splice(toIdx, 0, moved);
+    const reindexed = grupo.map((m, idx) => ({ ...m, ordem: idx }));
+    setMidias([...resto, ...reindexed]);
+    setDragMidiaId(null);
+
+    await fetch(`/api/site-vision/site-revendas/${activeRevenda.id}/midias/ordem`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ordem: reindexed.map((m) => ({ id: m.id, ordem: m.ordem })) }),
+    });
   };
 
   const carregarRevendasDoEmpreendimento = async (empId: string) => {
@@ -158,10 +289,12 @@ export default function RevendasPage() {
   const removerRevenda = async (id: number) => {
     if (!confirm('Remover essa revenda do site? As fotos vão junto.')) return;
     await fetch(`/api/site-vision/site-revendas/${id}`, { method: 'DELETE' });
+    if (editingRevendaId === id) cancelarEdicao();
     await carregarRevendasDoEmpreendimento(browseEmpId);
   };
 
-  const siteBaseUrl = 'https://longview.guru.dev.br';
+  const fotos = midias.filter((m) => m.tipo === 'foto').sort((a, b) => a.ordem - b.ordem);
+  const outrasMidias = midias.filter((m) => m.tipo !== 'foto');
 
   return (
     <div className="space-y-6 p-6">
@@ -171,6 +304,37 @@ export default function RevendasPage() {
           Cadastre empreendimentos que não vêm do CV CRM e as revendas (unidades já vendidas, à venda por fora) —
           cada revenda ganha uma página própria no site.
         </p>
+      </div>
+
+      {/* Ordem dos empreendimentos na home */}
+      <div className={cardClass}>
+        <div className="mb-1 flex items-center gap-2">
+          <Building2 size={16} className="text-teal-300" />
+          <h2 className="text-sm font-semibold text-white">Empreendimentos</h2>
+          {reordering ? <Loader2 size={13} className="animate-spin text-teal-300" /> : null}
+        </div>
+        <p className="mb-4 text-xs text-zinc-500">Arraste pra definir a ordem de exibição na home do site.</p>
+        <div className="space-y-2">
+          {empreendimentos.map((e) => (
+            <div
+              key={e.id}
+              draggable
+              onDragStart={() => setDragEmpId(e.id)}
+              onDragOver={(ev) => ev.preventDefault()}
+              onDrop={() => onDropEmp(e.id)}
+              className="flex items-center gap-3 rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3 cursor-grab active:cursor-grabbing"
+            >
+              <GripVertical size={15} className="text-zinc-600" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-white">{e.nome}</p>
+                <p className="text-xs text-zinc-500">{e.cidade} · {e.origem === 'manual' ? 'manual' : 'CV CRM'}</p>
+              </div>
+            </div>
+          ))}
+          {!loadingEmps && empreendimentos.length === 0 ? (
+            <p className="text-sm text-zinc-500">Nenhum empreendimento ainda.</p>
+          ) : null}
+        </div>
       </div>
 
       {/* Empreendimento manual */}
@@ -210,11 +374,18 @@ export default function RevendasPage() {
         </div>
       </div>
 
-      {/* Nova revenda */}
+      {/* Nova revenda / edição */}
       <div className={cardClass}>
-        <div className="mb-4 flex items-center gap-2">
-          <Home size={16} className="text-teal-300" />
-          <h2 className="text-sm font-semibold text-white">Nova revenda</h2>
+        <div className="mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {editingRevendaId ? <Pencil size={16} className="text-teal-300" /> : <Home size={16} className="text-teal-300" />}
+            <h2 className="text-sm font-semibold text-white">{editingRevendaId ? 'Editando revenda' : 'Nova revenda'}</h2>
+          </div>
+          {editingRevendaId ? (
+            <button className={btnGhost} onClick={cancelarEdicao}>
+              <X size={12} /> Cancelar edição
+            </button>
+          ) : null}
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className={`${labelClass} sm:col-span-2`}>
@@ -222,6 +393,7 @@ export default function RevendasPage() {
             <select
               className={inputClass}
               value={revForm.empreendimentoId}
+              disabled={!!editingRevendaId}
               onChange={(e) => setRevForm((f) => ({ ...f, empreendimentoId: e.target.value }))}
             >
               <option value="">{loadingEmps ? 'Carregando...' : 'Selecione'}</option>
@@ -271,9 +443,9 @@ export default function RevendasPage() {
           </label>
         </div>
         <div className="mt-4 flex items-center gap-3">
-          <button className={btnPrimary} disabled={revSaving || !revForm.empreendimentoId || !revForm.titulo} onClick={criarRevenda}>
-            {revSaving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-            Criar revenda
+          <button className={btnPrimary} disabled={revSaving || !revForm.empreendimentoId || !revForm.titulo} onClick={salvarRevenda}>
+            {revSaving ? <Loader2 size={14} className="animate-spin" /> : editingRevendaId ? <Pencil size={14} /> : <Plus size={14} />}
+            {editingRevendaId ? 'Salvar alterações' : 'Criar revenda'}
           </button>
           {revMsg ? <span className="text-xs text-zinc-400">{revMsg}</span> : null}
         </div>
@@ -283,7 +455,7 @@ export default function RevendasPage() {
             <p className="text-xs font-semibold uppercase tracking-wide text-teal-300">Revenda ativa</p>
             <div className="mt-2 flex flex-wrap items-center gap-3">
               <a
-                href={`${siteBaseUrl}/${activeRevenda.empSlug}/revenda/${activeRevenda.slug}`}
+                href={`${SITE_BASE_URL}/${activeRevenda.empSlug}/revenda/${activeRevenda.slug}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1.5 text-sm text-teal-300 hover:text-teal-200"
@@ -302,6 +474,47 @@ export default function RevendasPage() {
               </label>
             </div>
             {uploadProgress ? <p className="mt-2 text-xs text-zinc-400">{uploadProgress}</p> : null}
+
+            {fotos.length > 0 ? (
+              <div className="mt-4">
+                <p className="mb-2 text-xs text-zinc-500">{fotos.length} foto(s) — arraste pra reordenar.</p>
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+                  {fotos.map((m) => (
+                    <div
+                      key={m.id}
+                      draggable
+                      onDragStart={() => setDragMidiaId(m.id)}
+                      onDragOver={(ev) => ev.preventDefault()}
+                      onDrop={() => onDropMidia(m.id, 'foto')}
+                      className="group relative aspect-square cursor-grab overflow-hidden rounded-lg border border-white/10 active:cursor-grabbing"
+                    >
+                      <img src={`${SITE_BASE_URL}${m.url_storage}`} alt="" className="h-full w-full object-cover" />
+                      <button
+                        onClick={() => removerMidia(m.id)}
+                        className="absolute right-1 top-1 hidden rounded-full bg-black/70 p-1 text-red-300 group-hover:block"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {outrasMidias.length > 0 ? (
+              <div className="mt-4 space-y-1">
+                {outrasMidias.map((m) => (
+                  <div key={m.id} className="flex items-center justify-between rounded-lg border border-white/8 bg-white/[0.02] px-3 py-2">
+                    <a href={`${SITE_BASE_URL}${m.url_storage}`} target="_blank" rel="noopener noreferrer" className="text-xs text-zinc-300 hover:text-white">
+                      {m.tipo === 'planta' ? 'Planta' : 'Documento'}
+                    </a>
+                    <button onClick={() => removerMidia(m.id)} className="text-red-300 hover:text-red-200">
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -323,30 +536,30 @@ export default function RevendasPage() {
         ) : null}
 
         <div className="mt-4 space-y-2">
-          {browseRevendas.map((r) => {
-            const emp = empreendimentos.find((e) => String(e.id) === browseEmpId);
-            return (
-              <div key={r.id} className="flex items-center justify-between rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3">
-                <div>
-                  <p className="text-sm font-medium text-white">{r.titulo}</p>
-                  <p className="text-xs text-zinc-500">{r.status === 'disponivel' ? 'Disponível' : 'Vendida'}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <a
-                    href={`${siteBaseUrl}/${emp?.slug ?? ''}/revenda/${r.slug}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={btnGhost}
-                  >
-                    Ver <ExternalLink size={12} />
-                  </a>
-                  <button className={`${btnGhost} text-red-300 hover:bg-red-500/15`} onClick={() => removerRevenda(r.id)}>
-                    <Trash2 size={12} /> Remover
-                  </button>
-                </div>
+          {browseRevendas.map((r) => (
+            <div key={r.id} className="flex items-center justify-between rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3">
+              <div>
+                <p className="text-sm font-medium text-white">{r.titulo}</p>
+                <p className="text-xs text-zinc-500">{r.status === 'disponivel' ? 'Disponível' : 'Vendida'}</p>
               </div>
-            );
-          })}
+              <div className="flex items-center gap-2">
+                <button className={btnGhost} onClick={() => carregarRevendaParaEdicao(r, browseEmpId)}>
+                  <Pencil size={12} /> Editar
+                </button>
+                <a
+                  href={`${SITE_BASE_URL}/${empreendimentos.find((e) => String(e.id) === browseEmpId)?.slug ?? ''}/revenda/${r.slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={btnGhost}
+                >
+                  Ver <ExternalLink size={12} />
+                </a>
+                <button className={`${btnGhost} text-red-300 hover:bg-red-500/15`} onClick={() => removerRevenda(r.id)}>
+                  <Trash2 size={12} /> Remover
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>
