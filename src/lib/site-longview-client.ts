@@ -164,3 +164,132 @@ export function pushRevenda(cvCrmId: number, params: RevendaPush) {
 export function deleteRevendaRemota(revendaId: number) {
   return call<{ success: boolean }>(`/api/admin/revendas/${revendaId}`, { method: 'DELETE' });
 }
+
+// ── Empreendimento manual (nao vem do CV CRM) + revenda por empreendimentoId ──
+// Complementa o fluxo acima (que so aceita cvCrmId) pra suportar projetos que
+// existem no site mas nunca foram sincronizados do CV CRM (ex: empreendimentos
+// antigos, so com link pro site legado).
+
+export type EmpreendimentoManualPush = {
+  nome: string;
+  endereco: string;
+  cidade: string;
+  estado: string;
+  cep?: string;
+  descricao?: string;
+  descricaoCurta?: string;
+  logoUrl?: string;
+  videoUrl?: string;
+};
+
+export function createEmpreendimentoManual(params: EmpreendimentoManualPush) {
+  return call<{ success: boolean; empreendimento: { id: number; nome: string; slug: string } }>(
+    '/api/admin/empreendimentos',
+    { method: 'POST', body: JSON.stringify(params) }
+  );
+}
+
+export type RevendaByEmpIdPush = {
+  empreendimentoId: number;
+  titulo: string;
+  preco?: number | null;
+  descricao?: string;
+  corretorNome?: string;
+  corretorTelefone?: string;
+  corretorEmail?: string;
+  posicao?: string;
+  vagas?: number | null;
+  areaPrivativa?: number | null;
+  areaTotal?: number | null;
+  dormitorios?: number | null;
+  suites?: number | null;
+  andar?: number | null;
+  bloco?: string;
+};
+
+export function createRevendaByEmpId(params: RevendaByEmpIdPush) {
+  return call<{ success: boolean; revenda: { id: number; slug: string; titulo: string; preco: number | null; status: string } }>(
+    '/api/admin/revendas',
+    { method: 'POST', body: JSON.stringify(params) }
+  );
+}
+
+export function pushRevendaMidia(revendaId: number, params: { tipo: 'foto' | 'planta' | 'documento'; dataUrl: string; ordem?: number }) {
+  return call<{ success: boolean; midia: { id: number; tipo: string; url_storage: string; ordem: number } }>(
+    `/api/admin/revendas/${revendaId}/midias`,
+    { method: 'POST', body: JSON.stringify(params) }
+  );
+}
+
+export function deleteRevendaMidiaRemota(midiaId: number) {
+  return call<{ success: boolean }>(`/api/admin/revenda-midias/${midiaId}`, { method: 'DELETE' });
+}
+
+export type RevendaPublica = {
+  id: number;
+  slug: string;
+  titulo: string;
+  descricao: string | null;
+  posicao: string | null;
+  vagas: number | null;
+  status: string;
+  dormitorios: number | null;
+  area_privativa: string | null;
+  area_total: string | null;
+  suites: number | null;
+  andar: number | null;
+  bloco: string | null;
+  corretor_nome: string | null;
+  corretor_telefone: string | null;
+  corretor_email: string | null;
+  empreendimento: { id: number; nome: string; slug: string; cidade: string; estado: string };
+  midias: Array<{ id: number; tipo: 'foto' | 'planta' | 'documento'; url_storage: string; ordem: number }>;
+};
+
+export async function fetchRevendaPublica(slug: string): Promise<RevendaPublica | null> {
+  if (!BASE_URL) return null;
+  try {
+    const res = await fetch(`${BASE_URL}/api/revendas/${slug}`, { cache: 'no-store' });
+    if (!res.ok) return null;
+    return (await res.json()) as RevendaPublica;
+  } catch {
+    return null;
+  }
+}
+
+export type EmpreendimentoListItem = {
+  id: number;
+  nome: string;
+  slug: string;
+  cidade: string;
+  estado: string;
+  origem: 'cvcrm' | 'manual';
+};
+
+export async function fetchEmpreendimentosPublicos(): Promise<EmpreendimentoListItem[]> {
+  if (!BASE_URL) return [];
+  try {
+    const res = await fetch(`${BASE_URL}/api/empreendimentos`, { cache: 'no-store' });
+    if (!res.ok) return [];
+    return (await res.json()) as EmpreendimentoListItem[];
+  } catch {
+    return [];
+  }
+}
+
+export type EmpreendimentoDetailPublico = EmpreendimentoListItem & {
+  revendas: Array<{ id: number; slug: string; titulo: string; preco: number | null; status: string }>;
+};
+
+// Busca por ID interno (PK), nao por cv_crm_id — funciona pra empreendimento manual
+// (que nao tem cv_crm_id) e pra CV CRM igual.
+export async function fetchEmpreendimentoDetailById(id: number): Promise<EmpreendimentoDetailPublico | null> {
+  if (!BASE_URL) return null;
+  try {
+    const res = await fetch(`${BASE_URL}/api/empreendimentos/${id}`, { cache: 'no-store' });
+    if (!res.ok) return null;
+    return (await res.json()) as EmpreendimentoDetailPublico;
+  } catch {
+    return null;
+  }
+}
