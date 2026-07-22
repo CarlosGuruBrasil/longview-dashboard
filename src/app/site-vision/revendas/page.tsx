@@ -7,6 +7,7 @@ import { Loader2, Plus, Trash2, Upload, ExternalLink, Building2, Home, Pencil, X
 type EmpItem = { id: number; nome: string; slug: string; cidade: string; estado: string; origem: 'cvcrm' | 'manual'; ordem: number };
 type RevendaItem = { id: number; slug: string; titulo: string; tipologia?: string | null; preco: number | null; status: string };
 type Midia = { id: number; tipo: 'foto' | 'planta' | 'documento'; url_storage: string; ordem: number; destaque?: boolean };
+type TeamMember = { id: string; name: string; email: string; phone: string; whatsapp: string; avatarUrl: string };
 
 const SITE_BASE_URL = 'https://longview.guru.dev.br';
 
@@ -20,7 +21,7 @@ const btnGhost = 'inline-flex items-center gap-2 h-9 px-3 rounded-xl bg-white/[0
 const emptyRevForm = {
   empreendimentoId: '', titulo: '', tipologia: '', descricao: '', preco: '', areaPrivativa: '', areaTotal: '',
   dormitorios: '', suites: '', vagas: '', andar: '', bloco: '', posicao: '',
-  corretorNome: '', corretorTelefone: '', corretorEmail: '',
+  corretorNome: '', corretorTelefone: '', corretorEmail: '', corretorFoto: '',
 };
 
 // Determina o link publico da revenda (URL = tipologia + nome do empreendimento).
@@ -66,6 +67,11 @@ export default function RevendasPage() {
   const [browseRevendas, setBrowseRevendas] = useState<RevendaItem[]>([]);
   const [browseLoading, setBrowseLoading] = useState(false);
 
+  // Corretor da revenda vem do People Vision (time Comercial/Corretor) — mesma
+  // lista que ja alimenta a equipe do site, em vez de nome/telefone digitados
+  // a mao.
+  const [team, setTeam] = useState<TeamMember[]>([]);
+
   const loadEmpreendimentos = async () => {
     setLoadingEmps(true);
     try {
@@ -77,7 +83,32 @@ export default function RevendasPage() {
     }
   };
 
-  useEffect(() => { loadEmpreendimentos(); }, []);
+  const loadTeam = async () => {
+    try {
+      const res = await fetch('/api/site-vision/team');
+      const json = await res.json();
+      setTeam(json.team ?? []);
+    } catch {
+      setTeam([]);
+    }
+  };
+
+  useEffect(() => { loadEmpreendimentos(); loadTeam(); }, []);
+
+  const selecionarCorretor = (memberId: string) => {
+    const m = team.find((t) => t.id === memberId);
+    if (!m) {
+      setRevForm((f) => ({ ...f, corretorNome: '', corretorTelefone: '', corretorEmail: '', corretorFoto: '' }));
+      return;
+    }
+    setRevForm((f) => ({
+      ...f,
+      corretorNome: m.name,
+      corretorTelefone: m.whatsapp || m.phone || '',
+      corretorEmail: m.email,
+      corretorFoto: m.avatarUrl || '',
+    }));
+  };
 
   const criarEmpreendimento = async () => {
     setEmpSaving(true);
@@ -157,6 +188,7 @@ export default function RevendasPage() {
         corretorNome: rev.corretor_nome || '',
         corretorTelefone: rev.corretor_telefone || '',
         corretorEmail: rev.corretor_email || '',
+        corretorFoto: rev.corretor_foto || '',
       });
       const emp = empreendimentos.find((e) => String(e.id) === empId);
       setActiveRevenda({ id: rev.id, slug: rev.slug, empSlug: emp?.slug ?? rev.empreendimento?.slug ?? '' });
@@ -196,6 +228,7 @@ export default function RevendasPage() {
         corretorNome: revForm.corretorNome || undefined,
         corretorTelefone: revForm.corretorTelefone || undefined,
         corretorEmail: revForm.corretorEmail || undefined,
+        corretorFoto: revForm.corretorFoto || undefined,
       };
 
       if (editingRevendaId) {
@@ -507,13 +540,27 @@ export default function RevendasPage() {
               <input className={inputClass} value={(revForm as Record<string, string>)[key]} onChange={(e) => setRevForm((f) => ({ ...f, [key]: e.target.value }))} />
             </label>
           ))}
-          <label className={labelClass}>
-            <span className={labelTextClass}>Corretor</span>
-            <input className={inputClass} value={revForm.corretorNome} onChange={(e) => setRevForm((f) => ({ ...f, corretorNome: e.target.value }))} />
-          </label>
-          <label className={labelClass}>
-            <span className={labelTextClass}>WhatsApp do corretor</span>
-            <input className={inputClass} value={revForm.corretorTelefone} onChange={(e) => setRevForm((f) => ({ ...f, corretorTelefone: e.target.value }))} />
+          <label className={`${labelClass} sm:col-span-2`}>
+            <span className={labelTextClass}>Corretor (do People Vision — time Comercial/Corretor)</span>
+            <select
+              className={inputClass}
+              value={team.find((t) => t.email === revForm.corretorEmail)?.id ?? ''}
+              onChange={(e) => selecionarCorretor(e.target.value)}
+            >
+              <option value="">Sem corretor definido</option>
+              {team.map((t) => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+            {revForm.corretorNome ? (
+              <div className="mt-2 flex items-center gap-2 text-xs text-zinc-400">
+                {revForm.corretorFoto ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={revForm.corretorFoto} alt="" className="h-6 w-6 rounded-full object-cover" />
+                ) : null}
+                {revForm.corretorNome} {revForm.corretorTelefone ? `· ${revForm.corretorTelefone}` : ''}
+              </div>
+            ) : null}
           </label>
         </div>
         <div className="mt-4 flex items-center gap-3">

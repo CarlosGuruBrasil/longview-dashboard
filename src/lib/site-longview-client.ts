@@ -211,6 +211,7 @@ export type RevendaByEmpIdPush = {
   corretorNome?: string;
   corretorTelefone?: string;
   corretorEmail?: string;
+  corretorFoto?: string;
   posicao?: string;
   vagas?: number | null;
   areaPrivativa?: number | null;
@@ -263,6 +264,7 @@ export type RevendaPublica = {
   corretor_nome: string | null;
   corretor_telefone: string | null;
   corretor_email: string | null;
+  corretor_foto: string | null;
   empreendimento: { id: number; nome: string; slug: string; cidade: string; estado: string };
   midias: Array<{ id: number; tipo: 'foto' | 'planta' | 'documento'; url_storage: string; ordem: number; destaque?: boolean }>;
 };
