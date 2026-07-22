@@ -178,6 +178,15 @@ export function deleteRevendaRemota(revendaId: number) {
   return call<{ success: boolean }>(`/api/admin/revendas/${revendaId}`, { method: 'DELETE' });
 }
 
+// Igual a RevendaPublica, mas com "preco" — so vem por rota autenticada (o GET
+// publico nunca expoe preco, e uso interno). Usado pra pre-preencher o
+// formulario de edicao no dashboard.
+export type RevendaAdmin = RevendaPublica & { preco: number | string | null };
+
+export function fetchRevendaAdminById(id: number): Promise<RevendaAdmin> {
+  return call<RevendaAdmin>(`/api/admin/revendas/${id}`, { method: 'GET' });
+}
+
 // ── Empreendimento manual (nao vem do CV CRM) + revenda por empreendimentoId ──
 // Complementa o fluxo acima (que so aceita cvCrmId) pra suportar projetos que
 // existem no site mas nunca foram sincronizados do CV CRM (ex: empreendimentos

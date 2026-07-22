@@ -171,7 +171,7 @@ export default function RevendasPage() {
   const carregarRevendaParaEdicao = async (r: RevendaItem, empId: number) => {
     setRevMsg('');
     try {
-      const res = await fetch(`/api/site-vision/site-revendas/by-slug/${r.slug}`);
+      const res = await fetch(`/api/site-vision/site-revendas/${r.id}`);
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Erro ao carregar revenda.');
       const rev = json.revenda;
@@ -181,7 +181,7 @@ export default function RevendasPage() {
         titulo: rev.titulo || '',
         tipologia: rev.tipologia || '',
         descricao: rev.descricao || '',
-        preco: '',
+        preco: rev.preco != null ? String(rev.preco) : '',
         areaPrivativa: rev.area_privativa ?? '',
         areaTotal: rev.area_total ?? '',
         dormitorios: rev.dormitorios ?? '',
@@ -355,7 +355,6 @@ export default function RevendasPage() {
       setExpandedEmpId(id);
       carregarRevendasDoEmpreendimento(id);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, empreendimentos]);
 
   const removerRevenda = async (id: number, empId: number) => {
@@ -368,113 +367,16 @@ export default function RevendasPage() {
   const fotos = midias.filter((m) => m.tipo === 'foto').sort((a, b) => a.ordem - b.ordem);
   const outrasMidias = midias.filter((m) => m.tipo !== 'foto');
 
-  return (
-    <div className="space-y-6 p-6">
-      <div>
-        <h1 className="text-xl font-bold text-white">Revendas</h1>
-        <p className="mt-1 text-sm text-zinc-400">
-          Unidades já vendidas, à venda por fora do incorporador — cada revenda ganha uma página própria no site.
-        </p>
-      </div>
+  // Editando/cadastrando revenda toma a tela inteira, sem a lista de
+  // empreendimentos por baixo empilhada — evita a bagunca visual de mostrar as
+  // duas coisas ao mesmo tempo. "Voltar" fecha o painel e volta pra lista.
+  if (showEditPanel) {
+    return (
+      <div className="space-y-6 p-6">
+        <button className={btnGhost} onClick={cancelarEdicao}>
+          <ArrowLeft size={14} /> Voltar
+        </button>
 
-      {/* Empreendimentos: ordem na home + revendas de cada um, expandindo inline */}
-      <div className={cardClass}>
-        <div className="mb-1 flex items-center gap-2">
-          <Building2 size={16} className="text-teal-300" />
-          <h2 className="text-sm font-semibold text-white">Empreendimentos</h2>
-          {reordering ? <Loader2 size={13} className="animate-spin text-teal-300" /> : null}
-        </div>
-        <p className="mb-4 text-xs text-zinc-500">
-          Arraste pra definir a ordem de exibição na home. Clique num empreendimento pra ver/cadastrar as revendas dele.
-        </p>
-        <div className="space-y-2">
-          {empreendimentos.map((e) => {
-            const isOpen = expandedEmpId === e.id;
-            const revendas = revendasPorEmp[e.id] ?? [];
-            const unidadesDisp = e.unidades_disponiveis ?? 0;
-            const revendasDisp = e.revendas_disponiveis ?? 0;
-            return (
-              <div key={e.id} className="rounded-xl border border-white/8 bg-white/[0.02] overflow-hidden">
-                <div
-                  draggable
-                  onDragStart={() => setDragEmpId(e.id)}
-                  onDragOver={(ev) => ev.preventDefault()}
-                  onDrop={() => onDropEmp(e.id)}
-                  onClick={() => toggleExpandEmp(e.id)}
-                  className="flex items-center gap-3 px-4 py-3 cursor-pointer"
-                >
-                  <GripVertical size={15} className="text-zinc-600 cursor-grab" onClick={(ev) => ev.stopPropagation()} />
-                  {isOpen ? <ChevronDown size={15} className="text-zinc-500" /> : <ChevronRight size={15} className="text-zinc-500" />}
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-white">{e.nome}</p>
-                    <p className="text-xs text-zinc-500">{e.cidade} · {e.origem === 'manual' ? 'manual' : 'CV CRM'}</p>
-                  </div>
-                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${unidadesDisp > 0 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/5 text-zinc-500'}`}>
-                    {unidadesDisp} unid.
-                  </span>
-                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${revendasDisp > 0 ? 'bg-teal-500/20 text-teal-300' : 'bg-white/5 text-zinc-500'}`}>
-                    {revendasDisp} revenda{revendasDisp === 1 ? '' : 's'}
-                  </span>
-                </div>
-
-                {isOpen ? (
-                  <div className="border-t border-white/8 bg-black/20 px-4 py-3">
-                    <div className="mb-3 flex items-center justify-between">
-                      <p className="text-xs text-zinc-500">
-                        {loadingRevendasEmpId === e.id ? 'Carregando...' : `${revendas.length} revenda(s) cadastrada(s)`}
-                      </p>
-                      <button className={btnGhost} onClick={(ev) => { ev.stopPropagation(); abrirNovaRevenda(e.id); }}>
-                        <Plus size={12} /> Nova revenda
-                      </button>
-                    </div>
-                    <div className="space-y-2">
-                      {revendas.map((r) => (
-                        <div key={r.id} className="flex items-center justify-between rounded-lg border border-white/8 bg-white/[0.02] px-3 py-2">
-                          <div>
-                            <p className="text-sm font-medium text-white">{r.titulo}</p>
-                            <p className="text-xs text-zinc-500">
-                              {r.tipologia ? `${r.tipologia} · ` : ''}{r.status === 'disponivel' ? 'Disponível' : 'Vendida'}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <button className={btnGhost} onClick={(ev) => { ev.stopPropagation(); carregarRevendaParaEdicao(r, e.id); }}>
-                              <Pencil size={12} /> Editar
-                            </button>
-                            <a
-                              href={`${SITE_BASE_URL}/${e.slug}/revenda/${r.slug}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(ev) => ev.stopPropagation()}
-                              className={btnGhost}
-                            >
-                              Ver <ExternalLink size={12} />
-                            </a>
-                            <button
-                              className={`${btnGhost} text-red-300 hover:bg-red-500/15`}
-                              onClick={(ev) => { ev.stopPropagation(); removerRevenda(r.id, e.id); }}
-                            >
-                              <Trash2 size={12} /> Remover
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                      {!loadingRevendasEmpId && revendas.length === 0 ? (
-                        <p className="text-xs text-zinc-600">Nenhuma revenda cadastrada pra esse empreendimento ainda.</p>
-                      ) : null}
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            );
-          })}
-          {!loadingEmps && empreendimentos.length === 0 ? (
-            <p className="text-sm text-zinc-500">Nenhum empreendimento ainda.</p>
-          ) : null}
-        </div>
-      </div>
-
-      {/* Painel de cadastro/edicao de revenda */}
-      {showEditPanel ? (
         <div className={cardClass} ref={editPanelRef}>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
@@ -490,15 +392,10 @@ export default function RevendasPage() {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <button className={btnPrimary} disabled={revSaving || !revForm.empreendimentoId || !revForm.titulo || (!editingRevendaId && !revForm.tipologia)} onClick={salvarRevenda}>
-                {revSaving ? <Loader2 size={14} className="animate-spin" /> : editingRevendaId ? <Pencil size={14} /> : <Plus size={14} />}
-                {editingRevendaId ? 'Salvar alterações' : 'Criar revenda'}
-              </button>
-              <button className={btnGhost} onClick={cancelarEdicao}>
-                <X size={12} /> Fechar
-              </button>
-            </div>
+            <button className={btnPrimary} disabled={revSaving || !revForm.empreendimentoId || !revForm.titulo || (!editingRevendaId && !revForm.tipologia)} onClick={salvarRevenda}>
+              {revSaving ? <Loader2 size={14} className="animate-spin" /> : editingRevendaId ? <Pencil size={14} /> : <Plus size={14} />}
+              {editingRevendaId ? 'Salvar alterações' : 'Criar revenda'}
+            </button>
           </div>
           {revMsg ? <p className="mb-4 text-xs text-teal-300">{revMsg}</p> : null}
 
@@ -664,41 +561,148 @@ export default function RevendasPage() {
             </div>
           ) : null}
         </div>
-      ) : null}
 
-      {lightboxIdx !== null && fotos[lightboxIdx] ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-6"
-          onClick={() => setLightboxIdx(null)}
-        >
-          <button className="absolute right-6 top-6 text-white" onClick={() => setLightboxIdx(null)}>
-            <X size={28} />
-          </button>
-          {fotos.length > 1 ? (
-            <button
-              className="absolute left-6 text-white"
-              onClick={(e) => { e.stopPropagation(); setLightboxIdx((i) => (i === null ? null : (i - 1 + fotos.length) % fotos.length)); }}
-            >
-              <ArrowLeft size={28} />
+        {lightboxIdx !== null && fotos[lightboxIdx] ? (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-6"
+            onClick={() => setLightboxIdx(null)}
+          >
+            <button className="absolute right-6 top-6 text-white" onClick={() => setLightboxIdx(null)}>
+              <X size={28} />
             </button>
-          ) : null}
-          <img
-            src={`${SITE_BASE_URL}${fotos[lightboxIdx].url_storage}`}
-            alt=""
-            className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain"
-            onClick={(e) => e.stopPropagation()}
-          />
-          {fotos.length > 1 ? (
-            <button
-              className="absolute right-6 text-white"
-              onClick={(e) => { e.stopPropagation(); setLightboxIdx((i) => (i === null ? null : (i + 1) % fotos.length)); }}
-            >
-              <ArrowRight size={28} />
-            </button>
-          ) : null}
-          <p className="absolute bottom-6 text-xs text-zinc-400">{lightboxIdx + 1} / {fotos.length}</p>
+            {fotos.length > 1 ? (
+              <button
+                className="absolute left-6 text-white"
+                onClick={(e) => { e.stopPropagation(); setLightboxIdx((i) => (i === null ? null : (i - 1 + fotos.length) % fotos.length)); }}
+              >
+                <ArrowLeft size={28} />
+              </button>
+            ) : null}
+            <img
+              src={`${SITE_BASE_URL}${fotos[lightboxIdx].url_storage}`}
+              alt=""
+              className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain"
+              onClick={(e) => e.stopPropagation()}
+            />
+            {fotos.length > 1 ? (
+              <button
+                className="absolute right-6 text-white"
+                onClick={(e) => { e.stopPropagation(); setLightboxIdx((i) => (i === null ? null : (i + 1) % fotos.length)); }}
+              >
+                <ArrowRight size={28} />
+              </button>
+            ) : null}
+            <p className="absolute bottom-6 text-xs text-zinc-400">{lightboxIdx + 1} / {fotos.length}</p>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 p-6">
+      <div>
+        <h1 className="text-xl font-bold text-white">Revendas</h1>
+        <p className="mt-1 text-sm text-zinc-400">
+          Unidades já vendidas, à venda por fora do incorporador — cada revenda ganha uma página própria no site.
+        </p>
+      </div>
+
+      {/* Empreendimentos: ordem na home + revendas de cada um, expandindo inline */}
+      <div className={cardClass}>
+        <div className="mb-1 flex items-center gap-2">
+          <Building2 size={16} className="text-teal-300" />
+          <h2 className="text-sm font-semibold text-white">Empreendimentos</h2>
+          {reordering ? <Loader2 size={13} className="animate-spin text-teal-300" /> : null}
         </div>
-      ) : null}
+        <p className="mb-4 text-xs text-zinc-500">
+          Arraste pra definir a ordem de exibição na home. Clique num empreendimento pra ver/cadastrar as revendas dele.
+        </p>
+        <div className="space-y-2">
+          {empreendimentos.map((e) => {
+            const isOpen = expandedEmpId === e.id;
+            const revendas = revendasPorEmp[e.id] ?? [];
+            const unidadesDisp = e.unidades_disponiveis ?? 0;
+            const revendasDisp = e.revendas_disponiveis ?? 0;
+            return (
+              <div key={e.id} className="rounded-xl border border-white/8 bg-white/[0.02] overflow-hidden">
+                <div
+                  draggable
+                  onDragStart={() => setDragEmpId(e.id)}
+                  onDragOver={(ev) => ev.preventDefault()}
+                  onDrop={() => onDropEmp(e.id)}
+                  onClick={() => toggleExpandEmp(e.id)}
+                  className="flex items-center gap-3 px-4 py-3 cursor-pointer"
+                >
+                  <GripVertical size={15} className="text-zinc-600 cursor-grab" onClick={(ev) => ev.stopPropagation()} />
+                  {isOpen ? <ChevronDown size={15} className="text-zinc-500" /> : <ChevronRight size={15} className="text-zinc-500" />}
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-white">{e.nome}</p>
+                    <p className="text-xs text-zinc-500">{e.cidade} · {e.origem === 'manual' ? 'manual' : 'CV CRM'}</p>
+                  </div>
+                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${unidadesDisp > 0 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/5 text-zinc-500'}`}>
+                    {unidadesDisp} unid.
+                  </span>
+                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${revendasDisp > 0 ? 'bg-teal-500/20 text-teal-300' : 'bg-white/5 text-zinc-500'}`}>
+                    {revendasDisp} revenda{revendasDisp === 1 ? '' : 's'}
+                  </span>
+                </div>
+
+                {isOpen ? (
+                  <div className="border-t border-white/8 bg-black/20 px-4 py-3">
+                    <div className="mb-3 flex items-center justify-between">
+                      <p className="text-xs text-zinc-500">
+                        {loadingRevendasEmpId === e.id ? 'Carregando...' : `${revendas.length} revenda(s) cadastrada(s)`}
+                      </p>
+                      <button className={btnGhost} onClick={(ev) => { ev.stopPropagation(); abrirNovaRevenda(e.id); }}>
+                        <Plus size={12} /> Nova revenda
+                      </button>
+                    </div>
+                    <div className="space-y-2">
+                      {revendas.map((r) => (
+                        <div key={r.id} className="flex items-center justify-between rounded-lg border border-white/8 bg-white/[0.02] px-3 py-2">
+                          <div>
+                            <p className="text-sm font-medium text-white">{r.titulo}</p>
+                            <p className="text-xs text-zinc-500">
+                              {r.tipologia ? `${r.tipologia} · ` : ''}{r.status === 'disponivel' ? 'Disponível' : 'Vendida'}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button className={btnGhost} onClick={(ev) => { ev.stopPropagation(); carregarRevendaParaEdicao(r, e.id); }}>
+                              <Pencil size={12} /> Editar
+                            </button>
+                            <a
+                              href={`${SITE_BASE_URL}/${e.slug}/revenda/${r.slug}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(ev) => ev.stopPropagation()}
+                              className={btnGhost}
+                            >
+                              Ver <ExternalLink size={12} />
+                            </a>
+                            <button
+                              className={`${btnGhost} text-red-300 hover:bg-red-500/15`}
+                              onClick={(ev) => { ev.stopPropagation(); removerRevenda(r.id, e.id); }}
+                            >
+                              <Trash2 size={12} /> Remover
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      {!loadingRevendasEmpId && revendas.length === 0 ? (
+                        <p className="text-xs text-zinc-600">Nenhuma revenda cadastrada pra esse empreendimento ainda.</p>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+          {!loadingEmps && empreendimentos.length === 0 ? (
+            <p className="text-sm text-zinc-500">Nenhum empreendimento ainda.</p>
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }
