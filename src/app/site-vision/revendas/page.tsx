@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Loader2, Plus, Trash2, Upload, ExternalLink, Building2, Home, Pencil, X, GripVertical, Star } from 'lucide-react';
 
 type EmpItem = { id: number; nome: string; slug: string; cidade: string; estado: string; origem: 'cvcrm' | 'manual'; ordem: number };
-type RevendaItem = { id: number; slug: string; titulo: string; preco: number | null; status: string };
+type RevendaItem = { id: number; slug: string; titulo: string; tipologia?: string | null; preco: number | null; status: string };
 type Midia = { id: number; tipo: 'foto' | 'planta' | 'documento'; url_storage: string; ordem: number; destaque?: boolean };
 
 const SITE_BASE_URL = 'https://longview.guru.dev.br';
@@ -17,10 +18,13 @@ const btnPrimary = 'inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-teal-
 const btnGhost = 'inline-flex items-center gap-2 h-9 px-3 rounded-xl bg-white/[0.05] text-zinc-300 hover:bg-white/[0.09] text-xs font-medium transition-colors';
 
 const emptyRevForm = {
-  empreendimentoId: '', titulo: '', descricao: '', preco: '', areaPrivativa: '', areaTotal: '',
+  empreendimentoId: '', titulo: '', tipologia: '', descricao: '', preco: '', areaPrivativa: '', areaTotal: '',
   dormitorios: '', suites: '', vagas: '', andar: '', bloco: '', posicao: '',
   corretorNome: '', corretorTelefone: '', corretorEmail: '',
 };
+
+// Determina o link publico da revenda (URL = tipologia + nome do empreendimento).
+const TIPOLOGIAS = ['Apartamento', 'Cobertura', 'Cobertura Duplex', 'Studio', 'Casa'];
 
 const fileToDataUrl = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -31,6 +35,8 @@ const fileToDataUrl = (file: File): Promise<string> =>
   });
 
 export default function RevendasPage() {
+  const searchParams = useSearchParams();
+  const empFilterApplied = useRef(false);
   const [empreendimentos, setEmpreendimentos] = useState<EmpItem[]>([]);
   const [loadingEmps, setLoadingEmps] = useState(true);
   const [reordering, setReordering] = useState(false);
@@ -39,6 +45,11 @@ export default function RevendasPage() {
   const [empForm, setEmpForm] = useState({ nome: '', endereco: '', cidade: '', estado: '', descricaoCurta: '' });
   const [empSaving, setEmpSaving] = useState(false);
   const [empMsg, setEmpMsg] = useState('');
+  const [showCadastrarEmp, setShowCadastrarEmp] = useState(false);
+
+  // Nova arquitetura: Revendas Disponíveis / Cadastrar Revenda são painéis
+  // exclusivos, escondidos ate o admin clicar no botao correspondente.
+  const [activePanel, setActivePanel] = useState<'none' | 'listar' | 'cadastrar'>('none');
 
   const [editingRevendaId, setEditingRevendaId] = useState<number | null>(null);
   const [revForm, setRevForm] = useState(emptyRevForm);
@@ -132,6 +143,7 @@ export default function RevendasPage() {
       setRevForm({
         empreendimentoId: empId,
         titulo: rev.titulo || '',
+        tipologia: rev.tipologia || '',
         descricao: rev.descricao || '',
         preco: '',
         areaPrivativa: rev.area_privativa ?? '',
@@ -149,6 +161,7 @@ export default function RevendasPage() {
       const emp = empreendimentos.find((e) => String(e.id) === empId);
       setActiveRevenda({ id: rev.id, slug: rev.slug, empSlug: emp?.slug ?? rev.empreendimento?.slug ?? '' });
       setMidias(rev.midias ?? []);
+      setActivePanel('cadastrar');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error) {
       setRevMsg(error instanceof Error ? error.message : 'Erro ao carregar revenda.');
@@ -169,6 +182,7 @@ export default function RevendasPage() {
     try {
       const payloadBase = {
         titulo: revForm.titulo,
+        tipologia: revForm.tipologia || undefined,
         descricao: revForm.descricao || undefined,
         preco: revForm.preco ? Number(revForm.preco) : null,
         areaPrivativa: revForm.areaPrivativa ? Number(revForm.areaPrivativa) : null,
@@ -298,6 +312,18 @@ export default function RevendasPage() {
     }
   };
 
+  // Vindo do link "Ver revendas disponíveis" na tela de Empreendimentos
+  // (/site-vision/revendas?emp=ID) — abre direto no painel Revendas Disponíveis
+  // ja filtrado.
+  useEffect(() => {
+    const empParam = searchParams.get('emp');
+    if (empParam && empreendimentos.length > 0 && !empFilterApplied.current) {
+      empFilterApplied.current = true;
+      setActivePanel('listar');
+      carregarRevendasDoEmpreendimento(empParam);
+    }
+  }, [searchParams, empreendimentos]);
+
   const removerRevenda = async (id: number) => {
     if (!confirm('Remover essa revenda do site? As fotos vão junto.')) return;
     await fetch(`/api/site-vision/site-revendas/${id}`, { method: 'DELETE' });
@@ -349,45 +375,70 @@ export default function RevendasPage() {
         </div>
       </div>
 
-      {/* Empreendimento manual */}
+      {/* Cadastrar Empreendimento — fora do bloco de revendas, botao que revela o form */}
       <div className={cardClass}>
-        <div className="mb-4 flex items-center gap-2">
-          <Building2 size={16} className="text-teal-300" />
-          <h2 className="text-sm font-semibold text-white">Novo empreendimento manual</h2>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className={labelClass}>
-            <span className={labelTextClass}>Nome</span>
-            <input className={inputClass} value={empForm.nome} onChange={(e) => setEmpForm((f) => ({ ...f, nome: e.target.value }))} placeholder="Campeche Beach Club" />
-          </label>
-          <label className={labelClass}>
-            <span className={labelTextClass}>Endereço</span>
-            <input className={inputClass} value={empForm.endereco} onChange={(e) => setEmpForm((f) => ({ ...f, endereco: e.target.value }))} placeholder="Av. Pequeno Príncipe" />
-          </label>
-          <label className={labelClass}>
-            <span className={labelTextClass}>Cidade</span>
-            <input className={inputClass} value={empForm.cidade} onChange={(e) => setEmpForm((f) => ({ ...f, cidade: e.target.value }))} placeholder="Florianópolis" />
-          </label>
-          <label className={labelClass}>
-            <span className={labelTextClass}>Estado (UF)</span>
-            <input className={inputClass} value={empForm.estado} onChange={(e) => setEmpForm((f) => ({ ...f, estado: e.target.value.toUpperCase().slice(0, 2) }))} placeholder="SC" maxLength={2} />
-          </label>
-          <label className={`${labelClass} sm:col-span-2`}>
-            <span className={labelTextClass}>Descrição curta (opcional)</span>
-            <input className={inputClass} value={empForm.descricaoCurta} onChange={(e) => setEmpForm((f) => ({ ...f, descricaoCurta: e.target.value }))} />
-          </label>
-        </div>
-        <div className="mt-4 flex items-center gap-3">
-          <button className={btnPrimary} disabled={empSaving || !empForm.nome || !empForm.endereco || !empForm.cidade || !empForm.estado} onClick={criarEmpreendimento}>
-            {empSaving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-            Criar empreendimento
-          </button>
-          {empMsg ? <span className="text-xs text-zinc-400">{empMsg}</span> : null}
-        </div>
+        <button
+          className={btnPrimary}
+          onClick={() => setShowCadastrarEmp((v) => !v)}
+        >
+          <Building2 size={14} />
+          Cadastrar Empreendimento
+        </button>
+
+        {showCadastrarEmp ? (
+          <div className="mt-5">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className={labelClass}>
+                <span className={labelTextClass}>Nome</span>
+                <input className={inputClass} value={empForm.nome} onChange={(e) => setEmpForm((f) => ({ ...f, nome: e.target.value }))} placeholder="Campeche Beach Club" />
+              </label>
+              <label className={labelClass}>
+                <span className={labelTextClass}>Endereço</span>
+                <input className={inputClass} value={empForm.endereco} onChange={(e) => setEmpForm((f) => ({ ...f, endereco: e.target.value }))} placeholder="Av. Pequeno Príncipe" />
+              </label>
+              <label className={labelClass}>
+                <span className={labelTextClass}>Cidade</span>
+                <input className={inputClass} value={empForm.cidade} onChange={(e) => setEmpForm((f) => ({ ...f, cidade: e.target.value }))} placeholder="Florianópolis" />
+              </label>
+              <label className={labelClass}>
+                <span className={labelTextClass}>Estado (UF)</span>
+                <input className={inputClass} value={empForm.estado} onChange={(e) => setEmpForm((f) => ({ ...f, estado: e.target.value.toUpperCase().slice(0, 2) }))} placeholder="SC" maxLength={2} />
+              </label>
+              <label className={`${labelClass} sm:col-span-2`}>
+                <span className={labelTextClass}>Descrição curta (opcional)</span>
+                <input className={inputClass} value={empForm.descricaoCurta} onChange={(e) => setEmpForm((f) => ({ ...f, descricaoCurta: e.target.value }))} />
+              </label>
+            </div>
+            <div className="mt-4 flex items-center gap-3">
+              <button className={btnPrimary} disabled={empSaving || !empForm.nome || !empForm.endereco || !empForm.cidade || !empForm.estado} onClick={criarEmpreendimento}>
+                {empSaving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                Criar empreendimento
+              </button>
+              {empMsg ? <span className="text-xs text-zinc-400">{empMsg}</span> : null}
+            </div>
+          </div>
+        ) : null}
       </div>
 
-      {/* Nova revenda / edição */}
+      {/* Revendas: 2 botoes — Revendas Disponiveis / Cadastrar Revenda */}
       <div className={cardClass}>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            className={activePanel === 'listar' ? btnPrimary : btnGhost}
+            onClick={() => setActivePanel((p) => (p === 'listar' ? 'none' : 'listar'))}
+          >
+            <Home size={14} /> Revendas Disponíveis
+          </button>
+          <button
+            className={activePanel === 'cadastrar' ? btnPrimary : btnGhost}
+            onClick={() => setActivePanel((p) => (p === 'cadastrar' ? 'none' : 'cadastrar'))}
+          >
+            <Plus size={14} /> Cadastrar Revenda
+          </button>
+        </div>
+
+      {activePanel === 'cadastrar' ? (
+      <div className="mt-6">
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             {editingRevendaId ? <Pencil size={16} className="text-teal-300" /> : <Home size={16} className="text-teal-300" />}
@@ -416,9 +467,20 @@ export default function RevendasPage() {
               ))}
             </select>
           </label>
-          <label className={`${labelClass} sm:col-span-2`}>
-            <span className={labelTextClass}>Título</span>
-            <input className={inputClass} value={revForm.titulo} onChange={(e) => setRevForm((f) => ({ ...f, titulo: e.target.value }))} placeholder="Cobertura Duplex Reformada — 304B" />
+          <label className={labelClass}>
+            <span className={labelTextClass}>Tipologia (define a URL da página)</span>
+            <select
+              className={inputClass}
+              value={revForm.tipologia}
+              onChange={(e) => setRevForm((f) => ({ ...f, tipologia: e.target.value }))}
+            >
+              <option value="">Selecione</option>
+              {TIPOLOGIAS.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </label>
+          <label className={labelClass}>
+            <span className={labelTextClass}>Título (marketing, não aparece na URL)</span>
+            <input className={inputClass} value={revForm.titulo} onChange={(e) => setRevForm((f) => ({ ...f, titulo: e.target.value }))} placeholder="Cobertura Duplex Reformada — vista mar" />
           </label>
           <label className={`${labelClass} sm:col-span-2`}>
             <span className={labelTextClass}>Descrição</span>
@@ -455,7 +517,7 @@ export default function RevendasPage() {
           </label>
         </div>
         <div className="mt-4 flex items-center gap-3">
-          <button className={btnPrimary} disabled={revSaving || !revForm.empreendimentoId || !revForm.titulo} onClick={salvarRevenda}>
+          <button className={btnPrimary} disabled={revSaving || !revForm.empreendimentoId || !revForm.titulo || (!editingRevendaId && !revForm.tipologia)} onClick={salvarRevenda}>
             {revSaving ? <Loader2 size={14} className="animate-spin" /> : editingRevendaId ? <Pencil size={14} /> : <Plus size={14} />}
             {editingRevendaId ? 'Salvar alterações' : 'Criar revenda'}
           </button>
@@ -537,9 +599,10 @@ export default function RevendasPage() {
           </div>
         ) : null}
       </div>
+      ) : null}
 
-      {/* Navegar revendas existentes */}
-      <div className={cardClass}>
+      {activePanel === 'listar' ? (
+      <div className="mt-6">
         <h2 className="mb-4 text-sm font-semibold text-white">Revendas existentes</h2>
         <select className={`${inputClass} sm:max-w-sm`} value={browseEmpId} onChange={(e) => carregarRevendasDoEmpreendimento(e.target.value)}>
           <option value="">Selecione um empreendimento</option>
@@ -559,7 +622,9 @@ export default function RevendasPage() {
             <div key={r.id} className="flex items-center justify-between rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3">
               <div>
                 <p className="text-sm font-medium text-white">{r.titulo}</p>
-                <p className="text-xs text-zinc-500">{r.status === 'disponivel' ? 'Disponível' : 'Vendida'}</p>
+                <p className="text-xs text-zinc-500">
+                  {r.tipologia ? `${r.tipologia} · ` : ''}{r.status === 'disponivel' ? 'Disponível' : 'Vendida'}
+                </p>
               </div>
               <div className="flex items-center gap-2">
                 <button className={btnGhost} onClick={() => carregarRevendaParaEdicao(r, browseEmpId)}>
@@ -580,6 +645,8 @@ export default function RevendasPage() {
             </div>
           ))}
         </div>
+      </div>
+      ) : null}
       </div>
     </div>
   );

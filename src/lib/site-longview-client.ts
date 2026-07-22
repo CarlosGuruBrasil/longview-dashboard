@@ -111,6 +111,7 @@ export type EmpreendimentoPublicState = {
   midias: Array<{ id: number; tipo: 'foto' | 'video'; url_storage: string; url_thumb: string | null; descricao: string | null; ordem: number }>;
   unidades: Array<{ id: number; numero: string; status: string }>;
   materiais?: Array<{ id: number; tipo: string; titulo: string; url_storage: string; origem: string }>;
+  revendas?: Array<{ id: number; slug: string; titulo: string; status: string }>;
 };
 
 // GET público (sem auth) do site real — a "verdade" do que está de fato ao vivo, pra não
@@ -120,6 +121,18 @@ export async function fetchEmpreendimentoPublicState(cvCrmId: number): Promise<E
   try {
     // by=cv_crm_id desambigua: id (PK) e cv_crm_id sao numeracoes independentes que podem colidir.
     const res = await fetch(`${BASE_URL}/api/empreendimentos/${cvCrmId}?by=cv_crm_id`, { cache: 'no-store' });
+    if (!res.ok) return null;
+    return (await res.json()) as EmpreendimentoPublicState;
+  } catch {
+    return null;
+  }
+}
+
+// Empreendimento manual (sem cv_crm_id) — lookup pelo id interno (PK) direto, sem ?by=.
+export async function fetchEmpreendimentoPublicStateById(id: number): Promise<EmpreendimentoPublicState | null> {
+  if (!BASE_URL) return null;
+  try {
+    const res = await fetch(`${BASE_URL}/api/empreendimentos/${id}`, { cache: 'no-store' });
     if (!res.ok) return null;
     return (await res.json()) as EmpreendimentoPublicState;
   } catch {
@@ -192,6 +205,7 @@ export function createEmpreendimentoManual(params: EmpreendimentoManualPush) {
 export type RevendaByEmpIdPush = {
   empreendimentoId: number;
   titulo: string;
+  tipologia?: string;
   preco?: number | null;
   descricao?: string;
   corretorNome?: string;

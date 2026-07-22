@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyPermission } from '@/lib/auth';
 import { ensureSchema, sql } from '@/lib/pg';
-import { fetchEmpreendimentoPublicState } from '@/lib/site-longview-client';
+import { fetchEmpreendimentoPublicState, fetchEmpreendimentoPublicStateById, fetchEmpreendimentosPublicos } from '@/lib/site-longview-client';
 import logger from '@/lib/logger';
 
 export async function GET() {
@@ -73,7 +73,41 @@ export async function GET() {
       })
     );
 
-    return NextResponse.json({ empreendimentos: enriched });
+    // Empreendimentos manuais (sem cv_crm_id — ex: os "entregues" legados, cadastrados
+    // direto no site real) nao existem em cv_empreendimentos, entao nao aparecem na query
+    // acima. Busca eles separado e junta na mesma lista, com o mesmo formato.
+    const todosPublicos = await fetchEmpreendimentosPublicos();
+    const manuais = todosPublicos.filter((e) => e.origem === 'manual');
+    const manuaisEnriquecidos = await Promise.all(
+      manuais.map(async (emp) => {
+        const publicState = await fetchEmpreendimentoPublicStateById(emp.id);
+        return {
+          id: emp.id,
+          nome: emp.nome,
+          situacao: null,
+          tipo: 'manual',
+          inventario: {
+            unidades: publicState?.unidades?.length ?? 0,
+            unidadesPublicadas: publicState?.unidades?.length ?? 0,
+            imagens: publicState?.midias?.filter((m) => m.tipo === 'foto').length ?? 0,
+            videos: publicState?.midias?.filter((m) => m.tipo === 'video').length ?? 0,
+            materiais: publicState?.materiais?.length ?? 0,
+            ebooks: 0,
+            revendas: publicState?.revendas?.length ?? 0,
+          },
+          site: {
+            publicado: publicState?.ativo ?? true,
+            siteProjectId: null,
+            status: 'manual',
+            ultimaAtualizacao: null,
+            noSiteReal: publicState !== null,
+          },
+          manualId: emp.id,
+        };
+      })
+    );
+
+    return NextResponse.json({ empreendimentos: [...enriched, ...manuaisEnriquecidos] });
   } catch (error) {
     logger.error({ error }, '[site-vision/projects-catalog] error');
     return NextResponse.json({ error: 'Erro ao carregar catálogo.' }, { status: 500 });

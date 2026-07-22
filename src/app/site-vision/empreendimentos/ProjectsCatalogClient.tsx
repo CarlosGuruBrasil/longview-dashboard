@@ -83,10 +83,9 @@ export function ProjectsCatalogClient() {
   return (
     <div className="space-y-3">
       {data.map((emp) => (
-        <Link
+        <div
           key={emp.id}
-          href={`/site-vision/empreendimentos/${emp.id}`}
-          className="group block rounded-[24px] border border-white/8 bg-white/[0.03] p-5 transition-all hover:border-teal-300/30 hover:bg-teal-500/[0.04]"
+          className="group rounded-[24px] border border-white/8 bg-white/[0.03] p-5 transition-all hover:border-teal-300/30 hover:bg-teal-500/[0.04]"
         >
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
@@ -146,13 +145,24 @@ export function ProjectsCatalogClient() {
               </div>
             </div>
 
-            <div className="flex flex-col gap-2 text-right">
-              <span className="text-xs text-teal-400 opacity-0 transition-opacity group-hover:opacity-100">
-                Configurar →
-              </span>
+            <div className="flex flex-col items-end gap-2 text-right">
+              {emp.tipo !== 'manual' ? (
+                <Link
+                  href={`/site-vision/empreendimentos/${emp.id}`}
+                  className="text-xs text-teal-400 opacity-0 transition-opacity group-hover:opacity-100"
+                >
+                  Configurar →
+                </Link>
+              ) : null}
+              <Link
+                href={`/site-vision/revendas?emp=${emp.id}`}
+                className="text-xs text-zinc-400 hover:text-teal-300"
+              >
+                Ver revendas disponíveis →
+              </Link>
             </div>
           </div>
-        </Link>
+        </div>
       ))}
     </div>
   );
