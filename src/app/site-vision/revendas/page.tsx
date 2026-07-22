@@ -32,6 +32,35 @@ const emptyRevForm = {
 
 const TIPOLOGIAS = ['Apartamento', 'Cobertura', 'Cobertura Duplex', 'Studio', 'Casa'];
 
+// Number(str) so entende ponto como decimal — "R$ 500.000" (formato BR, ponto
+// como milhar) virava NaN e, pior, JSON.stringify(NaN) vira "null" sem erro
+// nenhum, entao o preco simplesmente sumia sem avisar ninguem. Aceita "R$",
+// espaco, ponto de milhar e virgula decimal.
+function parseBRLNumber(input: string): number | null {
+  const cleaned = input.replace(/[^\d,.-]/g, '');
+  if (!cleaned) return null;
+  const lastSep = Math.max(cleaned.lastIndexOf(','), cleaned.lastIndexOf('.'));
+  if (lastSep === -1) {
+    const n = Number(cleaned);
+    return Number.isFinite(n) ? n : null;
+  }
+  const intPart = cleaned.slice(0, lastSep).replace(/[.,]/g, '');
+  const decPart = cleaned.slice(lastSep + 1).replace(/[.,]/g, '');
+  const n = Number(`${intPart}.${decPart}`);
+  return Number.isFinite(n) ? n : null;
+}
+
+// Mascara de moeda "digite e ja aparece formatado" — le so os digitos (como
+// centavos) e formata em R$ a cada tecla, no padrao dos campos de valor de
+// banco/maquininha. Evita de vez o problema de formato ambiguo do
+// parseBRLNumber acima, ja que o usuario nunca digita separador na mao.
+function formatPrecoDigitado(raw: string): string {
+  const digits = raw.replace(/\D/g, '');
+  if (!digits) return '';
+  const cents = parseInt(digits, 10);
+  return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
 const fileToDataUrl = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -181,7 +210,7 @@ export default function RevendasPage() {
         titulo: rev.titulo || '',
         tipologia: rev.tipologia || '',
         descricao: rev.descricao || '',
-        preco: rev.preco != null ? String(rev.preco) : '',
+        preco: rev.preco != null ? Number(rev.preco).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '',
         areaPrivativa: rev.area_privativa ?? '',
         areaTotal: rev.area_total ?? '',
         dormitorios: rev.dormitorios ?? '',
@@ -222,7 +251,7 @@ export default function RevendasPage() {
         titulo: revForm.titulo,
         tipologia: revForm.tipologia || undefined,
         descricao: revForm.descricao || undefined,
-        preco: revForm.preco ? Number(revForm.preco) : null,
+        preco: revForm.preco ? parseBRLNumber(revForm.preco) : null,
         areaPrivativa: revForm.areaPrivativa ? Number(revForm.areaPrivativa) : null,
         areaTotal: revForm.areaTotal ? Number(revForm.areaTotal) : null,
         dormitorios: revForm.dormitorios ? Number(revForm.dormitorios) : null,
@@ -424,8 +453,17 @@ export default function RevendasPage() {
                 onChange={(e) => setRevForm((f) => ({ ...f, descricao: e.target.value }))}
               />
             </label>
+            <label className={labelClass}>
+              <span className={labelTextClass}>Preço (R$, uso interno — não aparece no site)</span>
+              <input
+                className={inputClass}
+                inputMode="numeric"
+                value={revForm.preco}
+                placeholder="R$ 0,00"
+                onChange={(e) => setRevForm((f) => ({ ...f, preco: formatPrecoDigitado(e.target.value) }))}
+              />
+            </label>
             {[
-              ['preco', 'Preço (R$, uso interno — não aparece no site)'],
               ['areaPrivativa', 'Área privativa (m²)'],
               ['areaTotal', 'Área total (m²)'],
               ['dormitorios', 'Dormitórios'],
@@ -514,47 +552,63 @@ export default function RevendasPage() {
 
               {fotos.length > 0 ? (
                 <div className="mt-4">
-                  <p className="mb-2 text-xs text-zinc-500">
-                    {fotos.length} foto(s) — arraste pra reordenar (a 1ª vira a capa), clique na lupa pra ampliar, na estrela pra destacar na página do imóvel.
+                  <p className="mb-1 text-xs text-zinc-500">
+                    {fotos.length} foto(s) — arraste pra reordenar (a 1ª vira a capa), clique na lupa pra ampliar.
                   </p>
+                  <div className="mb-2 flex items-center gap-2 rounded-lg border border-amber-400/20 bg-amber-500/[0.06] px-3 py-2">
+                    <Star size={12} className="shrink-0 text-yellow-400" fill="currentColor" />
+                    <p className="text-xs text-amber-100/80">
+                      <strong className="text-amber-200">{fotos.filter((f) => f.destaque).length} de {fotos.length} marcada(s) como destaque.</strong>{' '}
+                      {fotos.filter((f) => f.destaque).length >= 2
+                        ? 'A página do imóvel vai intercalar texto com essas fotos, na ordem em que foram marcadas (número no canto).'
+                        : 'Marque pelo menos 2 pra curar quais fotos entram na seção de texto+foto — com 0 ou 1 marcada, o site usa a galeria inteira automaticamente.'}
+                    </p>
+                  </div>
                   <div className="grid grid-cols-6 gap-1.5 sm:grid-cols-8 md:grid-cols-10">
-                    {fotos.map((m, idx) => (
-                      <div
-                        key={m.id}
-                        draggable
-                        onDragStart={() => setDragMidiaId(m.id)}
-                        onDragOver={(ev) => ev.preventDefault()}
-                        onDrop={() => onDropMidia(m.id, 'foto')}
-                        className="group relative aspect-square cursor-grab overflow-hidden rounded-lg border border-white/10 active:cursor-grabbing"
-                      >
-                        <img
-                          src={`${SITE_BASE_URL}${m.url_thumb || m.url_storage}`}
-                          alt=""
-                          loading="lazy"
-                          className="h-full w-full object-cover"
-                        />
-                        <button
-                          onClick={() => setLightboxIdx(idx)}
-                          title="Ampliar"
-                          className="absolute inset-0 hidden items-center justify-center bg-black/40 group-hover:flex"
-                        >
-                          <ZoomIn size={16} className="text-white" />
-                        </button>
-                        <button
-                          onClick={() => toggleDestaque(m.id, !!m.destaque)}
-                          title={m.destaque ? 'Remover destaque' : 'Marcar como destaque'}
-                          className={`absolute left-1 top-1 rounded-full bg-black/70 p-1 ${m.destaque ? 'text-yellow-400' : 'hidden text-zinc-300 group-hover:block'}`}
-                        >
-                          <Star size={11} fill={m.destaque ? 'currentColor' : 'none'} />
-                        </button>
-                        <button
-                          onClick={() => removerMidia(m.id)}
-                          className="absolute right-1 top-1 hidden rounded-full bg-black/70 p-1 text-red-300 group-hover:block"
-                        >
-                          <X size={11} />
-                        </button>
-                      </div>
-                    ))}
+                    {(() => {
+                      let destaqueSeq = 0;
+                      return fotos.map((m, idx) => {
+                        const destaqueOrdem = m.destaque ? ++destaqueSeq : null;
+                        return (
+                          <div
+                            key={m.id}
+                            draggable
+                            onDragStart={() => setDragMidiaId(m.id)}
+                            onDragOver={(ev) => ev.preventDefault()}
+                            onDrop={() => onDropMidia(m.id, 'foto')}
+                            className={`group relative aspect-square cursor-grab overflow-hidden rounded-lg border active:cursor-grabbing ${m.destaque ? 'border-yellow-400/60' : 'border-white/10'}`}
+                          >
+                            <img
+                              src={`${SITE_BASE_URL}${m.url_thumb || m.url_storage}`}
+                              alt=""
+                              loading="lazy"
+                              className="h-full w-full object-cover"
+                            />
+                            <button
+                              onClick={() => setLightboxIdx(idx)}
+                              title="Ampliar"
+                              className="absolute inset-0 hidden items-center justify-center bg-black/40 group-hover:flex"
+                            >
+                              <ZoomIn size={16} className="text-white" />
+                            </button>
+                            <button
+                              onClick={() => toggleDestaque(m.id, !!m.destaque)}
+                              title={m.destaque ? `Destaque nº ${destaqueOrdem} — clique pra remover` : 'Marcar como destaque'}
+                              className={`absolute left-1 top-1 flex items-center gap-0.5 rounded-full bg-black/70 px-1 py-1 ${m.destaque ? 'text-yellow-400' : 'hidden text-zinc-300 group-hover:flex'}`}
+                            >
+                              <Star size={11} fill={m.destaque ? 'currentColor' : 'none'} />
+                              {destaqueOrdem ? <span className="text-[9px] font-bold leading-none">{destaqueOrdem}</span> : null}
+                            </button>
+                            <button
+                              onClick={() => removerMidia(m.id)}
+                              className="absolute right-1 top-1 hidden rounded-full bg-black/70 p-1 text-red-300 group-hover:block"
+                            >
+                              <X size={11} />
+                            </button>
+                          </div>
+                        );
+                      });
+                    })()}
                   </div>
                 </div>
               ) : null}
