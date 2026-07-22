@@ -1,11 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Loader2, Plus, Trash2, Upload, ExternalLink, Building2, Home, Pencil, X, GripVertical } from 'lucide-react';
+import { Loader2, Plus, Trash2, Upload, ExternalLink, Building2, Home, Pencil, X, GripVertical, Star } from 'lucide-react';
 
 type EmpItem = { id: number; nome: string; slug: string; cidade: string; estado: string; origem: 'cvcrm' | 'manual'; ordem: number };
 type RevendaItem = { id: number; slug: string; titulo: string; preco: number | null; status: string };
-type Midia = { id: number; tipo: 'foto' | 'planta' | 'documento'; url_storage: string; ordem: number };
+type Midia = { id: number; tipo: 'foto' | 'planta' | 'documento'; url_storage: string; ordem: number; destaque?: boolean };
 
 const SITE_BASE_URL = 'https://longview.guru.dev.br';
 
@@ -220,7 +220,7 @@ export default function RevendasPage() {
     if (!files || !files.length || !activeRevenda) return;
     setUploadBusy(true);
     let ok = 0;
-    const ordemBase = midias.filter((m) => m.tipo === tipo).length;
+    let ordemBase = midias.filter((m) => m.tipo === tipo).length;
     const novas: Midia[] = [];
     for (let i = 0; i < files.length; i++) {
       setUploadProgress(`Enviando ${i + 1}/${files.length}...`);
@@ -249,6 +249,18 @@ export default function RevendasPage() {
     if (!confirm('Remover essa foto?')) return;
     await fetch(`/api/site-vision/site-revendas/midias/${midiaId}`, { method: 'DELETE' });
     setMidias((prev) => prev.filter((m) => m.id !== midiaId));
+  };
+
+  // Fotos marcadas como destaque entram nas secoes de foto+texto da pagina
+  // conceito da revenda, no lugar da ordem padrao.
+  const toggleDestaque = async (midiaId: number, atual: boolean) => {
+    const novoValor = !atual;
+    setMidias((prev) => prev.map((m) => (m.id === midiaId ? { ...m, destaque: novoValor } : m)));
+    await fetch(`/api/site-vision/site-revendas/midias/${midiaId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ destaque: novoValor }),
+    });
   };
 
   // Arrastar as fotos reordena localmente; solta = persiste a nova ordem em lote.
@@ -477,7 +489,7 @@ export default function RevendasPage() {
 
             {fotos.length > 0 ? (
               <div className="mt-4">
-                <p className="mb-2 text-xs text-zinc-500">{fotos.length} foto(s) — arraste pra reordenar.</p>
+                <p className="mb-2 text-xs text-zinc-500">{fotos.length} foto(s) — arraste pra reordenar, clique na estrela pra destacar na pagina do imóvel.</p>
                 <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
                   {fotos.map((m) => (
                     <div
@@ -489,6 +501,13 @@ export default function RevendasPage() {
                       className="group relative aspect-square cursor-grab overflow-hidden rounded-lg border border-white/10 active:cursor-grabbing"
                     >
                       <img src={`${SITE_BASE_URL}${m.url_storage}`} alt="" className="h-full w-full object-cover" />
+                      <button
+                        onClick={() => toggleDestaque(m.id, !!m.destaque)}
+                        title={m.destaque ? 'Remover destaque' : 'Marcar como destaque'}
+                        className={`absolute left-1 top-1 rounded-full bg-black/70 p-1 ${m.destaque ? 'text-yellow-400' : 'hidden text-zinc-300 group-hover:block'}`}
+                      >
+                        <Star size={12} fill={m.destaque ? 'currentColor' : 'none'} />
+                      </button>
                       <button
                         onClick={() => removerMidia(m.id)}
                         className="absolute right-1 top-1 hidden rounded-full bg-black/70 p-1 text-red-300 group-hover:block"

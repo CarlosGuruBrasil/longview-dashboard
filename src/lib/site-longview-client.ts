@@ -225,6 +225,13 @@ export function deleteRevendaMidiaRemota(midiaId: number) {
   return call<{ success: boolean }>(`/api/admin/revenda-midias/${midiaId}`, { method: 'DELETE' });
 }
 
+export function toggleRevendaMidiaDestaque(midiaId: number, destaque: boolean) {
+  return call<{ success: boolean; midia: { id: number; destaque: boolean } }>(
+    `/api/admin/revenda-midias/${midiaId}/destaque`,
+    { method: 'PATCH', body: JSON.stringify({ destaque }) }
+  );
+}
+
 export type RevendaPublica = {
   id: number;
   slug: string;
@@ -243,7 +250,7 @@ export type RevendaPublica = {
   corretor_telefone: string | null;
   corretor_email: string | null;
   empreendimento: { id: number; nome: string; slug: string; cidade: string; estado: string };
-  midias: Array<{ id: number; tipo: 'foto' | 'planta' | 'documento'; url_storage: string; ordem: number }>;
+  midias: Array<{ id: number; tipo: 'foto' | 'planta' | 'documento'; url_storage: string; ordem: number; destaque?: boolean }>;
 };
 
 export async function fetchRevendaPublica(slug: string): Promise<RevendaPublica | null> {
