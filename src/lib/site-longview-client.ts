@@ -230,7 +230,7 @@ export function createRevendaByEmpId(params: RevendaByEmpIdPush) {
 }
 
 export function pushRevendaMidia(revendaId: number, params: { tipo: 'foto' | 'planta' | 'documento'; dataUrl: string; ordem?: number }) {
-  return call<{ success: boolean; midia: { id: number; tipo: string; url_storage: string; ordem: number } }>(
+  return call<{ success: boolean; midia: { id: number; tipo: string; url_storage: string; url_thumb: string | null; ordem: number; descricao: string | null } }>(
     `/api/admin/revendas/${revendaId}/midias`,
     { method: 'POST', body: JSON.stringify(params) }
   );
@@ -244,6 +244,13 @@ export function toggleRevendaMidiaDestaque(midiaId: number, destaque: boolean) {
   return call<{ success: boolean; midia: { id: number; destaque: boolean } }>(
     `/api/admin/revenda-midias/${midiaId}/destaque`,
     { method: 'PATCH', body: JSON.stringify({ destaque }) }
+  );
+}
+
+export function updateRevendaMidiaDescricao(midiaId: number, descricao: string) {
+  return call<{ success: boolean; midia: { id: number; descricao: string | null } }>(
+    `/api/admin/revenda-midias/${midiaId}/descricao`,
+    { method: 'PATCH', body: JSON.stringify({ descricao }) }
   );
 }
 
@@ -266,7 +273,7 @@ export type RevendaPublica = {
   corretor_email: string | null;
   corretor_foto: string | null;
   empreendimento: { id: number; nome: string; slug: string; cidade: string; estado: string };
-  midias: Array<{ id: number; tipo: 'foto' | 'planta' | 'documento'; url_storage: string; ordem: number; destaque?: boolean }>;
+  midias: Array<{ id: number; tipo: 'foto' | 'planta' | 'documento'; url_storage: string; url_thumb: string | null; ordem: number; destaque?: boolean; descricao?: string | null }>;
 };
 
 export async function fetchRevendaPublica(slug: string): Promise<RevendaPublica | null> {
@@ -288,6 +295,9 @@ export type EmpreendimentoListItem = {
   estado: string;
   origem: 'cvcrm' | 'manual';
   ordem: number;
+  unidades_disponiveis?: number;
+  revendas_disponiveis?: number;
+  situacao_obra?: string;
 };
 
 export async function fetchEmpreendimentosPublicos(): Promise<EmpreendimentoListItem[]> {
