@@ -454,7 +454,7 @@ export default function RevendasPage() {
               />
             </label>
             <label className={labelClass}>
-              <span className={labelTextClass}>Preço (R$, uso interno — não aparece no site)</span>
+              <span className={labelTextClass}>Preço (R$) — aparece na página do imóvel; deixe em branco pra mostrar "Consulte o valor"</span>
               <input
                 className={inputClass}
                 inputMode="numeric"
